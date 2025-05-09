@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tim.workingType.workingTypeAppDet">
+	<!-- 근로시간단축 신청 세부내역 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWorkingTypeAppDetList">
+		SELECT    A.ENTER_CD
+				, A.SABUN
+				, B.APPL_SEQ     																-- 신청서순번(THRI103)
+				, B.APPL_CD                 													-- 신청코드
+				, NVL(B.APPL_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')) AS APPL_YMD                		-- 신청일자
+				, NVL(B.JOIN_YMD,(
+						 SELECT EMP_YMD
+					   FROM THRM100
+					  WHERE ENTER_CD = A.ENTER_CD
+						AND SABUN = A.SABUN	
+				  )) AS JOIN_YMD                												-- 입사일자
+				, B.PREGNANCY_YMD  
+				, B.DUE_DATE  
+				, NVL(B.SWT_APPLY_STR_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')) AS SWT_APPLY_STR_YMD     -- 단축근무적용기간(근로자_시작)
+				, B.SWT_APPLY_END_YMD       													-- 단축근무적용기간(근로자_종료)
+				, B.SWT_CA_STR_YMD          													-- 단축근무적용기간(사업장 조정_시작)
+				, B.SWT_CA_END_YMD          													-- 단축근무적용기간(사업장 조정_종료)
+				, B.GESTATIO_YMD            													-- 임신주차(TSYS005_WT9002)
+				, B.SWT_STR_H
+				, B.SWT_END_H
+				, B.APPROVAL_YN             													-- 신청자 인정 확인
+				, B.CHILDREN_CD             													-- 신청자 자녀명 코드
+				, B.CHILDREN_NM             													-- 신청자 자녀명
+				, B.BIRTH_YMD               													-- 신청자 자녀 생년월일
+				, B.CHILDREN_YEAR          														-- 신청자 자녀 학년
+				, B.FAMILY_NM               													-- 신청자 가족명
+				, B.FAMILY_RELATIONS        													-- 신청자 가족관계
+				, B.SWT_CA_REASON           													-- 단축근무 조정 사유
+				, B.LOOK_AFTER_REASON       													-- 가족돌봄 사유(TSYS005_WT9004)
+				, B.REASON                  													-- 사유
+				, B.CAUSE_OF_RETURN      	  													-- 반려사유(TSYS005_WT9003/NUM_NOTE:1-육아, 2-가족돌봄)
+				, B.REPLACE_ACTION          													-- 대체조치(TSYS005_WT9005)
+				, B.AGREE_SABUN																	-- 결재자사번
+				, B.APPL_STATUS_CD
+		  FROM
+		  (
+			SELECT A.ENTER_CD
+				 , A.SABUN
+				 , A.GEMP_YMD
+				 , A.EMP_YMD --입사일
+				 , A.RET_YMD --퇴사일
+				 , B.ADDR1||' '||B.ADDR2 AS ADDR --주소
+				 , C.MANAGE_CD --고용형태
+				 , D.LOCATION_CD		-- 근무지코드
+				 , (SELECT E.ADDR || E.DETAIL_ADDR
+					FROM TSYS015 E WHERE 1=1
+					AND E.ENTER_CD = A.ENTER_CD
+					AND E.LOCATION_CD = D.LOCATION_CD) AS LOCATION_NM -- 근무지주소
+			  FROM THRM100 A,
+				   THRM123 B,
+				   THRM151 C,
+				   TORG101 D
+			 WHERE A.ENTER_CD = B.ENTER_CD(+)
+			   AND A.SABUN = B.SABUN(+)
+			   AND A.ENTER_CD = C.ENTER_CD
+			   AND A.SABUN = C.SABUN
+			   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+			   AND NVL(A.RET_YMD, TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+			   AND B.ADD_TYPE (+)= '2' --현거주지
+			   AND A.ENTER_CD = #{ssnEnterCd}
+			   AND A.SABUN = TRIM( #{sabun} )
+			   AND A.ENTER_CD = D.ENTER_CD(+)
+			   AND C.ORG_CD = D.ORG_CD
+		  ) A,
+		  (
+			 SELECT A.ENTER_CD
+				  , A.SABUN                
+				  , A.APPL_SEQ             
+				  , A.WT_CD AS APPL_CD  
+				  , A.APPL_YMD           
+				  , A.JOIN_YMD              
+				  , A.SWT_APPLY_STR_YMD    
+				  , A.SWT_APPLY_END_YMD    
+				  , A.SWT_CA_STR_YMD       
+				  , A.SWT_CA_END_YMD       
+				  , A.GESTATIO_YMD         
+				  , A.SWT_STR_H          
+				  , A.SWT_END_H          
+				  , A.APPROVAL_YN  
+				  , A.CHILDREN_CD        
+				  , A.CHILDREN_NM          
+				  , A.BIRTH_YMD            
+				  , A.CHILDREN_YEAR        
+				  , A.FAMILY_NM            
+				  , A.FAMILY_RELATIONS     
+				  , A.SWT_CA_REASON        
+				  , A.LOOK_AFTER_REASON    
+				  , A.REASON                              
+				  , A.CAUSE_OF_RETURN      
+				  , A.REPLACE_ACTION
+				  , A.PREGNANCY_YMD
+				  , A.DUE_DATE
+				  , B.APPL_STATUS_CD
+				  , (
+						SELECT AGREE_SABUN
+						  FROM THRI107
+						 WHERE ENTER_CD	= A.ENTER_CD
+						   AND APPL_SEQ = A.APPL_SEQ
+						   AND AGREE_STATUS_CD = '10'
+					 )AGREE_SABUN
+			  FROM TTIM710 A
+				 , THRI103 B
+			 WHERE A.ENTER_CD = B.ENTER_CD
+			   AND A.APPL_SEQ = B.APPL_SEQ
+			   AND A.ENTER_CD = #{ssnEnterCd}
+			   AND B.APPL_CD = '300'
+		<if test='wtCd != null and wtCd neq ""'>
+			   AND A.WT_CD = #{wtCd}
+		</if>
+			   AND A.APPL_SEQ = TRIM( #{applSeq} )
+			   AND A.SABUN = TRIM( #{sabun} )
+		  ) B
+		 WHERE A.ENTER_CD = B.ENTER_CD(+)
+		   AND A.SABUN = B.SABUN(+)
+		 ORDER BY B.APPL_SEQ DESC 
+	</select>
+
+	<!-- 근로시간단축 신청 세부내역 저장 -->
+	<update parameterType="map" id="saveWorkingTypeAppDet">
+		 MERGE INTO TTIM710 T
+		 USING (
+		<foreach item="rm" collection="mergeRows" index="idx" separator=" UNION ALL ">
+		       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+		            , TRIM(#{rm.sabun}) AS SABUN
+		            , TRIM(#{rm.applSeq}) AS APPL_SEQ
+		            , TRIM(#{rm.applCd}) AS WT_CD
+		            , TRIM(#{rm.applYmd}) AS APPL_YMD
+		            , TRIM(#{rm.joinYmd}) AS JOIN_YMD
+		            , TRIM(#{rm.swtApplyStrYmd}) AS SWT_APPLY_STR_YMD
+		            , TRIM(#{rm.swtApplyEndYmd}) AS SWT_APPLY_END_YMD
+		            , TRIM(#{rm.pregnancyYmd}) AS PREGNANCY_YMD
+		            , TRIM(#{rm.swtCaStrYmd}) AS SWT_CA_STR_YMD
+		            , TRIM(#{rm.swtCaEndYmd}) AS SWT_CA_END_YMD
+		            , TRIM(#{rm.gestatioYmd}) AS GESTATIO_YMD
+		            , TRIM(#{rm.approvalYn}) AS APPROVAL_YN
+		            , TRIM(#{rm.childrenCd}) AS CHILDREN_CD
+		            , TRIM(#{rm.childrenNm}) AS CHILDREN_NM
+		            , REPLACE(TRIM(#{rm.birthYmd}), '-', '') AS BIRTH_YMD
+		            , TRIM(#{rm.childrenYear}) AS CHILDREN_YEAR
+		            , TRIM(#{rm.familyNm}) AS FAMILY_NM
+		            , TRIM(#{rm.familyRelations}) AS FAMILY_RELATIONS
+		            , TRIM(#{rm.swtCaReason}) AS SWT_CA_REASON
+		            , TRIM(#{rm.lookAfterReason}) AS LOOK_AFTER_REASON
+		            , TRIM(#{rm.reason}) AS REASON
+		            , TRIM(#{rm.etc01}) AS ETC01
+		            , TRIM(#{rm.etc02}) AS ETC02
+		            , REPLACE(TRIM(#{rm.dueDate}), '-', '') AS DUE_DATE
+		            , TRIM(#{rm.causeOfReturn}) AS CAUSE_OF_RETURN
+		            , TRIM(#{rm.replaceAction}) AS REPLACE_ACTION
+		            , TRIM(#{rm.appWorkHour}) AS APP_WORK_HOUR
+		            , TRIM(#{rm.shortenHour}) AS SHORTEN_HOUR
+		            , TRIM(#{rm.swtStrH}) AS SWT_STR_H
+		            , TRIM(#{rm.swtEndH}) AS SWT_END_H
+		            , TRIM(#{rm.statusCd}) AS STATUS_CD
+		        FROM DUAL
+		</foreach>
+			   ) S
+			  ON (
+					  T.ENTER_CD = S.ENTER_CD
+				 AND  T.SABUN = S.SABUN
+				 AND  T.APPL_SEQ = S.APPL_SEQ
+				 AND  T.WT_CD = S.WT_CD
+			     )
+		    WHEN MATCHED THEN
+		  UPDATE SET T.CHKDATE	= sysdate
+		            , T.CHKID	    = #{ssnSabun}
+		            , T.APPL_YMD = S.APPL_YMD
+		            , T.JOIN_YMD = S.JOIN_YMD
+		            , T.SWT_APPLY_STR_YMD = S.SWT_APPLY_STR_YMD
+		            , T.SWT_APPLY_END_YMD = S.SWT_APPLY_END_YMD
+		            , T.PREGNANCY_YMD = S.PREGNANCY_YMD
+		            , T.SWT_CA_STR_YMD = S.SWT_CA_STR_YMD
+		            , T.SWT_CA_END_YMD = S.SWT_CA_END_YMD
+		            , T.GESTATIO_YMD = S.GESTATIO_YMD
+		            , T.APPROVAL_YN = S.APPROVAL_YN
+		            , T.CHILDREN_CD = S.CHILDREN_CD
+		            , T.CHILDREN_NM = S.CHILDREN_NM
+		            , T.BIRTH_YMD = S.BIRTH_YMD
+		            , T.CHILDREN_YEAR = S.CHILDREN_YEAR
+		            , T.FAMILY_NM = S.FAMILY_NM
+		            , T.FAMILY_RELATIONS = S.FAMILY_RELATIONS
+		            , T.SWT_CA_REASON = S.SWT_CA_REASON
+		            , T.LOOK_AFTER_REASON = S.LOOK_AFTER_REASON
+		            , T.REASON = S.REASON
+		            , T.ETC01 = S.ETC01
+		            , T.ETC02 = S.ETC02
+		            , T.DUE_DATE = S.DUE_DATE
+		            , T.CAUSE_OF_RETURN = S.CAUSE_OF_RETURN
+		            , T.REPLACE_ACTION = S.REPLACE_ACTION
+		            , T.APP_WORK_HOUR = S.APP_WORK_HOUR
+		            , T.SHORTEN_HOUR = S.SHORTEN_HOUR
+		            , T.SWT_STR_H = S.SWT_STR_H
+		            , T.SWT_END_H = S.SWT_END_H
+		            , T.STATUS_CD = S.STATUS_CD
+		  WHEN NOT MATCHED THEN
+		   INSERT
+		   (
+		              T.ENTER_CD
+		            , T.SABUN
+		            , T.APPL_SEQ
+		            , T.WT_CD
+		            , T.APPL_YMD
+		            , T.JOIN_YMD
+		            , T.SWT_APPLY_STR_YMD
+		            , T.SWT_APPLY_END_YMD
+		            , T.PREGNANCY_YMD
+		            , T.SWT_CA_STR_YMD
+		            , T.SWT_CA_END_YMD
+		            , T.GESTATIO_YMD
+		            , T.APPROVAL_YN
+		            , T.CHILDREN_CD
+		            , T.CHILDREN_NM
+		            , T.BIRTH_YMD
+		            , T.CHILDREN_YEAR
+		            , T.FAMILY_NM
+		            , T.FAMILY_RELATIONS
+		            , T.SWT_CA_REASON
+		            , T.LOOK_AFTER_REASON
+		            , T.REASON
+		            , T.ETC01
+		            , T.ETC02
+		            , T.DUE_DATE
+		            , T.CAUSE_OF_RETURN
+		            , T.REPLACE_ACTION
+		            , T.APP_WORK_HOUR
+		            , T.SHORTEN_HOUR
+		            , T.SWT_STR_H
+		            , T.SWT_END_H
+		            , T.STATUS_CD
+		            , T.CHKDATE
+		            , T.CHKID
+		   )
+		   VALUES
+		   (
+		              S.ENTER_CD
+		            , S.SABUN
+		            , S.APPL_SEQ
+		            , S.WT_CD
+		            , S.APPL_YMD
+		            , S.JOIN_YMD
+		            , S.SWT_APPLY_STR_YMD
+		            , S.SWT_APPLY_END_YMD
+		            , S.PREGNANCY_YMD
+		            , S.SWT_CA_STR_YMD
+		            , S.SWT_CA_END_YMD
+		            , S.GESTATIO_YMD
+		            , S.APPROVAL_YN
+		            , S.CHILDREN_CD
+		            , S.CHILDREN_NM
+		            , S.BIRTH_YMD
+		            , S.CHILDREN_YEAR
+		            , S.FAMILY_NM
+		            , S.FAMILY_RELATIONS
+		            , S.SWT_CA_REASON
+		            , S.LOOK_AFTER_REASON
+		            , S.REASON
+		            , S.ETC01
+		            , S.ETC02
+		            , S.DUE_DATE
+		            , S.CAUSE_OF_RETURN
+		            , S.REPLACE_ACTION
+		            , S.APP_WORK_HOUR
+		            , S.SHORTEN_HOUR
+		            , S.SWT_STR_H
+		            , S.SWT_END_H
+		            , S.STATUS_CD
+		            , sysdate
+		            , #{ssnSabun}
+		   )
+	</update>
+
+	<!-- 육아기(생년월일 조회)-->
+	<select parameterType="map" resultType="cMap" id="getBirthYmd">
+		SELECT FAM_YMD AS CODE_NM,
+			   F_COM_GET_AGE(ENTER_CD, '', CRYPTIT.DECRYPT(FAMRES, ENTER_CD), TO_CHAR(SYSDATE, 'YYYYMMDD')) AS AGE
+		  FROM THRM111
+		 WHERE 1=1
+		   AND ENTER_CD 	= #{ssnEnterCd}
+		   AND SABUN 	= #{sabun}
+		   AND FAM_CD 	= #{famCd}
+		   AND FAM_NM 	= #{famNm}
+	</select>
+
+	<!-- 유연근무 사용체크 -->
+	<select parameterType="map" resultType="cMap" id="getFlexChk">
+	   <![CDATA[
+			SELECT (
+			--자율
+					SELECT COUNT(1)
+					  FROM TFTM034 A
+					 INNER JOIN TFTM003_AUTONOMY B
+						ON A.ENTER_CD = B.ENTER_CD
+					   AND A.auto_cd = B.auto_cd
+					 INNER JOIN THRI103 C
+						ON A.ENTER_CD = C.ENTER_CD
+					   AND A.APPL_SEQ = C.APPL_SEQ
+					   AND C.APPL_STATUS_CD = '99'
+
+					 /*
+						22. 09. 14 근로시간단축 신청시 유연근무 진행 여부 체크 쿼리 수정
+						신청한 유연 근무제에 대하여 중간에 종료하는 케이스가 있으므로 TFTM011(유연근무변경이력)을 OUTER JOIN하여
+						종료된 건이 있으면 해당 날짜로 조회할 수 있도록 수정
+						시차출퇴근과 탄근도 쿼리 동일하게 적용(페타시스 윤규미 요청)
+					 */
+					 LEFT OUTER JOIN TFTM011 D
+						ON A.ENTER_CD = D.ENTER_CD
+					  AND A.SABUN = D.SABUN
+					  AND A.WORK_ID = D.WORK_ID
+					  AND NVL(FINISHED, 'D') = 'D'
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND a.sabun = #{sabun}
+					   AND (#{swtApplyStrYmd} BETWEEN NVL(D.SDATE, A.SDATE) AND NVL(D.EDATE, A.EDATE)
+						OR #{swtApplyEndYmd} BETWEEN NVL(D.SDATE, A.SDATE) AND NVL(D.EDATE, A.EDATE))
+					) AS AUTO,
+					 (
+					 --시차출
+					SELECT COUNT(1)
+					  FROM TFTM046 A
+					 INNER JOIN TFTM003_DIFF_APP B
+						ON A.ENTER_CD = B.ENTER_CD
+					   AND A.DIFF_CD = B.DIFF_CD
+					 INNER JOIN THRI103 C
+						ON A.ENTER_CD = C.ENTER_CD
+					   AND A.APPL_SEQ = C.APPL_SEQ
+					   AND C.APPL_STATUS_CD = '99'
+					 LEFT OUTER JOIN TFTM011 D
+						ON A.ENTER_CD = D.ENTER_CD
+					  AND A.SABUN = D.SABUN
+					  AND A.WORK_ID = D.WORK_ID
+					  AND NVL(FINISHED, 'D') = 'D'
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN = #{sabun}
+					   AND (#{swtApplyStrYmd} BETWEEN NVL(D.SDATE, A.SDATE) AND NVL(D.EDATE, A.EDATE)
+						OR #{swtApplyEndYmd} BETWEEN NVL(D.SDATE, A.SDATE) AND NVL(D.EDATE, A.EDATE))
+					) AS DIFF,
+					(  --탄근
+					   SELECT COUNT(1)
+						 FROM TFTM040 A
+						INNER JOIN THRI103 C
+						   ON A.ENTER_CD = C.ENTER_CD
+						  AND A.APPL_SEQ = C.APPL_SEQ
+						  AND C.APPL_STATUS_CD = '99'
+						LEFT OUTER JOIN TFTM011 D
+							ON A.ENTER_CD = D.ENTER_CD
+						  AND A.SABUN = D.SABUN
+						  AND A.WORK_ID = D.WORK_ID
+						  AND NVL(FINISHED, 'D') = 'D'
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						  AND A.SABUN = #{sabun}
+						  AND (#{swtApplyStrYmd} BETWEEN NVL(D.SDATE, A.SDATE) AND NVL(D.EDATE, A.EDATE)
+						   OR #{swtApplyEndYmd} BETWEEN NVL(D.SDATE, A.SDATE) AND NVL(D.EDATE, A.EDATE))
+						   ) AS ELAS
+				FROM DUAL
+	   ]]>
+	</select>
+</mapper>

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.research.researchSta">
+	<select parameterType="map" resultType="cMap" id="getResearchStaResearchList">
+
+				<![CDATA[
+					SELECT   RESEARCH_SEQ 	AS CODE
+					        , RESEARCH_NM  AS CODE_NM
+					FROM TSYS601
+					WHERE 1=1
+					AND 	ENTER_CD =#{ssnEnterCd}
+					ORDER BY RESEARCH_SYMD DESC
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getResearchStaQuestionList">
+
+
+					SELECT   QUESTION_SEQ	AS CODE
+					        , QUESTION_NM  AS CODE_NM
+					FROM TSYS603
+					WHERE 1=1
+					AND ENTER_CD 		= #{ssnEnterCd}
+			<if test='rSeq != null and !rSeq.equals("")'>
+					AND RESEARCH_SEQ 	= TO_NUMBER( TRIM( #{rSeq} ))
+			</if>
+					ORDER BY QUESTION_SEQ
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getResearchStaList">
+
+				<![CDATA[
+					SELECT * FROM (
+						SELECT 	  A.RESEARCH_SEQ
+								, A.QUESTION_SEQ
+								, A.QUESTION_NM
+								, A.QUESTION_NO
+								, A.QUESTION_ITEM_CD
+								, A.RIGHT
+								, B.ITEM_SEQ
+								, B.DISPLAY_SEQ
+								, B.ITEM_NM
+								, C.SUM_POINT
+	                            , C.ANSWER_AVERAGE
+	                            , C.ANSWER_AVERAGE_P1
+	                            , C.ANSWER_CNT
+	                            , C.TOTAL_PERSON
+	                            , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H60280' , A.QUESTION_ITEM_CD, #{ssnLocaleCd})      		AS ITEM_CD_NM
+						FROM TSYS603 A, TSYS605 B,
+							(	SELECT 	  A.ENTER_CD
+										, A.RESEARCH_SEQ
+										, A.QUESTION_SEQ
+										, A.ITEM_SEQ
+										, NVL(A.ACNT,0)                				AS ANSWER_CNT
+										, CASE WHEN B.TCNT > 0 THEN ROUND((NVL(A.ACNT, 0)/B.TCNT)*100,1) ELSE 0 END 		AS ANSWER_AVERAGE
+										, CASE WHEN B.TCNT > 0 THEN ROUND((NVL(A.ACNT, 0)/B.TCNT)*100,0) ELSE 0 END 		AS ANSWER_AVERAGE_P1
+										, B.TCNT                           			AS TOTAL_PERSON
+										, A.SUM_POINT
+								FROM 	(
+										    SELECT A.ENTER_CD, A.RESEARCH_SEQ, A.QUESTION_SEQ,A.ITEM_SEQ,COUNT(B.ANSWER_SEQ) AS ACNT, SUM(NVL(A.RIGHT_POINT,0)) AS SUM_POINT
+										    FROM TSYS605 A, TSYS607 B, TSYS603 C
+										    WHERE 1=1
+										    AND 	A.ENTER_CD	    = #{ssnEnterCd}
+										             ]]>
+								<if test='rSeq != null and !rSeq.equals("")'>
+											AND 	A.RESEARCH_SEQ 	= TO_NUMBER( TRIM( #{rSeq} ))
+								</if>
+								<if test='qSeq != null and !qSeq.equals("")'>
+											AND 	A.QUESTION_SEQ 	= TO_NUMBER( TRIM( #{qSeq} ))
+								</if>
+										    AND 	A.ENTER_CD		= B.ENTER_CD(+)
+										    AND 	A.RESEARCH_SEQ 	= B.RESEARCH_SEQ(+)
+										    AND 	A.QUESTION_SEQ 	= B.QUESTION_SEQ(+)
+										    AND 	A.ITEM_SEQ     	= B.ANSWER_SEQ(+)
+										    AND 	A.ENTER_CD		= C.ENTER_CD
+										    AND 	A.RESEARCH_SEQ	= C.RESEARCH_SEQ
+										    AND		A.QUESTION_SEQ 	= C.QUESTION_SEQ
+										    AND 	C.QUESTION_ITEM_CD IN ('10','20')
+										    GROUP BY A.ENTER_CD , A.RESEARCH_SEQ,A.QUESTION_SEQ  ,A.ITEM_SEQ
+									) A
+									,(
+									    SELECT COUNT(*) TCNT
+									    FROM (
+										        SELECT DISTINCT SABUN
+										        FROM TSYS607
+										        WHERE 1=1
+										        AND 	ENTER_CD 		= #{ssnEnterCd}
+						        	<if test='rSeq != null and !rSeq.equals("")'>
+												AND 	RESEARCH_SEQ 	= TO_NUMBER( TRIM( #{rSeq} ))
+									</if>
+									<if test='qSeq != null and !qSeq.equals("")'>
+												AND 	QUESTION_SEQ 	= TO_NUMBER( TRIM( #{qSeq} ))
+									</if>
+											)
+										) B
+								) C
+						WHERE 1=1
+						AND 	A.ENTER_CD		= #{ssnEnterCd}
+				<if test='rSeq != null and !rSeq.equals("")'>
+						AND 	A.RESEARCH_SEQ 	= TO_NUMBER( TRIM( #{rSeq} ))
+				</if>
+				<if test='qSeq != null and !qSeq.equals("")'>
+						AND 	A.QUESTION_SEQ 	= TO_NUMBER( TRIM( #{qSeq} ))
+				</if>
+				<![CDATA[ 		AND 	A.QUESTION_ITEM_CD IN ('10','20')
+						AND 	A.ENTER_CD 		= B.ENTER_CD(+)
+						AND 	A.RESEARCH_SEQ 	= B.RESEARCH_SEQ(+)
+						AND 	A.QUESTION_SEQ	= B.QUESTION_SEQ(+)
+						AND 	B.ENTER_CD      = C.ENTER_CD(+)
+	                    AND 	B.RESEARCH_SEQ  = C.RESEARCH_SEQ(+)
+	                    AND 	B.QUESTION_SEQ  = C.QUESTION_SEQ(+)
+	                    AND 	B.ITEM_SEQ      = C.ITEM_SEQ(+)
+		UNION ALL
+				SELECT 	  A.RESEARCH_SEQ
+									, A.QUESTION_SEQ
+									, A.QUESTION_NM
+									, A.QUESTION_NO
+									, A.QUESTION_ITEM_CD
+									, A.RIGHT
+									, 1		AS ITEM_SEQ
+									, 1		AS DISPLAY_SEQ
+									, '서술형' AS ITEM_NM
+									, C.SUM_POINT
+		                            , C.ANSWER_AVERAGE
+		                            , C.ANSWER_AVERAGE_P1
+		                            , C.ANSWER_CNT
+		                            , C.TOTAL_PERSON
+		                            , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H60280' , A.QUESTION_ITEM_CD, #{ssnLocaleCd})      		AS ITEM_CD_NM
+							FROM TSYS603 A,
+								(	SELECT 	  A.ENTER_CD
+											, A.RESEARCH_SEQ
+											, A.QUESTION_SEQ
+											, A.ITEM_SEQ
+											, NVL(A.ACNT,0)                				AS ANSWER_CNT
+											, CASE WHEN B.TCNT > 0 THEN ROUND((NVL(A.ACNT, 0)/B.TCNT)*100,1) ELSE 0 END 		AS ANSWER_AVERAGE
+											, CASE WHEN B.TCNT > 0 THEN ROUND((NVL(A.ACNT, 0)/B.TCNT)*100,0) ELSE 0 END 		AS ANSWER_AVERAGE_P1
+											, B.TCNT                           			AS TOTAL_PERSON
+											, A.SUM_POINT
+									FROM 	(
+											    SELECT A.ENTER_CD, A.RESEARCH_SEQ, A.QUESTION_SEQ,A.ANSWER_SEQ AS ITEM_SEQ,COUNT(DECODE(TRIM(A.ANSWER),'',0,1)) AS ACNT, 0 AS SUM_POINT
+											    FROM TSYS607 A, TSYS603 B
+											    WHERE 1=1
+											    AND 	A.ENTER_CD	    =  #{ssnEnterCd}
+											             ]]>
+								    <if test='rSeq != null and !rSeq.equals("")'>
+												AND 	A.RESEARCH_SEQ 	= TO_NUMBER( TRIM( #{rSeq} ))
+									</if>
+									<if test='qSeq != null and !qSeq.equals("")'>
+												AND 	A.QUESTION_SEQ 	= TO_NUMBER( TRIM( #{qSeq} ))
+									</if>
+			                                	AND     A.ENTER_CD      = B.ENTER_CD
+			                                 	AND     A.RESEARCH_SEQ  = B.RESEARCH_SEQ
+			                                 	AND     A.QUESTION_SEQ  = B.QUESTION_SEQ
+			                               		AND     B.QUESTION_ITEM_CD = '30'
+											    GROUP BY A.ENTER_CD , A.RESEARCH_SEQ,A.QUESTION_SEQ  ,A.ANSWER_SEQ
+
+										) A
+										,(
+											SELECT COUNT(*) TCNT
+											FROM (
+											        SELECT DISTINCT SABUN
+											        FROM TSYS607
+											        WHERE 1=1
+											        AND 	ENTER_CD 		= #{ssnEnterCd}
+							        	<if test='rSeq != null and !rSeq.equals("")'>
+													AND 	RESEARCH_SEQ 	= TO_NUMBER( TRIM( #{rSeq} ))
+										</if>
+										<if test='qSeq != null and !qSeq.equals("")'>
+													AND 	QUESTION_SEQ 	= TO_NUMBER( TRIM( #{qSeq} ))
+										</if>
+												)
+										) B
+								) C
+							WHERE 1=1
+							AND 	A.ENTER_CD		= #{ssnEnterCd}
+					<if test='rSeq != null and !rSeq.equals("")'>
+							AND 	A.RESEARCH_SEQ 	= TO_NUMBER( TRIM( #{rSeq} ))
+					</if>
+					<if test='qSeq != null and !qSeq.equals("")'>
+							AND 	A.QUESTION_SEQ 	= TO_NUMBER( TRIM( #{qSeq} ))
+					</if>
+						 	AND 	A.QUESTION_ITEM_CD IN ('30')
+							AND 	A.ENTER_CD      = C.ENTER_CD
+		                    AND 	A.RESEARCH_SEQ  = C.RESEARCH_SEQ
+		                    AND 	A.QUESTION_SEQ  = C.QUESTION_SEQ
+	             	)
+					ORDER BY RESEARCH_SEQ,  QUESTION_SEQ ASC, DISPLAY_SEQ ASC
+
+
+
+		</select>
+
+</mapper>

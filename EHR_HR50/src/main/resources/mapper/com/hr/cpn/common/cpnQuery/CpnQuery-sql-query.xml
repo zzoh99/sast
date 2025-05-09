@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.common.cpnQuery">
+		<select parameterType="map" resultType="cMap" id="getCpnLatestPaymentInfoMap">
+					SELECT A.PAY_ACTION_CD
+						 , TRIM(A.PAY_ACTION_NM) AS PAY_ACTION_NM
+						 , A.PAY_CD
+						 , B.PAY_NM
+						 , A.PAY_YM
+						 , A.PAYMENT_YMD
+						 , TO_CHAR(TO_DATE(A.PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+					     , A.TIME_YM
+					     , C.CLOSE_YN
+					  FROM TCPN201 A
+						 , TCPN051 B
+					     , TCPN981 C
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.PAY_CD			= B.PAY_CD
+					   AND A.ENTER_CD       = C.ENTER_CD
+					   AND A.PAY_ACTION_CD  = C.PAY_ACTION_CD
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= ( SELECT MAX(A.PAY_ACTION_CD)
+												  FROM TCPN201 A
+													 , TCPN051 B
+													 , TCPN203 D
+												 WHERE A.ENTER_CD		= #{ssnEnterCd}
+												   AND B.ENTER_CD		= A.ENTER_CD
+												   AND B.PAY_CD			= A.PAY_CD
+												   AND A.ENTER_CD		= D.ENTER_CD(+)
+												   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD(+)
+												<if test='runType != null and !runType.equals("")'>
+												   AND B.RUN_TYPE		IN
+		<foreach collection="runType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+												</if>
+												<if test='sabun != null and !sabun.equals("")'>
+												   AND D.SABUN			= #{sabun}
+												</if>
+<if test='ssnSearchType.equals("O")'>
+			<![CDATA[
+										            AND (B.BUSINESS_PLACE_CD IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+										                                          FROM (SELECT F_COM_GET_AUTH_PARSE(TRIM(#{ssnEnterCd}),'C10',F_COM_GET_AUTH_VALUE(TRIM(#{ssnEnterCd}),TRIM(#{ssnSabun}),TRIM(#{ssnGrpCd}))) AS PARAM FROM dual) A
+										                                        CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) 
+													  OR B.BUSINESS_PLACE_CD IS NULL)
+					 ]]>
+</if>
+												)
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getCpnCloseYnMap">
+
+				<![CDATA[
+					SELECT NVL(CLOSE_YN,'N') AS CLOSE_YN
+					  FROM TCPN981
+					 WHERE ENTER_CD		= #{ssnEnterCd}
+					   AND PAY_ACTION_CD= #{payActionCd}
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveCpnCloseYn">
+
+
+                    MERGE INTO TCPN981 T
+                    USING   (
+                            SELECT    ENTER_CD
+                                    , PAY_ACTION_CD
+                                    , CLOSE_YN
+                            FROM    (
+                                    SELECT    NULL      AS ENTER_CD
+                                            , NULL      AS PAY_ACTION_CD
+                                            , NULL      AS CLOSE_YN
+                                    FROM    DUAL
+                            UNION ALL
+                                    SELECT   #{ssnEnterCd}            AS ENTER_CD
+                                            ,TRIM(#{payActionCd})  	AS PAY_ACTION_CD
+                                            ,TRIM(#{closeYn})   		AS CLOSE_YN
+                                            FROM   DUAL
+                                    )  WHERE ENTER_CD IS NOT NULL
+                                         AND PAY_ACTION_CD IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD      	= S.ENTER_CD
+                    AND  T.PAY_ACTION_CD   	= S.PAY_ACTION_CD
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.CLOSE_YN   	    = S.CLOSE_YN
+                                    , T.CHKDATE     	= SYSDATE
+                                    , T.CHKID       	= #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.PAY_ACTION_CD
+                            , T.CLOSE_YN
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.PAY_ACTION_CD
+                            , S.CLOSE_YN
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+		</update>
+
+		<select parameterType="map" resultType="cMap" id="getCpnPayActionMap">
+			SELECT PAY_ACTION_CD
+			     , PAY_ACTION_NM
+			     , PAY_YM
+			     , ORD_SYMD, ORD_EYMD
+			  FROM TCPN201
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			   AND PAY_ACTION_CD = #{searchPayActionCd}
+		</select>
+	</mapper>

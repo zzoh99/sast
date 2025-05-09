@@ -1,0 +1,863 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.applyApproval.approvalMgrResult">
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultUserInfoMap">
+
+				<![CDATA[
+					WITH HRI103 AS
+					(
+					    SELECT TO_CHAR(TO_DATE(APPL_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS APPL_YMD
+					         , APPL_SABUN
+					      FROM THRI103
+					     WHERE ENTER_CD = #{ssnEnterCd}
+					       AND APPL_SEQ = #{searchApplSeq}
+					)
+					SELECT    A.SABUN
+							, F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) 									AS NAME
+            				, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020' , A.JIKCHAK_CD, #{ssnLocaleCd}) 			AS JIKCHAK_NM
+            				, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030' , A.JIKWEE_CD, #{ssnLocaleCd}) 			AS JIKWEE_NM
+            				, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD') ) 	AS ORG_NM
+           					, A.ORG_CD
+           					, NVL( (SELECT APPL_YMD FROM HRI103), TO_CHAR(SYSDATE, 'YYYY-MM-DD') ) AS APPL_YMD
+           			FROM THRM151 A
+					WHERE 1=1
+                    AND A.ENTER_CD	= #{ssnEnterCd}
+					AND A.SABUN 	= (SELECT APPL_SABUN FROM HRI103)
+					AND A.SDATE =
+                        (
+                        	SELECT MAX(SDATE)
+							 FROM THRM151
+							 WHERE ENTER_CD = A.ENTER_CD
+							   AND SABUN = A.SABUN
+							   AND NVL(#{searchApplYmd}, TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN SDATE AND NVL(EDATE, '99991231')
+						)
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultInList">
+
+				<![CDATA[
+					SELECT   C.SABUN
+					        , F_COM_GET_GRCODE_NAME(B.ENTER_CD,'R10052',B.APPL_TYPE_CD) AS APPL_TYPE_CD_NM
+					        , C.NAME
+					        , C.JIKCHAK_NM
+					        , C.ORG_NM
+					        , C.ORG_CD
+					FROM THRI101 A , THRI102 B,
+					(   SELECT 	  A.ENTER_CD                                                           AS ENTER_CD
+					                , A.SABUN                                                            	AS SABUN
+					                , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) 									AS NAME
+					                , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') 							AS EMP_ALIAS
+					                , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020' , A.JIKCHAK_CD) 			AS JIKCHAK_NM
+					                , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030' , A.JIKWEE_CD) 			AS JIKWEE_NM
+					                , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD') ) 	AS ORG_NM
+					    			, A.ORG_CD
+					    FROM THRM151 A
+					    WHERE A.ENTER_CD	= #{ssnEnterCd}
+					    AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+					) C
+					WHERE 1=1
+					AND A.ENTER_CD 	= #{ssnEnterCd}
+					AND A.APPL_CD 	= TRIM( #{searchApplCd} )
+					AND A.ENTER_CD 	= B.ENTER_CD
+					AND A.APPL_CD 	= B.APPL_CD
+					AND B.ENTER_CD 	= C.ENTER_CD
+					AND B.SABUN   	= C.SABUN
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultReferUserChgList">
+
+				<![CDATA[
+					SELECT C.ENTER_CD, C.SABUN, C.PATH_SEQ, C.CC_SABUN, C.MEMO, D.NAME, D.JIKCHAK_NM, D.ORG_NM, D.ORG_CD
+					FROM THRI104 B, THRI127 C ,
+					(   SELECT 	  A.ENTER_CD                                                           		AS ENTER_CD
+					                , A.SABUN                                                            	AS SABUN
+					                , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) 									AS NAME
+					                , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') 							AS EMP_ALIAS
+					                , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020' , A.JIKCHAK_CD) 			AS JIKCHAK_NM
+					                , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030' , A.JIKWEE_CD) 			AS JIKWEE_NM
+					                , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD') ) 	AS ORG_NM
+					                , ORG_CD
+					    FROM THRM151 A
+					    WHERE A.ENTER_CD	= #{ssnEnterCd}
+					    AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+					) D
+					WHERE 1=1
+					AND B.ENTER_CD 		= #{ssnEnterCd}
+					AND B.SABUN 		= TRIM( #{searchSabun} )
+					AND B.ORG_LEVEL_CD  = TRIM( #{lvlCode} )
+					AND B.ENTER_CD 		= C.ENTER_CD
+					AND B.SABUN 		= C.SABUN
+					AND B.PATH_SEQ 		= C.PATH_SEQ
+					AND C.ENTER_CD 		= D.ENTER_CD
+					AND C.CC_SABUN 		= D.SABUN
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultDeputyUserChgList">
+
+				<![CDATA[
+					SELECT	  A.ENTER_CD
+					        , A.AGREE_SABUN
+					        , A.DEPUTY_SABUN
+					        , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) 									AS DEPUTY_NAME
+					        , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS')							AS DEPUTY_EMP_ALIAS
+					        , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020' , B.JIKCHAK_CD) 			AS DEPUTY_JIKCHAK_NM
+					        , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030' , B.JIKWEE_CD) 			AS DEPUTY_JIKWEE_NM
+					        , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD') ) 	AS DEPUTY_ORG_NM
+							, B.ORG_CD																AS DEPUTY_ORG_CD
+					FROM THRI120 A ,THRM151 B
+					WHERE 1=1
+					AND A.ENTER_CD 		= #{ssnEnterCd}
+					AND A.AGREE_SABUN 	IN
+		<foreach collection="agreeSabun" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					AND A.ENTER_CD 		= B.ENTER_CD
+					AND A.DEPUTY_SABUN 	= B.SABUN
+					AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+					AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultApplOrgLvl">
+
+				<![CDATA[
+					SELECT 	 ORG_LEVEL_CD AS ORG_LVL
+					FROM THRI101
+					WHERE 	1=1
+					AND 	ENTER_CD	= #{ssnEnterCd}
+					AND 	APPL_CD		= TRIM( #{searchApplCd} )
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultTHRI103">
+
+				<![CDATA[
+					SELECT 	  APPL_SEQ
+				            , TITLE
+				            , APPL_CD
+				            , APPL_YMD
+				            , APPL_SABUN
+				            , APPL_IN_SABUN
+				            , F_COM_GET_GRCODE_NAME(ENTER_CD,'R10010',APPL_STATUS_CD) AS APPL_STATUS_CD_NM
+				            , APPL_STATUS_CD
+				            , MEMO
+				            , AGREE_SABUN
+				            , AGREE_YMD
+				            , FINISH_YN
+				            , FILE_SEQ
+				            , DOC_NO
+					FROM THRI103
+					WHERE 	ENTER_CD = #{ssnEnterCd}
+					AND 	APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ))
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultTHRI107">
+
+				<![CDATA[
+					SELECT    A.APPL_SEQ
+							, A.AGREE_SABUN
+							, F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN,#{ssnLocaleCd})   		AS AGREE_NAME
+							, F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN,'ALIAS')				AS AGREE_EMP_ALIAS
+							, A.AGREE_SEQ
+							, A.PATH_SEQ
+							, (	CASE 	WHEN A.AGREE_STATUS_CD = '30' OR A.AGREE_STATUS_CD = '50' THEN F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10052',A.APPL_TYPE_CD,#{ssnLocaleCd})||'('||F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10050',A.AGREE_STATUS_CD,#{ssnLocaleCd})||')'
+										ELSE
+										    CASE WHEN  A.GUBUN  = '3' AND  A.AGREE_STATUS_CD = '20' THEN DECODE(#{ssnLocaleCd},'','수신','ko_KR','수신','Reception')
+                                            ELSE
+                                                F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10052',A.APPL_TYPE_CD,#{ssnLocaleCd})
+                                            END
+							  	END
+							  ) 															AS APPL_TYPE_CD_NM
+							, A.APPL_TYPE_CD
+							, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10050',A.AGREE_STATUS_CD,#{ssnLocaleCd}) 	AS AGREE_STATUS_CD_NM
+							, A.AGREE_STATUS_CD
+							, A.AGREE_TIME
+							, TO_CHAR(A.AGREE_TIME,'YYYY.MM.DD')							AS AGREE_YMD
+							, TO_CHAR(A.AGREE_TIME,'HH24:mm:ss')							AS AGREE_HMS
+							, A.GUBUN
+							, A.MEMO
+							, A.ORG_NM        												AS AGREE_ORG_NM
+							, A.JIKCHAK_NM   												AS AGREE_JIKCHAK_NM
+							, A.JIKWEE_NM     												AS AGREE_JIKWEE_NM
+							, CASE WHEN A.AGREE_STATUS_CD = '10' AND B.DEPUTY_SABUN IS NOT NULL THEN 'Y'
+							       WHEN A.AGREE_STATUS_CD <> '10' THEN A.DEPUTY_YN
+							       ELSE 'N' END AS DEPUTY_YN
+							, DECODE(A.AGREE_STATUS_CD,'10',F_COM_GET_NAMES(B.ENTER_CD,B.DEPUTY_SABUN,#{ssnLocaleCd}),F_COM_GET_NAMES(A.ENTER_CD,A.DEPUTY_SABUN,#{ssnLocaleCd}))	AS DEPUTY_NAME
+							, DECODE(A.AGREE_STATUS_CD,'10',F_COM_GET_NAMES(B.ENTER_CD,B.DEPUTY_SABUN,'ALIAS'),F_COM_GET_NAMES(A.ENTER_CD,A.DEPUTY_SABUN,'ALIAS'))	AS DEPUTY_EMP_ALIAS
+							, DECODE(A.AGREE_STATUS_CD,'10',B.DEPUTY_SABUN,A.DEPUTY_SABUN) 															AS DEPUTY_SABUN
+							, DECODE(A.AGREE_STATUS_CD,'10',F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'),#{ssnLocaleCd} ) ,A.DEPUTY_ORG)		AS DEPUTY_ORG_NM
+							, DECODE(A.AGREE_STATUS_CD,'10',F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20020' , C.JIKCHAK_CD, #{ssnLocaleCd}) ,A.DEPUTY_JIKCHAK) 			AS DEPUTY_JIKCHAK_NM
+							, DECODE(A.AGREE_STATUS_CD,'10',F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20030' , C.JIKWEE_CD, #{ssnLocaleCd}) ,A.DEPUTY_JIKWEE)				AS DEPUTY_JIKWEE_NM
+							, NVL((SELECT CASE WHEN COUNT(*) = 0 THEN 'N' ELSE 'Y' END FROM THRM911 WHERE ENTER_CD = A.ENTER_CD AND SABUN = DECODE(A.DEPUTY_YN, 'N', A.AGREE_SABUN,A.DEPUTY_SABUN) AND IMAGE_TYPE = '2'),'N') AS SIGN_YN
+					FROM THRI107 A, THRI120 B, THRM151 C
+					WHERE 	A.ENTER_CD 		= #{ssnEnterCd}
+					AND 	A.APPL_SEQ 		= TO_NUMBER( #{searchApplSeq} )
+					AND 	A.ENTER_CD 		= B.ENTER_CD(+)
+					AND		A.AGREE_SABUN	= B.AGREE_SABUN(+)
+					AND 	B.ENTER_CD		= C.ENTER_CD(+)
+					AND 	B.DEPUTY_SABUN  = C.SABUN(+)
+					AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE(+) AND NVL( B.EDATE(+), '99991231')
+					AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN C.SDATE(+) AND NVL( C.EDATE(+), '99991231')
+					ORDER BY A.AGREE_SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAgreeSabun">
+
+				<![CDATA[
+					SELECT    AGREE_SABUN , APPL_TYPE_CD
+					FROM THRI107
+					WHERE 	ENTER_CD		 = #{ssnEnterCd}
+					AND 	APPL_SEQ 		= TO_NUMBER( TRIM( #{searchApplSeq} ) )
+					AND 	AGREE_STATUS_CD = '10'
+					AND		AGREE_SABUN 	= #{ssnSabun}
+					ORDER BY AGREE_SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrThri107Gubun">
+
+				<![CDATA[
+					SELECT	GUBUN
+					FROM	THRI107
+					WHERE 	ENTER_CD		= #{ssnEnterCd}
+					  AND 	APPL_SEQ 		= TO_NUMBER( TRIM( #{searchApplSeq} ) )
+					  AND	AGREE_SABUN 	= #{ssnSabun}
+					  AND	APPL_TYPE_CD 	= '40'		-- 40	담당
+					  AND	AGREE_STATUS_CD = '10'		-- 10	결재요청
+					  AND	GUBUN 			= '3'		-- 3	수신
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultTHRI125">
+
+				<![CDATA[
+					SELECT 	  APPL_SEQ
+							, AGREE_SEQ
+							, F_COM_GET_NAMES(ENTER_CD,CC_SABUN) AS NAME
+							, CC_SABUN
+							, CC_ORG_NM
+							, CC_JIKCHAK_NM
+							, CC_JIKWEE_NM
+							, F_COM_GET_NAMES(ENTER_CD,IN_SABUN) AS IN_NAME
+							, IN_SABUN
+							, IN_ORG_NM
+							, DECODE(IN_JIKCHAK_NM,NULL, IN_JIKWEE_NM,IN_JIKCHAK_NM)	AS IN_JIKCHAK_NM
+							, IN_JIKWEE_NM
+							, TO_CHAR(CHKDATE,'YYYY.MM.DD HH24:mm:ss') 							AS CHKDATE
+							, MEMO
+					FROM THRI125
+					WHERE 1=1
+					AND	ENTER_CD = #{ssnEnterCd}
+					AND APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+					ORDER BY  AGREE_SEQ, CHKDATE
+				]]>
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getApprovalPushSabun">
+				<![CDATA[
+					-- 신청자 최초신청, 결재완료시, 반려 시
+					SELECT A.APPL_SABUN AS sabun
+					  FROM THRI103 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+					   AND F_COM_GET_NOTIFY_YN(A.ENTER_CD, A.APPL_SEQ) = 'Y'
+					   AND ((TRIM(A.APPL_STATUS_CD) IN ('21', '23', '33', 99) AND A.AGREE_SABUN IS NOT NULL AND A.AGREE_YMD IS NULL AND A.CHKID IN (A.APPL_SABUN, A.APPL_IN_SABUN)) OR (A.FINISH_YN = 'Y'))
+					UNION ALL
+					-- 결재요청자
+					SELECT A.AGREE_SABUN AS sabun
+					  FROM THRI107 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+					   AND F_COM_GET_NOTIFY_YN(A.ENTER_CD, A.APPL_SEQ) = 'Y'
+					   AND A.AGREE_STATUS_CD = '10'
+					   AND A.AGREE_SEQ = (SELECT MIN(AGREE_SEQ) FROM THRI107 WHERE ENTER_CD = A.ENTER_CD AND APPL_SEQ = A.APPL_SEQ AND AGREE_STATUS_CD = A.AGREE_STATUS_CD)
+				    UNION ALL
+					-- 결재완료자
+					SELECT A.AGREE_SABUN AS sabun
+					  FROM THRI107 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+					   AND F_COM_GET_NOTIFY_YN(A.ENTER_CD, A.APPL_SEQ) = 'Y'
+					   AND A.AGREE_STATUS_CD = '20'
+					   AND A.GUBUN <> '0'
+					   AND A.AGREE_SEQ = (SELECT MAX(AGREE_SEQ) FROM THRI107 WHERE ENTER_CD = A.ENTER_CD AND APPL_SEQ = A.APPL_SEQ AND AGREE_STATUS_CD = A.AGREE_STATUS_CD)
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getApprovalNotiSabun">
+			<![CDATA[
+			-- 신청자 최초신청, 결재완료시, 반려 시
+			SELECT A.APPL_SABUN AS NOTI_SABUN
+			     , TITLE||' ['||F_COM_GET_GRCODE_NAME(ENTER_CD,'R10010',APPL_STATUS_CD)||']'AS TITLE
+				 , '신청서[' || A.TITLE || ']이(가)' || F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010', A.APPL_STATUS_CD)||' 되었습니다.' AS CONTENT
+			     , '' AS LINK
+			FROM THRI103 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			  AND A.APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+			  AND F_COM_GET_NOTIFY_YN(A.ENTER_CD, A.APPL_SEQ) = 'Y'
+			  AND (TRIM(A.APPL_STATUS_CD) IN ('23', '33', '99') OR A.FINISH_YN = 'Y')
+			UNION ALL
+			-- 결재요청자
+			SELECT A.AGREE_SABUN AS NOTI_SABUN
+				 , B.TITLE||' [결재요청]'AS TITLE
+				 , '신청서[' || B.TITLE || ']에 대한 신규 결재 건이 있습니다.' AS CONTENT
+				 , '' AS LINK
+			FROM THRI107 A
+			   , THRI103 B
+			WHERE A.ENTER_CD = B.ENTER_CD
+			  AND A.APPL_SEQ = B.APPL_SEQ
+			  AND A.ENTER_CD = #{ssnEnterCd}
+			  AND A.APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+			  AND F_COM_GET_NOTIFY_YN(A.ENTER_CD, A.APPL_SEQ) = 'Y'
+			  AND A.AGREE_STATUS_CD = '10'
+			  AND A.AGREE_SEQ = (SELECT MIN(AGREE_SEQ) FROM THRI107 WHERE ENTER_CD = A.ENTER_CD AND APPL_SEQ = A.APPL_SEQ AND AGREE_STATUS_CD = A.AGREE_STATUS_CD)
+		  ]]>
+		</select>
+
+	<select parameterType="map" resultType="cMap" id="getApprovalAppPushList">
+		<![CDATA[
+		-- 신청자 결재완료시, 반려 시
+		SELECT A.ENTER_CD || '@' || A.APPL_SABUN AS EMP_KEY
+		FROM THRI103 A
+		WHERE A.ENTER_CD = #{ssnEnterCd}
+		  AND A.APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+		  AND F_COM_GET_NOTIFY_YN(A.ENTER_CD, A.APPL_SEQ) = 'Y'
+		  AND ((TRIM(A.APPL_STATUS_CD) IN ('23', '33', 99) AND A.AGREE_SABUN IS NOT NULL AND A.AGREE_YMD IS NOT NULL) OR (A.FINISH_YN = 'Y'))
+		UNION ALL
+		-- 결재요청자
+		SELECT A.ENTER_CD || '@' || A.AGREE_SABUN AS EMP_KEY
+		FROM THRI107 A
+		WHERE A.ENTER_CD = #{ssnEnterCd}
+		  AND A.APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+		  AND F_COM_GET_NOTIFY_YN(A.ENTER_CD, A.APPL_SEQ) = 'Y'
+		  AND A.AGREE_STATUS_CD = '10'
+		  AND A.AGREE_SEQ = (SELECT MIN(AGREE_SEQ) FROM THRI107 WHERE ENTER_CD = A.ENTER_CD AND APPL_SEQ = A.APPL_SEQ AND AGREE_STATUS_CD = A.AGREE_STATUS_CD)
+		]]>
+	</select>
+		
+
+		<delete parameterType="map" id="deleteApprovalMgrResultMaster">
+
+   					DELETE FROM THRI103
+					WHERE ( ENTER_CD,APPL_SEQ  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{rm.applSeq})  )
+</foreach>
+							)
+		</delete>
+		<insert parameterType="map" id="saveApprovalMgrResultMaster">
+
+				<![CDATA[
+           			INSERT INTO THRI103
+           			(
+           				  ENTER_CD
+						, APPL_SEQ
+						, TITLE
+						, APPL_CD
+						, APPL_YMD
+						, APPL_SABUN
+						, APPL_IN_SABUN
+						, APPL_STATUS_CD
+						, FILE_SEQ
+						, CHKDATE
+						, CHKID
+           			)
+           			VALUES
+           			(
+           				  #{ssnEnterCd}
+						, TO_NUMBER( TRIM( #{searchApplSeq} ) )
+						, TRIM( #{applTitle}       )
+						, TRIM( #{searchApplCd}      )
+						, TO_CHAR( SYSDATE, 'YYYYMMDD')
+						, TRIM( #{searchApplSabun} )
+						, TRIM( #{searchSabun} )
+						, TRIM( #{applStatusCd}      )
+						, TO_NUMBER( TRIM( #{fileSeq} ) )
+						, SYSDATE
+						, #{ssnSabun}
+           			)
+				]]>
+
+
+		</insert>
+		<delete parameterType="map" id="deleteApprovalMgrResultMater">
+
+				<![CDATA[
+   					DELETE FROM THRI103
+					WHERE 	ENTER_CD	= #{ssnEnterCd}
+					AND 	APPL_SEQ 	= TO_NUMBER( TRIM( #{searchApplSeq} )   )
+				]]>
+
+
+		</delete>
+		<insert parameterType="map" id="insertApprovalMgrResultAgreeUser">
+
+				<![CDATA[
+           			INSERT INTO THRI107
+						(
+							  ENTER_CD
+							, APPL_SEQ
+							, AGREE_SABUN
+							, AGREE_SEQ
+							, PATH_SEQ
+							, APPL_TYPE_CD
+							, GUBUN
+							, MEMO
+							, ORG_NM
+							, JIKCHAK_NM
+							, JIKWEE_NM
+							, CHKDATE
+							, CHKID
+						)
+						]]>
+<foreach item="rm" collection="insertAgreeUser" separator=" UNION ALL " >
+					SELECT
+							  #{ssnEnterCd}
+							, TO_NUMBER( TRIM( #{searchApplSeq} ) )
+							, TRIM( #{rm.agreeSabun} )
+							, #{rm.agreeSeq}
+							, TO_NUMBER( TRIM( #{pathSeq} ) )
+							, TRIM( #{rm.applTypeCd} )
+							, TRIM( #{rm.gubun})
+							, ''
+							, TRIM( #{rm.org})
+							, TRIM( #{rm.jikchak})
+							, TRIM( #{rm.jikwee})
+							, SYSDATE
+							, #{ssnSabun}
+					FROM   DUAL
+</foreach>
+		</insert>
+
+
+		<delete parameterType="map" id="deleteApprovalMgrResultAgreeUser">
+
+				<![CDATA[
+   					DELETE FROM THRI107
+					WHERE 	ENTER_CD	= #{ssnEnterCd}
+					AND 	APPL_SEQ 	= TO_NUMBER( TRIM( #{searchApplSeq} )   )
+					AND 	AGREE_SEQ 	> TO_NUMBER( TRIM( #{agreeSeq} )   )
+				]]>
+
+
+		</delete>
+		<insert parameterType="map" id="insertApprovalMgrResultReferUser">
+
+				<![CDATA[
+           			INSERT INTO THRI125
+						(
+							  ENTER_CD
+							, APPL_SEQ
+							, AGREE_SEQ
+							, CC_SABUN
+							, CC_ORG_NM
+							, CC_JIKCHAK_NM
+							, CC_JIKWEE_NM
+							, IN_SABUN
+							, IN_ORG_NM
+							, IN_JIKCHAK_NM
+							, IN_JIKWEE_NM
+							, MEMO
+							, CHKDATE
+							, CHKID
+						)
+           			    ]]>
+<foreach item='rm' collection='insertReferUser' separator=" UNION ALL " >
+					SELECT
+							  #{ssnEnterCd}
+							, TO_NUMBER( TRIM( #{searchApplSeq} ) )
+							, TO_NUMBER( TRIM( #{agreeSeq} ) )
+							, TRIM( #{rm.referSabun})
+							, TRIM( #{rm.referOrg})
+							, TRIM( #{rm.referJikchak})
+							, TRIM( #{rm.referJikwee})
+							, TRIM( #{rm.inSabun})
+							, TRIM( #{rm.inOrg})
+							, TRIM( #{rm.inJikchak})
+							, TRIM( #{rm.inJikwee})
+							, ''
+							, SYSDATE
+							, #{ssnSabun}
+					FROM   DUAL
+</foreach>
+		</insert>
+		<delete parameterType="map" id="deleteApprovalMgrResultReferUser">
+
+				<![CDATA[
+   					DELETE FROM THRI125
+					WHERE 	ENTER_CD	= #{ssnEnterCd}
+					AND 	APPL_SEQ 	= TO_NUMBER( TRIM( #{searchApplSeq} )   )
+				]]>
+
+		</delete>
+
+		<select parameterType="map" resultType="cMap" id="getAgreeDateMap">
+
+				<![CDATA[
+   					SELECT TO_CHAR(SYSDATE, 'YYYYMMDDHH24mmss') AGREE_TIME FROM DUAL
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="approvalMgrResultProcCall" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRI_APP_AGREE_INS(
+				#{outCode,mode=OUT,jdbcType=VARCHAR},
+				#{outErrorMsg,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSeq,mode=IN,jdbcType=VARCHAR},
+				#{searchApplCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR},
+				#{agreeSeq,mode=IN,jdbcType=VARCHAR},
+				#{agreeGubun,mode=IN,jdbcType=VARCHAR},
+				#{agreeTime,mode=IN,jdbcType=VARCHAR},
+				#{agreeUserMemo,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR},
+				#{deputyAdminYn,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		<update parameterType="map" id="afterApprovalMgrResultProcCall" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRI_AFTER_PROC_EXEC(
+				#{outCode,mode=OUT,jdbcType=VARCHAR},
+				#{outErrorMsg,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSeq,mode=IN,jdbcType=VARCHAR},
+				#{searchApplCd,mode=IN,jdbcType=VARCHAR},
+				#{afterProcStatusCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		<select parameterType="map" resultType="cMap" id="getAgreeMaxCntMap">
+
+				<![CDATA[
+   					SELECT MAX(AGREE_SEQ+1)  AS AGREE_MAX
+   					FROM THRI107
+					WHERE 	ENTER_CD	= #{ssnEnterCd}
+					AND 	APPL_SEQ 	= #{searchApplSeq}
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultPopupList">
+
+				<![CDATA[
+   					SELECT
+							  A.APPL_CD
+							, A.AGREE_SEQ AS OLD_AGREE_SEQ
+							, A.AGREE_SEQ
+							, A.APPL_TYPE_CD
+							, A.SABUN
+							, F_COM_GET_NAMES(ENTER_CD, A.SABUN) AS NAME
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD,A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+  					FROM THRI102 A
+ 					WHERE A.ENTER_CD 	= #{ssnEnterCd}
+ 					AND A.APPL_CD 		= TRIM( #{searchApplCd} )
+ 					ORDER BY A.AGREE_SEQ ASC
+				]]>
+
+
+		</select>
+
+		<update parameterType="map" id="updateStatusCd">
+
+				<![CDATA[
+					UPDATE THRI103 SET
+							APPL_STATUS_CD 	= #{statusCd}
+						, 	AGREE_SABUN		= #{ssnSabun}
+						, 	AGREE_YMD		= (CASE WHEN #{statusCd} = '99' THEN NVL(SUBSTR(#{agreeTime}, 1, 8), TO_CHAR(sysdate, 'YYYYMMDD')) ELSE '' END)
+						, 	FINISH_YN		= ''
+						, 	CHKDATE 		= SYSDATE
+						, 	CHKID			= #{ssnSabun}
+					WHERE 1 =1
+					AND ENTER_CD = #{ssnEnterCd}
+					AND APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} )   )
+
+				]]>
+
+
+		</update>
+		<update parameterType="map" id="updateThir107StatusCd">
+
+				<![CDATA[
+					UPDATE THRI107 SET
+			                DEPUTY_YN =NULL
+			            ,   DEPUTY_SABUN =NULL
+			            ,   DEPUTY_ORG =NULL
+			            ,   DEPUTY_JIKCHAK =NULL
+			            ,   DEPUTY_JIKWEE =NULL
+						, 	CHKDATE 		= SYSDATE
+						, 	CHKID			= #{ssnSabun}
+					WHERE 1 =1
+					AND ENTER_CD = #{ssnEnterCd}
+					AND APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} )   )
+				]]>
+
+
+		</update>
+		<select parameterType="map" resultType="cMap" id="getApprovalMgrResultReferAllList">
+
+				<![CDATA[
+					SELECT 	  F_COM_GET_NAMES(A.ENTER_CD,A.CC_SABUN) AS NAME
+							, A.CC_SABUN
+							, A.CC_ORG_NM
+							, A.CC_JIKWEE_NM
+					FROM THRI125 A, THRM151 B
+					WHERE 1=1
+					AND A.ENTER_CD = #{ssnEnterCd}
+					AND A.APPL_SEQ = TO_NUMBER( #{searchApplSeq} )
+					AND A.ENTER_CD 	= B.ENTER_CD
+					AND A.CC_SABUN 	= B.SABUN
+					AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+				]]>
+
+
+		</select>
+		<insert parameterType="map" id="insertApprovalMgrResultReferAddUser">
+
+				<![CDATA[
+           			INSERT INTO THRI125
+						(
+							  ENTER_CD
+							, APPL_SEQ
+							, AGREE_SEQ
+							, CC_SABUN
+							, CC_ORG_NM
+							, CC_JIKCHAK_NM
+							, CC_JIKWEE_NM
+							, IN_SABUN
+							, IN_ORG_NM
+							, IN_JIKCHAK_NM
+							, IN_JIKWEE_NM
+							, MEMO
+							, CHKDATE
+							, CHKID
+						)
+           			    ]]>
+<foreach item="rm" collection="insertRows" separator=" UNION ALL " >
+					SELECT
+							  #{ssnEnterCd}
+							, TO_NUMBER( #{applSeq} )
+							, TO_NUMBER( #{agreeSeq} )
+							, TRIM( #{rm.ccSabun} )
+							, TRIM( #{rm.orgNm})
+							, TRIM( #{rm.jikchakNm})
+							, TRIM( #{rm.jikweeNm})
+							, TRIM( #{inSabun} )
+							, TRIM( #{inOrgNm} )
+							, TRIM( #{inJikchakNm} )
+							, TRIM( #{inJikweeNm} )
+							, ''
+							, SYSDATE
+							, #{ssnSabun}
+					FROM   DUAL
+</foreach>
+		</insert>
+        
+		<update parameterType="map" id="approvalMgrResultCancelProcCall" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRI_APP_AGREE_CANCEL(
+				#{outCode,mode=OUT,jdbcType=VARCHAR},
+				#{outErrorMsg,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSeq,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<select parameterType="map" resultType="cMap" id="getCancelButtonMap">
+
+				<![CDATA[
+					WITH THRI103_W AS
+					(
+					    SELECT A.*
+					      FROM THRI103 A
+					     WHERE A.ENTER_CD = #{ssnEnterCd}
+					       AND A.APPL_SEQ = TO_NUMBER(#{searchApplSeq})
+					)
+					-- 기안 후 아무도 결재안함 또는 반려된 신청서는 회수버튼이 보이도록 함 2020.11.12
+					SELECT ( SELECT 'YES'
+					           FROM THRI103_W A
+					          WHERE A.APPL_STATUS_CD NOT IN ('23', '33', '99') -- 반려 또는 처리완료 상태 제외
+					            AND (A.APPL_SABUN = #{ssnSabun} OR A.APPL_IN_SABUN = #{ssnSabun})
+					            AND (
+					                    A.APPL_STATUS_CD IN ('23', '33')
+					                    OR
+					                    NOT EXISTS
+					                    (
+					                        SELECT 1
+					                          FROM THRI107
+					                         WHERE ENTER_CD = A.ENTER_CD
+					                           AND APPL_SEQ = A.APPL_SEQ
+					                           AND APPL_TYPE_CD <> '30' -- 기안 제외
+					                           AND AGREE_STATUS_CD IN ('20', '40') -- 결재완료, 합의완료
+												)
+					                ) ) AS CANCEL
+					     , NVL(( SELECT 'Y'
+					           FROM THRI103_W A
+					          WHERE A.APPL_STATUS_CD <> '99'
+					            AND EXISTS
+					                (
+					                    SELECT 1
+					                      FROM THRI107 T
+					                     WHERE ENTER_CD = A.ENTER_CD
+					                       AND APPL_SEQ = A.APPL_SEQ
+					                       AND AGREE_STATUS_CD = '10' -- 결재요청
+					                       AND (
+					                               DEPUTY_SABUN = #{ssnSabun}
+					                               OR
+					                               AGREE_SABUN = #{ssnSabun}
+					                               OR
+												   EXISTS
+												   ( SELECT 1
+												       FROM THRI120
+												      WHERE ENTER_CD = T.ENTER_CD
+												        AND AGREE_SABUN = T.AGREE_SABUN
+												        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+												        AND DEPUTY_SABUN = #{ssnSabun} )
+					                               OR
+					                               AGREE_SABUN = #{ssnOrgCd}
+					                           )
+									  ) ), 'N') AS VISIBLE_APPROVE_BTN
+					  FROM DUAL
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="interfaceJejuApplCd104Data">
+
+				<![CDATA[
+ 					SELECT A.PAY_ACTION_CD
+					  ,(SELECT AA.PAY_ACTION_NM FROM TCPN201 AA WHERE AA.ENTER_CD = A.ENTER_CD AND AA.PAY_ACTION_CD = A.PAY_ACTION_CD) AS PAY_ACTION_NM
+				      ,A.PAY_CD
+				      ,A.SEQ
+				      ,A.BSCHL
+				      ,A.HKONT_CD
+				      ,A.HKONT
+				      ,A.CURRENCY_CD
+				      ,A.KOSTL
+				      ,A.MAP_CD
+				      ,A.DMBTR
+				      ,A.EX_BELNR
+				      ,A.EX_MSG
+				      ,A.PAYMENT_YMD
+				      ,A.EX_SEND_YN
+				      ,A.EX_BUKRS
+					  ,A.EX_GJAHR
+				  FROM TCPN978 A
+				WHERE A.ENTER_CD		= #{ssnEnterCd}
+				  AND A.PAY_ACTION_CD	= #{searchApplSeq}
+				ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+
+
+<!-- 담당자 대결정보삭제1 2020.01.15 -->	
+		<update parameterType="map" id="deleteDeputyAdminInfo1">
+
+				<![CDATA[
+					UPDATE THRI107 A
+					   SET AGREE_STATUS_CD = '' -- 결재요청
+					 WHERE ENTER_CD        = #{ssnEnterCd}
+					   AND APPL_SEQ        = TRIM( #{searchApplSeq} )
+					   AND AGREE_STATUS_CD = '10' -- 결재요청
+					   AND EXISTS ( SELECT 1
+					                  FROM THRI107 X
+					                 WHERE X.ENTER_CD = A.ENTER_CD
+					                   AND X.APPL_SEQ = A.APPL_SEQ
+					                   AND X.AGREE_STATUS_CD = '20'
+					                   AND X.DEPUTY_ADMIN_YN = 'Y'  ) --담당자 전결 처리한 건이 있으면 
+				]]>
+
+		</update>
+<!-- 담당자 대결정보삭제2 2020.01.15 -->	
+		<delete parameterType="map" id="deleteDeputyAdminInfo2">
+
+				<![CDATA[
+					UPDATE THRI107 A
+					   SET AGREE_STATUS_CD = '10' -- 결재요청
+					     , DEPUTY_YN       ='N'
+					     , DEPUTY_SABUN    = NULL
+					     , DEPUTY_ORG      = NULL
+					     , DEPUTY_JIKCHAK  = NULL
+					     , DEPUTY_JIKWEE   = NULL
+					     , DEPUTY_ADMIN_YN = 'N'
+					 WHERE ENTER_CD        = #{ssnEnterCd}
+					   AND APPL_SEQ        = TRIM( #{searchApplSeq} )
+					   AND AGREE_STATUS_CD = '20' -- 결재완료
+					   AND DEPUTY_ADMIN_YN = 'Y'  -- 담당자 전결 처리 여부
+				]]>
+
+		</delete>
+		<!-- 의견댓글 저장 -->
+		<insert parameterType="map" id="saveComment">
+
+				<![CDATA[
+						INSERT INTO THRI730(ENTER_CD, SABUN, APPL_SEQ,APPL_CD, COMMENTS_SEQ, COMMENTS, CHKDATE, CHKID)
+						VALUES(TRIM(#{ssnEnterCd}), TRIM(#{ssnSabun}), TRIM (#{searchApplSeq}), TRIM( #{searchApplCd} ), APPL_COMTSEQ.nextval, TRIM(#{comments}), sysdate, TRIM(#{ssnSabun}))
+				]]>
+
+
+		</insert>
+
+		<!-- 의견댓글 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCommentList">
+
+				<![CDATA[
+				SELECT A.APPL_CD
+					 , A.APPL_SEQ
+					 , A.COMMENTS_SEQ
+					 , A.SABUN
+					 , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) AS EMP_NAME
+					 , A.COMMENTS
+					 , TO_CHAR(A.CHKDATE, 'YY.MM.DD HH24:mi') AS CHKDATE
+				FROM THRI730 A, THRM100 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.SABUN = B.SABUN
+					AND A.ENTER_CD      = #{ssnEnterCd}
+					AND A.APPL_SEQ      = TRIM (#{searchApplSeq})
+					AND A.APPL_CD		= TRIM (#{searchApplCd})
+				ORDER BY  A.COMMENTS_SEQ DESC
+				]]>
+
+
+		</select>
+
+		<!-- 의견댓글 삭제 -->
+		<delete parameterType="map" id="delComment">
+
+				<![CDATA[
+						DELETE THRI730 
+						 WHERE ENTER_CD 	=#{ssnEnterCd}
+						 AND SABUN 			=#{ssnSabun}
+						 AND APPL_SEQ       =TRIM (#{searchApplSeq})
+						 AND APPL_CD		=TRIM (#{searchApplCd})
+						 AND COMMENTS_SEQ   =TRIM(#{commentsSeq})
+				]]>
+
+		</delete>
+</mapper>

@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appCompItemCreateMgr">
+<!-- 		조회 위-->
+		<select parameterType="map" resultType="cMap" id="getAppCompItemCreateMgrCodeList">
+
+				<![CDATA[
+                    SELECT A.COMPETENCY_CD AS CODE
+                         , A.COMPETENCY_NM AS CODE_NM
+                      FROM TORG051 A
+                     WHERE A.ENTER_CD = #{ssnEnterCd}
+                       AND A.MAIN_APP_TYPE = #{searchComGubunCd}
+                  ORDER BY (SELECT SEQ FROM TORG055 WHERE ENTER_CD = #{ssnEnterCd} AND COMPETENCY_CD = A.COMPETENCY_CD AND ROWNUM = 1)
+				]]>
+		</select>
+
+<!-- 		조회 위-->
+		<select parameterType="map" resultType="cMap" id="getAppCompItemCreateMgrList">
+
+				<![CDATA[
+			    SELECT DISTINCT A.SABUN
+					,A.NAME
+					,A.APP_ORG_CD
+					,A.APP_ORG_NM
+                    ,A.JIKGUB_CD
+					,A.JIKGUB_NM
+                    ,A.JIKWEE_CD
+					,A.JIKWEE_NM
+					,A.JIKCHAK_CD
+					,A.JIKCHAK_NM
+					,D.MAIN_APP_TYPE AS COM_GUBUN_CD
+					,F_COM_GET_GRCODE_NAME(C.ENTER_CD,'P00007',D.MAIN_APP_TYPE) AS COM_GUBUN_NM
+					,C.COMPETENCY_CD
+					,D.COMPETENCY_NM
+					,D.MEMO
+					,A.APPRAISAL_CD
+					,A.APP_ORG_CD
+				FROM TPAP201 A
+				]]>
+				<choose><when test='searchAppTypeCd.equals("D")'> /* 다면평가 이면 TPAP404 */
+						,TPAP404 C
+				</when><otherwise>
+					<if test='searchAppStepCd.equals("1")'>
+						,TPAP401 C /* 평가단계가 1이면 TPAP401, 3이면 TPAP402 */
+					</if>
+					<if test='searchAppStepCd.equals("3") or searchAppStepCd.equals("5")'>
+						,TPAP402 C /* 평가단계가 1이면 TPAP401, 3이면 TPAP402 */
+					</if>
+				</otherwise>
+				</choose>
+					,TORG051 D
+					,TPAP101 E
+				WHERE A.ENTER_CD = C.ENTER_CD
+					AND A.ENTER_CD = D.ENTER_CD
+					AND A.ENTER_CD = E.ENTER_CD
+					AND A.APPRAISAL_CD = C.APPRAISAL_CD
+					AND A.APPRAISAL_CD = E.APPRAISAL_CD
+					AND A.SABUN = C.SABUN
+					AND A.APP_ORG_CD = C.APP_ORG_CD
+					AND C.COMPETENCY_CD = D.COMPETENCY_CD
+					AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					AND A.APP_STEP_CD = TRIM(#{searchAppStepCd})
+					<if test='searchComGubunCd != null and !searchComGubunCd.equals("")'>
+						AND D.MAIN_APP_TYPE LIKE TRIM(#{searchComGubunCd})||'%'
+					</if>
+					<if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+						AND ( A.SABUN LIKE TRIM(#{searchNameSabun})||'%' OR A.NAME LIKE TRIM(#{searchNameSabun})||'%' )
+					</if>
+					<if test='searchCompetencyCd != null and !searchCompetencyCd.equals("")'>
+						AND C.COMPETENCY_CD = TRIM(#{searchCompetencyCd})
+					</if>
+					AND D.SDATE = (SELECT MAX(SDATE) FROM TORG051
+									WHERE ENTER_CD = D.ENTER_CD
+										AND COMPETENCY_CD = D.COMPETENCY_CD
+										AND E.APP_E_YMD BETWEEN SDATE AND NVL(EDATE,'99991231'))
+					AND A.APP_YN = 'Y'
+			    ORDER BY A.APP_ORG_NM, A.JIKCHAK_CD, A.JIKWEE_CD, A.JIKGUB_CD, A.NAME, D.MAIN_APP_TYPE, C.COMPETENCY_CD
+
+
+		</select>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppCompItemCreateMgr">
+
+					DELETE FROM
+
+				<choose><when test='searchAppTypeCd.equals("D")'> /* 다면평가 이면 TPAP404 */
+						,TPAP404 C
+				</when><otherwise>
+					<choose><when test='searchAppStepCd.equals("1")'>
+						TPAP401 /* 평가단계가 1이면 TPAP401, 3이면 TPAP402 */
+					</when><otherwise>
+						TPAP402 /* 평가단계가 1이면 TPAP401, 3이면 TPAP402 */
+					</otherwise>
+					</choose>
+				</otherwise>
+				</choose>
+					WHERE 	(ENTER_CD,APPRAISAL_CD,SABUN,APP_ORG_CD,COMPETENCY_CD) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											, TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											, TRIM( #{rm.sabun} )
+										</if>
+										<if test='rm.appOrgCd != null and !rm.appOrgCd.equals("")'>
+											, TRIM( #{rm.appOrgCd} )
+										</if>
+										<if test='rm.competencyCd != null and !rm.competencyCd.equals("")'>
+											, TRIM( #{rm.competencyCd} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+
+<!-- 		역량평가표생성 -->
+		<update parameterType="map" id="prcAppCompItemCreateMgr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_COMP_DIC_INS(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchAppStepCd,mode=IN,jdbcType=VARCHAR},
+				NULL,
+				NULL,
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

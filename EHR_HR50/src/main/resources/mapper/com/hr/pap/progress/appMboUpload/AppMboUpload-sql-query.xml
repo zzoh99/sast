@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appMboUpload">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppMboUploadList">
+
+				<![CDATA[
+					SELECT X.*
+					FROM (
+							SELECT 	 A.ENTER_CD
+							        ,A.APPRAISAL_CD
+							        ,A.SABUN
+							        ,D.NAME
+							        ,E.ORG_CD
+							        ,F_COM_GET_ORG_NM(E.ENTER_CD, E.ORG_CD, E.SDATE) AS ORG_NM
+							        ,E.JIKWEE_CD
+							        ,E.JIKGUB_CD
+							        ,E.JIKCHAK_CD     
+							        ,E.JIKWEE_NM
+							        ,E.JIKGUB_NM
+							        ,E.JIKCHAK_NM
+							        ,E.JOB_CD
+							        ,F_COM_GET_JOB_NM_201(E.ENTER_CD, E.JOB_CD, E.SDATE)  AS JOB_NM
+							        ,E.WORK_TYPE
+							        ,E.WORK_TYPE_NM
+							        ,C.APP_GROUP_CD
+							        ,(SELECT APP_GROUP_NM
+							          FROM   TPAP133
+							          WHERE  ENTER_CD     = C.ENTER_CD
+							          AND    APPRAISAL_CD = C.APPRAISAL_CD
+							          AND    APP_GROUP_CD = C.APP_GROUP_CD
+							         ) AS APP_GROUP_NM -- 평가그룹명
+							        ,B.D_BASE_YMD 
+									,A.MBO_SELF_POINT     /* 업적평가점수_본인 */
+									,A.MBO_SELF_CLASS_CD  /* 업적평가등급코드_본인 */
+									,A.MBO_1ST_POINT      /* 업적평가점수_1차 */
+									,A.MBO_1ST_CLASS_CD   /* 업적평가등급코드_1차 */
+									,A.MBO_2ND_POINT      /* 업적평가점수_2차 */
+									,A.MBO_2ND_CLASS_CD   /* 업적평가등급코드_2차 */
+									,A.MBO_POINT          /* 업적평가점수 */
+									,A.MBO_CLASS_CD       /* 업적평가등급코드 */
+									,A.MEMO               /* 비고 */
+							 FROM   TPAP579 A, 
+							        TPAP105 B,
+							        TPAP201 C,
+							        THRM100 D,
+							        THRM151 E   
+							WHERE A.ENTER_CD        = B.ENTER_CD
+							   AND A.APPRAISAL_CD   = B.APPRAISAL_CD   
+							   AND B.APP_STEP_CD    = '5'	-- 최종평가
+							   AND A.ENTER_CD       = C.ENTER_CD(+)
+							   AND A.APPRAISAL_CD   = C.APPRAISAL_CD(+)   
+							   AND A.SABUN          = C.SABUN(+)
+							   AND C.APP_STEP_CD(+) = '5'	-- 최종평가
+							   AND C.APP_YN(+)      = 'Y'
+							   AND A.ENTER_CD       = D.ENTER_CD
+							   AND A.SABUN          = D.SABUN
+							   AND A.ENTER_CD       = E.ENTER_CD
+							   AND A.SABUN          = E.SABUN
+							   AND E.SDATE          = ( SELECT MAX(SDATE) FROM THRM151 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND B.D_BASE_YMD BETWEEN SDATE AND NVL(EDATE, '99991231') )
+							   AND A.ENTER_CD       = #{ssnEnterCd}
+							   AND A.APPRAISAL_CD   = #{searchAppraisalCd}
+						) X
+				   WHERE NVL(X.ORG_NM,'^')     LIKE '%'|| #{searchOrgNm} ||'%'
+				   AND   (NVL(X.SABUN,'^')     LIKE '%'|| #{searchSabun} ||'%' OR NVL(X.NAME,'^') LIKE '%'|| #{searchName} ||'%')
+				   AND   NVL(X.WORK_TYPE,'^')  LIKE '%'|| #{searchWorkType} ||'%'
+				   AND   NVL(X.JIKWEE_CD,'^')  LIKE '%'|| #{searchJikwee} ||'%'
+				   AND   NVL(X.JIKCHAK_CD,'^') LIKE '%'|| #{searchJikchak} ||'%'
+				   ORDER BY F_ORG_ORG_CHART_SORT(X.ENTER_CD, X.ORG_CD, X.D_BASE_YMD) 
+						,F_COM_GET_GRCODE_SEQ(X.ENTER_CD, 'H20030', X.JIKWEE_CD) 
+						,F_COM_GET_GRCODE_SEQ(X.ENTER_CD, 'H20010', X.JIKGUB_CD) 
+						,F_COM_GET_GRCODE_SEQ(X.ENTER_CD, 'H20020', X.JIKCHAK_CD)
+						,X.SABUN                                             
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppMboUploadMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppMboUpload">
+
+					MERGE INTO TPAP579 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.SABUN
+									, A.MBO_SELF_POINT
+									, A.MBO_SELF_CLASS_CD
+									, A.MBO_1ST_POINT
+									, A.MBO_1ST_CLASS_CD
+									, A.MBO_2ND_POINT
+									, A.MBO_2ND_CLASS_CD
+									, A.MBO_POINT
+									, A.MBO_CLASS_CD
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD         
+											, NULL		AS APPRAISAL_CD     
+											, NULL		AS SABUN            
+											, NULL		AS MBO_SELF_POINT   
+											, NULL		AS MBO_SELF_CLASS_CD
+											, NULL		AS MBO_1ST_POINT    
+											, NULL		AS MBO_1ST_CLASS_CD 
+											, NULL		AS MBO_2ND_POINT    
+											, NULL		AS MBO_2ND_CLASS_CD 
+											, NULL		AS MBO_POINT        
+											, NULL		AS MBO_CLASS_CD     
+											, NULL		AS MEMO             
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT  #{ssnEnterCd}                     AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	    AS APPRAISAL_CD
+											, TRIM( #{rm.sabun} )	        AS SABUN
+											, TRIM( #{rm.mboSelfPoint})	AS MBO_SELF_POINT
+											, TRIM( #{rm.mboSelfClassCd})	AS MBO_SELF_CLASS_CD
+											, TRIM( #{rm.mbo1stPoint})	    AS MBO_1ST_POINT
+											, TRIM( #{rm.mbo1stClassCd})	AS MBO_1ST_CLASS_CD
+											, TRIM( #{rm.mbo2ndPoint})	    AS MBO_2ND_POINT
+											, TRIM( #{rm.mbo2ndClassCd})	AS MBO_2ND_CLASS_CD
+											, TRIM( #{rm.mboPoint})	    AS MBO_POINT
+											, TRIM( #{rm.mboClassCd})	    AS MBO_CLASS_CD
+											, TRIM( #{rm.memo} )	        AS MEMO
+									FROM      DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.APPRAISAL_CD = S.APPRAISAL_CD
+					AND  T.SABUN        = S.SABUN
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MBO_SELF_POINT   	= S.MBO_SELF_POINT   
+									, T.MBO_SELF_CLASS_CD	= S.MBO_SELF_CLASS_CD
+									, T.MBO_1ST_POINT    	= S.MBO_1ST_POINT    
+									, T.MBO_1ST_CLASS_CD 	= S.MBO_1ST_CLASS_CD 
+									, T.MBO_2ND_POINT    	= S.MBO_2ND_POINT    
+									, T.MBO_2ND_CLASS_CD    = S.MBO_2ND_CLASS_CD 
+									, T.MBO_POINT           = S.MBO_POINT        
+									, T.MBO_CLASS_CD        = S.MBO_CLASS_CD     
+									, T.MEMO                = S.MEMO             
+									, T.CHKDATE	            = SYSDATE
+									, T.CHKID	            = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD         
+							, T.APPRAISAL_CD     
+							, T.SABUN            
+							, T.MBO_SELF_POINT   
+							, T.MBO_SELF_CLASS_CD
+							, T.MBO_1ST_POINT    
+							, T.MBO_1ST_CLASS_CD 
+							, T.MBO_2ND_POINT    
+							, T.MBO_2ND_CLASS_CD 
+							, T.MBO_POINT        
+							, T.MBO_CLASS_CD     
+							, T.MEMO             
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD         
+							, S.APPRAISAL_CD     
+							, S.SABUN            
+							, S.MBO_SELF_POINT   
+							, S.MBO_SELF_CLASS_CD
+							, S.MBO_1ST_POINT    
+							, S.MBO_1ST_CLASS_CD 
+							, S.MBO_2ND_POINT    
+							, S.MBO_2ND_CLASS_CD 
+							, S.MBO_POINT        
+							, S.MBO_CLASS_CD     
+							, S.MEMO             
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppMboUpload">
+
+					DELETE FROM TPAP579
+					WHERE 	(ENTER_CD,APPRAISAL_CD,SABUN) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											, TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											, TRIM( #{rm.sabun} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppMboUpload">
+
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppMboUpload">
+
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+</mapper>

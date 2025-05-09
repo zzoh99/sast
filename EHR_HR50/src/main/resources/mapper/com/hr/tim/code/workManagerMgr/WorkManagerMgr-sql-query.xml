@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.workManagerMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkManagerMgrList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.ORG_CD
+						     , A.SABUN
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+						     , (SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+							 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS JIKCHAK_NM
+							 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS JIKWEE_NM
+							 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS JIKGUB_NM
+						     , A.SDATE
+						     , A.EDATE
+						     , A.USE_YN
+						     , A.NOTE
+						  FROM TTIM117 A 
+					  	 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					       AND REPLACE( #{searchDate} ,'-','') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+					               ]]>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					      AND (SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+		      		    ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE( #{searchDate} ,'-',''))
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveWorkManagerMgr">
+
+					 MERGE INTO TTIM117 T 
+					 USING 
+					( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD
+					            , TRIM(#{rm.orgCd})  AS  ORG_CD
+					            , TRIM(#{rm.sabun})  AS  SABUN
+					            , TRIM(#{rm.sdate})  AS  SDATE
+					            , TRIM(#{rm.edate})  AS  EDATE
+					            , TRIM(#{rm.useYn})  AS  USE_YN
+					            , TRIM(#{rm.note})   AS  NOTE
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.ORG_CD   = S.ORG_CD 
+					     AND  T.SABUN    = S.SABUN 
+					     AND  T.SDATE    = S.SDATE 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE	= sysdate 
+					            , T.CHKID	= #{ssnSabun}
+					            , T.EDATE   = S.EDATE 
+					            , T.USE_YN  = S.USE_YN 
+					            , T.NOTE    = S.NOTE 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.ORG_CD
+					            , T.SABUN
+					            , T.SDATE
+					            , T.EDATE
+					            , T.USE_YN
+					            , T.NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.ORG_CD
+					            , S.SABUN
+					            , S.SDATE
+					            , S.EDATE
+					            , S.USE_YN
+					            , S.NOTE
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteWorkManagerMgr">
+
+					DELETE FROM TTIM117
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND ( ORG_CD,SABUN,SDATE ) IN ( ( NULL,NULL,NULL) 
+<foreach item="rm" collection="deleteRows" >
+    <if test='rm.orgCd != null and !rm.orgCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.sdate != null and !rm.sdate.equals("") '>
+					     , ( TRIM( #{rm.orgCd} ),TRIM( #{rm.sabun} ),TRIM( #{rm.sdate} ) )
+	</if>
+</foreach>
+					       )
+
+		</delete>
+
+
+</mapper>

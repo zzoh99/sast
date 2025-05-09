@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayYearEleGroupMgr">
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerPayYearEleGroupMgrListFirst">
+				<![CDATA[
+				  SELECT PAY_GROUP_CD ,
+				         PAY_GROUP_NM,
+				         DESCRIPTION,
+				         SEQ
+				    FROM TCPN401
+				   WHERE ENTER_CD = #{ssnEnterCd} ]]>
+				   <if test="searchPayGroupNm != null and searchPayGroupNm neq ''">
+                        AND PAY_GROUP_NM LIKE '%'||TRIM(#{searchPayGroupNm})||'%'
+                   </if>
+				ORDER BY SEQ, PAY_GROUP_CD
+		</select>
+		
+<!--        조회 -->
+        <select parameterType="map" resultType="cMap" id="getPerPayYearEleGroupMgrListSecond">
+                <![CDATA[
+				SELECT DENSE_RANK () OVER (ORDER BY B.ELEMENT_TYPE, B.PRIORITY ASC, A.SDATE DESC) AS RNUM,
+				       A.PAY_GROUP_CD ,
+				       A.ELEMENT_CD,
+				       NVL(A.ELEMENT_NM, B.ELEMENT_NM) AS ELEMENT_NM,
+				       A.SDATE,
+				       A.EDATE,
+				       A.SEQ
+				  FROM TCPN402 A,
+                       (
+                        SELECT C.*
+                          FROM TCPN011 C
+                             , (
+                                SELECT MAX(SDATE) AS SDATE, ENTER_CD, ELEMENT_CD
+                                  FROM TCPN011
+                                 WHERE ENTER_CD = #{ssnEnterCd}
+                                   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                              GROUP BY ENTER_CD, ELEMENT_CD
+                               ) D
+                         WHERE C.ENTER_CD   = #{ssnEnterCd}
+                           AND C.ENTER_CD   = D.ENTER_CD
+                           AND C.ELEMENT_CD = D.ELEMENT_CD
+                           AND C.SDATE      = D.SDATE
+                       ) B
+				 WHERE     A.ENTER_CD = #{ssnEnterCd}
+				       AND A.PAY_GROUP_CD  = #{searchPayGroupCd}
+				       AND A.ENTER_CD = B.ENTER_CD
+				       AND A.ELEMENT_CD = B.ELEMENT_CD
+				 ORDER BY A.SEQ, RNUM
+                ]]>
+        </select>		
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePerPayYearEleGroupMgrFirst">
+					MERGE INTO TCPN401 T
+					USING	(
+							SELECT	  PAY_GROUP_CD     -- key
+									, PAY_GROUP_NM
+									, DESCRIPTION
+									, SEQ
+							FROM	(
+									SELECT	  NULL  AS PAY_GROUP_CD     -- key                 
+                                            , NULL	AS PAY_GROUP_NM                           
+                                            , NULL  AS DESCRIPTION                              
+                                            , NULL  AS SEQ                                      
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM(#{rm.payGroupCd})  AS PAY_GROUP_CD     -- key      
+											, TRIM(#{rm.payGroupNm})  AS PAY_GROUP_NM                
+											, TRIM(#{rm.description})   AS DESCRIPTION                   
+											, TRIM(#{rm.seq})           AS SEQ                           
+											FROM   DUAL
+</foreach>
+									)  WHERE PAY_GROUP_CD  IS NOT NULL
+							) S
+					ON ( T.ENTER_CD        = #{ssnEnterCd}
+					 AND T.PAY_GROUP_CD   = S.PAY_GROUP_CD 
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAY_GROUP_NM  = S.PAY_GROUP_NM 
+                                    , T.DESCRIPTION     = S.DESCRIPTION    
+                                    , T.SEQ             = S.SEQ            
+									, T.CHKDATE	    = SYSDATE
+									, T.CHKID    	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.PAY_GROUP_CD  
+                            , T.PAY_GROUP_NM 
+                            , T.DESCRIPTION    
+                            , T.SEQ            
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+                            , S.PAY_GROUP_CD  
+                            , S.PAY_GROUP_NM 
+                            , S.DESCRIPTION    
+                            , S.SEQ            
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!--      저장 -->  
+        <update parameterType="map" id="savePerPayYearEleGroupMgrSecond">
+                    MERGE INTO TCPN402 T
+                    USING   (
+                            SELECT    PAY_GROUP_CD       -- key
+									, ELEMENT_CD          -- key
+									, SDATE               -- key
+									, ELEMENT_NM
+									, EDATE
+									, SEQ
+                            FROM    (
+                                    SELECT    NULL AS PAY_GROUP_CD       -- key             
+                                            , NULL AS ELEMENT_CD          -- key             
+                                            , NULL AS SDATE               -- key             
+											, NULL AS ELEMENT_NM                           
+											, NULL AS EDATE                                  
+											, NULL AS SEQ
+                                    FROM    DUAL
+<foreach item="rm" collection="mergeRows">
+                            UNION ALL
+                                    SELECT    TRIM(#{rm.payGroupCd})     AS PAY_GROUP_CD    
+											, TRIM(#{rm.elementCd})        AS ELEMENT_CD       
+											, TRIM(#{rm.sdate})            AS SDATE            
+											, TRIM(#{rm.elementNm})      AS ELEMENT_NM     
+											, TRIM(#{rm.edate})            AS EDATE            
+											, TRIM(#{rm.seq})            AS SEQ
+                                            FROM   DUAL
+</foreach>
+                                    )  WHERE PAY_GROUP_CD  IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD       = #{ssnEnterCd}
+                     AND T.PAY_GROUP_CD   = S.PAY_GROUP_CD 
+                     AND T.ELEMENT_CD     = S.ELEMENT_CD
+                     AND T.SDATE          = S.SDATE
+                     )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.ELEMENT_NM = S.ELEMENT_NM
+                                    , T.EDATE      = S.EDATE
+                                    , T.SEQ		= S.SEQ
+                                    , T.CHKDATE    = SYSDATE
+                                    , T.CHKID      = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                              T.ENTER_CD
+							, T.PAY_GROUP_CD     
+							, T.ELEMENT_CD        
+							, T.SDATE             
+							, T.ELEMENT_NM      
+							, T.EDATE             
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd}
+                            , S.PAY_GROUP_CD     
+                            , S.ELEMENT_CD        
+                            , S.SDATE             
+                            , S.ELEMENT_NM      
+                            , S.EDATE            
+                            , S.SEQ 
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+        </update>
+        
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePerPayYearEleGroupMgrFirst">
+					DELETE FROM TCPN401
+					WHERE 	(ENTER_CD, PAY_GROUP_CD ) IN 	(  (NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+										  <if test="rm.payGroupCd != null and rm.payGroupCd neq ''">
+											 (#{ssnEnterCd}, TRIM( #{rm.payGroupCd} ))
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+		
+        <delete parameterType="map" id="deletePerPayYearEleGroupMgrSecond">
+                    DELETE FROM TCPN402 
+                    WHERE   (ENTER_CD, PAY_GROUP_CD , ELEMENT_CD, SDATE) IN     (  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+                        ,
+                                        <if test="ssnEnterCd != null and ssnEnterCd neq ''">
+                                          <if test="rm.payGroupCd != null and rm.payGroupCd neq ''">
+                                            <if test="rm.elementCd != null and rm.elementCd neq ''">
+                                             <if test="rm.sdate != null and sdate neq ''">
+                                                (#{ssnEnterCd}, TRIM( #{rm.payGroupCd} ), TRIM( #{rm.elementCd} ), TRIM( #{rm.sdate} ))
+                                             </if>
+                                            </if>
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+        </delete>
+        
+        <delete parameterType="map" id="deletePerPayYearEleGroupMgrSecondCasCading">
+                    DELETE FROM TCPN402 
+                    WHERE   (ENTER_CD, PAY_GROUP_CD ) IN     (  (NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+                        ,
+                                        <if test="ssnEnterCd != null and ssnEnterCd neq ''">
+                                          <if test="rm.payGroupCd != null and rm.payGroupCd neq ''">
+                                                (#{ssnEnterCd}, TRIM( #{rm.payGroupCd} ))
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+        </delete>
+</mapper>

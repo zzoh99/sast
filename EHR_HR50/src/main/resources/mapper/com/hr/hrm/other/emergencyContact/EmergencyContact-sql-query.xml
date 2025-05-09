@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.emergencyContact">
+
+	<select parameterType="map" resultType="cMap" id="getEmergencyContactPicList">
+
+				<![CDATA[
+					SELECT     (SELECT STD_CD_DESC FROM TSYS955 WHERE ENTER_CD = #{ssnEnterCd} AND STD_CD = 'EMP_PICTURE_LOCATION') || (SELECT FILENAME FROM THRM911 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = T2.SABUN) AS PHOTO
+							 , DECODE( (SELECT DECODE( NVL(FILENAME, '0'), '0', '0', '1') FROM THRM911 WHERE SABUN = T2.SABUN AND ENTER_CD = T2.ENTER_CD), '1', ROWNUM+100, '12003') AS PIC_SEQ
+					FROM       THRM100 T2
+					         , THRM151 T3
+					WHERE      T2.ENTER_CD = T3.ENTER_CD
+					AND        T2.SABUN    = T3.SABUN
+					AND        TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN T3.SDATE AND NVL(T3.EDATE, '99991231')
+					AND        T2.ENTER_CD = #{ssnEnterCd}
+					AND (T3.ENTER_CD, T3.SABUN, T3.SDATE)
+					        =
+					       (
+					         SELECT /*+ INDEX_DESC(THRM151 PK_HRM151)*/ ENTER_CD, SABUN, SDATE
+					           FROM THRM151
+					          WHERE ENTER_CD = T2.ENTER_CD
+					            AND SABUN = T2.SABUN
+					            AND SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD')
+					            AND STATUS_CD <> 'RAA'
+					            AND ROWNUM = 1
+					       )
+					       ]]>
+				<if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+					AND 	   F_COM_GET_ORG_NM2(T3.ENTER_CD,T3.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%'|| TRIM( #{searchOrgNm} ) ||'%'
+				</if>
+				<if test='searchName != null and !searchName.equals("")'>
+					AND 	   F_COM_GET_NAMES(T2.ENTER_CD,T2.SABUN, #{ssnLocaleCd}) LIKE '%'|| TRIM( #{searchName} ) ||'%'
+				</if>
+				<if test='searchJikchakYn != null and searchJikchakYn.equals("Y")'>
+						<![CDATA[
+					AND T3.JIKCHAK_Cd IS NOT NULL
+					AND T3.JIKCHAK_Cd <> '40'
+					]]>
+				</if>
+				<choose>
+					<when test='statusCd != null and !statusCd.equals("")'>
+					   AND T3.STATUS_CD != #{statusCd}
+					</when>
+					<otherwise>
+					   AND NVL(T2.RET_YMD, REPLACE(NVL(TRIM( #{searchRetEYmd} ),'99991231'),'-','')) BETWEEN REPLACE(NVL(TRIM( #{searchRetSYmd} ),'00000000'),'-','') AND REPLACE(NVL(TRIM( #{searchRetEYmd} ),'99991231'),'-','')
+					</otherwise>
+				</choose>
+					<![CDATA[ AND T3.STATUS_CD <> 'RAA' ]]>
+				ORDER BY F_COM_JIKJE_SORT(T3.ENTER_CD, T3.SABUN, T3.SDATE)
+
+		</select>
+
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmergencyContactList">
+
+				<![CDATA[
+					WITH DATA AS ( 
+                  SELECT T2.SABUN,
+					     F_COM_GET_NAMES(T2.ENTER_CD,T2.SABUN, #{ssnLocaleCd}) AS NAME,
+					     F_COM_GET_NAMES(T2.ENTER_CD,T2.SABUN,'ALIAS') AS ALIAS,
+					     F_COM_GET_ORG_NM (T2.ENTER_CD,T3.ORG_CD, TO_CHAR (SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM,
+						 T3.STATUS_NM,	
+          				 F_COM_GET_GRCODE_NAME(T3.ENTER_CD, 'H20020' , T3.JIKCHAK_CD, #{ssnLocaleCd})  AS JIKCHAK_NM,
+          				 F_COM_GET_GRCODE_NAME(T3.ENTER_CD, 'H20010' , T3.JIKGUB_CD, #{ssnLocaleCd})   AS JIKGUB_NM,
+          				 F_COM_GET_GRCODE_NAME(T3.ENTER_CD, 'H20030' , T3.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM,
+					     F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'OT') AS CONTACT_OT,
+						 F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'HT') AS CONTACT_HT,
+						 F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'HP') AS CONTACT_HP,
+						 F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'FT') AS CONTACT_FT,
+						 F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'IM') AS CONTACT_IM,
+						 F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'OM') AS CONTACT_OM,
+					     F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'SC1') AS CONTACT_SC1,
+					     F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'SC2') AS CONTACT_SC2,
+					     F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'SC3') AS CONTACT_SC3,
+					     DECODE((SELECT COUNT(1) FROM THRM911 WHERE ENTER_CD = T2.ENTER_CD AND SABUN = T2.SABUN AND IMAGE_TYPE = '1'), 0, 'N', 'Y') AS FILE_YN,
+					     '/EmpPhotoOut.do'||chr(63)||'enterCd=' || T2.ENTER_CD || chr(38) || 'searchKeyword=' || T2.SABUN ||  chr(38) || 'type=1' AS PHOTO
+                         , T2.ENTER_CD
+                         , T3.SDATE
+					FROM THRM100 T2,
+					     THRM151 T3
+					WHERE T2.ENTER_CD = T3.ENTER_CD
+					AND T2.SABUN = T3.SABUN
+					AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN T3.SDATE AND NVL (T3.EDATE, '99991231')
+					AND T2.ENTER_CD = #{ssnEnterCd}
+					AND (T3.ENTER_CD, T3.SABUN, T3.SDATE) =
+					    (SELECT /*+ INDEX_DESC(THRM151 PK_HRM151)*/ ENTER_CD, SABUN, SDATE
+					    FROM THRM151
+					    WHERE     ENTER_CD = T2.ENTER_CD
+					    AND SABUN = T2.SABUN
+					    AND SDATE <= TO_CHAR (SYSDATE, 'YYYYMMDD')
+					    AND STATUS_CD <> 'RAA'
+					    AND ROWNUM = 1)
+					        ]]>
+				<if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+					AND F_COM_GET_ORG_NM2(T3.ENTER_CD,T3.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%'|| TRIM( #{searchOrgNm} ) ||'%'
+				</if>
+				<if test='searchName != null and !searchName.equals("")'>
+					AND F_COM_GET_NAMES(T2.ENTER_CD,T2.SABUN, #{ssnLocaleCd}) LIKE '%'|| TRIM( #{searchName} ) ||'%'
+				</if>
+				<if test='searchJikchakYn != null and searchJikchakYn.equals("Y")'>
+						<![CDATA[
+					AND T3.JIKCHAK_Cd IS NOT NULL
+					AND T3.JIKCHAK_Cd <> '40'
+					]]>
+				</if>
+				<choose>
+					<when test='statusCd != null and !statusCd.equals("")'>
+					AND T3.STATUS_CD != #{statusCd}
+					</when>
+					<otherwise>
+					   AND NVL(T2.RET_YMD, REPLACE(NVL(TRIM( #{searchRetEYmd} ),'99991231'),'-','')) BETWEEN REPLACE(NVL(TRIM( #{searchRetSYmd} ),'00000000'),'-','') AND REPLACE(NVL(TRIM( #{searchRetEYmd} ),'99991231'),'-','')
+					</otherwise>
+				</choose>
+					<![CDATA[ AND T3.STATUS_CD <> 'RAA' ]]>
+            ) 
+                SELECT A.ENTER_CD
+                     , A.SABUN
+                     , MAX(A.SDATE) AS SDATE 
+                     , MAX(A.NAME) AS NAME
+                     , MAX(A.ALIAS) AS ALIAS
+                     , MAX(A.ORG_NM) AS ORG_NM
+                     , MAX(A.STATUS_NM) AS STATUS_NM
+                     , MAX(A.JIKCHAK_NM) AS JIKCHAK_NM
+                     , MAX(A.JIKGUB_NM) AS JIKGUB_NM
+                     , MAX(A.JIKWEE_NM) AS JIKWEE_NM
+                     , MAX(A.CONTACT_OT) AS CONTACT_OT
+                     , MAX(A.CONTACT_HT) AS CONTACT_HT
+                     , MAX(A.CONTACT_HP) AS CONTACT_HP
+                     , MAX(A.CONTACT_FT) AS CONTACT_FT
+                     , MAX(A.CONTACT_IM) AS CONTACT_IM
+                     , MAX(A.CONTACT_OM) AS CONTACT_OM
+                     , MAX(A.CONTACT_SC1) AS CONTACT_SC1
+                     , MAX(A.CONTACT_SC2) AS CONTACT_SC2
+                     , MAX(A.CONTACT_SC3) AS CONTACT_SC3 
+                     , MAX(A.FILE_YN) AS FILE_YN
+                     , MAX(A.PHOTO) AS PHOTO
+
+				<if test='titles !=null and !titles.equals("")'>
+					<foreach item="tit" collection="titles">
+                     , MAX(CASE WHEN B.CONT_TYPE = #{tit.code} THEN B.CONT_ADDRESS END) AS ${tit.code}
+					</foreach>
+				</if>
+                     
+                FROM DATA A
+                LEFT JOIN THRM124 B
+                  ON A.ENTER_CD = B.ENTER_CD
+                 AND A.SABUN = B.SABUN
+               GROUP BY A.ENTER_CD, A.SABUN
+               ORDER BY F_COM_JIKJE_SORT (A.ENTER_CD, A.SABUN, MAX(A.SDATE))
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getEmergencyContacTitletList">
+
+				<![CDATA[
+					  SELECT CODE
+                           , CODE_NM
+                        FROM TSYS005
+                       WHERE 1=1
+                         AND ENTER_CD = #{ssnEnterCd}
+                         AND GRCODE_CD = 'H12410'
+                         AND USE_YN = 'Y' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+                      ORDER BY CODE_NM DESC
+				]]>
+
+
+		</select>
+		
+
+</mapper>

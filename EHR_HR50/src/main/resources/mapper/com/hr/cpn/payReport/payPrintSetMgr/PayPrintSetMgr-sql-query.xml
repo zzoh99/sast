@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payReport.payPrintSetMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayPrintSetMgrFirstList">
+
+				<![CDATA[
+				SELECT PAY_CD, ELEMENT_TYPE, SEQ, REPORT_NM, USE_YN, ELEMENT_NMS
+				FROM (
+						SELECT ROWNUM AS RNUM, PAY_CD, ELEMENT_TYPE, SEQ, REPORT_NM, USE_YN, ELEMENT_NMS
+						  FROM (
+								SELECT B.PAY_CD, B.ELEMENT_TYPE, B.SEQ, B.REPORT_NM, B.USE_YN,
+								       (
+											SELECT MAX(DECODE(ROWNUM, 1, F_CPN_GET_ELEMENT_NM(ENTER_CD, ELEMENT_CD, #{ssnBaseDate}), NULL)) ||
+												   MAX(DECODE(ROWNUM, 2, ', ' || F_CPN_GET_ELEMENT_NM(ENTER_CD, ELEMENT_CD, #{ssnBaseDate}), NULL)) ||
+												   MAX(DECODE(ROWNUM, 3, ', ' || F_CPN_GET_ELEMENT_NM(ENTER_CD, ELEMENT_CD, #{ssnBaseDate}), NULL)) ||
+												   MAX(DECODE(ROWNUM, 4, ', ' || F_CPN_GET_ELEMENT_NM(ENTER_CD, ELEMENT_CD, #{ssnBaseDate}), NULL)) ||
+												   MAX(DECODE(ROWNUM, 5, ', ' || F_CPN_GET_ELEMENT_NM(ENTER_CD, ELEMENT_CD, #{ssnBaseDate}), NULL))
+											FROM TCPN994
+											WHERE ENTER_CD = B.ENTER_CD
+											  AND PAY_CD = B.PAY_CD
+											  AND ELEMENT_TYPE = B.ELEMENT_TYPE
+											  AND SEQ = B.SEQ
+									   ) AS ELEMENT_NMS
+
+								  FROM TCPN993 B
+								 WHERE B.ENTER_CD = #{ssnEnterCd}
+								 AND	 B.PAY_CD = #{searchPayCd}
+								 ORDER BY B.ELEMENT_TYPE, B.SEQ
+								)
+					)
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePayPrintSetMgrFirst">
+
+
+					MERGE INTO TCPN993 T
+					USING	(
+							SELECT	  PAY_CD
+									, ELEMENT_TYPE
+									, SEQ
+									, REPORT_NM
+									, USE_YN
+							FROM	(
+									SELECT	  NULL		AS PAY_CD
+											, NULL		AS ELEMENT_TYPE
+											, NULL		AS SEQ
+											, NULL		AS REPORT_NM
+											, NULL		AS USE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{rm.payCd} )	AS PAY_CD
+											, TRIM( #{rm.elementType} )	AS ELEMENT_TYPE
+											, TRIM( #{rm.seq} )	AS SEQ
+											, TRIM( #{rm.reportNm} )	AS REPORT_NM
+											, TRIM( #{rm.useYn} )	AS USE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE PAY_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD			= #{ssnEnterCd}
+					AND T.PAY_CD 			= S.PAY_CD
+					AND T.ELEMENT_TYPE    	= S.ELEMENT_TYPE
+					AND T.SEQ				= S.SEQ
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.REPORT_NM	= S.REPORT_NM
+									, T.USE_YN	= S.USE_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_CD
+							, T.ELEMENT_TYPE
+							, T.SEQ
+							, T.REPORT_NM
+							, T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_CD
+							, S.ELEMENT_TYPE
+							, S.SEQ
+							, S.REPORT_NM
+							, S.USE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayPrintSetMgrFirst">
+
+
+				--deletePayPrintSetMgrFirst
+					DELETE FROM TCPN993
+					WHERE 	(ENTER_CD, PAY_CD, ELEMENT_TYPE, SEQ) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+											(#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.elementType} ), TRIM( #{rm.seq} ))
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+		<!-- 	마스터 삭제시 디테일 삭제 -->
+		<delete parameterType="map" id="deletePayPrintSetMgrFirstDetail">
+
+
+					DELETE FROM TCPN994
+					WHERE 	(ENTER_CD, PAY_CD, ELEMENT_TYPE, SEQ) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+											(#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.elementType} ), TRIM( #{rm.seq} ))
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayPrintSetMgrSecondList">
+
+				<![CDATA[
+
+			SELECT PAY_CD, ELEMENT_TYPE, SEQ, ELEMENT_CD, ELEMENT_NM
+			FROM (
+			        SELECT ROWNUM AS RNUM, PAY_CD, ELEMENT_TYPE, SEQ, ELEMENT_CD, ELEMENT_NM
+			          FROM (
+			                SELECT A.PAY_CD, A.ELEMENT_TYPE, A.SEQ, A.ELEMENT_CD, B.ELEMENT_NM
+			                  FROM TCPN994 A, TCPN011 B
+			                 WHERE A.ENTER_CD = #{ssnEnterCd}
+			                   AND A.PAY_CD = #{searchHiddenPayCd}
+			                   AND A.ELEMENT_TYPE = #{searchElementType}
+			                   AND A.SEQ = #{searchSeq}
+			                   -- 항목테이블 조인
+			                   AND A.ENTER_CD  = B.ENTER_CD
+			                   AND A.ELEMENT_CD = B.ELEMENT_CD
+			                   AND B.SDATE = ( SELECT MAX(SDATE)
+			                   					 FROM TCPN011
+			                   					WHERE ENTER_CD = A.ENTER_CD
+			                   					  AND ELEMENT_CD = A.ELEMENT_CD
+			                   					  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+
+			                 ORDER BY A.SEQ
+			                )
+			    )
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePayPrintSetMgrSecond">
+
+
+				--USE_YN이 아닌 기본키업데이트는 안되므로 일단 사용은 하지 않음
+					MERGE INTO TCPN994 T
+					USING	(
+							SELECT
+									  PAY_CD
+									, ELEMENT_TYPE
+									, SEQ
+									, ELEMENT_CD
+									, USE_YN
+							FROM	(
+									SELECT	  NULL		AS PAY_CD
+											, NULL		AS ELEMENT_TYPE
+											, NULL		AS SEQ
+											, NULL		AS ELEMENT_CD
+											, NULL		AS USE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{rm.payCd} )		AS PAY_CD
+											, TRIM( #{rm.elementType} )	AS ELEMENT_TYPE
+											, TRIM( #{rm.seq} )			AS SEQ
+											, TRIM( #{rm.elementCd} )	AS ELEMENT_CD
+											, TRIM( #{rm.useYn} )	AS USE_YN
+									  FROM   DUAL
+</foreach>
+									) A WHERE PAY_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD      	= #{ssnEnterCd}
+					AND  T.PAY_CD		 	= S.PAY_CD
+					AND  T.ELEMENT_TYPE		= S.ELEMENT_TYPE
+					AND  T.SEQ		 		= S.SEQ
+					AND  T.ELEMENT_CD    	= S.ELEMENT_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.USE_YN	= #{useYn}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_CD
+							, T.ELEMENT_TYPE
+							, T.SEQ
+							, T.ELEMENT_CD
+							, T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_CD
+							, S.ELEMENT_TYPE
+							, S.SEQ
+							, S.ELEMENT_CD
+							, S.USE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayPrintSetMgrSecond">
+
+
+					DELETE FROM TCPN994
+					WHERE 	(ENTER_CD, PAY_CD, ELEMENT_TYPE, SEQ, ELEMENT_CD) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+											(#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.elementType} ), TRIM( #{rm.seq} ), TRIM( #{rm.elementCd} ))
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+	</mapper>

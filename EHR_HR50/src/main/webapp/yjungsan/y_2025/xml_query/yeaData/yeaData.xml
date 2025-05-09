@@ -1,0 +1,1449 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	소득공제자료등록
+ -->
+<root>
+
+	<!-- 소득공제자료 기본 정보 -->
+	<query id="selectYeaDataDefaultInfo">
+	   <![CDATA[
+			SELECT WORK_YY
+			     , ADJUST_TYPE
+			     , SABUN
+			     , BUSINESS_PLACE_CD
+			     , PAY_ACTION_CD
+			     , INPUT_CLOSE_YN
+			     , APPRV_YN
+			     , FINAL_CLOSE_YN
+			     , PAY_PEOPLE_STATUS
+				 , (SELECT F_COM_DECRYPT(RES_NO, ENTER_CD)
+				      FROM THRM100
+				     WHERE ENTER_CD = TCPN811.ENTER_CD
+				       AND SABUN    = TCPN811.SABUN) AS RES_NO
+			  FROM TCPN811
+			 WHERE ENTER_CD       = #ssnEnterCd#
+			   AND WORK_YY        = #searchWorkYy#
+			   $query$
+			   AND SABUN          = #searchSabun#
+	   ]]>
+	</query>
+
+	<!-- 특이사항 표시 -->
+	<query id="selectCheckClearYn">
+	   <![CDATA[
+			SELECT (CASE WHEN TIP_TEXT IS NOT NULL AND CLEAR_YN = 'Y' THEN '3'
+					ELSE (CASE WHEN TIP_TEXT IS NOT NULL  THEN '2' ELSE '1' END)
+			        END) AS CLEAR_YN_STR
+			  FROM TCPN847
+			 WHERE ENTER_CD       = #ssnEnterCd#
+			   AND WORK_YY        = #searchWorkYy#
+			   AND ADJUST_TYPE    = #searchAdjustType#
+			   AND SABUN          = #searchSabun#
+	   ]]>
+	</query>
+
+	<!-- 특이사항 팝업 조회 -->
+	<query id="selectUnusualPopupList">
+	   <![CDATA[
+			SELECT A.WORK_YY
+				 , A.ADJUST_TYPE
+				 , A.SABUN
+				 , A.TIP_TEXT
+				 , A.CLEAR_YN
+			  FROM TCPN847 A
+			 WHERE A.ENTER_CD      = #ssnEnterCd#
+			   AND A.WORK_YY       = #searchWorkYy#
+			   AND A.ADJUST_TYPE   = #searchAdjustType#
+			   AND A.SABUN         = #searchSabun#
+	   ]]>
+	</query>
+
+	<!-- 특이사항 입력 -->
+	<query id="insertUnusualPopup">
+		<![CDATA[
+			INSERT INTO TCPN847
+			(
+				ENTER_CD
+				, WORK_YY
+				, ADJUST_TYPE
+				, SABUN
+				, TIP_TEXT
+			    , CLEAR_YN
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #work_yy#
+                , #adjust_type#
+                , #sabun#
+                , #tip_text#
+                , #clear_yn#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 특이사항 수정 -->
+	<query id="updateUnusualPopup">
+		<![CDATA[
+			UPDATE TCPN847
+			SET TIP_TEXT = #tip_text#
+				, CLEAR_YN = #clear_yn#
+				, CHKDATE = SYSDATE
+				, CHKID = #ssnSabun#
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun#
+		]]>
+	</query>
+
+	<!-- 소득공제자료등록 팝업 자료 조회 -->
+	<query id="selectRes3List">
+		<![CDATA[
+			SELECT WORK_YY, ADJUST_TYPE, SABUN, BUSINESS_PLACE_CD, PAY_ACTION_CD, ZIP, ADDR1, ADDR2, ORG_CD, F_COM_GET_ORG_NM(ENTER_CD,ORG_CD,TO_CHAR(WORK_YY) || '1231') AS ORG_NM, INPUT_CLOSE_YN, APPRV_YN, FINAL_CLOSE_YN, PAY_PEOPLE_STATUS
+			      ,( SELECT F_COM_DECRYPT(RES_NO, ENTER_CD)
+			          FROM THRM100
+			         WHERE ENTER_CD = TCPN811.ENTER_CD
+			           AND SABUN    = TCPN811.SABUN) AS RES_NO
+			     ,RESULT_CONFIRM_YN
+			  FROM TCPN811
+			 WHERE ENTER_CD       = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			   AND WORK_YY  	  = #searchWorkYy#
+			   AND ADJUST_TYPE    = '999_' || #searchAdjustType#
+			   AND SABUN          = #searchSabun#
+		]]>
+	</query>
+
+	<!-- 소득공제자료등록 팝업 자료 조회 -->
+	<query id="selectRes2List871">
+		<![CDATA[
+			SELECT WORK_YY, ADJUST_TYPE, SABUN, ENTER_NO, ADJ_S_YMD, ADJ_E_YMD, RESIDENCY_TYPE, CITIZEN_TYPE, RESIDENCE_CD, RESIDENCE_NM,
+				   CASE WHEN FOREIGN_TAX_TYPE IN ('1', '4', '5') THEN TO_CHAR(NVL(PRE_PAY_MON,0)
+									- NVL(PRE_NOTAX_TOT_MON, 0)
+			                        - NVL(PRE_HEL_MON, 0)
+			                        - (
+			                            SELECT NVL(SUM(NVL(EMP_MON,0)), 0) -- 고용보험
+			                              FROM TCPN817
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                        )
+                                    - (
+			                            SELECT NVL(SUM(NVL(MON, 0)), 0)
+			                              FROM TCPN818
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                            -- AND ADJ_ELEMENT_CD IN ('C010_05', 'C010_051') -- 고용보험			                               
+			                               AND ADJ_ELEMENT_CD IN ('C010_05') -- 고용보험.. 20250213 세금계산 패키지에서 PRE_PAY_MON에는 고용보험(회사부담금)을 더하지 않음.
+			                           )
+			                        )
+                      ELSE DECODE(PRE_PAY_MON,'','0',PRE_PAY_MON)
+                   END AS PRE_PAY_MON,
+				   DECODE(PRE_BONUS_MON,'','0',PRE_BONUS_MON) PRE_BONUS_MON,
+				   DECODE(PRE_ETC_BONUS_MON,'','0',PRE_ETC_BONUS_MON) PRE_ETC_BONUS_MON,
+				   DECODE(PRE_STOCK_BUY_MON,'','0',PRE_STOCK_BUY_MON) PRE_STOCK_BUY_MON,
+				   DECODE(PRE_STOCK_UNION_MON,'','0',PRE_STOCK_UNION_MON) PRE_STOCK_UNION_MON,
+				   DECODE(PRE_IMWON_RET_OVER_MON,'','0',PRE_IMWON_RET_OVER_MON) PRE_IMWON_RET_OVER_MON,
+				   DECODE(PRE_JOB_INVENTION_OVER_MON,'','0',PRE_JOB_INVENTION_OVER_MON) AS PRE_JOB_INVT_OVR_MON,
+				   CASE WHEN FOREIGN_TAX_TYPE IN ('1', '4', '5') THEN TO_CHAR(NVL(PRE_TOT_MON, 0)
+									- NVL(PRE_NOTAX_TOT_MON, 0)
+			                        - NVL(PRE_HEL_MON, 0)
+			                        - (
+			                            SELECT NVL(SUM(NVL(EMP_MON,0)), 0) -- 고용보험
+			                              FROM TCPN817
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                        )
+                                    - (
+			                            SELECT NVL(SUM(NVL(MON, 0)), 0)
+			                              FROM TCPN818
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                            -- AND ADJ_ELEMENT_CD IN ('C010_05', 'C010_051') -- 고용보험			                               
+			                               AND ADJ_ELEMENT_CD IN ('C010_05') -- 고용보험.. 20250213 세금계산 패키지에서 PRE_PAY_MON에는 고용보험(회사부담금)을 더하지 않음.
+			                          )
+			                        )
+                      ELSE DECODE(PRE_TOT_MON,'','0',PRE_TOT_MON)
+                  END AS PRE_TOT_MON,
+				   DECODE(PRE_NOTAX_TOT_MON,'','0',PRE_NOTAX_TOT_MON) PRE_NOTAX_TOT_MON,
+			       DECODE(PRE_NOTAX_BABY_MON,'','0',PRE_NOTAX_BABY_MON) PRE_NOTAX_BABY_MON,
+			       DECODE(NVL(PRE_NOTAX_CHILD_BIRTH1_MON, 0)+NVL(PRE_NOTAX_CHILD_BIRTH2_MON, 0),'','0',NVL(PRE_NOTAX_CHILD_BIRTH1_MON, 0)+NVL(PRE_NOTAX_CHILD_BIRTH2_MON, 0)) PRE_NOTAX_CHILD_BIRTH_MON,
+			       DECODE(PRE_NOTAX_FORN_MON,'','0',PRE_NOTAX_FORN_MON) PRE_NOTAX_FORN_MON,
+				   DECODE(PRE_NOTAX_ABROAD_MON,'','0',PRE_NOTAX_ABROAD_MON) PRE_NOTAX_ABROAD_MON,
+				   DECODE(PRE_NOTAX_FOOD_MON,'','0',PRE_NOTAX_FOOD_MON) PRE_NOTAX_FOOD_MON,
+				   DECODE(PRE_NOTAX_WORK_MON,'','0',PRE_NOTAX_WORK_MON) PRE_NOTAX_WORK_MON,
+				   DECODE(PRE_NOTAX_ETC_MON,'','0',PRE_NOTAX_ETC_MON) PRE_NOTAX_ETC_MON,
+                   DECODE(PRE_JOB_INVENTION_MON,'','0',PRE_JOB_INVENTION_MON) AS PRE_NOTAX_JOB_INVT_MON,                 
+                   DECODE(PRE_NOTAX_REPORTER_MON,'','0',PRE_NOTAX_REPORTER_MON) AS PRE_NOTAX_RPT_MON,     
+			       NVL(F_CPN_YEA_PRE_NOTAX_NEW(ENTER_CD,WORK_YY,ADJUST_TYPE,SABUN,'ALL','ALL'),0) AS PRE_NOTAX_EXT_MON,
+
+				   --DECODE(CURR_PAY_MON,'','0',CURR_PAY_MON) CURR_PAY_MON,
+				   CASE WHEN FOREIGN_TAX_TYPE IN ('1', '4', '5') THEN TO_CHAR(NVL(CURR_PAY_MON, 0)
+				                    - ( CASE WHEN CHKDATE <= TO_DATE('20250101', 'YYYYMMDD') -- 2024년 귀속연말정산 1차 패치 이전 방식으로 계산되었다면 CURR_NOTAX_TOT_MON에 미신고 비과세 일부 금액이 합산되어 있음.
+					                         THEN NVL(CURR_NOTAX_ETC_MON, 0) + NVL(CURR_NOTAX_TOT_MON, 0) -- 과거 로직
+						                     ELSE NVL(CURR_NOTAX_TOT_MON, 0)
+							            END )
+			                        - NVL(CURR_HEL_MON, 0)
+			                        - (
+			                            SELECT NVL(SUM(NVL(EMP_MON,0)), 0)
+			                              FROM TCPN813
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                          )
+                                    - (
+			                            SELECT NVL(SUM(NVL(MON, 0)), 0)
+			                              FROM TCPN815
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                            -- AND ADJ_ELEMENT_CD IN ('C010_05', 'C010_051') -- 고용보험			                               
+			                               AND ADJ_ELEMENT_CD IN ('C010_05') -- 고용보험.. 20250213 세금계산 패키지에서 PRE_PAY_MON에는 고용보험(회사부담금)을 더하지 않음.
+			                           )
+			                        )
+			             ELSE DECODE(CURR_PAY_MON,'','0',CURR_PAY_MON)
+			         END AS CURR_PAY_MON,
+				   DECODE(CURR_BONUS_MON,'','0',CURR_BONUS_MON) CURR_BONUS_MON,
+				   DECODE(CURR_ETC_BONUS_MON,'','0',CURR_ETC_BONUS_MON) CURR_ETC_BONUS_MON,
+				   DECODE(CURR_STOCK_BUY_MON,'','0',CURR_STOCK_BUY_MON) CURR_STOCK_BUY_MON,
+				   DECODE(CURR_STOCK_UNION_MON,'','0',CURR_STOCK_UNION_MON) CURR_STOCK_UNION_MON,
+				   DECODE(CURR_IMWON_RET_OVER_MON,'','0',CURR_IMWON_RET_OVER_MON) CURR_IMWON_RET_OVER_MON,
+				   DECODE(CURR_JOB_INVENTION_OVER_MON,'','0',CURR_JOB_INVENTION_OVER_MON) AS CURR_JOB_INVT_OVR_MON,
+				   --DECODE(CURR_TOT_MON,'','0',CURR_TOT_MON) CURR_TOT_MON,
+				   CASE WHEN FOREIGN_TAX_TYPE IN ('1', '4', '5') THEN TO_CHAR(NVL(CURR_TOT_MON,0)
+									- ( CASE WHEN CHKDATE <= TO_DATE('20250101', 'YYYYMMDD') -- 2024년 귀속연말정산 1차 패치 이전 방식으로 계산되었다면 CURR_NOTAX_TOT_MON에 미신고 비과세 일부 금액이 합산되어 있음.
+					                         THEN NVL(CURR_NOTAX_ETC_MON, 0) + NVL(CURR_NOTAX_TOT_MON, 0) -- 과거 로직
+						                     ELSE NVL(CURR_NOTAX_TOT_MON, 0)
+							            END )
+			                        - NVL(CURR_HEL_MON, 0)
+			                        - (
+			                            SELECT NVL(SUM(NVL(EMP_MON,0)), 0)
+			                              FROM TCPN813
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                          )
+                                    - (
+			                            SELECT NVL(SUM(NVL(MON, 0)), 0)
+			                              FROM TCPN815
+			                             WHERE ENTER_CD = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			                               AND WORK_YY = #searchWorkYy#
+			                               AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			                               AND SABUN = #searchSabun#
+			                            -- AND ADJ_ELEMENT_CD IN ('C010_05', 'C010_051') -- 고용보험			                               
+			                               AND ADJ_ELEMENT_CD IN ('C010_05') -- 고용보험.. 20250213 세금계산 패키지에서 PRE_PAY_MON에는 고용보험(회사부담금)을 더하지 않음.
+			                           )
+			                        )
+			             ELSE DECODE(CURR_TOT_MON,'','0',CURR_TOT_MON)
+			         END AS CURR_TOT_MON,
+
+				   DECODE(CURR_NOTAX_ABROAD_MON,'','0',CURR_NOTAX_ABROAD_MON) CURR_NOTAX_ABROAD_MON,
+				   DECODE(CURR_NOTAX_FOOD_MON,'','0',CURR_NOTAX_FOOD_MON) CURR_NOTAX_FOOD_MON,
+				   DECODE(CURR_NOTAX_BABY_MON,'','0',CURR_NOTAX_BABY_MON) CURR_NOTAX_BABY_MON,
+				   DECODE(NVL(CURR_NOTAX_CHILD_BIRTH1_MON, 0)+NVL(CURR_NOTAX_CHILD_BIRTH2_MON, 0),'','0',NVL(CURR_NOTAX_CHILD_BIRTH1_MON, 0)+NVL(CURR_NOTAX_CHILD_BIRTH2_MON, 0)) CURR_NOTAX_CHILD_BIRTH_MON,
+				   DECODE(CURR_NOTAX_WORK_MON,'','0',CURR_NOTAX_WORK_MON) CURR_NOTAX_WORK_MON,
+				   DECODE(CURR_NOTAX_FORN_MON,'','0',CURR_NOTAX_FORN_MON) CURR_NOTAX_FORN_MON,
+				   DECODE(CURR_NOTAX_ETC_MON,'','0',CURR_NOTAX_ETC_MON) CURR_NOTAX_ETC_MON,				   
+                   DECODE(CURR_JOB_INVENTION_MON,'','0',CURR_JOB_INVENTION_MON) AS CURR_NOTAX_JOB_INVT_MON,                   
+                   DECODE(CURR_NOTAX_REPORTER_MON,'','0',CURR_NOTAX_REPORTER_MON) AS CURR_NOTAX_RPT_MON,                   
+			       NVL(F_CPN_YEA_ETC_NOTAX_MON_NEW(ENTER_CD,WORK_YY,ADJUST_TYPE,SABUN,'ALL'), '0') AS CURR_NOTAX_EXT_MON,
+				   CASE WHEN CURR_NOTAX_TOT_MON IS NULL OR CURR_NOTAX_TOT_MON = 0 
+                        THEN '0'
+	                    WHEN CHKDATE <= TO_DATE('20250101', 'YYYYMMDD') -- 2024년 귀속연말정산 1차 패치 이전 방식으로 계산되었다면 CURR_NOTAX_TOT_MON에 미신고 비과세 일부 금액이 합산되어 있음.
+	                         THEN TO_CHAR(CURR_NOTAX_TOT_MON - (SELECT NVL(SUM(NVL(Z.NOTAX_ETC_MON,0) /*+ NVL(Z.NOTAX_FORN_MON,0) */ ), 0)
+	                                                              FROM TCPN813 Z
+	                                                             WHERE Z.ENTER_CD       = A.ENTER_CD
+	                                                               AND Z.WORK_YY  	    = A.WORK_YY
+	                                                               AND Z.ADJUST_TYPE    = A.ADJUST_TYPE
+	                                                               AND Z.SABUN          = A.SABUN)
+	                                                            ) 
+	                    ELSE TO_CHAR(CURR_NOTAX_TOT_MON)
+	               END AS CURR_NOTAX_TOT_MON,
+
+				   CASE WHEN NOTAX_TOT_MON IS NULL OR NOTAX_TOT_MON = 0 
+	                         THEN '0'
+	                    WHEN CHKDATE <= TO_DATE('20250101', 'YYYYMMDD') -- 2024년 귀속연말정산 1차 패치 이전 방식으로 계산되었다면 CURR_NOTAX_TOT_MON에 미신고 비과세 일부 금액이 합산되어 있음.
+	                         THEN TO_CHAR(NOTAX_TOT_MON - (SELECT NVL(SUM(NVL(Z.NOTAX_ETC_MON,0) /*+ NVL(Z.NOTAX_FORN_MON,0) */ ), 0)
+	                                                              FROM TCPN813 Z
+	                                                             WHERE Z.ENTER_CD       = A.ENTER_CD
+	                                                               AND Z.WORK_YY  	    = A.WORK_YY
+	                                                               AND Z.ADJUST_TYPE    = A.ADJUST_TYPE
+	                                                               AND Z.SABUN          = A.SABUN)
+	                                                            ) 
+	                    ELSE TO_CHAR(NOTAX_TOT_MON)
+	               END AS NOTAX_TOT_MON,
+			       DECODE(OTHER_PAY_MON,'','0',OTHER_PAY_MON) OTHER_PAY_MON,
+			       DECODE(OTHER_NOTAX_MON,'','0',OTHER_NOTAX_MON) OTHER_NOTAX_MON,
+			       DECODE(TAXABLE_PAY_MON,'','0',TAXABLE_PAY_MON) TAXABLE_PAY_MON,
+			       DECODE(INCOME_MON,'','0',INCOME_MON) INCOME_MON,
+			       DECODE(STAND_DEDUCT_MON,'','0',STAND_DEDUCT_MON) STAND_DEDUCT_MON,
+			       DECODE(BLNCE_INCOME_MON,'','0',BLNCE_INCOME_MON) BLNCE_INCOME_MON,
+			       DECODE(TAX_BASE_MON,'','0',TAX_BASE_MON) TAX_BASE_MON,
+			       DECODE(CLCLTE_TAX_MON,'','0',CLCLTE_TAX_MON) CLCLTE_TAX_MON,
+			       DECODE(TOT_TAX_DEDUCT_MON,'','0',TOT_TAX_DEDUCT_MON) TOT_TAX_DEDUCT_MON,
+			       DECODE(FIN_INCOME_TAX,'','0',FIN_INCOME_TAX) FIN_INCOME_TAX,
+			       DECODE(FIN_INBIT_TAX_MON,'','0',FIN_INBIT_TAX_MON) FIN_INBIT_TAX_MON,
+			       DECODE(FIN_AGRCL_TAX_MON,'','0',FIN_AGRCL_TAX_MON) FIN_AGRCL_TAX_MON,
+			       DECODE(FIN_TOT_TAX_MON,'','0',FIN_TOT_TAX_MON) FIN_TOT_TAX_MON,
+			       DECODE(FIN_HEL_MON,'','0',FIN_HEL_MON) FIN_HEL_MON,
+			       DECODE(PRE_INCOME_TAX_MON,'','0',PRE_INCOME_TAX_MON) PRE_INCOME_TAX_MON,
+				   DECODE(PRE_INBIT_TAX_MON,'','0',PRE_INBIT_TAX_MON) PRE_INBIT_TAX_MON,
+				   DECODE(PRE_AGRCL_TAX_MON,'','0',PRE_AGRCL_TAX_MON) PRE_AGRCL_TAX_MON,
+				   DECODE(PRE_TOT_TAX_MON,'','0',PRE_TOT_TAX_MON) PRE_TOT_TAX_MON,
+				   DECODE(PRE_HEL_MON,'','0',PRE_HEL_MON) PRE_HEL_MON,
+				   DECODE(CURR_INCOME_TAX_MON,'','0',CURR_INCOME_TAX_MON) CURR_INCOME_TAX_MON,
+				   DECODE(CURR_INBIT_TAX_MON,'','0',CURR_INBIT_TAX_MON) CURR_INBIT_TAX_MON,
+				   DECODE(CURR_AGRCL_TAX_MON,'','0',CURR_AGRCL_TAX_MON) CURR_AGRCL_TAX_MON,
+				   DECODE(CURR_TOT_TAX_MON,'','0',CURR_TOT_TAX_MON) CURR_TOT_TAX_MON,
+				   DECODE(CURR_HEL_MON,'','0',CURR_HEL_MON) CURR_HEL_MON,
+				   DECODE(BLC_INCOME_TAX_MON,'','0',BLC_INCOME_TAX_MON) BLC_INCOME_TAX_MON,
+				   DECODE(BLC_INBIT_TAX_MON,'','0',BLC_INBIT_TAX_MON) BLC_INBIT_TAX_MON,
+				   DECODE(BLC_AGRCL_TAX_MON,'','0',BLC_AGRCL_TAX_MON) BLC_AGRCL_TAX_MON,
+				   DECODE(BLC_TOT_TAX_MON,'','0',BLC_TOT_TAX_MON) BLC_TOT_TAX_MON,
+				   DECODE(SPC_INCOME_TAX_MON,'','0',SPC_INCOME_TAX_MON) SPC_INCOME_TAX_MON,
+				   DECODE(SPC_INBIT_TAX_MON,'','0',SPC_INBIT_TAX_MON) SPC_INBIT_TAX_MON,
+				   DECODE(SPC_AGRCL_TAX_MON,'','0',SPC_AGRCL_TAX_MON) SPC_AGRCL_TAX_MON,
+				   (NVL(SPC_INCOME_TAX_MON,0)+NVL(SPC_INBIT_TAX_MON,0)+NVL(SPC_AGRCL_TAX_MON,0)) SPC_TOT_TAX_MON,
+				   DECODE(BLC_HEL_MON,'','0',BLC_HEL_MON) BLC_HEL_MON,
+				   DECODE(CURR_NOTAX_RESEARCH_MON,'','0',CURR_NOTAX_RESEARCH_MON) CURR_NOTAX_RESEARCH_MON,
+				   DECODE(PRE_NOTAX_RESEARCH_MON,'','0',PRE_NOTAX_RESEARCH_MON) PRE_NOTAX_RESEARCH_MON,
+				   DECODE(LIMIT_OVER_MON,'','0',LIMIT_OVER_MON) LIMIT_OVER_MON, -- 특별공제 종합한도 초과액
+				   DECODE(EFF_TAX_RATE,'','0',EFF_TAX_RATE) EFF_TAX_RATE,
+				   '0' AS TEMP
+	         FROM TCPN841 A
+	        WHERE ENTER_CD       =  #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+	          AND WORK_YY  	     =  #searchWorkYy#
+	          AND ADJUST_TYPE    =  '999_' || #searchAdjustType#
+	          AND SABUN          =  #searchSabun#
+		]]>
+	</query>
+
+	<!-- 소득공제자료등록 팝업 자료 조회 -->
+	<query id="selectRes5List873">
+		<![CDATA[
+		SELECT MAX(DECODE(ADJ_ELEMENT_CD, 'A000_01', DATA_MON , '0'))  A000_01 -- 근로소득공제
+		       -- 기본공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A010_01', DATA_MON , '0'))  A010_01 -- 본인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A010_03', DATA_MON , '0'))  A010_03 -- 배우자공제
+		      ,NVL(MAX(DECODE(ADJ_ELEMENT_CD, 'A010_05', DATA_CNT , '0')),'0') +
+		       NVL(MAX(DECODE(ADJ_ELEMENT_CD, 'A010_07', DATA_CNT , '0')),'0') +
+		       NVL(MAX(DECODE(ADJ_ELEMENT_CD, 'A010_09', DATA_CNT , '0')),'0') AS A010_11_CNT -- 부양가족인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A010_11', DATA_MON , '0'))  A010_11 -- 부양가족공제
+		      -- 추가공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_03', DATA_CNT , '0'))  A020_03_CNT -- 경로우대인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_04', DATA_MON , '0'))  A020_04 -- 경로우대공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_05', DATA_CNT , '0'))  A020_05_CNT -- 장애인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_05', DATA_MON , '0'))  A020_05 -- 장애인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_07', DATA_MON , '0'))  A020_07 -- 부녀자공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_09', DATA_CNT , '0'))  A020_09_CNT -- 자녀양육비인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_09', DATA_MON , '0'))  A020_09 -- 자녀양육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_12', DATA_CNT , '0'))  A020_12_CNT -- 출산입양인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_12', DATA_MON , '0'))  A020_12 -- 출산입양공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_14', DATA_MON , '0'))  A020_14 -- 한부모
+		      -- 다자녀추가공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_11', DATA_CNT , '0'))  A020_11_CNT -- 다자녀인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_11', DATA_MON , '0'))  A020_11 -- 다자녀추가공제
+		      -- 연금보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_01', INPUT_MON , '0'))  A030_01_INP -- 국민연금보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_01', DATA_MON , '0'))  A030_01 -- 국민연금보험료공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_11', INPUT_MON , '0'))  A030_11_INP -- 공무원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_11', DATA_MON ,  '0'))  A030_11 -- 공무원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_12', INPUT_MON , '0'))  A030_12_INP -- 군인연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_12', DATA_MON ,  '0'))  A030_12 -- 군인연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_02', INPUT_MON , '0'))  A030_02_INP -- 사립학교교직원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_02', DATA_MON ,  '0'))  A030_02 -- 사립학교교직원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_13', INPUT_MON , '0'))  A030_13_INP -- 별정우체국연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_13', DATA_MON ,  '0'))  A030_13 -- 별정우체국연금
+		      -- 보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_03', INPUT_MON , '0'))  A040_03_INP -- 건강보험공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_04', INPUT_MON , '0'))  A040_04_INP -- 고용보험공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_03', DATA_MON , '0'))  A040_03 -- 보험료공제-건강보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_04', DATA_MON , '0'))  A040_04 -- 보험료공제-고용보험료
+		      -- 주택자금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_13', INPUT_MON , '0'))  A070_13 -- 주택임차차입금원리금상환액(대출기관)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_14', DATA_MON , '0'))  A070_14 -- 주택임차차입금원리금상환액공제(대출기관)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_19', INPUT_MON , '0'))  A070_19 -- 주택임차차입금원리금상환액(거주자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_21', DATA_MON , '0'))  A070_21 -- 주택임차차입금원리금상환액공제(거주자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_10', INPUT_MON , '0'))  A070_10_INP -- 월세액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_10', STD_MON , '0'))   A070_10_STD -- 월세액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_10', DATA_MON , '0'))  A070_10 -- 월세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_17', DATA_MON , '0'))  A070_17 -- 이자상환액(차입금상환기간 2011년 이전(15년미만)                   )공제금액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_15', DATA_MON , '0'))  A070_15 -- 이자상환액(차입금상환기간 2011년 이전(15년이상)                  )공제금액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_16', DATA_MON , '0'))  A070_16 -- 이자상환액(차입금상환기간 2011년 이전(30년이상)                   )공제금액
+		      -- 2024년 변경 시작
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_22', DATA_MON , '0'))  A070_22 -- 이자상환액(차입금상환기간 2011년 이전(고정&비거치 상환) )공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_23', DATA_MON , '0'))  A070_23 -- 이자상환액(차입금상환기간 2011년 이전(고정/비거치 상환)                )  공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_24', DATA_MON , '0'))  A070_24 -- 2012년 이후(15년이상 고정&비거치 상환)                )  공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_25', DATA_MON , '0'))  A070_25 -- 2012년 이후(15년이상 고정/비거치 상환)                )  공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_26', DATA_MON , '0'))  A070_26 -- 2012년 이후(15년이상 기타대출)                        )  공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_27', DATA_MON , '0'))  A070_27 -- 2012년 이후(10년이상 고정/비거치 상환)                )  공제금액
+          -- 2024년 변경 끝
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_17', INPUT_MON , '0'))  A070_17_INP -- 이자상환액(차입금상환기간 2011년 이전(15년미만)                 )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_15', INPUT_MON , '0'))  A070_15_INP -- 이자상환액(차입금상환기간 2011년 이전(15년이상)                )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_16', INPUT_MON , '0'))  A070_16_INP -- 이자상환액(차입금상환기간 2011년 이전(30년이상)                 )
+          -- 2024년 변경 시작
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_22', INPUT_MON , '0'))  A070_22_INP -- 이자상환액(차입금상환기간 2011년 이전(고정&비거치 상환) )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_23', INPUT_MON , '0'))  A070_23_INP -- 이자상환액(차입금상환기간 2011년 이전(고정/비거치 상환)                )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_24', INPUT_MON , '0'))  A070_24_INP -- 2012년 이후(15년이상 고정&비거치 상환)                )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_25', INPUT_MON , '0'))  A070_25_INP -- 2012년 이후(15년이상 고정/비거치 상환)                )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_26', INPUT_MON , '0'))  A070_26_INP -- 2012년 이후(15년이상 기타대출)                 )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_27', INPUT_MON , '0'))  A070_27_INP -- 2012년 이후(10년이상 고정/비거치 상환)                 )
+          -- 2024년 변경 끝
+			  --,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_18', DATA_MON , '0'))  A070_18 -- 주택임차차입금원리금상환액공제
+		      -- 특별공제 계
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A099_02', DATA_MON , '0'))  A099_02 -- 특별공제 계
+		      -- 기부금(이월분)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_20', DATA_MON , '0'))  A080_20 -- 기부금(이월분)
+		      -- 연금저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_03', INPUT_MON , '0'))  A100_03_INP -- 개인연금저축소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_03', DATA_MON , '0'))  A100_03 -- 개인연금저축소득공제
+		      -- 소기업·소상공인 공제부금공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_30', INPUT_MON , '0'))  A100_30_INP -- 소기업·소상공인 공제부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_30', DATA_MON , '0'))  A100_30 -- 소기업·소상공인 공제부금공제
+		      -- 장기집합투자증권저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_40', DATA_MON , '0'))  A100_40 -- 장기집합투자증권저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_40', INPUT_MON , '0'))  A100_40_INP -- 장기집합투자증권저축
+              -- 청년형장기집합투자증권저축
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_41', DATA_MON , '0'))   A100_41 -- 청년형장기집합투자증권저축
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_41', INPUT_MON , '0'))  A100_41_INP -- 청년형장기집합투자증권저축		      
+		      -- 주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_34', INPUT_MON , '0'))  A100_34_INP -- 주택청약저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_31', INPUT_MON , '0'))  A100_31_INP -- 주택청약종합저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_32', INPUT_MON , '0'))  A100_32_INP -- 장기주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_33', INPUT_MON , '0'))  A100_33_INP -- 근로자주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_35', DATA_MON , '0'))  A100_35 -- 주택마련저축소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_34', DATA_MON , '0'))  A100_34 -- 주택청약저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_31', DATA_MON , '0'))  A100_31 -- 주택청약종합저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_32', DATA_MON , '0'))  A100_32 -- 장기주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_33', DATA_MON , '0'))  A100_33 -- 근로자주택마련저축
+		      -- 투자조합출자소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_11', INPUT_MON , '0'))  A100_11 -- 2011.12.31 이전 출자분
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_08', INPUT_MON , '0'))  A100_08 -- 2012.1.1 ~ 2012.12.31(간접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_10', INPUT_MON , '0'))  A100_10 -- 2012.1.1 ~ 2012.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_09', INPUT_MON , '0'))  A100_09 -- 2013.1.1 ~ 2013.12.31(간접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_12', INPUT_MON , '0'))  A100_12 -- 2013.1.1 ~ 2013.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_55', INPUT_MON , '0'))  A100_55 -- 2014.1.1 ~ 2014.12.31(간접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_56', INPUT_MON , '0'))  A100_56 -- 2014.1.1 ~ 2014.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_57', INPUT_MON , '0'))  A100_57 -- 2015.1.1 ~ 2015.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_58', INPUT_MON , '0'))  A100_58 -- 2015.1.1 ~ 2015.12.31(직접출자)
+		      -- 2016년 추가 start
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_59', INPUT_MON , '0'))  A100_59 -- 2016.1.1 ~ 2016.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_60', INPUT_MON , '0'))  A100_60 -- 2016.1.1 ~ 2016.12.31(직접출자)
+		      -- 2016년 추가 end
+		      -- 2017년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_71', INPUT_MON , '0'))  A100_71 -- 2017.1.1 ~ 2017.12.31(간접출자)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_72', INPUT_MON , '0'))  A100_72 -- 2017.1.1 ~ 2017.12.31(직접출자)
+              -- 2017년 추가 end
+              -- 2018년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_73', INPUT_MON , '0'))  A100_73 -- 2018.1.1 ~ 2018.12.31(간접출자)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_74', INPUT_MON , '0'))  A100_74 -- 2018.1.1 ~ 2018.12.31(직접출자)
+              -- 2018년 추가 end
+              -- 2019년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_75', INPUT_MON , '0'))  A100_75 -- 2019.1.1 ~ 2019.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_79', INPUT_MON , '0'))  A100_79 -- 2019.1.1 ~ 2019.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_76', INPUT_MON , '0'))  A100_76 -- 2019.1.1 ~ 2019.12.31(직접출자_벤처등)
+              -- 2019년 추가 end
+              -- 2020년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_77', INPUT_MON , '0'))  A100_77 -- 2020.1.1 ~ 2020.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_80', INPUT_MON , '0'))  A100_80 -- 2020.1.1 ~ 2020.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_78', INPUT_MON , '0'))  A100_78 -- 2020.1.1 ~ 2020.12.31(직접출자_벤처등)
+              -- 2020년 추가 end
+              -- 2021년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_81', INPUT_MON , '0'))  A100_81 -- 2021.1.1 ~ 2021.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_82', INPUT_MON , '0'))  A100_82 -- 2021.1.1 ~ 2021.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_83', INPUT_MON , '0'))  A100_83 -- 2021.1.1 ~ 2021.12.31(직접출자_벤처등)
+              -- 2021년 추가 end
+              -- 2022년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_84', INPUT_MON , '0'))  A100_84 -- 2022.1.1 ~ 2022.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_85', INPUT_MON , '0'))  A100_85 -- 2022.1.1 ~ 2022.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_86', INPUT_MON , '0'))  A100_86 -- 2022.1.1 ~ 2022.12.31(직접출자_벤처등)
+              -- 2022년 추가 end
+              -- 2023년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_87', INPUT_MON , '0'))  A100_87 -- 2023.1.1 ~ 2022.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_88', INPUT_MON , '0'))  A100_88 -- 2023.1.1 ~ 2022.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_89', INPUT_MON , '0'))  A100_89 -- 2023.1.1 ~ 2022.12.31(직접출자_벤처등)
+              -- 2023년 추가 end
+              -- 2024년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_90', INPUT_MON , '0'))  A100_90 -- 2024.1.1 ~ 2024.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_91', INPUT_MON , '0'))  A100_91 -- 2024.1.1 ~ 2024.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_92', INPUT_MON , '0'))  A100_92 -- 2024.1.1 ~ 2024.12.31(직접출자_벤처등)
+              -- 2024년 추가 end
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_07', DATA_MON , '0'))  A100_07 -- 투자조합출자소득공제
+		      -- 신용카드 등
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_15', INPUT_MON , '0'))   -- 신용카드(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_152', INPUT_MON , '0'))  -- 신용카드(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_153', INPUT_MON , '0'))  A100_15  -- 신용카드(4월~7월)
+
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_13', INPUT_MON , '0'))   -- 현금영수증(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_132', INPUT_MON , '0'))   -- 현금영수증(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_133', INPUT_MON , '0'))  A100_13 -- 현금영수증(4월~7월)
+
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_22', INPUT_MON , '0')) -- 직불(선불)카드(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_222', INPUT_MON , '0')) -- 직불(선불)카드(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_223', INPUT_MON , '0')) -- 직불(선불)카드(4월~7월)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_45', INPUT_MON , '0'))   -- 직불카드등(제로페이) - 2020.01.21(그 외)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_452', INPUT_MON , '0'))   -- 직불카드등(제로페이) - 2020.01.21(3월)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_453', INPUT_MON , '0'))  A100_22 -- 직불카드등(제로페이) - 2020.01.21(4월~7월)
+
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_42', INPUT_MON , '0')) -- 도서공연사용분(신용카드)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_43', INPUT_MON , '0')) -- 도서공연사용분(직불카드)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_44', INPUT_MON , '0')) -- 도서공연사용분(현금영수증)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_48', INPUT_MON , '0')) A100_42 -- 도서공연사용분(제로페이)
+
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_14', INPUT_MON , '0')) -- 전통시장사용분
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_47', INPUT_MON , '0'))  A100_14 -- 전통시장사용분 (제로페이)
+
+                  , MAX(DECODE(ADJ_ELEMENT_CD, 'A100_16', INPUT_MON , '0')) -- 대중교통이용분 2022귀속 대중교통 상/하반기 추가
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_161', INPUT_MON , '0')) -- 대중교통이용분(상반기)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_162', INPUT_MON , '0')) -- 대중교통이용분(하반기)                  
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_46', INPUT_MON , '0')) -- 대중교통이용분(제로페이)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_461', INPUT_MON , '0'))-- 대중교통이용분(제로페이_상반기)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_462', INPUT_MON , '0'))  A100_16 -- 대중교통이용분(제로페이_하반기)
+
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_17', INPUT_MON , '0')) -- 사업관련비용(신용카드)(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_172', INPUT_MON , '0')) -- 사업관련비용(신용카드)(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_173', INPUT_MON , '0')) -- 사업관련비용(신용카드)(4월~7월)
+		      	  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_18', INPUT_MON , '0'))   -- 사업관련비용(직불/선불카드)(그 외)
+		      	  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_182', INPUT_MON , '0'))   -- 사업관련비용(직불/선불카드)(3월)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_183', INPUT_MON , '0'))  A100_17 -- 사업관련비용(직불/선불카드)(4월~7월)
+
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_23', DATA_MON , '0'))  A100_23 -- 신용카드등소득공제
+		      -- 우리사주조합출연금소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_21', INPUT_MON , '0'))  A100_21_INP -- 우리사주조합출연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_21', DATA_MON , '0'))  A100_21 -- 우리사주조합출연금소득공제
+		      -- 장기주식형저축소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_26', INPUT_MON , '0'))  A100_26 -- 1년차불입
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_27', INPUT_MON , '0'))  A100_27 -- 2년차불입
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_28', INPUT_MON , '0'))  A100_28 -- 3년차불입
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_29', DATA_MON , '0'))  A100_29 -- 장기주식형저축소득공제
+			  -- 우리사주조합기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_09', DATA_MON , '0'))  A080_09 -- 우리사주조합기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_09', INPUT_MON , '0'))  A080_09_INP -- 우리사주조합기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_09', STD_MON , '0'))  A080_09_STD -- 우리사주조합기부금
+		      -- 고용유지중소기업근로자소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_37', INPUT_MON , '0'))  A100_37_INP -- 고용유지중소기업근로자
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_37', DATA_MON , '0'))  A100_37 -- 고용유지중소기업근로자소득공제
+		      -- 목돈 안드는 전세 이자상환액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_38', INPUT_MON , '0'))  A100_38_INP -- 목돈 안드는 전세 이자상환액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_38', DATA_MON , '0'))  A100_38 -- 목돈 안드는 전세 이자상환액
+		       -- 그밖의소득공제계
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_99', DATA_MON , '0')) AS A100_99 -- 그밖의소득공제계
+		       -- 세액감면
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_14', DATA_MON , '0'))  B010_14 -- 소득세법
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', DATA_MON , '0'))  B010_15 -- 조세특례제한법(제30조 제외)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', DATA_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_40', DATA_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_42', DATA_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_18', DATA_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_45', DATA_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_43', DATA_MON , '0'))
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_46', DATA_MON , '0'))
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_47', DATA_MON , '0'))
+                   AS EX_B010_16 /* 조세특례제한법(제30조 제외) - 제19조, 제26조의6 추가 - 2019.12.24. | B010_18, B010_45 추가 2020.12.14 | B010_43 추가 - 2021.12.03 */
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_16', DATA_MON , '0'))  B010_16 -- 조세특례제한법 제30조
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_17', DATA_MON , '0'))  B010_17 -- 조세조약
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_14', INPUT_MON , '0'))  B010_14_INP -- 소득세법
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', INPUT_MON , '0'))  B010_15_INP -- 조세특례제한법(제30조 제외)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', INPUT_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_40', INPUT_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_42', INPUT_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_18', INPUT_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_45', INPUT_MON , '0')) 
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_43', INPUT_MON , '0'))
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_46', INPUT_MON , '0'))
+                  	+ MAX(DECODE(ADJ_ELEMENT_CD, 'B010_47', INPUT_MON , '0'))   
+                  AS EX_B010_16_INP  /* 조세특례제한법(제30조 제외) - 제19조, 제26조의6 추가 - 2019.12.24. | B010_18, B010_45 추가 2020.12.14 | B010_43 추가 - 2021.12.03 */
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_30', INPUT_MON , '0'))
+		       + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_31', INPUT_MON , '0'))
+		       + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_32', INPUT_MON , '0'))
+		       + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_33', INPUT_MON , '0')) B010_30_31_INP -- 조세특례제한법 제30조
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_17', INPUT_MON , '0'))  B010_17_INP -- 조세조약
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_13', DATA_MON , '0'))  B010_13 -- 세액감면 계
+		       -- 세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B000_01', DATA_MON , '0'))  B000_01 -- 근로소득세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B002_10', DATA_MON , '0'))  B002_10 -- 결혼세액공제액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B000_10', DATA_MON , '0'))  B000_10 -- 자녀세액공제액
+		      -- 2015-04-23 추가사항 Start
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B000_10', DATA_CNT , '0'))  B000_10_CNT -- 자녀수
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_20', DATA_MON , '0'))  B001_20     -- 6세이하자녀세액공제액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_20', DATA_CNT , '0'))  B001_20_CNT -- 6세이하자녀수
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_30', DATA_MON , '0'))  B001_30     -- 출산입양세액공제액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_30', DATA_CNT , '0'))  B001_30_CNT -- 출산입양수
+              -- 2015-04-23 추가사항 end
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_03', INPUT_MON , '0'))  A030_03_INP -- 퇴직연금소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_03', STD_MON , '0'))    A030_03_STD -- 퇴직연금소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_03', DATA_MON , '0'))  A030_03 -- 퇴직연금소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_04', INPUT_MON , '0'))  A030_04_INP -- 과학기술인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_04', STD_MON , '0'))    A030_04_STD -- 과학기술인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_04', DATA_MON ,  '0'))  A030_04 -- 과학기술인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_05', INPUT_MON , '0'))  A100_05_INP -- 연금저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_05', STD_MON , '0'))    A100_05_STD -- 연금저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_05', DATA_MON ,  '0'))  A100_05 -- 연금저축
+		      -- 2021.12.13. ISA계좌 만기전환금액 추가공제
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_031', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A030_041', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_051', INPUT_MON , '0'))  ISA_MON_INP -- ISA 추가납입액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_031', STD_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A030_041', STD_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_051', STD_MON , '0'))    ISA_MON_STD -- ISA 추가납입액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_031', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A030_041', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_051', DATA_MON , '0'))  ISA_MON     -- ISA 추가납입액
+		      -- 2015-04-23 start
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_05', INPUT_MON , '0'))  A040_05_INP -- 보장성보험공제 입력액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_05', STD_MON , '0'))    A040_05_STD -- 보장성보험공제 공제대상금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_05', DATA_MON , '0'))   A040_05     -- 보장성보험 세액공제액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_07', INPUT_MON , '0'))  A040_07_INP -- 장애인전용 보장성보험 입력액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_07', STD_MON , '0'))    A040_07_STD -- 장애인전용 보장성보험 공제대상금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_07', DATA_MON , '0'))   A040_07     -- 장애인전용 보장성보험 세액공제액
+              -- 2015-04-23 end
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A050_01', INPUT_MON , '0'))  A050_01_INP -- 의료비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A050_01', STD_MON , '0'))    A050_01_STD -- 의료비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A050_01', DATA_MON , '0'))  A050_01 -- 의료비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A060_01', INPUT_MON , '0'))  A060_01_INP -- 교육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A060_01', STD_MON , '0'))    A060_01_STD -- 교육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A060_01', DATA_MON , '0'))  A060_01 -- 교육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_05', INPUT_MON , '0')) B010_05_INP -- 정치자금기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_05', STD_MON , '0'))   B010_05_STD -- 정치자금기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_05', DATA_MON , '0'))  B010_05     -- 정치자금기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_05', DATA_MON , '0'))  A080_05     -- 정치자금기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_05', INPUT_MON , '0')) A080_05_INP -- 정치자금기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_05', STD_MON , '0'))   A080_05_STD -- 정치자금기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_15', INPUT_MON , '0')) A080_15_INP -- 고향사랑기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_15', STD_MON , '0'))   A080_15_STD -- 고향사랑기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_15', DATA_MON , '0'))  A080_15     -- 고향사랑기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_17', DATA_MON , '0'))  A080_17     -- 고향사랑기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_17', INPUT_MON , '0')) A080_17_INP -- 고향사랑기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_17', STD_MON , '0'))   A080_17_STD -- 고향사랑기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_03', DATA_MON , '0'))  A080_03 -- 법정기부금
+			  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_03', INPUT_MON , '0'))  A080_03_INP -- 법정기부금
+			  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_03', STD_MON , '0'))    A080_03_STD -- 법정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_13', DATA_MON , '0')) A080_13 -- 지정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_10', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A080_11', INPUT_MON , '0'))  A080_10_11_INP -- 지정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_13', TMP1_MON , '0')) A080_13_STD -- 지정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B013_01', DATA_MON , '0'))  B013_01 -- 특별세액공제 계
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A099_01', DATA_MON , '0'))  A099_01 -- 표준세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_01', INPUT_MON , '0'))  B010_01_INP -- 납세조합공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_01', DATA_MON , '0'))  B010_01 -- 납세조합공제
+		      -- 주택자금이자세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_03', INPUT_MON , '0'))  B010_03_INP -- 주택자금이자
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_03', DATA_MON , '0'))  B010_03 -- 주택자금이자세액공제
+		      -- 외국납부세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_09', INPUT_MON , '0'))  B010_09 -- 국외근로소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_11', INPUT_MON , '0'))  B010_11 -- 외국납부세액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_07', DATA_MON , '0'))  B010_07 -- 외국납부세액공제
+
+		FROM (
+			  SELECT ADJ_ELEMENT_CD
+			       , DATA_MON
+			       , INPUT_MON
+			       , STD_MON
+			       , DATA_CNT
+			       , TMP1_MON
+			    FROM TCPN843
+			   WHERE ENTER_CD      = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			     AND WORK_YY       = #searchWorkYy#
+			     AND ADJUST_TYPE   = '999_' || #searchAdjustType#
+			     AND SABUN         = #searchSabun#
+			     AND #searchTable# = 'TCPN843'
+
+			   UNION ALL
+			  SELECT ADJ_ELEMENT_CD
+			       , DATA_MON
+			       , INPUT_MON
+			       , STD_MON
+			       , DATA_CNT
+			       , TMP1_MON
+			    FROM TCPN843_BK
+			   WHERE ENTER_CD      = #ssnEnterCd#
+			     AND WORK_YY       = #searchWorkYy#
+			     AND ADJUST_TYPE   = '999_' || #searchAdjustType#
+			     AND SABUN         = #searchSabun#
+			     AND #searchTable#     = 'TCPN843_BK'
+		         AND ORI_PAY_ACTION_CD = #searchPayActionCd#
+		         AND RE_CALC_SEQ       = #searchReCalcSeq#
+		      )
+		]]>
+	</query>
+	<!-- 소득공제자료등록 팝업 자료 조회 -->
+	<query id="selectRes5List873_bak">
+		<![CDATA[
+		SELECT MAX(DECODE(ADJ_ELEMENT_CD, 'A000_01', DATA_MON , '0'))  A000_01 -- 근로소득공제
+		       -- 기본공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A010_01', DATA_MON , '0'))  A010_01 -- 본인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A010_03', DATA_MON , '0'))  A010_03 -- 배우자공제
+		      ,NVL(MAX(DECODE(ADJ_ELEMENT_CD, 'A010_05', DATA_CNT , '0')),'0') +
+		       NVL(MAX(DECODE(ADJ_ELEMENT_CD, 'A010_07', DATA_CNT , '0')),'0') +
+		       NVL(MAX(DECODE(ADJ_ELEMENT_CD, 'A010_09', DATA_CNT , '0')),'0') AS A010_11_CNT -- 부양가족인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A010_11', DATA_MON , '0'))  A010_11 -- 부양가족공제
+		      -- 추가공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_03', DATA_CNT , '0'))  A020_03_CNT -- 경로우대인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_04', DATA_MON , '0'))  A020_04 -- 경로우대공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_05', DATA_CNT , '0'))  A020_05_CNT -- 장애인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_05', DATA_MON , '0'))  A020_05 -- 장애인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_07', DATA_MON , '0'))  A020_07 -- 부녀자공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_09', DATA_CNT , '0'))  A020_09_CNT -- 자녀양육비인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_09', DATA_MON , '0'))  A020_09 -- 자녀양육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_12', DATA_CNT , '0'))  A020_12_CNT -- 출산입양인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_12', DATA_MON , '0'))  A020_12 -- 출산입양공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_14', DATA_MON , '0'))  A020_14 -- 한부모
+		      -- 다자녀추가공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_11', DATA_CNT , '0'))  A020_11_CNT -- 다자녀인원수
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A020_11', DATA_MON , '0'))  A020_11 -- 다자녀추가공제
+		      -- 연금보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_01', INPUT_MON , '0'))  A030_01_INP -- 국민연금보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_01', DATA_MON , '0'))  A030_01 -- 국민연금보험료공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_11', INPUT_MON , '0'))  A030_11_INP -- 공무원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_11', DATA_MON ,  '0'))  A030_11 -- 공무원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_12', INPUT_MON , '0'))  A030_12_INP -- 군인연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_12', DATA_MON ,  '0'))  A030_12 -- 군인연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_02', INPUT_MON , '0'))  A030_02_INP -- 사립학교교직원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_02', DATA_MON ,  '0'))  A030_02 -- 사립학교교직원연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_13', INPUT_MON , '0'))  A030_13_INP -- 별정우체국연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_13', DATA_MON ,  '0'))  A030_13 -- 별정우체국연금
+		      -- 보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_03', INPUT_MON , '0'))  A040_03_INP -- 건강보험공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_04', INPUT_MON , '0'))  A040_04_INP -- 고용보험공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_03', DATA_MON , '0'))  A040_03 -- 보험료공제-건강보험료
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_04', DATA_MON , '0'))  A040_04 -- 보험료공제-고용보험료
+		      -- 주택자금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_13', INPUT_MON , '0'))  A070_13 -- 주택임차차입금원리금상환액(대출기관)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_14', DATA_MON , '0'))  A070_14 -- 주택임차차입금원리금상환액공제(대출기관)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_19', INPUT_MON , '0'))  A070_19 -- 주택임차차입금원리금상환액(거주자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_21', DATA_MON , '0'))  A070_21 -- 주택임차차입금원리금상환액공제(거주자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_10', INPUT_MON , '0'))  A070_10_INP -- 월세액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_10', STD_MON , '0'))   A070_10_STD -- 월세액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_10', DATA_MON , '0'))  A070_10 -- 월세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_17', DATA_MON , '0'))  A070_17 -- 이자상환액(차입금상환기간 2011년 이전(15년미만)                   )공제금액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_15', DATA_MON , '0'))  A070_15 -- 이자상환액(차입금상환기간 2011년 이전(15년이상)                  )공제금액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_16', DATA_MON , '0'))  A070_16 -- 이자상환액(차입금상환기간 2011년 이전(30년이상)                   )공제금액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_22', DATA_MON , '0'))  A070_22 -- 이자상환액(차입금상환기간 2012년 이후(고정금리/비거치상환 대출) )공제금액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_23', DATA_MON , '0'))  A070_23 -- 이자상환액(차입금상환기간 2012년 이후(기타 대출)                )  공제금액
+		      -- 2015년 추가 시작
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_24', DATA_MON , '0'))  A070_24 -- 2015년 이후(15년이상 고정&비거치 상환)                )  공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_25', DATA_MON , '0'))  A070_25 -- 2015년 이후(15년이상 고정/비거치 상환)                )  공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_26', DATA_MON , '0'))  A070_26 -- 2015년 이후(15년이상 기타대출)                        )  공제금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_27', DATA_MON , '0'))  A070_27 -- 2015년 이후(10년이상 고정/비거치 상환)                )  공제금액
+              -- 2015년 추가 끝
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_17', INPUT_MON , '0'))  A070_17_INP -- 이자상환액(차입금상환기간 2011년 이전(15년미만)                 )
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_15', INPUT_MON , '0'))  A070_15_INP -- 이자상환액(차입금상환기간 2011년 이전(15년이상)                )
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_16', INPUT_MON , '0'))  A070_16_INP -- 이자상환액(차입금상환기간 2011년 이전(30년이상)                 )
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_22', INPUT_MON , '0'))  A070_22_INP -- 이자상환액(차입금상환기간 2012년 이후(고정금리/비거치상환 대출) )
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_23', INPUT_MON , '0'))  A070_23_INP -- 이자상환액(차입금상환기간 2012년 이후(기타 대출)                )
+			  -- 2015년 추가 시작
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_24', INPUT_MON , '0'))  A070_24_INP -- 2015년 이후(15년이상 고정&비거치 상환)                )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_25', INPUT_MON , '0'))  A070_25_INP -- 2015년 이후(15년이상 고정/비거치 상환)                )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_26', INPUT_MON , '0'))  A070_26_INP -- 2015년 이후(15년이상 기타대출)                 )
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_27', INPUT_MON , '0'))  A070_27_INP -- 2015년 이후(10년이상 고정/비거치 상환)                 )
+              -- 2015년 추가 끝
+			  --,MAX(DECODE(ADJ_ELEMENT_CD, 'A070_18', DATA_MON , '0'))  A070_18 -- 주택임차차입금원리금상환액공제
+		      -- 특별공제 계
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A099_02', DATA_MON , '0'))  A099_02 -- 특별공제 계
+		      -- 기부금(이월분)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_20', DATA_MON , '0'))  A080_20 -- 기부금(이월분)
+		      -- 연금저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_03', INPUT_MON , '0'))  A100_03_INP -- 개인연금저축소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_03', DATA_MON , '0'))  A100_03 -- 개인연금저축소득공제
+		      -- 소기업·소상공인 공제부금공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_30', INPUT_MON , '0'))  A100_30_INP -- 소기업·소상공인 공제부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_30', DATA_MON , '0'))  A100_30 -- 소기업·소상공인 공제부금공제
+		      -- 장기집합투자증권저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_40', DATA_MON , '0'))  A100_40 -- 장기집합투자증권저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_40', INPUT_MON , '0'))  A100_40_INP -- 장기집합투자증권저축
+              -- 청년형장기집합투자증권저축
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_41', DATA_MON , '0'))   A100_41 -- 청년형장기집합투자증권저축
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_41', INPUT_MON , '0'))  A100_41_INP -- 청년형장기집합투자증권저축		      
+		      -- 주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_34', INPUT_MON , '0'))  A100_34_INP -- 주택청약저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_31', INPUT_MON , '0'))  A100_31_INP -- 주택청약종합저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_32', INPUT_MON , '0'))  A100_32_INP -- 장기주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_33', INPUT_MON , '0'))  A100_33_INP -- 근로자주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_35', DATA_MON , '0'))  A100_35 -- 주택마련저축소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_34', DATA_MON , '0'))  A100_34 -- 주택청약저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_31', DATA_MON , '0'))  A100_31 -- 주택청약종합저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_32', DATA_MON , '0'))  A100_32 -- 장기주택마련저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_33', DATA_MON , '0'))  A100_33 -- 근로자주택마련저축
+		      -- 투자조합출자소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_11', INPUT_MON , '0'))  A100_11 -- 2011.12.31 이전 출자분
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_08', INPUT_MON , '0'))  A100_08 -- 2012.1.1 ~ 2012.12.31(간접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_10', INPUT_MON , '0'))  A100_10 -- 2012.1.1 ~ 2012.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_09', INPUT_MON , '0'))  A100_09 -- 2013.1.1 ~ 2013.12.31(간접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_12', INPUT_MON , '0'))  A100_12 -- 2013.1.1 ~ 2013.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_55', INPUT_MON , '0'))  A100_55 -- 2014.1.1 ~ 2014.12.31(간접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_56', INPUT_MON , '0'))  A100_56 -- 2014.1.1 ~ 2014.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_57', INPUT_MON , '0'))  A100_57 -- 2015.1.1 ~ 2015.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_58', INPUT_MON , '0'))  A100_58 -- 2015.1.1 ~ 2015.12.31(직접출자)
+		      -- 2016년 추가 start
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_59', INPUT_MON , '0'))  A100_59 -- 2016.1.1 ~ 2016.12.31(직접출자)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_60', INPUT_MON , '0'))  A100_60 -- 2016.1.1 ~ 2016.12.31(직접출자)
+		      -- 2016년 추가 end
+		      -- 2017년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_71', INPUT_MON , '0'))  A100_71 -- 2017.1.1 ~ 2017.12.31(간접출자)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_72', INPUT_MON , '0'))  A100_72 -- 2017.1.1 ~ 2017.12.31(직접출자)
+              -- 2017년 추가 end
+              -- 2018년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_73', INPUT_MON , '0'))  A100_73 -- 2018.1.1 ~ 2018.12.31(간접출자)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_74', INPUT_MON , '0'))  A100_74 -- 2018.1.1 ~ 2018.12.31(직접출자)
+              -- 2018년 추가 end
+              -- 2019년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_75', INPUT_MON , '0'))  A100_75 -- 2019.1.1 ~ 2019.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_79', INPUT_MON , '0'))  A100_79 -- 2019.1.1 ~ 2019.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_76', INPUT_MON , '0'))  A100_76 -- 2019.1.1 ~ 2019.12.31(직접출자_벤처등)
+              -- 2019년 추가 end
+              -- 2020년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_77', INPUT_MON , '0'))  A100_77 -- 2020.1.1 ~ 2020.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_80', INPUT_MON , '0'))  A100_80 -- 2020.1.1 ~ 2020.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_78', INPUT_MON , '0'))  A100_78 -- 2020.1.1 ~ 2020.12.31(직접출자_벤처등)
+              -- 2020년 추가 end
+              -- 2021년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_81', INPUT_MON , '0'))  A100_81 -- 2021.1.1 ~ 2021.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_82', INPUT_MON , '0'))  A100_82 -- 2021.1.1 ~ 2021.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_83', INPUT_MON , '0'))  A100_83 -- 2021.1.1 ~ 2021.12.31(직접출자_벤처등)
+              -- 2021년 추가 end
+              -- 2022년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_84', INPUT_MON , '0'))  A100_84 -- 2022.1.1 ~ 2022.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_85', INPUT_MON , '0'))  A100_85 -- 2022.1.1 ~ 2022.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_86', INPUT_MON , '0'))  A100_86 -- 2022.1.1 ~ 2022.12.31(직접출자_벤처등)
+              -- 2022년 추가 end
+              -- 2023년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_87', INPUT_MON , '0'))  A100_87 -- 2023.1.1 ~ 2022.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_88', INPUT_MON , '0'))  A100_88 -- 2023.1.1 ~ 2022.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_89', INPUT_MON , '0'))  A100_89 -- 2023.1.1 ~ 2022.12.31(직접출자_벤처등)
+              -- 2023년 추가 end
+              -- 2024년 추가 start
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_90', INPUT_MON , '0'))  A100_90 -- 2024.1.1 ~ 2024.12.31(간접출자_조합1)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_91', INPUT_MON , '0'))  A100_91 -- 2024.1.1 ~ 2024.12.31(간접출자_조합2)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_92', INPUT_MON , '0'))  A100_92 -- 2024.1.1 ~ 2024.12.31(직접출자_벤처등)
+              -- 2024년 추가 end
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_07', DATA_MON , '0'))  A100_07 -- 투자조합출자소득공제
+		      -- 신용카드 등
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_15', INPUT_MON , '0'))   -- 신용카드(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_152', INPUT_MON , '0'))  -- 신용카드(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_153', INPUT_MON , '0'))  A100_15  -- 신용카드(4월~7월)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_13', INPUT_MON , '0'))   -- 현금영수증(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_132', INPUT_MON , '0'))   -- 현금영수증(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_133', INPUT_MON , '0'))  A100_13 -- 현금영수증(4월~7월)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_22', INPUT_MON , '0')) -- 직불(선불)카드(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_222', INPUT_MON , '0')) -- 직불(선불)카드(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_223', INPUT_MON , '0')) -- 직불(선불)카드(4월~7월)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_45', INPUT_MON , '0'))   -- 직불카드등(제로페이) - 2020.01.21(그 외)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_452', INPUT_MON , '0'))   -- 직불카드등(제로페이) - 2020.01.21(3월)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_453', INPUT_MON , '0'))  A100_22 -- 직불카드등(제로페이) - 2020.01.21(4월~7월)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_421', INPUT_MON , '0')) -- 도서공연사용분(신용카드 1~3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_431', INPUT_MON , '0')) -- 도서공연사용분(직불카드 1~3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_441', INPUT_MON , '0')) -- 도서공연사용분(현금영수증 1~3월)
+                   +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_481', INPUT_MON , '0')) A100_42 -- 도서공연사용분(제로페이 1~3월)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_14', INPUT_MON , '0')) -- 전통시장사용분(그 외) 2022귀속 전통시장 사용분
+                  --+MAX(DECODE(ADJ_ELEMENT_CD, 'A100_142', INPUT_MON , '0')) -- 전통시장사용분(3월)
+                  --+MAX(DECODE(ADJ_ELEMENT_CD, 'A100_143', INPUT_MON , '0')) -- 전통시장사용분(4월~7월)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_47', INPUT_MON , '0'))  A100_14-- 전통시장사용분(제로페이) - 2020.01.21(그 외) 2022귀속 전통시장사용분(제로페이)
+                  --+ MAX(DECODE(ADJ_ELEMENT_CD, 'A100_472', INPUT_MON , '0'))  -- 전통시장사용분(제로페이) - 2020.01.21(3월)
+                  --+ MAX(DECODE(ADJ_ELEMENT_CD, 'A100_473', INPUT_MON , '0'))  A100_14 -- 전통시장사용분(제로페이) - 2020.01.21(4월~7월)
+                  , MAX(DECODE(ADJ_ELEMENT_CD, 'A100_16', INPUT_MON , '0')) -- 대중교통이용분 2022귀속 대중교통 상/하반기 추가
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_161', INPUT_MON , '0')) -- 대중교통이용분(상반기)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_162', INPUT_MON , '0')) -- 대중교통이용분(하반기)                  
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_46', INPUT_MON , '0')) -- 대중교통이용분(제로페이)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_461', INPUT_MON , '0'))-- 대중교통이용분(제로페이_상반기)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_462', INPUT_MON , '0'))  A100_16 -- 대중교통이용분(제로페이_하반기)
+                  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_17', INPUT_MON , '0')) -- 사업관련비용(신용카드)(그 외)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_172', INPUT_MON , '0')) -- 사업관련비용(신용카드)(3월)
+                  +MAX(DECODE(ADJ_ELEMENT_CD, 'A100_173', INPUT_MON , '0')) -- 사업관련비용(신용카드)(4월~7월)
+		      	  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_18', INPUT_MON , '0'))   -- 사업관련비용(직불/선불카드)(그 외)
+		      	  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_182', INPUT_MON , '0'))   -- 사업관련비용(직불/선불카드)(3월)
+                  + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_183', INPUT_MON , '0'))  A100_17 -- 사업관련비용(직불/선불카드)(4월~7월)
+
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_23', DATA_MON , '0'))  A100_23 -- 신용카드등소득공제
+		      -- 우리사주조합출연금소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_21', INPUT_MON , '0'))  A100_21_INP -- 우리사주조합출연금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_21', DATA_MON , '0'))  A100_21 -- 우리사주조합출연금소득공제
+		      -- 장기주식형저축소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_26', INPUT_MON , '0'))  A100_26 -- 1년차불입
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_27', INPUT_MON , '0'))  A100_27 -- 2년차불입
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_28', INPUT_MON , '0'))  A100_28 -- 3년차불입
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_29', DATA_MON , '0'))  A100_29 -- 장기주식형저축소득공제
+			  -- 우리사주조합기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_09', DATA_MON , '0'))  A080_09 -- 우리사주조합기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_09', INPUT_MON , '0'))  A080_09_INP -- 우리사주조합기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_09', STD_MON , '0'))  A080_09_STD -- 우리사주조합기부금
+		      -- 고용유지중소기업근로자소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_37', INPUT_MON , '0'))  A100_37_INP -- 고용유지중소기업근로자
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_37', DATA_MON , '0'))  A100_37 -- 고용유지중소기업근로자소득공제
+		      -- 목돈 안드는 전세 이자상환액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_38', INPUT_MON , '0'))  A100_38_INP -- 목돈 안드는 전세 이자상환액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_38', DATA_MON , '0'))  A100_38 -- 목돈 안드는 전세 이자상환액
+		       -- 그밖의소득공제계
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_99', DATA_MON , '0')) AS A100_99 -- 그밖의소득공제계
+		       -- 세액감면
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_14', DATA_MON , '0'))  B010_14 -- 소득세법
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', DATA_MON , '0'))  B010_15 -- 조세특례제한법(제30조 제외)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_40', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_42', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_18', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_45', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_43', DATA_MON , '0')) AS EX_B010_16 /* 조세특례제한법(제30조 제외) - 제19조, 제26조의6 추가 - 2019.12.24. |  B010_18, B010_45 추가 2020.12.14 | B010_43 추가 - 2021.12.03 */
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_16', DATA_MON , '0'))  B010_16 -- 조세특례제한법 제30조
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_17', DATA_MON , '0'))  B010_17 -- 조세조약
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_14', INPUT_MON , '0'))  B010_14_INP -- 소득세법
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', INPUT_MON , '0'))  B010_15_INP -- 조세특례제한법(제30조 제외)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_15', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_40', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_42', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_18', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_45', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_43', INPUT_MON , '0')) AS EX_B010_16_INP  /* 조세특례제한법(제30조 제외) - 제19조, 제26조의6 추가 - 2019.12.24. |  B010_18, B010_45 추가 2020.12.14 | B010_43 추가 - 2021.12.03 */
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_30', INPUT_MON , '0'))
+		       + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_31', INPUT_MON , '0'))
+		       + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_32', INPUT_MON , '0'))
+		       + MAX(DECODE(ADJ_ELEMENT_CD, 'B010_33', INPUT_MON , '0')) B010_30_31_INP -- 조세특례제한법 제30조
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_17', INPUT_MON , '0'))  B010_17_INP -- 조세조약
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_13', DATA_MON , '0'))  B010_13 -- 세액감면 계
+		       -- 세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B000_01', DATA_MON , '0'))  B000_01 -- 근로소득세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B002_10', DATA_MON , '0'))  B002_10 -- 결혼세액공제액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B000_10', DATA_MON , '0'))  B000_10 -- 자녀세액공제액
+		      -- 2015-04-23 추가사항 Start
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B000_10', DATA_CNT , '0'))  B000_10_CNT -- 자녀수
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_20', DATA_MON , '0'))  B001_20     -- 6세이하자녀세액공제액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_20', DATA_CNT , '0'))  B001_20_CNT -- 6세이하자녀수
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_30', DATA_MON , '0'))  B001_30     -- 출산입양세액공제액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'B001_30', DATA_CNT , '0'))  B001_30_CNT -- 출산입양수
+              -- 2015-04-23 추가사항 end
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_03', INPUT_MON , '0'))  A030_03_INP -- 퇴직연금소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_03', STD_MON , '0'))    A030_03_STD -- 퇴직연금소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_03', DATA_MON , '0'))  A030_03 -- 퇴직연금소득공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_04', INPUT_MON , '0'))  A030_04_INP -- 과학기술인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_04', STD_MON , '0'))    A030_04_STD -- 과학기술인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_04', DATA_MON ,  '0'))  A030_04 -- 과학기술인공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_05', INPUT_MON , '0'))  A100_05_INP -- 연금저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_05', STD_MON , '0'))    A100_05_STD -- 연금저축
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A100_05', DATA_MON ,  '0'))  A100_05 -- 연금저축
+		      -- 2021.12.13. ISA계좌 만기전환금액 추가공제
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_031', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A030_041', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_051', INPUT_MON , '0'))  ISA_MON_INP -- ISA 추가납입액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_031', STD_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A030_041', STD_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_051', STD_MON , '0'))    ISA_MON_STD -- ISA 추가납입액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A030_031', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A030_041', DATA_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A100_051', DATA_MON , '0'))  ISA_MON     -- ISA 추가납입액
+		      -- 2015-04-23 start
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_05', INPUT_MON , '0'))  A040_05_INP -- 보장성보험공제 입력액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_05', STD_MON , '0'))    A040_05_STD -- 보장성보험공제 공제대상금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_05', DATA_MON , '0'))   A040_05     -- 보장성보험 세액공제액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_07', INPUT_MON , '0'))  A040_07_INP -- 장애인전용 보장성보험 입력액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_07', STD_MON , '0'))    A040_07_STD -- 장애인전용 보장성보험 공제대상금액
+              ,MAX(DECODE(ADJ_ELEMENT_CD, 'A040_07', DATA_MON , '0'))   A040_07     -- 장애인전용 보장성보험 세액공제액
+              -- 2015-04-23 end
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A050_01', INPUT_MON , '0'))  A050_01_INP -- 의료비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A050_01', STD_MON , '0'))    A050_01_STD -- 의료비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A050_01', DATA_MON , '0'))  A050_01 -- 의료비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A060_01', INPUT_MON , '0'))  A060_01_INP -- 교육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A060_01', STD_MON , '0'))    A060_01_STD -- 교육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A060_01', DATA_MON , '0'))  A060_01 -- 교육비공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_05', INPUT_MON , '0')) B010_05_INP -- 정치자금기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_05', STD_MON , '0'))   B010_05_STD -- 정치자금기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_05', DATA_MON , '0'))  B010_05     -- 정치자금기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_05', DATA_MON , '0'))  A080_05     -- 정치자금기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_05', INPUT_MON , '0')) A080_05_INP -- 정치자금기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_05', STD_MON , '0'))   A080_05_STD -- 정치자금기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_15', INPUT_MON , '0')) A080_15_INP -- 고향사랑기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_15', STD_MON , '0'))   A080_15_STD -- 고향사랑기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_15', DATA_MON , '0'))  A080_15     -- 고향사랑기부금(10만원이하)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_17', DATA_MON , '0'))  A080_17     -- 고향사랑기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_17', INPUT_MON , '0')) A080_17_INP -- 고향사랑기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_17', STD_MON , '0'))   A080_17_STD -- 고향사랑기부금(10만원초과)
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_03', DATA_MON , '0'))  A080_03 -- 법정기부금
+			  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_03', INPUT_MON , '0'))  A080_03_INP -- 법정기부금
+			  ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_03', STD_MON , '0'))    A080_03_STD -- 법정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_13', DATA_MON , '0')) A080_13 -- 지정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_10', INPUT_MON , '0')) + MAX(DECODE(ADJ_ELEMENT_CD, 'A080_11', INPUT_MON , '0'))  A080_10_11_INP -- 지정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A080_13', TMP1_MON , '0')) A080_13_STD -- 지정기부금
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B013_01', DATA_MON , '0'))  B013_01 -- 특별세액공제 계
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'A099_01', DATA_MON , '0'))  A099_01 -- 표준세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_01', INPUT_MON , '0'))  B010_01_INP -- 납세조합공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_01', DATA_MON , '0'))  B010_01 -- 납세조합공제
+		      -- 주택자금이자세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_03', INPUT_MON , '0'))  B010_03_INP -- 주택자금이자
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_03', DATA_MON , '0'))  B010_03 -- 주택자금이자세액공제
+		      -- 외국납부세액공제
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_09', INPUT_MON , '0'))  B010_09 -- 국외근로소득
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_11', INPUT_MON , '0'))  B010_11 -- 외국납부세액
+		      ,MAX(DECODE(ADJ_ELEMENT_CD, 'B010_07', DATA_MON , '0'))  B010_07 -- 외국납부세액공제
+
+		FROM (SELECT ADJ_ELEMENT_CD
+			       , DATA_MON
+			       , INPUT_MON
+			       , STD_MON
+			       , DATA_CNT
+			       , TMP1_MON
+			    FROM TCPN873
+			   WHERE ENTER_CD 	   = #ssnEnterCd#
+			     AND WORK_YY  	   = #searchWorkYy#
+			     AND ADJUST_TYPE   = #searchAdjustType#
+			     AND SABUN         = #searchSabun#
+			     AND #searchTable# = 'TCPN873'
+
+			   UNION ALL
+			  SELECT ADJ_ELEMENT_CD
+			       , DATA_MON
+			       , INPUT_MON
+			       , STD_MON
+			       , DATA_CNT
+			       , TMP1_MON
+			    FROM TCPN843
+			   WHERE ENTER_CD 	   = #ssnEnterCd#
+			     AND WORK_YY  	   = #searchWorkYy#
+			     AND ADJUST_TYPE   = #searchAdjustType#
+			     AND SABUN         = #searchSabun#
+			     AND #searchTable# = 'TCPN843'
+
+			   UNION ALL
+			  SELECT ADJ_ELEMENT_CD
+			       , DATA_MON
+			       , INPUT_MON
+			       , STD_MON
+			       , DATA_CNT
+			       , TMP1_MON
+			    FROM TCPN843_BK
+			   WHERE ENTER_CD 	   = #ssnEnterCd#
+			     AND WORK_YY  	   = #searchWorkYy#
+			     AND ADJUST_TYPE   = #searchAdjustType#
+			     AND SABUN         = #searchSabun#
+			     AND #searchTable#     = 'TCPN843_BK'
+		         AND ORI_PAY_ACTION_CD = #searchPayActionCd#
+		         AND RE_CALC_SEQ       = #searchReCalcSeq#
+		      )
+		]]>
+	</query>
+	<!-- 소득공제자료 기본 자료 -->
+	<query id="selectCommonSheetList">
+		<![CDATA[
+			SELECT B.WORK_YY
+			     , ADJUST_TYPE
+			     , SABUN
+			     , B.ADJ_ELEMENT_CD
+			     , DATA_YN
+			     , DECODE(DATA_MON, NULL, '0', '','0', DATA_MON)   AS DATA_MON
+			     , DECODE(DATA_CNT, NULL, '0', '','0', DATA_CNT)   AS DATA_CNT
+			     , DECODE(INPUT_MON, NULL, '0', '','0', INPUT_MON) AS INPUT_MON
+			     , BUSINESS_PLACE_CD
+			  FROM TCPN843 B,TCPN803 A
+			 WHERE B.ENTER_CD		   = #ssnEnterCd#
+			   AND B.WORK_YY		   = #searchWorkYy#
+			   AND B.ADJUST_TYPE	   = #searchAdjustType#
+			   AND B.SABUN			   = #searchSabun#
+			   AND A.ENTER_CD(+)       = B.ENTER_CD
+			   AND A.WORK_YY(+)        = B.WORK_YY
+			   AND A.ADJ_ELEMENT_CD(+) = B.ADJ_ELEMENT_CD
+		]]>
+	</query>
+
+	<!-- 소득공제자료 기본 자료 입력 -->
+	<query id="insertCommonSheet">
+		<![CDATA[
+			INSERT INTO TCPN843
+			(
+				ENTER_CD
+				, WORK_YY
+				, ADJUST_TYPE
+				, SABUN
+				, ADJ_ELEMENT_CD
+				, BUSINESS_PLACE_CD
+			    , DATA_YN
+			    , DATA_CNT
+			    , INPUT_MON
+			    , DATA_MON
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #work_yy#
+                , #adjust_type#
+                , #sabun#
+                , #adj_element_cd#
+                , #business_place_cd#
+                , #data_yn#
+                , #data_cnt#
+                , #input_mon#
+                , #data_mon#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 소득공제자료 기본 자료 수정 -->
+	<query id="updateCommonSheet">
+		<![CDATA[
+			UPDATE TCPN843
+			SET BUSINESS_PLACE_CD = #business_place_cd#
+				, DATA_YN = #data_yn#
+			    , DATA_CNT = #data_cnt#
+			    , INPUT_MON = #input_mon#
+			    , DATA_MON = #data_mon#
+				, CHKDATE = SYSDATE
+				, CHKID = #ssnSabun#
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun#
+			  AND ADJ_ELEMENT_CD = #adj_element_cd#
+		]]>
+	</query>
+
+	<!-- Tab상의 카운트 조회 -->
+	<query id="selectTabCnt">
+		<![CDATA[
+			SELECT '' AS CNT1
+				  ,(SELECT COUNT(*) FROM TCPN823 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# ) AS CNT2	--인적공제
+				  ,(SELECT COUNT(*) FROM TCPN851 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# AND FORM_CD NOT IN ('P102M', 'O101M','0000')) AS CNT3	--PDF등록
+				  ,(SELECT COUNT(*) FROM TCPN830 WHERE ENTER_CD = #ssnEnterCd#
+				  								   AND WORK_YY = #searchWorkYy#
+				  								   AND ADJUST_TYPE = #searchAdjustType#
+				  								   AND SABUN = #searchSabun#
+				  								   AND SAVING_DEDUCT_TYPE  IN (SELECT B.CODE
+														                       FROM TSYS005 B
+														                       WHERE B.ENTER_CD = #ssnEnterCd#
+														                       AND B.GRCODE_CD = 'C00317'
+														                       AND B.NOTE1 IN ('2')
+														                       AND #searchWorkYy#||'1231' BETWEEN S_YMD AND E_YMD)
+				  								   ) AS CNT4
+				  ,(SELECT COUNT(*) FROM TCPN828 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# ) AS CNT5
+				  ,(SELECT COUNT(*) FROM TCPN839 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# /* AND HOUSE_DEC_CD IN ('20', '60', '10') */) AS CNT6
+				  ,(SELECT COUNT(*) FROM TCPN839 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# AND HOUSE_DEC_CD NOT IN ('20', '60', '10')) AS CNT7
+				  ,(SELECT COUNT(*) FROM TCPN830 WHERE ENTER_CD = #ssnEnterCd#
+				  								   AND WORK_YY = #searchWorkYy#
+				  								   AND ADJUST_TYPE = #searchAdjustType#
+				  								   AND SABUN = #searchSabun#
+				  								   AND SAVING_DEDUCT_TYPE  IN (SELECT B.CODE
+														                       FROM TSYS005 B
+														                       WHERE B.ENTER_CD = #ssnEnterCd#
+														                       AND B.GRCODE_CD = 'C00317'
+														                       AND B.NOTE1 IN ('4','3','10')
+														                       AND #searchWorkYy#||'1231' BETWEEN S_YMD AND E_YMD)
+				  								   ) AS CNT8
+				  ,(SELECT COUNT(*) FROM TCPN821 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# ) AS CNT9
+				  ,(SELECT COUNT(*) FROM TCPN843 WHERE ENTER_CD = #ssnEnterCd#
+				  								   AND WORK_YY = #searchWorkYy#
+				  								   AND ADJUST_TYPE = #searchAdjustType#
+				  								   AND SABUN = #searchSabun#
+				  								   AND ADJ_ELEMENT_CD IN ('A100_30', 'A100_11', 'A100_21', 'A100_37', 'A100_38', 'A100_55', 'A100_56', 'A100_57'
+                                                                        , 'A100_58', 'A100_59', 'A100_60','A100_71','A100_72','A100_73','A100_74','A100_75'
+                                                                        ,'A100_76','A100_77','A100_78','A100_79','A100_80','A100_81','A100_82','A100_83'
+                                                                        ,'A100_84','A100_85','A100_86','A100_87','A100_88','A100_89','A100_90','A100_91','A100_92')
+				  								   AND NVL(INPUT_MON,0) > 0
+				  								   ) AS CNT10
+				  ,(SELECT COUNT(*) FROM TCPN825 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# ) AS CNT11
+				  ,(SELECT COUNT(*) FROM TCPN829 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# ) AS CNT12
+				  ,(SELECT COUNT(*) FROM TCPN827 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# ) AS CNT13
+				  ,(SELECT COUNT(*) FROM TCPN843 WHERE ENTER_CD = #ssnEnterCd#
+				  								   AND WORK_YY = #searchWorkYy#
+				  								   AND ADJUST_TYPE = #searchAdjustType#
+				  								   AND SABUN = #searchSabun#
+				  								   --AND ADJ_ELEMENT_CD IN ('B010_14', 'B010_15', 'B010_17', 'B010_05', 'B010_01', 'B010_03', 'B010_09', 'B010_11', 'B010_30', 'B010_31', 'B010_32', 'B010_11', 'B010_33', 'B010_40', 'B010_42', 'B010_43', 'B010_45', 'C015_01', 'C015_02', 'C015_03')
+				  								   AND ADJ_ELEMENT_CD IN ('B010_14', 'B010_15', 'B010_17', 'B010_01', 'B010_03', 'B010_09', 'B010_11', 'B010_30', 'B010_31', 'B010_32', 'B010_11', 'B010_33', 'B010_40', 'B010_42', 'B010_43', 'B010_45', 'B010_46', 'B010_47', 'C015_01', 'C015_02', 'C015_03')
+				  								   AND NVL(INPUT_MON,0) > 0
+				  								   ) AS CNT14
+			   	  ,(SELECT COUNT(*) FROM TCPN817 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun# ) AS CNT16
+			      ,(SELECT COUNT(*) FROM TYEA105 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun#
+			   	                                   AND FILE_TYPE IN (SELECT B.CODE
+														               FROM TSYS005 B
+														              WHERE B.ENTER_CD = #ssnEnterCd#
+														                AND B.GRCODE_CD = 'YEA001'
+														                AND B.USE_YN = 'Y'
+														                AND #searchWorkYy#||'1231' BETWEEN B.S_YMD AND B.E_YMD) ) AS CNT19
+			   	  ,(SELECT INPUT_STATUS FROM TCPN811 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #searchWorkYy# AND ADJUST_TYPE = #searchAdjustType# AND SABUN = #searchSabun#) AS INPUT_STATUS
+			FROM DUAL
+		]]>
+	</query>
+
+	<!-- 담당자피드백 표시 -->
+	<query id="selectFeedbackYn">
+	   <![CDATA[
+		    SELECT DECODE(COUNT(*), 0, 'N', 'Y') AS YN
+		      FROM TCPN840
+		    WHERE ENTER_CD       = #ssnEnterCd#
+			   AND WORK_YY        = #searchWorkYy#
+			   AND ADJUST_TYPE    = #searchAdjustType#
+			   AND SABUN          = #searchSabun#
+			   AND MANAGER_NOTE IS NULL
+			   AND EMPLOYEE_NOTE IS NOT NULL
+	   ]]>
+	</query>
+
+	<!-- 기부금상세내역조회  -->
+	<query id="selectDonDetailList">
+		<![CDATA[
+			SELECT SABUN,
+			       CONTRIBUTION_CD,
+			       F_COM_GET_GRCODE_NAME(#ssnEnterCd#,'C00307',CONTRIBUTION_CD, NULL, #searchWorkYy# || '1231') AS CONTRIBUTION_NM,
+			       DONATION_YY,
+			       DONATION_MON,
+			       PREV_DED_MON,
+			       NVL(DONATION_MON,0) - NVL(PREV_DED_MON,0) AS DED_MON_OBJ,
+			       DED_MON,
+			       EXTINCTION_MON,
+			       CARRIED_MON
+			  FROM TCPN837
+			 WHERE ENTER_CD        = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			       AND WORK_YY     = #searchWorkYy#
+			       AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			       AND SABUN       = #searchSabun#
+			ORDER BY CONTRIBUTION_CD,
+			       DECODE(WORK_YY,DONATION_YY,1,2),
+			       DONATION_YY,
+			       CONTRIBUTION_CD
+		]]>
+	</query>
+
+	<!-- 외국납부상세내역조회  -->
+	<query id="selectForeignPayDetailList">
+		<![CDATA[
+			SELECT WORK_YY
+                  ,F_COM_GET_GRCODE_NAME(#ssnEnterCd#,'C00303',ADJUST_TYPE, NULL) AS ADJUST_TYPE
+                  ,SABUN
+                  ,PAY_YY
+                  ,F_COM_GET_GRCODE_NAME(ENTER_CD,'H20295',NATIONAL_CD, NULL) AS NATIONAL_NM
+                  ,PAY_MON
+                  ,REDUCE_MON
+                  ,TRG_MON
+                  ,BASE_MON
+                  ,CLCLTE_TAX_MON
+                  ,INCOME_MON
+                  ,PAY_TAX_MON
+                  ,LIMIT_MON
+                  ,LIMIT_OV_MON
+                  ,EXC_TAX_MON
+                  ,NO_CARRIED_MON
+                  ,PREV_CARRIED_MON
+                  ,PREV_DED_MON
+                  ,CUR_DED_MON
+                  ,DED_MON
+                  ,CARRIED_MON
+                  ,EXTINCTION_MON
+                  ,CARRIED_MON_841
+                  ,MEMO
+			  FROM TCPN886
+			 WHERE ENTER_CD        = #ssnEnterCd#||'_'||substr(#searchWorkYy#,3,2)
+			       AND WORK_YY     = #searchWorkYy#
+			       AND ADJUST_TYPE = '999_' || #searchAdjustType#
+			       AND SABUN       = #searchSabun#
+			ORDER BY WORK_YY,
+			       ADJUST_TYPE,
+			       PAY_YY DESC,  -- 이월기간이 많이 남아 있는 최신 자료부터 미공제액을 이월분으로 반영
+			       CUR_DED_MON,
+                   CARRIED_MON_841 DESC, -- 공제액이 큰 것부터 미공제액 이월됨
+                   DED_MON DESC,                   
+                   NATIONAL_CD
+		]]>
+	</query>
+
+	<!-- 외국인기술자 감면소득코드저장 (TCPN815_C010_79/C010_80)  -->
+	<query id="deleteAdjElCdTCPN815">
+		<![CDATA[
+			DELETE TCPN815
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			AND WORK_YY 		= #work_yy#
+			AND ADJUST_TYPE 	= #adjust_type#
+			AND SABUN 			= #sabun#
+			AND ADJ_ELEMENT_CD 	= #adj_element_cd#
+		]]>
+	</query>
+
+	<!-- 외국인기술자 감면소득코드저장 (TCPN815_C010_79/C010_80)  -->
+	<query id="insertAdjElCdTCPN815">
+		<![CDATA[
+
+			INSERT INTO TCPN815
+			(
+				 ENTER_CD
+				,WORK_YY
+				,ADJUST_TYPE
+				,SABUN
+				,YM
+				,ADJ_ELEMENT_CD
+				,MON
+				,NOTAX_MON
+				,CHKDATE
+				,CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #work_yy#||'01'
+				, #adj_element_cd#
+				, #input_mon#
+				, #input_mon#
+				, SYSDATE
+				, #sabun#
+			)
+		]]>
+	</query>
+    <!-- 총급여 조회-->
+    <query id="getPayTotal">
+       <![CDATA[
+            SELECT F_PAY_TOT_MON(#ssnEnterCd#,#work_yy#,#adjust_type#,#sabun#) AS PAY_TOTAL FROM DUAL
+       ]]>
+    </query>
+
+    <!-- 감면기간 조회-->
+    <query id="getReduceYmd">
+       <![CDATA[
+            SELECT REDUCE_S_YMD AS S_YMD,
+                   REDUCE_E_YMD AS E_YMD
+            FROM TCPN811
+            WHERE ENTER_CD    = #ssnEnterCd#
+              AND WORK_YY     = #srchYear#
+              AND SABUN       = #srchSabun#
+              AND ADJUST_TYPE = #srchAdjustType#
+       ]]>
+    </query>
+
+    <!-- 감면기간 저장 -->
+    <query id="saveReduceYmd">
+       <![CDATA[
+            UPDATE TCPN811
+            SET REDUCE_S_YMD = REPLACE(#reduce_s_ymd#,'-',''),
+                REDUCE_E_YMD = REPLACE(#reduce_e_ymd#,'-','')
+               WHERE ENTER_CD    = #ssnEnterCd#
+                 AND WORK_YY     = #srchYear#
+                 AND SABUN       = #srchSabun#
+                 AND ADJUST_TYPE = #srchAdjustType#
+       ]]>
+    </query>
+    <!-- 출력탭(기부금명세서) -->
+    <query id="selecPayPeopleStsCnt">
+       <![CDATA[
+            SELECT COUNT(*) AS CNT
+            FROM TCPN811
+            WHERE ENTER_CD      = #ssnEnterCd#
+              AND WORK_YY       = #searchWorkYy#
+              AND SABUN         = #searchSabun#
+              AND ADJUST_TYPE   = #searchAdjustType#
+              AND PAY_PEOPLE_STATUS NOT IN ('J','M')
+       ]]>
+    </query>
+
+    <!-- 소득공제서 출력가능여부 -->
+    <query id="selectDedPrintEnableYn">
+       <![CDATA[
+			SELECT NVL(MAX(STD_CD_VALUE), 'Y') AS PRINT_ENABLE_YN
+			  FROM TYEA955
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #searchWorkYy#
+			   AND STD_CD = 'CPN_YEA_DED_PRINT_ENABLE_YN'
+       ]]>
+    </query>
+
+    <!-- 소득공제서 전자서명여부 -->
+    <query id="selectSignEnableYn">
+       <![CDATA[
+			SELECT NVL(MAX(STD_CD_VALUE), 'N') AS SIGN_YN
+			  FROM TYEA955
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #searchWorkYy#
+			   AND STD_CD = 'CPN_YEA_SIGN_YN'
+       ]]>
+    </query>
+
+    <!-- 전자서명(소득공제서) -->
+    <query id="selectIncomeElcSignCnt">
+       <![CDATA[
+            SELECT COUNT(*) AS CNT
+            FROM TCPN811
+            WHERE ENTER_CD      = #ssnEnterCd#
+              AND WORK_YY       = #searchWorkYy#
+              AND SABUN         = #searchSabun#
+              AND ADJUST_TYPE   = #searchAdjustType#
+              AND (FILE_SEQ IS NOT NULL OR IE_CONFIRM_DATE IS NOT NULL)
+       ]]>
+    </query>
+
+    <!--  전자서명 저장 -->
+    <query id="saveIncomeElcSign">
+       <![CDATA[
+			UPDATE TCPN811
+			SET FILE_SEQ	= #seqNo#
+			  , FILE_PATH	= #filePath#
+			  , R_FILE_NM	= #rFileNm# 
+			  , S_FILE_NM	= #sFileNm#
+			  , INCOME_SUBMIT_YN = #incomeSubmitYn#
+			  , FOR_SUBMIT_YN = #forSubmitYn#
+			  , PEN_SUBMIT_YN = #penSubmitYn#
+			  , RENT_SUBMIT_YN = #rentSubmitYn#
+			  , MED_SUBMIT_YN = #medSubmitYn#
+			  , DO_SUBMIT_YN = #doSubmitYn#
+			  , CONFIRM_IMG = #confirmImg#
+			WHERE ENTER_CD		= #ssnEnterCd#
+			  AND WORK_YY		= #searchWorkYy#
+			  AND ADJUST_TYPE 	= #searchAdjustType#
+			  AND SABUN 		= #searchSabun#
+       ]]>
+    </query>
+
+    <!--  전자서명 저장_IE -->
+    <query id="saveIncomeElcSign_IE">
+       <![CDATA[
+			UPDATE TCPN811
+			SET INCOME_SUBMIT_YN = #income_submit_yn#
+			  , FOR_SUBMIT_YN = #for_submit_yn#
+			  , PEN_SUBMIT_YN = #pen_submit_yn#
+			  , RENT_SUBMIT_YN = #rent_submit_yn#
+			  , MED_SUBMIT_YN = #med_submit_yn#
+			  , DO_SUBMIT_YN = #do_submit_yn#
+			  , IE_CONFIRM_DATE = SYSDATE
+			WHERE ENTER_CD		= #ssnEnterCd#
+			  AND WORK_YY		= #work_yy#
+			  AND ADJUST_TYPE 	= #adjust_type#
+			  AND SABUN 		= #sabun#
+       ]]>
+    </query>
+    
+    <!-- 추가 서류 제출 여부 조회  -->
+    <query id="selectIncomeElcSignMgr">
+       <![CDATA[
+            SELECT INCOME_SUBMIT_YN
+                 , FOR_SUBMIT_YN
+                 , PEN_SUBMIT_YN
+                 , RENT_SUBMIT_YN
+                 , MED_SUBMIT_YN
+                 , DO_SUBMIT_YN
+            FROM TCPN811
+            WHERE ENTER_CD      = #ssnEnterCd#
+              AND WORK_YY       = #searchWorkYy#
+              AND SABUN         = #searchSabun#
+              AND ADJUST_TYPE   = #searchAdjustType#
+       ]]>
+    </query>
+    
+    <!-- 개인별 오류검증내역 조회  -->
+    <query id="selectErrChkPerMgr">
+       <![CDATA[
+            SELECT WORK_YY
+            	, SABUN
+            	, CASE WHEN INSTR(CHK_GUBUN, '^|') > 0 THEN SUBSTR(CHK_GUBUN, 0, INSTR(CHK_GUBUN, '^|')-1) END AS CHK_GUBUN_C
+            	, CASE WHEN INSTR(CHK_GUBUN, '^|') > 0 THEN SUBSTR(CHK_GUBUN, INSTR(CHK_GUBUN, '^|')+2) ELSE CHK_GUBUN END AS CHK_GUBUN
+            	, CHK_TEXT
+            	, CHK_TYPE
+            FROM TCPN849
+            WHERE ENTER_CD      = #ssnEnterCd#
+              AND WORK_YY       = #searchWorkYy#
+              AND SABUN         = #searchSabun#
+              AND ADJUST_TYPE   = #searchAdjustType#
+              --AND CHK_TYPE = 'E'
+             ORDER BY CHK_TYPE, CHK_GUBUN_C, SEQ
+       ]]>
+    </query>
+    
+    <!-- 개인별 오류검증내역 갯수  -->
+    <query id="selectErrChkPerCnt">
+       <![CDATA[
+            SELECT COUNT(*) AS CNT
+            FROM TCPN849
+            WHERE ENTER_CD      = #ssnEnterCd#
+              AND WORK_YY       = #searchWorkYy#
+              AND SABUN         = #searchSabun#
+              AND ADJUST_TYPE   = #searchAdjustType#
+              AND CHK_TYPE IN ('E', 'W')
+       ]]>
+    </query>
+</root>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.contactMgr">
+<!-- 		담당자연락처관리 조회  -->
+		<select parameterType="map" resultType="cMap" id="getContactMgrList">
+
+
+					SELECT A.SEQ
+						 , A.POSITION_NM
+						 , F_COM_GET_NAMES(#{ssnEnterCd}, A.SABUN, #{ssnLocaleCd}) NAME
+						 , A.OFFICE_TEL
+					     , A.LANGUAGE_CD1
+					     , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys985', A.LANGUAGE_CD1, #{ssnLocaleCd}) AS LANGUAGE_NM1
+					     , A.LANGUAGE_CD2
+					     , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys985', A.LANGUAGE_CD2, #{ssnLocaleCd}) AS LANGUAGE_NM2
+					     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+						 , A.SABUN
+					  FROM TSYS985 A , THRM100 B
+					  
+				     WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				     	AND A.ENTER_CD = B.ENTER_CD
+				  		AND A.SABUN = B.SABUN
+					  <if test='searchName != null and !searchName.equals("")'>
+						 AND (B.SABUN LIKE #{searchName} OR B.NAME LIKE '%' || #{searchName} || '%')
+					  </if>
+					 ORDER BY SEQ
+
+
+
+		</select>
+
+<!-- 		담당자연락처관리 저장 -->
+		<update parameterType="map" id="saveContactMgr">
+
+
+					MERGE INTO TSYS985 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SEQ
+									, A.POSITION_NM
+									, A.NAME
+									, A.OFFICE_TEL
+									, A.LANGUAGE_CD1
+									, A.LANGUAGE_CD2
+									, A.SABUN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SEQ
+											, NULL		AS POSITION_NM
+											, NULL		AS NAME
+											, NULL		AS OFFICE_TEL
+											, NULL		AS LANGUAGE_CD1
+											, NULL		AS LANGUAGE_CD2
+											, NULL		AS SABUN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.seq} )	AS SEQ
+											, TRIM( #{rm.positionNm} )	AS POSITION_NM
+											, TRIM( #{rm.name} )	AS NAME
+											, TRIM( #{rm.officeTel} )	AS OFFICE_TEL
+											, TRIM( #{rm.languageCd1} )	AS LANGUAGE_CD1
+											, TRIM( #{rm.languageCd2} )	AS LANGUAGE_CD2
+											, TRIM( #{rm.sabun} )	AS SABUN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SEQ = S.SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.POSITION_NM	= S.POSITION_NM
+									, T.NAME	= S.NAME
+									, T.OFFICE_TEL	= S.OFFICE_TEL
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+									, T.LANGUAGE_CD1 = S.LANGUAGE_CD1
+									, T.LANGUAGE_CD2 = S.LANGUAGE_CD2
+									, T.SABUN = S.SABUN
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.SEQ
+							, T.POSITION_NM
+							, T.NAME
+							, T.OFFICE_TEL
+							, T.CHKDATE
+							, T.CHKID
+							, T.LANGUAGE_CD1
+							, T.LANGUAGE_CD2
+							, T.SABUN
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SEQ
+							, S.POSITION_NM
+							, S.NAME
+							, S.OFFICE_TEL
+							, SYSDATE
+							, #{ssnSabun}
+							, S.LANGUAGE_CD1
+							, S.LANGUAGE_CD2
+							, S.SABUN
+						)
+		</update>
+<!-- 		담당자연락처관리 삭제 -->
+		<delete parameterType="map" id="deleteContactMgr">
+
+
+					DELETE FROM TSYS985
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.seq})
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+
+</mapper>

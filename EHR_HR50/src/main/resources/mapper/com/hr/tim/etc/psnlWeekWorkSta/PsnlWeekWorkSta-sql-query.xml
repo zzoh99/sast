@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="tim.etc.psnlWeekWorkSta">
+<!-- 조직코드 조회 -->
+        <select parameterType="map" resultType="cMap" id="getPsnlWeekWorkStaOrgList">
+
+                    --조직가져오기
+<choose><when test='ssnSearchType != null and ssnSearchType.equals("A")'>
+                        SELECT '전체' AS CODE_NM, '0' AS CODE FROM DUAL
+                         UNION ALL
+                        SELECT ORG_NM AS CODE_NM, ORG_CD AS CODE
+                          FROM
+                               (
+                                 SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM, A.ORG_CD
+                                   FROM (
+                                            SELECT T.ENTER_CD, T.ORG_CD, T.SDATE, T.PRIOR_ORG_CD, T.SEQ
+                                              FROM TORG105 T
+                                             WHERE T.ENTER_CD = #{ssnEnterCd}
+                                               AND T.SDATE =
+                                                   (
+                                                       SELECT MAX(SDATE)
+                                                         FROM TORG103
+                                                        WHERE ENTER_CD = T.ENTER_CD
+                                                        <if test='searchYmd != null and !searchYmd.equals("")'>
+                                                          AND CASE WHEN LENGTH(REPLACE(#{searchYmd},'-','')) = 6 THEN TO_CHAR(LAST_DAY(TO_DATE(REPLACE(#{searchYmd},'-',''),'YYYYMM')), 'YYYYMMDD')
+                                                                   ELSE REPLACE(#{searchYmd},'-','') END BETWEEN SDATE AND NVL(EDATE,'29991231')
+                                                        </if>
+                                                   )
+                                        ) A, TORG101 B
+                                  WHERE A.ENTER_CD = B.ENTER_CD
+                                    AND A.ORG_CD   = B.ORG_CD
+                                    AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                                  START WITH A.PRIOR_ORG_CD = '0'
+                                CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+                                    AND    PRIOR A.SDATE    = A.SDATE
+                                    AND    PRIOR A.ORG_CD   = A.PRIOR_ORG_CD
+                                ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+                               )
+
+        </when><otherwise>
+                        SELECT F_COM_GET_ORG_NM(ENTER_CD,SCOPE_VALUE,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CODE_NM, SCOPE_VALUE AS CODE
+                          FROM TSYS319
+                         WHERE ENTER_CD      = #{ssnEnterCd}
+                           AND AUTH_SCOPE_CD = 'W10'
+                           AND GRP_CD        = #{ssnGrpCd}
+                           AND SABUN         = #{ssnSabun}
+</otherwise>
+</choose>
+
+        </select>
+        
+<!-- 개인별주근무현황 조회 -->
+        <select parameterType="map" resultType="cMap" id="getPsnlWeekWorkStaList">
+
+                <![CDATA[
+                WITH TMP AS (
+                               SELECT A.ENTER_CD
+                                    , A.SABUN
+                                    , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+                                    , A.EMP_YMD
+                                    , B.ORG_CD
+                                    , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD)    AS JIKGUB_NM
+                                    , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10050', B.WORK_TYPE)    AS WORK_TYPE_NM
+                                    , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, REPLACE(TRIM(#{searchSymd}), '-', '')||'01') AS ORG_NM
+                                    
+                                    , NVL(F_COM_GET_PRIOR_ORG_TYPE_NM(B.ENTER_CD, B.ORG_CD, 'B0400', REPLACE(TRIM(#{searchEymd}), '-', ''))
+                                        ,  F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, REPLACE(TRIM(#{searchEymd}), '-', '')) )  AS P_ORG_NM
+                                        
+                                    , NVL(F_COM_GET_PRIOR_ORG_TYPE_CD(B.ENTER_CD, B.ORG_CD, 'B0400', REPLACE(TRIM(#{searchEymd}), '-', '') )
+                                    ,  B.ORG_CD )  AS P_ORG_CD
+                                        
+                                    , ( SELECT SUM(X.WORK_HH) + TRUNC( SUM(X.WORK_MM)/60, 2) 
+                                          FROM TTIM337 X
+                                         WHERE X.ENTER_CD = A.ENTER_CD
+                                           AND X.SABUN    = A.SABUN
+                                           AND X.YMD      BETWEEN REPLACE(TRIM(#{searchSymd}), '-', '') AND REPLACE(TRIM(#{searchEymd}), '-', '')
+                                           AND X.WORK_CD  IN ( '0010' )   --정규근무시간
+                                       ) AS WORK_TIME
+                                       
+                                    , ( SELECT SUM(X.WORK_HH) + TRUNC( SUM(X.WORK_MM)/60, 2) 
+                                          FROM TTIM337 X
+                                         WHERE X.ENTER_CD = A.ENTER_CD
+                                           AND X.SABUN    = A.SABUN
+                                           AND X.YMD      BETWEEN REPLACE(TRIM(#{searchSymd}), '-', '') AND REPLACE(TRIM(#{searchEymd}), '-', '')
+                                           AND X.WORK_CD  IN ( '0040', '0070', '0075' )  --연장근무시간
+                                       ) AS OT_TIME
+                                       
+                                    , ( SELECT SUM(X.WORK_HH) + TRUNC( SUM(X.WORK_MM)/60, 2) 
+                                          FROM TTIM337 X
+                                         WHERE X.ENTER_CD = A.ENTER_CD
+                                           AND X.SABUN    = A.SABUN
+                                           AND X.YMD      BETWEEN REPLACE(TRIM(#{searchSymd}), '-', '') AND REPLACE(TRIM(#{searchEymd}), '-', '')
+                                           AND X.WORK_CD  IN ( '0210' ) -- 연장휴게시간('0215')은 제외
+                                       ) AS REF_TIME
+                                        
+                                    , ( SELECT SUM(X.WORK_HH) + TRUNC( SUM(X.WORK_MM)/60, 2) 
+                                          FROM TTIM337 X
+                                         WHERE X.ENTER_CD = A.ENTER_CD
+                                           AND X.SABUN    = A.SABUN
+                                           AND X.YMD      BETWEEN REPLACE(TRIM(#{searchSymd}), '-', '') AND REPLACE(TRIM(#{searchEymd}), '-', '')
+                                           AND X.WORK_CD  IN ( '0215' ) -- 연장휴게시간('0215')
+                                       ) AS OT_REF_TIME    
+                                  FROM THRM100 A, THRM151 B
+                                 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                                   AND A.ENTER_CD = B.ENTER_CD
+                                   AND A.SABUN    = B.SABUN
+                                   AND REPLACE(TRIM(#{searchEymd}), '-', '') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+                                   AND B.STATUS_CD NOT LIKE 'RA%'   -- 해당월 1일 기준으로 재직, 휴직자
+                                   
+                                   
+                                   AND NVL(A.RET_YMD, '99991231' ) >  REPLACE(TRIM(#{searchEymd}), '-', '')
+                                           ]]>
+<if test='searchOrgCd != null and searchOrgCd != ""'>
+                                   AND B.ORG_CD IN (SELECT #{searchOrgCd}
+                                                      FROM DUAL
+        
+    <if test='searchOrgType != null and searchOrgType == "Y"'>
+                                                    /*하위조직포함일때 Y , 아닐때 N */
+                                                      <![CDATA[
+                                                    UNION
+                                                    SELECT ORG_CD
+                                                      FROM TORG105
+                                                     WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                                       AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchEymd},'-','') )
+                                                     START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                                                     CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                            AND PRIOR SDATE    = SDATE
+                                                            AND PRIOR ORG_CD   = PRIOR_ORG_CD
+                                                         ]]>
+    </if>
+                                                    )
+</if>
+<if test='searchWorkType != null and searchWorkType != ""'>
+                                   AND B.WORK_TYPE = TRIM( #{searchWorkType} )
+</if>
+<if test='searchJikgubCd != null and searchJikgubCd != ""'>
+                                   AND B.JIKGUB_CD IN
+                                        <foreach collection="searchJikgubCdList" item="jikgubCd" open="(" separator="," close=")">
+                                                         #{jikgubCd}
+                                        </foreach>
+</if>
+<if test='ssnSearchType != null and ssnSearchType eq "O"'>
+                                   AND A.SABUN IN (SELECT SABUN 
+                                                        FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+                                                      )
+</if>
+                )
+                <![CDATA[
+                SELECT A.*
+                     , DECODE(A.WORK_TIME2, 0, NULL, A.WORK_TIME2) AS WORK_TIME
+                     , DECODE(A.OT_TIME2, 0, NULL, A.OT_TIME2) AS OT_TIME  
+                     , DECODE(A.REF_TIME2, 0, NULL, A.REF_TIME2) AS REF_TIME
+                     , DECODE(A.OT_REF_TIME, 0, NULL, A.OT_REF_TIME) AS OT_REF_TIME
+                     , DECODE(A.REAL_TIME2, 0, NULL, A.REAL_TIME2) AS REAL_TIME
+                     , DECODE(A.WEEK_AVG2, 0, NULL, A.WEEK_AVG2) AS WEEK_AVG
+                     ,  ( 52 - A.WEEK_AVG2 )  AS WEEK_REM
+                     , CASE WHEN A.WEEK_AVG2 > 52 THEN '#ff0000' ELSE '#000000' END AS WEEK_AVG_COLOR
+                  FROM (
+                        SELECT A.ENTER_CD
+                             , A.SABUN
+                             , A.NAME
+                             , A.EMP_YMD
+                             , A.ORG_CD
+                             , A.JIKGUB_NM
+                             , A.WORK_TYPE_NM
+                             , A.ORG_NM
+                             , A.P_ORG_NM
+                             , A.P_ORG_CD
+                             , A.WORK_TIME                AS WORK_TIME2      
+                             , A.OT_TIME                  AS OT_TIME2
+                             , A.REF_TIME                 AS REF_TIME2    
+                             , A.OT_REF_TIME              AS OT_REF_TIME
+                             , (NVL(A.WORK_TIME,0) + NVL(A.OT_TIME,0) - NVL(A.REF_TIME,0)  - NVL(A.OT_REF_TIME,0)) AS REAL_TIME2                          
+                             , CASE WHEN DAYS <= 7 THEN (NVL(A.WORK_TIME,0) + NVL(A.OT_TIME,0) - NVL(A.REF_TIME,0) - NVL(A.OT_REF_TIME,0))
+                                    ELSE TRUNC((NVL(A.WORK_TIME,0) + NVL(A.OT_TIME,0) - NVL(A.REF_TIME,0) - NVL(A.OT_REF_TIME,0)) / B.DAYS * 7, 0) 
+                                    END AS WEEK_AVG2      
+                          FROM TMP A
+                             , (
+                                 SELECT TO_DATE(TRIM(#{searchEymd}), 'YYYY-MM-DD') - TO_DATE(TRIM(#{searchSymd}), 'YYYY-MM-DD')+1 AS DAYS
+                                   FROM DUAL
+                               ) B    
+                       ) A              
+                 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE(TRIM(#{searchEymd}), '-', ''))
+                
+
+
+                ]]>
+
+        </select>
+        
+        
+
+</mapper>

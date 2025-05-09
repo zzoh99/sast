@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.alteration.mainMuPrg">
+<!-- 		조회 -->
+		<select id="getMainMuPrgList" parameterType="map" resultType="cMap">
+
+					SELECT F_SYS_MAIN_MENU_PRG_LEVEL_SEQ(A.ENTER_CD, A.MAIN_MENU_CD, A.PRIOR_MENU_CD, A.MENU_CD) AS LEVEL_SEQ
+						  ,LEVEL AS "_level"
+						  , A.ENTER_CD
+						  , A.MAIN_MENU_CD
+						  , A.PRIOR_MENU_CD
+						  , A.MENU_CD
+						  , A.MENU_SEQ
+						  , A.TYPE
+						  , A.MENU_NM
+						  , A.PRG_CD
+						  , A.SEARCH_SEQ
+						  , ( SELECT B.SEARCH_DESC FROM THRI201 B
+						      WHERE B.ENTER_CD = A.ENTER_CD
+						      AND  B.SEARCH_SEQ = A.SEARCH_SEQ
+						      AND ROWNUM = 1) AS SEARCH_DESC
+						  , A.DATA_RW_TYPE
+						  , A.DATA_PRG_TYPE
+						  , A.SEQ
+						  , A.CNT
+						  , A.LANGUAGE_CD
+						  , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys303', A.LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM
+						  , NVL(C.MGR_HELP_YN, 'N') AS MGR_HELP_YN
+						  , NVL(C.EMP_HELP_YN, 'N') AS EMP_HELP_YN
+						  , DECODE(A.TYPE, 'P', '0', 'S', '0', NULL) AS HELP_POP
+						  , A.APPL_CD
+					FROM TSYS303 A, TSYS395 C
+					WHERE 1 = 1
+					AND A.ENTER_CD = C.ENTER_CD(+)
+					AND A.PRG_CD = C.PRG_CD(+)
+					AND A.ENTER_CD     = #{ssnEnterCd}
+					AND A.MAIN_MENU_CD   = #{mainMenuCd}
+<if test='excludeTab != null and excludeTab neq "" and excludeTab eq "Y"'>
+	<![CDATA[				AND A.TYPE <> 'T' ]]>
+</if>
+					START WITH A.PRIOR_MENU_CD   = '0'
+					CONNECT BY PRIOR A.ENTER_CD   = A.ENTER_CD
+					AND PRIOR A.MAIN_MENU_CD     = A.MAIN_MENU_CD
+					AND PRIOR A.MENU_CD       = A.PRIOR_MENU_CD
+					ORDER BY LEVEL_SEQ
+
+
+		</select>
+
+		<!-- 메뉴명 조회 COMBO LIST -->
+		<select id="getMainMuPrgMainMenuList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT MAIN_MENU_CD AS CODE, NVL(F_COM_GET_LANGUAGE_MAPPING(ENTER_CD,'tsys309', LANGUAGE_CD, #{ssnLocaleCd}), MAIN_MENU_NM) AS CODE_NM
+					FROM TSYS309
+					WHERE USE_YN = '1'
+					  AND ENTER_CD = #{ssnEnterCd}
+					ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+		<!-- 도움말 조회 -->
+		<select id="getMainMuPrgPopMap" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+				  SELECT
+						MGR_HELP
+						, MGR_HELP_YN
+						, EMP_HELP
+						, EMP_HELP_YN
+						, FILE_SEQ
+					FROM TSYS395
+				   WHERE ENTER_CD = #{ssnEnterCd}
+					 AND PRG_CD = #{searchPrgCd}
+				]]>
+
+
+		</select>
+
+<!--        조회 -->
+        <select id="getMainMuPrgApplCdList" parameterType="map" resultType="cMap">
+
+                <![CDATA[   
+                    SELECT APPL_CD AS CODE
+                         , APPL_NM AS CODE_NM
+                      FROM THRI101
+                     WHERE USE_YN = 'Y'
+					 AND ENTER_CD = #{ssnEnterCd}
+                     ORDER BY SEQ        
+
+                ]]>
+
+
+		</select>
+
+
+
+
+<!-- 		저장 -->
+		<update id="saveMainMuPrg" parameterType="map">
+
+						MERGE INTO TSYS303 T
+					USING	(
+							SELECT	  A.MAIN_MENU_CD
+									, A.PRIOR_MENU_CD
+									, A.MENU_CD
+									, A.MENU_SEQ
+									, A.TYPE
+									, A.MENU_NM
+									, A.PRG_CD
+									, A.SEARCH_SEQ
+									, A.DATA_RW_TYPE
+									, A.DATA_PRG_TYPE
+									, A.SEQ
+									, A.CNT
+									, A.LANGUAGE_CD
+                                    , A.APPL_CD
+							FROM	(
+									SELECT	  NULL		AS MAIN_MENU_CD
+											, NULL		AS PRIOR_MENU_CD
+											, NULL		AS MENU_CD
+											, NULL		AS MENU_SEQ
+											, NULL		AS TYPE
+											, NULL		AS MENU_NM
+											, NULL		AS PRG_CD
+											, NULL		AS SEARCH_SEQ
+											, NULL		AS DATA_RW_TYPE
+											, NULL		AS DATA_PRG_TYPE
+											, NULL		AS SEQ
+											, NULL		AS CNT
+											, NULL		AS LANGUAGE_CD
+                                            , NULL      AS APPL_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM(#{rm.mainMenuCd})		AS MAIN_MENU_CD
+											, TRIM(#{rm.priorMenuCd})		AS PRIOR_MENU_CD
+											, TRIM(#{rm.menuCd})			AS MENU_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose>
+											<when test='rm.menuSeq != null and !rm.menuSeq.equals("")' >
+												, TO_NUMBER(TRIM(#{rm.menuSeq})) 			AS MENU_SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+												, (SELECT (NVL(MAX(TO_NUMBER(MENU_SEQ)),0) + ${icnt}) FROM TSYS303) AS MENU_SEQ
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM(#{rm.type})				AS TYPE
+											, TRIM(#{rm.menuNm})			AS MENU_NM
+											, TRIM(#{rm.prgCd})				AS PRG_CD
+											, TRIM(#{rm.searchSeq})			AS SEARCH_SEQ
+											, TRIM(#{rm.dataRwType})		AS DATA_RW_TYPE
+											, TRIM(#{rm.dataPrgType})		AS DATA_PRG_TYPE
+											, TO_NUMBER( TRIM(#{rm.seq}) )	AS SEQ
+											, TO_NUMBER( TRIM(#{rm.cnt}) )	AS CNT
+											, TRIM(#{rm.languageCd})		AS LANGUAGE_CD
+                                            , TRIM(#{rm.applCd})            AS APPL_CD
+											FROM DUAL
+</foreach>
+									) A WHERE A.MAIN_MENU_CD IS NOT NULL
+							) S
+					ON ( 		T.ENTER_CD		= #{ssnEnterCd}
+							AND T.MAIN_MENU_CD	= S.MAIN_MENU_CD
+							AND T.PRIOR_MENU_CD	= S.PRIOR_MENU_CD
+							AND T.MENU_CD		= S.MENU_CD
+							AND T.MENU_SEQ		= S.MENU_SEQ
+							)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.TYPE         	= S.TYPE
+									, T.MENU_NM      	= S.MENU_NM
+									, T.PRG_CD       	= S.PRG_CD
+									, T.SEARCH_SEQ   	= S.SEARCH_SEQ
+									, T.DATA_RW_TYPE 	= S.DATA_RW_TYPE
+									, T.DATA_PRG_TYPE	= S.DATA_PRG_TYPE
+									, T.SEQ          	= S.SEQ
+									, T.CNT          	= S.CNT
+									, T.LANGUAGE_CD    	= S.LANGUAGE_CD
+                                    , T.APPL_CD         = S.APPL_CD
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.MAIN_MENU_CD
+							, T.PRIOR_MENU_CD
+							, T.MENU_CD
+							, T.MENU_SEQ
+							, T.TYPE
+							, T.MENU_NM
+							, T.PRG_CD
+							, T.SEARCH_SEQ
+							, T.DATA_RW_TYPE
+							, T.DATA_PRG_TYPE
+							, T.SEQ
+							, T.CNT
+							, T.LANGUAGE_CD
+                            , T.APPL_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.MAIN_MENU_CD
+							, S.PRIOR_MENU_CD
+							, S.MENU_CD
+							, S.MENU_SEQ
+							, S.TYPE
+							, S.MENU_NM
+							, S.PRG_CD
+							, S.SEARCH_SEQ
+							, S.DATA_RW_TYPE
+							, S.DATA_PRG_TYPE
+							, S.SEQ
+							, S.CNT
+							, S.LANGUAGE_CD
+                            , S.APPL_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+		<update id="saveMainMuPrgPop" parameterType="map">
+
+					MERGE INTO TSYS395 T
+					USING	(
+							SELECT #{ssnEnterCd} AS ENTER_CD
+								, #{mgrHelpYn} AS MGR_HELP_YN
+								, #{empHelpYn} AS EMP_HELP_YN
+								, #{fileSeq} AS FILE_SEQ
+								, #{searchPrgCd} AS PRG_CD
+							FROM	DUAL
+						) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PRG_CD = S.PRG_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MGR_HELP_YN	= S.MGR_HELP_YN
+									, T.EMP_HELP_YN	= S.EMP_HELP_YN
+									, T.FILE_SEQ	= S.FILE_SEQ
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PRG_CD
+							, T.MGR_HELP_YN
+							, T.EMP_HELP_YN
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.PRG_CD
+							, S.MGR_HELP_YN
+							, S.EMP_HELP_YN
+							, S.FILE_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+		<update id="saveMainMuPrgPopContents" parameterType="map">
+
+				<![CDATA[
+   					UPDATE TSYS395
+   					   SET MGR_HELP = #{mgrHelp}
+   					     , EMP_HELP = #{empHelp}
+   				  	 WHERE ENTER_CD = #{ssnEnterCd}
+   					   AND PRG_CD   = #{searchPrgCd}
+				]]>
+
+		</update>
+
+		<!-- 도움말 조회 -->
+		<select id="getMainMnMgrHelpPopMap" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+				  SELECT MGR_HELP_YN
+				  	   , MGR_HELP
+					FROM TSYS310
+				   WHERE ENTER_CD = #{ssnEnterCd}
+					 AND MAIN_MENU_CD = #{searchMainMenuCd}
+				]]>
+
+
+		</select>
+		
+<!-- 		저장 -->
+		<update id="saveMainMnMgrHelpPop" parameterType="map">
+
+				<![CDATA[
+					MERGE INTO TSYS310 T
+					USING	(
+							SELECT	  A.ENTER_CD		AS ENTER_CD
+									, A.MAIN_MENU_CD	AS MAIN_MENU_CD
+									, A.MGR_HELP_YN		AS MGR_HELP_YN
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD
+											, NULL	AS MAIN_MENU_CD
+											, NULL	AS MGR_HELP_YN
+									FROM	DUAL
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{searchMainMenuCd} )		AS MAIN_MENU_CD
+											, TRIM( #{mgrHelpYn} )		AS MGR_HELP_YN
+											FROM   DUAL
+									) A WHERE A.ENTER_CD IS NOT NULL
+									      AND A.MAIN_MENU_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD AND T.MAIN_MENU_CD		= S.MAIN_MENU_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MGR_HELP_YN	= S.MGR_HELP_YN
+									, T.MGR_HELP = EMPTY_CLOB()
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.MAIN_MENU_CD
+							, T.MGR_HELP_YN
+							, T.MGR_HELP
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.MAIN_MENU_CD
+							, S.MGR_HELP_YN
+							, EMPTY_CLOB()
+							, SYSDATE
+							, #{ssnSabun}
+						)
+				]]>
+
+
+		</update>
+
+		<update id="saveMainMnMgrHelpPopContents" parameterType="map">
+
+				<![CDATA[
+   					UPDATE TSYS310
+   					   SET MGR_HELP = #{mgrHelp}
+   				  	 WHERE ENTER_CD = #{ssnEnterCd}
+   					   AND MAIN_MENU_CD   = #{searchMainMenuCd}
+				]]>
+
+		</update>
+
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteMainMuPrg">
+
+					DELETE FROM TSYS303
+					WHERE 	( ENTER_CD,MAIN_MENU_CD,PRIOR_MENU_CD,MENU_CD,MENU_SEQ )
+					  IN 	(  ( NULL, NULL , NULL , NULL , NULL )
+				<foreach item="rm" collection="deleteRows" >
+						, 	( 	#{ssnEnterCd}
+								, TRIM( #{rm.mainMenuCd} )
+								, TRIM( #{rm.priorMenuCd} )
+								, TRIM( #{rm.menuCd} )
+								, TRIM( #{rm.menuSeq} )
+							)
+				</foreach>
+					)
+
+
+		</delete>
+
+
+<!-- 		tsys311 삭제 -->
+		<delete parameterType="map" id="deleteMainMuPrg2">
+
+					DELETE FROM TSYS311
+					WHERE 	(ENTER_CD,MAIN_MENU_CD,PRIOR_MENU_CD,MENU_CD,MENU_SEQ)
+					  IN 	(  ( NULL, NULL , NULL , NULL , 0 )
+				<foreach item="rm" collection="deleteRows" >
+						, 	( 	#{ssnEnterCd}
+								, TRIM( #{rm.mainMenuCd} )
+								, TRIM( #{rm.priorMenuCd} )
+								, TRIM( #{rm.menuCd} )
+								, TO_NUMBER(TRIM( #{rm.menuSeq} ))
+							)
+				</foreach>
+					)
+
+
+		</delete>
+
+
+
+</mapper>

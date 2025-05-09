@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.capacity.orgCapaPlanAppDet">
+<!-- 인력충원요청팝업 단건 조회 -->
+	<!-- 인력충원요청 삭제 HR 4.0 이관 반영하면서 id값 수정(뒤에 _ 붙임) -->
+		<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppDetMap_">
+
+				<![CDATA[
+					  SELECT  A.APPL_SEQ
+		          			, A.PLAN_YM
+			                , A.SABUN
+			                , A.ORG_CD
+			                , A.NOW_CNT1
+			                , A.NOW_CNT2
+			                , A.REQ_CNT1
+			                , A.REQ_CNT2
+			                , A.BIGO1
+			                , A.BIGO2
+			                , A.REQ_PLAN
+			                , A.REQ_ETC
+			            FROM  THRM328 A
+			            	, THRI103 B
+			           WHERE A.ENTER_CD = B.ENTER_CD
+			             AND A.APPL_SEQ = B.APPL_SEQ
+			             AND A.ENTER_CD = #{ssnEnterCd}
+			             AND B.APPL_SEQ = #{applSeq}
+				]]>
+
+
+		</select>
+
+<!-- 인력충원요청팝업(현재인원,정원) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgCntMap">
+
+				<![CDATA[
+				SELECT  A.NOW_CNT1
+					  , A.NOW_CNT2
+			      	  , NVL((
+				      		  SELECT B.ORG_JIK_CNT
+				            	FROM THRM313 B
+				           	   WHERE B.ENTER_CD = #{ssnEnterCd}
+				                 AND B.ORG_CD = #{orgCd}
+				             	 AND SUBSTR(B.SDATE,0,4) = SUBSTR(#{searchApplYmd},0,4)
+			       		),0) AS ORG_TO_CNT
+			      FROM (
+						SELECT SUM(DECODE(NVL(F_COM_GET_GRCODE_NOTE_VAL(ENTER_CD, 'H10030', F_COM_GET_MANAGE_CD(ENTER_CD, SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')), 1),'N'),'Y',1,0)) AS NOW_CNT1
+			    			 , SUM(DECODE(NVL(F_COM_GET_GRCODE_NOTE_VAL(ENTER_CD, 'H10030', F_COM_GET_MANAGE_CD(ENTER_CD, SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')), 1),'N'),'N',1,0)) AS NOW_CNT2
+					      FROM THRM151 
+					     WHERE ENTER_CD  = #{ssnEnterCd}
+					       AND ORG_CD    = #{orgCd}
+					       AND #{searchApplYmd} BETWEEN SDATE AND NVL(EDATE, '99991231')
+					       AND STATUS_CD NOT LIKE 'RA%'
+					   )A
+				]]>
+
+
+		</select>
+
+<!-- 인력충원요청팝업 저장 -->
+		<update parameterType="map" id="saveOrgCapaPlanAppDet">
+
+				<![CDATA[
+					MERGE INTO THRM328 T
+					USING	(
+								SELECT	  #{ssnEnterCd}   			AS ENTER_CD
+										, #{applSeq}      			AS APPL_SEQ
+										, REPLACE( #{planYm},'-','')	AS PLAN_YM
+										, #{sabun}          			AS SABUN
+										, #{orgCd}      				AS ORG_CD
+										, #{nowCnt1} 					AS NOW_CNT1
+										, #{nowCnt2}         			AS NOW_CNT2
+										, #{reqCnt1}         			AS REQ_CNT1
+										, #{reqCnt2}     				AS REQ_CNT2
+										, #{bigo1}      				AS BIGO1
+										, #{bigo2}     				AS BIGO2
+										, #{reqPlan}   				AS REQ_PLAN
+										, #{reqEtc}    				AS REQ_ETC
+								  FROM  DUAL
+							) S
+					ON ( 	T.ENTER_CD	= S.ENTER_CD
+						AND T.APPL_SEQ = S.APPL_SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.PLAN_YM     = S.PLAN_YM
+									, T.SABUN     	= S.SABUN
+									, T.ORG_CD     	= S.ORG_CD
+									, T.NOW_CNT1	= S.NOW_CNT1
+									, T.NOW_CNT2	= S.NOW_CNT2
+						   			, T.REQ_CNT1    = S.REQ_CNT1
+									, T.REQ_CNT2    = S.REQ_CNT2
+									, T.BIGO1     	= S.BIGO1
+									, T.BIGO2     	= S.BIGO2
+									, T.REQ_PLAN   	= S.REQ_PLAN
+									, T.REQ_ETC   	= S.REQ_ETC
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPL_SEQ
+							, T.PLAN_YM
+							, T.SABUN
+							, T.ORG_CD
+							, T.NOW_CNT1
+							, T.NOW_CNT2
+							, T.REQ_CNT1
+							, T.REQ_CNT2
+							, T.BIGO1
+							, T.BIGO2
+							, T.REQ_PLAN
+							, T.REQ_ETC
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPL_SEQ
+							, S.PLAN_YM
+							, S.SABUN							
+							, S.ORG_CD
+							, S.NOW_CNT1
+							, S.NOW_CNT2
+							, S.REQ_CNT1
+							, S.REQ_CNT2
+							, S.BIGO1
+							, S.BIGO2
+							, S.REQ_PLAN
+							, S.REQ_ETC
+							, SYSDATE
+							, #{ssnSabun}
+						)
+				]]>
+
+
+		</update>
+
+
+	<!-- 인력충원요청 삭제 HR 4.0 이관 START -->
+	<!-- 인력충원요청팝업 조회 -->
+	<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppDetUserMap">
+		<![CDATA[
+		   SELECT F_COM_GET_ORG_CD(TRIM(#{ssnEnterCd}), TRIM(#{searchApplSabun}), TO_CHAR(sysdate, 'yyyymmdd')) AS ORG_CD
+				, F_COM_GET_ORG_NM2(TRIM(#{ssnEnterCd}), TRIM(#{searchApplSabun}), TO_CHAR(sysdate, 'yyyymmdd')) AS ORG_NM
+			FROM DUAL
+		]]>
+	</select>
+	
+	<select parameterType="map" resultType="cMap" id="getjobCodeList">
+		<![CDATA[
+			SELECT   A.MAP_CD AS CODE,
+					 B.MAP_NM AS CODE_NM
+			FROM TORG107 A, 
+				( SELECT ENTER_CD,'900' AS MAP_TYPE_CD,JOB_CD AS MAP_CD, JOB_NM AS  MAP_NM, SDATE, EDATE FROM TORG201
+				  WHERE #{searchApplYmd} BETWEEN SDATE AND NVL(EDATE,'99991231'))  B
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			 AND A.ORG_CD = F_COM_GET_ORG_CD(#{ssnEnterCd}, #{searchApplSabun}, #{searchApplYmd}) 
+			AND A.ENTER_CD = B.ENTER_CD
+			 AND A.MAP_TYPE_CD = B.MAP_TYPE_CD
+			 AND A.MAP_CD = B.MAP_CD
+			 AND  #{searchApplYmd} BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+			ORDER BY A.MAP_TYPE_CD, A.SDATE
+		]]>
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppDetUserMap2">
+		<![CDATA[
+		   SELECT DISTINCT A.REQ_GUBUN
+			FROM THRM329 A
+		   WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+			 AND A.APPL_SEQ = TRIM(#{searchApplSeq})
+		]]>
+	</select>
+
+
+	<!-- 인력충원요청팝업 조회 -->
+	<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppDetList1">
+		<![CDATA[
+			SELECT A.ENTER_CD
+					, A.APPL_SEQ
+					, A.SABUN
+					, A.SEQ
+					, A.REQ_GUBUN
+					, A.ORG_CD
+					, F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, B.APPL_YMD) AS ORG_NM
+					, A.STD_CNT
+					, A.CUR_CNT
+					, A.REQ_CNT
+					, A.RA_CNT
+					, A.MV_CNT
+					, A.CA_CNT
+					, A.TOT_CNT
+					, A.NOTE
+				FROM THRM329 A, THRI103 B
+			   WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				 AND A.APPL_SEQ = TRIM(#{searchApplSeq})
+				 AND A.ENTER_CD = B.ENTER_CD
+				 AND A.APPL_SEQ = B.APPL_SEQ
+			   ORDER BY A.SEQ
+		]]>
+	</select>
+
+
+	<!-- 인력충원요청팝업 상세 조회 -->
+	<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppDetList2">
+		<![CDATA[
+			   SELECT A.SEQ				AS DTL_SEQ
+					, A.REQ_CNT			AS DTL_REQ_CNT
+					, A.RSN_ORG_CD		AS DTL_RSN_ORG_CD
+					, A.RSN_SABUN		AS DTL_RSN_SABUN
+
+					, F_COM_GET_NAMES(A.ENTER_CD, A.RSN_SABUN) 						AS DTL_RSN_NAME
+					, F_COM_GET_ORG_NM(A.ENTER_CD, A.RSN_ORG_CD, B.APPL_YMD) 		AS DTL_RSN_ORG_NM
+					, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010', A.RSN_JIKGUB_CD) 	AS DTL_RSN_JIKGUB_NM
+
+					, A.RSN_JIKGUB_CD	AS DTL_RSN_JIKGUB_CD
+					, A.RSN_GUBUN		AS DTL_RSN_GUBUN
+					, A.RSN_NOTE		AS DTL_RSN_NOTE
+					, A.ACA_CD			AS DTL_ACA_CD
+					, A.JIKGUB_CD		AS DTL_JIKGUB_CD
+					, A.CAREER_CD		AS DTL_CAREER_CD
+					, A.CAREER_NOTE		AS DTL_CAREER_NOTE
+					, A.ACAMAJ_NOTE		AS DTL_ACAMAJ_NOTE
+					, A.ETC_NOTE		AS DTL_ETC_NOTE
+					, A.JOB_CD		    AS DTL_JOB_CD
+					, TO_CHAR(TO_DATE(A.REQ_YMD, 'yyyymmdd'),'yyyy-mm-dd')			AS DTL_REQ_YMD
+					, A.NOTE			AS DTL_NOTE
+
+					, A.TITLE
+				FROM THRM330 A, THRI103 B
+			   WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				 AND A.APPL_SEQ = TRIM(#{searchApplSeq})
+				 AND A.ENTER_CD = B.ENTER_CD
+				 AND A.APPL_SEQ = B.APPL_SEQ
+			   ORDER BY A.SEQ
+		]]>
+	</select>
+
+
+	<!-- 조직별 기준인원 조회 조회 -->
+	<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppDetMap">
+		<![CDATA[
+                SELECT SUM(ORG_JIK_CNT) AS PLAN_CNT
+                     --, SUM(NOW_CNT) AS CUR_CNT
+                     , MAX((SELECT COUNT(*) AS CUR_CNT
+						FROM THRM151
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						  AND ORG_CD = TRIM(#{searchOrgCd})
+						  AND #{searchApplYmd} BETWEEN SDATE AND NVL(EDATE, '99991231')
+						  AND STATUS_CD NOT LIKE 'RA%'
+						GROUP BY ENTER_CD, ORG_CD))
+					  AS CUR_CNT
+                FROM THRM313 A
+                WHERE A.ENTER_CD =#{ssnEnterCd}
+                AND A.ORG_CD   = #{searchOrgCd}
+                AND SUBSTR(SDATE,1,4) = SUBSTR(#{searchApplYmd},1,4)
+                
+
+		]]>
+	</select>
+
+
+	<!-- 인력충원요청팝업 저장1 -->
+	<update parameterType="map" id="saveOrgCapaPlanAppDet1">
+					MERGE INTO THRM329 T
+					USING	(
+							SELECT	  A.ENTER_CD
+                                    , A.PLAN_YY
+									, A.APPL_SEQ
+									, A.SABUN
+									, A.SEQ
+									, A.REQ_GUBUN
+									, A.ORG_CD
+									, A.STD_CNT
+									, A.CUR_CNT
+									, A.REQ_CNT
+									, A.RA_CNT
+									, A.MV_CNT
+									, A.CA_CNT
+									, A.TOT_CNT
+							FROM	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+									SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, SUBSTR(TRIM( #{searchApplYmd} ),1,4)	AS PLAN_YY
+											, TRIM( #{searchApplSeq} )	AS APPL_SEQ
+											, TRIM( #{searchApplSabun} )	AS SABUN
+											, TRIM( #{icnt} )				AS SEQ
+											, TRIM( #{searchReqGubun} )	AS REQ_GUBUN
+											, TRIM( #{rm.orgCd} )		AS ORG_CD
+											, TRIM( #{rm.stdCnt} )		AS STD_CNT
+											, TRIM( #{rm.curCnt} )		AS CUR_CNT
+											, TRIM( #{rm.reqCnt} )		AS REQ_CNT
+											, TRIM( #{rm.raCnt} )		AS RA_CNT
+											, TRIM( #{rm.mvCnt} )		AS MV_CNT
+											, TRIM( #{rm.caCnt} )		AS CA_CNT
+											, TRIM( #{rm.totCnt} )		AS TOT_CNT
+									  FROM  DUAL
+<bind name="icnt" value="icnt + 1" />
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL AND A.ORG_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PLAN_YY= S.PLAN_YY AND T.APPL_SEQ = S.APPL_SEQ )
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+                            , T.PLAN_YY
+							, T.APPL_SEQ
+							, T.SABUN
+							, T.SEQ
+							, T.REQ_GUBUN
+							, T.ORG_CD
+							, T.STD_CNT
+							, T.CUR_CNT
+							, T.REQ_CNT
+							, T.RA_CNT
+							, T.MV_CNT
+							, T.CA_CNT
+							, T.TOT_CNT
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.PLAN_YY
+                            , S.APPL_SEQ
+							, S.SABUN
+							, S.SEQ
+							, S.REQ_GUBUN
+							, S.ORG_CD
+							, S.STD_CNT
+							, S.CUR_CNT
+							, S.REQ_CNT
+							, S.RA_CNT
+							, S.MV_CNT
+							, S.CA_CNT
+							, S.TOT_CNT
+							, SYSDATE
+							, #{ssnSabun}
+						)
+	</update>
+
+	<!-- 인력충원요청팝업 저장2 -->
+	<update parameterType="map" id="saveOrgCapaPlanAppDet2">
+					MERGE INTO THRM330 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.PLAN_YY
+									, A.APPL_SEQ
+									, A.SEQ
+                                    , A.SEQ_DETAIL
+									, A.REQ_CNT
+									, A.RSN_ORG_CD
+									, A.RSN_SABUN
+									, A.RSN_JIKGUB_CD
+									, A.RSN_GUBUN
+									, A.RSN_NOTE
+									, A.ACA_CD
+									, A.JIKGUB_CD
+									, A.CAREER_CD
+									, A.CAREER_NOTE
+									, A.ACAMAJ_NOTE
+									, A.ETC_NOTE
+									, A.JOB_CD
+									, A.REQ_YMD
+									, A.NOTE
+									, A.TITLE
+							FROM	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+									SELECT    TRIM( #{ssnEnterCd} )			AS ENTER_CD
+                                            , SUBSTR(TRIM( #{searchApplYmd} ),1,4)    AS PLAN_YY
+											, TRIM( #{searchApplSeq} )		AS APPL_SEQ
+											, (SELECT NVL(MAX(SEQ),0)+1 FROM THRM330 WHERE ENTER_CD= TRIM( #{ssnEnterCd} )) AS SEQ
+                                            , TRIM( #{icnt} )					AS SEQ_DETAIL
+											, TRIM( #{rm.dtlReqCnt} )		AS REQ_CNT
+											, TRIM( #{rm.dtlRsnOrgCd} )		AS RSN_ORG_CD
+											, TRIM( #{rm.dtlRsnSabun} )		AS RSN_SABUN
+											, TRIM( #{rm.dtlRsnJikgubCd} )	AS RSN_JIKGUB_CD
+											, TRIM( #{rm.dtlRsnGubun} )		AS RSN_GUBUN
+											, TRIM( #{rm.dtlRsnNote} )		AS RSN_NOTE
+											, TRIM( #{rm.dtlAcaCd} )		AS ACA_CD
+											, TRIM( #{rm.dtlJikgubCd} )		AS JIKGUB_CD
+											, TRIM( #{rm.dtlCareerCd} )		AS CAREER_CD
+											, TRIM( #{rm.dtlCareerNote} )	AS CAREER_NOTE
+											, TRIM( #{rm.dtlAcamajNote} )	AS ACAMAJ_NOTE
+											, TRIM( #{rm.dtlEtcNote} )		AS ETC_NOTE
+											, TRIM( #{rm.dtlJobCd} )		AS JOB_CD
+											, REPLACE(TRIM( #{rm.dtlReqYmd} ),'-','')		AS REQ_YMD
+											, TRIM( #{rm.dtlNote} )			AS NOTE
+											, TRIM( #{titleValue} )				AS TITLE
+									  FROM  DUAL
+<bind name="icnt" value="icnt + 1" />
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL AND A.REQ_CNT IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PLAN_YY= S.PLAN_YY  AND T.APPL_SEQ = S.APPL_SEQ )
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PLAN_YY
+							, T.APPL_SEQ
+							, T.SEQ
+							, T.SEQ_DETAIL
+							, T.REQ_CNT
+							, T.RSN_ORG_CD
+							, T.RSN_SABUN
+							, T.RSN_JIKGUB_CD
+							, T.RSN_GUBUN
+							, T.RSN_NOTE
+							, T.ACA_CD
+							, T.JIKGUB_CD
+							, T.CAREER_CD
+							, T.CAREER_NOTE
+							, T.ACAMAJ_NOTE
+							, T.ETC_NOTE
+							, T.JOB_CD
+							, T.REQ_YMD
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+							, T.TITLE
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+                            , S.PLAN_YY
+							, S.APPL_SEQ
+							, S.SEQ
+							, S.SEQ_DETAIL
+							, S.REQ_CNT
+							, S.RSN_ORG_CD
+							, S.RSN_SABUN
+							, S.RSN_JIKGUB_CD
+							, S.RSN_GUBUN
+							, S.RSN_NOTE
+							, S.ACA_CD
+							, S.JIKGUB_CD
+							, S.CAREER_CD
+							, S.CAREER_NOTE
+							, S.ACAMAJ_NOTE
+							, S.ETC_NOTE
+							, S.JOB_CD
+							, S.REQ_YMD
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+							, S.TITLE
+						)
+	</update>
+
+	<!-- 인력충원 삭제1 -->
+	<delete id="deleteOrgCapaPlanAppDet1">
+		DELETE FROM THRM329
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+	</delete>
+
+	<!-- 인력충원 삭제1 -->
+	<delete id="deleteOrgCapaPlanAppDet2">
+			DELETE FROM THRM330
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+	</delete>
+
+
+	<delete id="selectOrgCapaPlanAppReqGubunIfNull">
+		<![CDATA[
+			SELECT	REQ_GUBUN
+			FROM		THRM329
+			WHERE	APPL_SEQ = TRIM(#{searchApplSeq})
+			AND		ROWNUM=1
+		]]>
+	</delete>
+	<!-- 인력충원요청 삭제 HR 4.0 이관 END -->
+	
+</mapper>

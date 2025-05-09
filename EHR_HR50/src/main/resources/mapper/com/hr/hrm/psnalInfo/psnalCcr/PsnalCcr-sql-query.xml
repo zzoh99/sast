@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalCcr">
+<!-- 		조회 -->
+		<select id="getPsnalCcrList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT 	 SABUN
+							,SEQ
+							,CCR_YMD
+							,CCR_CD
+							,MEMO
+							,CCR_POINT
+							,SG_POINT
+							,F_COM_GET_NAMES(ENTER_CD,ADVISER, #{ssnLocaleCd}) AS ADVISER
+							,FILE_SEQ
+					FROM 	 THRM185
+					WHERE    ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					AND 	 SABUN    = #{sabun}
+					ORDER BY CCR_YMD DESC
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePsnalCcr">
+
+					MERGE INTO THRM185 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SEQ
+									, A.CCR_YMD
+									, A.CCR_CD
+									, A.MEMO
+									, A.CCR_POINT
+									, A.SG_POINT
+									, A.ADVISER
+									, A.FILE_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS SEQ
+											, NULL		AS CCR_YMD
+											, NULL		AS CCR_CD
+											, NULL		AS MEMO
+											, NULL		AS CCR_POINT
+											, NULL		AS SG_POINT
+											, NULL		AS ADVISER
+											, NULL		AS FILE_SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	#{ssnEnterCd}                 AS ENTER_CD
+											, TRIM( #{rm.sabun} )	    AS SABUN
+									     <choose>
+											<when test='rm.seq != null and !rm.seq.equals("")' >
+											, TRIM(#{rm.seq}) 			AS SEQ
+											</when>
+										<otherwise>
+											, TO_CHAR( (
+															SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+															  FROM THRM185
+															 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+															   AND SABUN = TRIM( #{rm.sabun} )
+														) )	AS SEQ
+												<bind name="icnt" value="icnt+1"/>
+										</otherwise>
+									</choose>
+											, TRIM( #{rm.ccrYmd} )	    AS CCR_YMD
+											, TRIM( #{rm.ccrCd} )	    AS CCR_CD
+											, TRIM( #{rm.memo} )	    AS MEMO
+											, TRIM( #{rm.ccrPoint} )	AS CCR_POINT
+											, TRIM( #{rm.sgPoint} )		AS SG_POINT
+											, TRIM( #{rm.adviser} )     AS ADVISER
+											, TRIM( #{rm.fileSeq} )     AS FILE_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.SABUN        = S.SABUN
+					AND  T.SEQ      	= S.SEQ
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CCR_YMD     = S.CCR_YMD
+									, T.CCR_CD     	= S.CCR_CD
+									, T.MEMO     	= S.MEMO
+									, T.CCR_POINT	= S.CCR_POINT
+									, T.SG_POINT	= S.SG_POINT
+									, T.ADVISER  	= S.ADVISER
+									, T.FILE_SEQ 	= S.FILE_SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SEQ
+							, T.CCR_YMD
+							, T.CCR_CD
+							, T.MEMO
+							, T.CCR_POINT
+							, T.SG_POINT
+							, T.ADVISER
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SEQ
+							, S.CCR_YMD
+							, S.CCR_CD
+							, S.MEMO
+							, S.CCR_POINT
+							, S.SG_POINT
+							, S.ADVISER
+							, S.FILE_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePsnalCcr">
+
+					DELETE FROM THRM185
+					WHERE 	(ENTER_CD,SABUN,SEQ) IN 	(  (NULL,NULL,NULL)
+<foreach collection="deleteRows" item="rm" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.sabun != null and !rm.sabun.equals("")' >
+											,TRIM( #{rm.sabun} )
+										</if>
+										<if test='rm.seq != null and !rm.seq.equals("")' >
+											,TRIM( #{rm.seq} )
+										</if>
+										)
+</foreach>
+										)
+
+
+		</delete>
+
+	</mapper>

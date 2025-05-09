@@ -1,0 +1,10 @@
+//document.write("<link rel='stylesheet' href='/common/css/style.css'/>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/jquery-1.7.2.min.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/jquery.cookie.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/jquery.treeview.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/jquery.easing.1.3.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/jquery.contact.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/iepngfix_tilebg.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/contact.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/debounce.js'></script>");
+//document.write("<script type='text/javascript' charset='utf-8' src='/common/js/etc.js'></script>");

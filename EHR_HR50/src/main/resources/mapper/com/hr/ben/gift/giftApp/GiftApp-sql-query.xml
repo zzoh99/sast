@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.gift.giftApp">
+	
+	<!-- 조회  -->
+	<select id="getGiftAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.*
+		     , DECODE( APP_YN, 'Y', '<a class="btn filled">신청</a>', 'N', '마감', '' ) AS BTN_APP
+		  FROM (
+				SELECT A.GIFT_SEQ
+				     , A.SDATE
+				     , A.EDATE
+				     , A.TITLE
+				     , A.SEARCH_SEQ
+					 ,  CASE WHEN A.SEARCH_SEQ IS NOT NULL THEN 
+			     		(SELECT F_COM_GET_SEARCH_YN(A.ENTER_CD, TRIM(#{searchSabun}), A.SEARCH_SEQ,  TO_CHAR(SYSDATE,'yyyymmdd')) FROM DUAL)
+                               ELSE 1 END AS AUTH_YN
+				     , B.GIFT_CD
+				     , ( SELECT GIFT_NM
+				           FROM TBEN766 X
+				          WHERE X.ENTER_CD  = B.ENTER_CD
+				            AND X.GIFT_SEQ  = B.GIFT_SEQ
+				            AND X.GIFT_CD   = B.GIFT_CD) AS GIFT_NM
+				     , B.APPL_YMD
+				     , B.REC_NAME
+				     , B.REC_PHONE
+				     , B.REC_ZIP || ' ' || B.REC_ADDR AS REC_ADDR
+				     , B.NOTE
+				     , CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND A.EDATE THEN 'Y' 
+				            WHEN A.EDATE  < TO_CHAR(SYSDATE, 'YYYYMMDD') THEN 'N'
+				            ELSE 'Z' END AS APP_YN 
+				  FROM TBEN765 A, TBEN767 B  
+                    WHERE A.ENTER_CD =	#{ssnEnterCd}
+                      AND A.ENTER_CD = B.ENTER_CD(+)
+                      AND A.GIFT_SEQ = B.GIFT_SEQ(+)
+                      AND TRIM(#{searchSabun}) = B.SABUN(+)
+				) A
+			WHERE A.AUTH_YN > 0	
+ 			        ORDER BY A.SDATE DESC, A.TITLE
+	]]>
+	</select>
+	
+</mapper>

@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.otWorkOrgAppDet">
+
+<!-- 대상부서 조회  -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetOrgCdList">
+
+				<![CDATA[
+					SELECT A.ORG_CD AS CODE
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE ) || DECODE(ORG_AUTH, 0,'(개인)','') AS CODE_NM
+					     , ORG_AUTH
+					     , CASE WHEN F_COM_GET_GRCODE_NOTE_VAL(#{ssnEnterCd}, 'H10050', F_COM_GET_WORKTYPE(#{ssnEnterCd}, #{searchApplSabun}, REPLACE( #{searchYmd} ,'-','')), 1) = 'A'
+					                 AND A.ORG_CD = F_COM_GET_ORG_CD(#{ssnEnterCd}, #{searchApplSabun}, REPLACE( #{searchYmd} ,'-','')) THEN  'A' -- 사무직
+					            ELSE 'B' END AS WORK_TYPE
+					  FROM TORG105 A 
+					     , (
+					         -- ORG_AUTH( 0:개인신청, 1:부서신청)   중복 시 부서 권한을 줌. 
+					     	 SELECT MAX(ORG_CD) KEEP(DENSE_RANK FIRST ORDER BY ORG_AUTH DESC) AS ORG_CD , MAX(ORG_AUTH) AS ORG_AUTH
+					     	   FROM (
+							         SELECT ORG_CD, 0 AS ORG_AUTH
+							           FROM THRM151
+							          WHERE ENTER_CD =  #{ssnEnterCd}
+							            AND SABUN    = #{searchApplSabun}
+							            AND REPLACE( #{searchYmd} ,'-','') BETWEEN SDATE AND NVL(EDATE, '29991231')
+							          UNION 
+							  		 SELECT ORG_CD, 1 AS ORG_AUTH 
+							           FROM TTIM117  --조직별 근무담당자
+							          WHERE ENTER_CD = #{ssnEnterCd}
+							            AND SABUN    = #{searchApplSabun}
+							            AND REPLACE( #{searchYmd} ,'-','') BETWEEN SDATE AND NVL(EDATE, '29991231')
+							          UNION 
+							  		 SELECT ORG_CD, 1 AS ORG_AUTH 
+							           FROM TORG111  --조직장
+							          WHERE ENTER_CD = #{ssnEnterCd}
+							            AND SABUN    = #{searchApplSabun}
+							            AND REPLACE( #{searchYmd} ,'-','') BETWEEN SDATE AND NVL(EDATE, '29991231')
+							          UNION 
+							         SELECT ORG_CD, 1 AS ORG_AUTH
+									   FROM THRM151
+								   	  WHERE ENTER_CD = #{ssnEnterCd}
+							            AND SABUN    = #{searchApplSabun}
+										AND JIKCHAK_CD = 'F320' -- 반장
+										AND REPLACE( #{searchYmd} ,'-','')  BETWEEN SDATE AND NVL(EDATE, '99991231')
+								   )
+							  GROUP BY ORG_CD, ORG_AUTH	   		  
+						   ) B
+					  WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND A.SDATE    = ( SELECT MAX(SDATE) 
+					                         FROM TORG103 
+					                        WHERE ENTER_CD = #{ssnEnterCd}
+					                          AND REPLACE( #{searchYmd} ,'-','') BETWEEN SDATE AND NVL(EDATE, '29991231') )
+					    AND A.ORG_CD   = B.ORG_CD
+					  ORDER BY B.ORG_AUTH, A.ORDER_SEQ 
+				]]>
+
+
+		</select>
+		
+
+	<!-- 헤더 조회(사용안함) -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetHeaderList">
+
+				<![CDATA[
+                SELECT X.CODE
+                     , CASE WHEN LENGTH(X.CODE_NM) > 2 THEN SUBSTR(CODE_NM,0,2)||CHR(13)||CHR(10)||SUBSTR(CODE_NM,3) ELSE X.CODE_NM END AS CODE_NM
+                     , X.SAVE_NAME
+                     , X.SAVE_NAME2
+                     , X.SAVE_NAME_DISP
+                  FROM (
+					     SELECT CODE
+							  , (SELECT NVL(WORK_S_NM, WORK_NM ) FROM TTIM015 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_CD = CODE) CODE_NM
+							  , 'WORK_CD_' || ROWNUM SAVE_NAME
+							  , 'WORK_CD_' || ROWNUM || 's' SAVE_NAME2
+							  , 'workCd'   || ROWNUM SAVE_NAME_DISP
+					       FROM (
+								 SELECT DECODE(ROWNUM,1 ,WORK_INPUT_CD1
+													 ,2 ,WORK_INPUT_CD2
+													 ,3 ,WORK_INPUT_CD3
+													 ,4 ,WORK_INPUT_CD4
+													 ,5 ,WORK_INPUT_CD5
+													 ,6 ,WORK_INPUT_CD6
+													 ,7 ,WORK_INPUT_CD7
+													 ,8 ,WORK_INPUT_CD8
+													 ,9 ,WORK_INPUT_CD9
+													 ,10, WORK_INPUT_CD10
+													 ,11, WORK_INPUT_CD11
+													 ,12, WORK_INPUT_CD12
+													 ,13, WORK_INPUT_CD13
+													 ,14, WORK_INPUT_CD14
+													 ,15, WORK_INPUT_CD15
+													 ,16, WORK_INPUT_CD16
+													 ,17, WORK_INPUT_CD17
+													 ,18, WORK_INPUT_CD18
+													 ,19, WORK_INPUT_CD19
+													 ,20, WORK_INPUT_CD20
+													 ) AS CODE
+								   FROM (SELECT *
+								           FROM TTIM355  -- 근무코드 출력항목 설정
+								          WHERE ENTER_CD = #{ssnEnterCd}
+								                    ]]>
+<choose><when test='searchWorkType != null and searchWorkType.equals("A")'>
+						                    AND WORK_GUBUN_CD = 'C'  
+		</when><otherwise>
+								            AND WORK_GUBUN_CD = 'B'
+</otherwise>
+</choose>
+		<![CDATA[						        )
+								CONNECT BY LEVEL <= 20
+						      ) A
+                         WHERE CODE IS NOT NULL
+                ) X
+				]]>
+
+
+		</select>
+
+		
+<!-- 신청내역(일자, 부서) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetMap">
+
+				<![CDATA[
+					   SELECT A.APPL_ORG_CD AS ORG_CD
+							, A.YMD
+							, F_COM_GET_ORG_NM( A.ENTER_CD, A.APPL_ORG_CD, A.YMD ) AS ORG_NM
+					     FROM TTIM601 A
+					    WHERE A.ENTER_CD   = #{ssnEnterCd}
+                          AND A.APPL_SEQ   = TRIM( #{searchApplSeq} )
+                          AND ROWNUM = 1
+				]]>
+
+
+		</select>
+		
+<!-- 대표 단위기간 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetTerDate">
+
+				<![CDATA[
+					  SELECT TO_CHAR(TO_DATE(X.S_YMD,'YYYYMMDD'),'YYYY-MM-DD') || ' ~ ' || TO_CHAR(TO_DATE(X.E_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS TERM_DATE
+			            FROM TABLE(EMP_WORK_TERM( #{ssnEnterCd}, TRIM( #{sabun} ), REPLACE( #{searchYmd} ,'-',''))) X
+                       WHERE REPLACE( #{searchYmd} ,'-','') BETWEEN X.S_YMD AND X.E_YMD
+				]]>
+
+
+		</select>
+<!-- 신청내역(대상자) 리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetList">
+
+				<![CDATA[
+				SELECT * FROM (
+						-- 기본조회
+						SELECT A.SABUN
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030' , JIKWEE_CD) AS JIKWEE_NM
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010' , JIKGUB_CD) AS JIKGUB_NM
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020' , JIKCHAK_CD) AS JIKCHAK_NM
+						     
+						     , A.ORG_CD
+						     
+						     , B.YMD        -- 근무일자
+						     , B.WORK_ORG_CD -- 근무조
+						     , D.TIME_CD    -- 근무시간코드
+						     , D.TIME_NM    -- 근무시간명
+						     , F_TIM_GET_DAY_GNT_NM(B.ENTER_CD, B.SABUN, B.YMD) AS GNT_NM
+						     , D.BEGIN_SHM  -- 인정시작시간 
+						     
+						     , NVL( C.IN_HM, D.WORK_SHM ) AS REQ_S_HM -- 출근시간
+						     , C.OUT_HM                   AS REQ_E_HM  -- 퇴근시간
+						     , NULL AS REQUEST_HOUR
+
+						     , '' AS REASON
+						     
+	                         , F_TIM_GET_OT_WORK_TIME(B.ENTER_CD, B.SABUN, B.WORK_GRP_CD, B.YMD, 'W') AS WEEK_OT_TIME	-- 주 합계
+	                         , F_TIM_GET_OT_WORK_TIME(B.ENTER_CD, B.SABUN, B.WORK_GRP_CD, B.YMD, 'T') AS TERM_OT_TIME	-- 단위기간 합계
+	                         , F_TIM_GET_OT_WORK_TIME_REM(B.ENTER_CD, B.SABUN, B.YMD, 'W') AS WEEK_OT_TIME_REM	-- 주 잔여시간
+	                         , F_TIM_GET_OT_WORK_TIME_REM(B.ENTER_CD, B.SABUN,  B.YMD, 'T') AS TERM_OT_TIME_REM	-- 단위기간 잔여시간
+						     
+						  FROM THRM151 A, TTIM120_V B, TTIM017 D, TTIM335 C
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND REPLACE( #{searchYmd} ,'-','') BETWEEN A.SDATE AND NVL( A.EDATE, '99991231' )
+						   AND A.STATUS_CD NOT LIKE 'RA%'
+						   AND A.ORG_CD   = TRIM( #{searchOrgCd} )
+						   /* WORK_TYPE에 들어 있는 직군코드(H10050) 값이 A(사무직), B(생산직)의 형태로 셋팅되어 있지 않음. 따라서 직군코드(H10050)의 NOTE1 값이 'A'면 사무직, 'B'면 생산직으로 처리하도록 변경
+						   */
+						   AND (    F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'H10050', A.WORK_TYPE, 1) IS NULL
+						         OR F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'H10050', A.WORK_TYPE, 1) <> 'A'
+						         OR ( F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'H10050', A.WORK_TYPE, 1) = 'A' AND B.WORK_YN = 'N' )  -- 사무직은 휴일근무신청 불가
+						       )
+						           ]]>
+<if test='searchOrgAuth != null and searchOrgAuth == "0"'>
+						   AND A.SABUN    = TRIM( #{searchApplSabun} )
+</if>
+						   AND A.ENTER_CD = B.ENTER_CD(+)
+						   AND A.SABUN    = B.SABUN(+)
+						   AND REPLACE( #{searchYmd} ,'-','') = B.YMD(+)
+						   
+						   AND B.ENTER_CD = D.ENTER_CD(+)
+						   AND B.TIME_CD  = D.TIME_CD(+)
+						   
+						   AND B.ENTER_CD = C.ENTER_CD(+)
+						   AND B.SABUN    = C.SABUN(+)
+						   AND B.YMD      = C.YMD(+)
+<if test='searchType != null and searchType != "clear"'>
+						   AND NOT EXISTS ( SELECT 1 FROM TTIM601 X WHERE X.ENTER_CD = #{ssnEnterCd} AND X.APPL_SEQ = TRIM( #{searchApplSeq} ) )
+</if>
+						   
+					    UNION
+						-- 신청내역
+						SELECT A.SABUN
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030' , JIKWEE_CD) AS JIKWEE_NM
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010' , JIKGUB_CD) AS JIKGUB_NM
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020' , JIKCHAK_CD) AS JIKCHAK_NM
+						     , A.ORG_CD
+						     
+						     , B.YMD        -- 근무일자
+						     , B.WORK_ORG_CD -- 근무조
+						     , B.TIME_CD    -- 근무시간코드
+						     , D.TIME_NM    -- 근무시간명
+						     , F_TIM_GET_DAY_GNT_NM(B.ENTER_CD, B.SABUN, B.YMD) AS GNT_NM
+						     , D.BEGIN_SHM  -- 인정시작시간 
+						     , C.REQ_S_HM   -- 출근시간
+						     , C.REQ_E_HM   -- 퇴근시간
+						     , C.REQUEST_HOUR
+						     
+						     , C.REASON        -- 신청사유
+					    
+	                         , F_TIM_GET_OT_WORK_TIME(B.ENTER_CD, B.SABUN, B.WORK_GRP_CD, B.YMD, 'W') AS WEEK_OT_TIME	-- 주 합계
+	                         , F_TIM_GET_OT_WORK_TIME(B.ENTER_CD, B.SABUN, B.WORK_GRP_CD, B.YMD, 'T') AS TERM_OT_TIME	-- 단위기간 합계
+	                         , F_TIM_GET_OT_WORK_TIME_REM(B.ENTER_CD, B.SABUN, B.YMD, 'W') AS WEEK_OT_TIME_REM	-- 주 잔여시간
+	                         , F_TIM_GET_OT_WORK_TIME_REM(B.ENTER_CD, B.SABUN,  B.YMD, 'T') AS TERM_OT_TIME_REM	-- 단위기간 잔여시간
+	                         
+						  FROM THRM151 A, TTIM601 C, TTIM120_V B, TTIM017 D
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND REPLACE( #{searchYmd} ,'-','') BETWEEN A.SDATE AND NVL( A.EDATE, '99991231' )
+						   AND A.STATUS_CD NOT LIKE 'RA%'
+						   AND A.ORG_CD   = TRIM( #{searchOrgCd} )
+						   
+						   -- 신청내역
+						   AND A.ENTER_CD = C.ENTER_CD
+						   AND A.SABUN    = C.SABUN
+						   AND C.APPL_SEQ = TRIM( #{searchApplSeq} )
+						   
+						   -- 스케쥴
+						   AND C.ENTER_CD = B.ENTER_CD
+						   AND C.SABUN    = B.SABUN
+						   AND C.YMD      = B.YMD
+						   
+						   AND B.ENTER_CD = D.ENTER_CD
+						   AND B.TIME_CD  = D.TIME_CD
+						   
+<if test='searchType != null and searchType == "clear"'>
+						   AND 1=2	
+</if> 				)
+					 ORDER BY F_COM_JIKJE_SORT(#{ssnEnterCd}, SABUN, REPLACE( #{searchYmd} ,'-',''))
+
+
+		</select>
+
+		
+<!-- 연장근무시간 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetTimeMap">
+
+				<![CDATA[    -- 101:기본근무, 105:연장근무, 201:휴일기본근무, 205:휴일연장근무
+				SELECT A.*
+				     , NVL(OT_HOUR, 0) + NVL(HOL_HOUR, 0) + NVL(HOL_OT_HOUR, 0) AS REQUEST_HOUR
+				FROM ( 
+						SELECT DECODE(A.WORK_YN, 'Y', NULL, F_TIM_WORK_INFO_TEMP_TYPE(A.ENTER_CD, A.SABUN, A.YMD, TRIM( #{searchSHm} ), TRIM( #{searchEHm} ), '105', '1')) AS OT_HOUR
+						     , DECODE(A.WORK_YN, 'Y', F_TIM_WORK_INFO_TEMP_TYPE(A.ENTER_CD, A.SABUN, A.YMD, TRIM( #{searchSHm} ), TRIM( #{searchEHm} ), '201', '1'), NULL) AS HOL_HOUR
+						     , DECODE(A.WORK_YN, 'Y', F_TIM_WORK_INFO_TEMP_TYPE(A.ENTER_CD, A.SABUN, A.YMD, TRIM( #{searchSHm} ), TRIM( #{searchEHm} ), '205', '1'), NULL) AS HOL_OT_HOUR
+		                  FROM TTIM120_V A
+		                 WHERE A.ENTER_CD = #{ssnEnterCd}
+		                   AND A.SABUN    = TRIM(#{searchSabun})
+		                   AND A.YMD      = REPLACE( #{searchYmd} ,'-','')
+                     ) A
+				]]>
+
+
+		</select>
+
+<!-- 기신청건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetDupCnt">
+
+				<![CDATA[    
+					SELECT COUNT(1) AS DUP_CNT
+					     , LISTAGG(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) || '(' || A.SABUN || ')', ', ') WITHIN GROUP (ORDER BY A.SABUN) AS DUP_LIST 
+					  FROM TTIM601 A, THRI103 B
+					 WHERE A.ENTER_CD     = #{ssnEnterCd}
+					   AND A.APPL_SEQ    != #{searchApplSeq}
+					   AND A.YMD          = REPLACE( #{searchYmd} ,'-','')
+                       AND A.SABUN IN (
+					 ]]>
+<foreach item="rm" collection="mergeRows" separator=" , " >
+										TRIM(#{rm.sabun})
+</foreach>
+							           )
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD NOT IN ( '11', '23', '33', 'ZZ' )   -- 11:임시저장, 23:결재반려, 33:수신반려, ZZ:취소완료
+
+		</select>
+		
+<!-- 신청시간 및 한도 체크   -->
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppDetCheckTime">
+
+				<![CDATA[
+				
+					SELECT TO_CHAR(TO_DATE(STD_CD_VALUE, 'HH24MI'), 'HH24:MI') AS TIME
+					     , CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') = REPLACE( #{searchYmd} ,'-','') AND  SYSDATE > TO_DATE( REPLACE( #{searchYmd} ,'-','') || STD_CD_VALUE, 'YYYY-MM-DDHH24MI') THEN 'N' ELSE 'Y' END AS CHK_YN
+					     , LISTAGG(CHK_MSG, '/n') WITHIN GROUP (ORDER BY 1) AS CHK_LIST 
+					  FROM TSYS955 A
+					     , (
+					     	 SELECT ENTER_CD, TARGET || CHK_MSG AS CHK_MSG 
+					     	   FROM (
+					         ]]>
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					         <![CDATA[
+									 SELECT #{ssnEnterCd} AS ENTER_CD
+									      , F_COM_GET_NAMES(#{ssnEnterCd}, TRIM(#{rm.sabun})) || '(' || TRIM(#{rm.sabun}) || ') => ' AS TARGET
+									      , F_TIM_GET_OT_WORK_TIME_CHECK( #{ssnEnterCd}, TRIM(#{rm.sabun}), REPLACE( #{searchYmd} ,'-',''), TRIM(#{rm.requestHour})) AS CHK_MSG
+									   FROM DUAL
+									   ]]>
+</foreach>
+		                            )
+		                      WHERE CHK_MSG IS NOT NULL        
+					  
+					       ) B
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.STD_CD   = 'TIM_HOUR_OT_APP'
+					   AND A.ENTER_CD = B.ENTER_CD(+)  
+					 GROUP BY A.STD_CD_VALUE
+
+
+		</select>
+<!--  세부내역 저장 -->
+		<update parameterType="map" id="saveOtWorkOrgAppDet">
+
+					 MERGE INTO TTIM601 T 
+					 USING 
+					( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM( #{ssnEnterCd} )  				AS  ENTER_CD
+					            , TRIM( #{searchApplSeq} ) 			AS  APPL_SEQ
+					            , TRIM(#{rm.sabun})  				AS  SABUN
+					            , REPLACE(TRIM(#{searchYmd}),'-','') 	AS  YMD
+					            , TRIM(#{rm.workOrgCd})  			AS  WORK_ORG_CD
+					            , TRIM(#{rm.timeCd})  				AS  TIME_CD
+					            , TRIM(#{rm.reqSHm})  				AS  REQ_S_HM
+					            , TRIM(#{rm.reqEHm})  				AS  REQ_E_HM
+					            , TRIM(#{rm.requestHour})  			AS  REQUEST_HOUR
+					            , TRIM(#{rm.reason})  				AS  REASON
+					            , TRIM( #{searchOrgCd} ) 				AS  APPL_ORG_CD
+					            , TRIM( #{searchApplSabun} ) 			AS  APPL_SABUN
+					            , TRIM( #{searchApplGubun} ) 			AS  APPL_GUBUN    --사전(B), 사후(A) 구분
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+					     AND  T.SABUN 		= S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+					            , T.WORK_ORG_CD 	= S.WORK_ORG_CD 
+					            , T.TIME_CD 		= S.TIME_CD 
+					            , T.YMD 			= S.YMD 
+					            , T.REQ_S_HM 		= S.REQ_S_HM 
+					            , T.REQ_E_HM 		= S.REQ_E_HM 
+					            , T.REQUEST_HOUR  	= S.REQUEST_HOUR 
+					            , T.REASON 			= S.REASON 
+					            , T.APPL_ORG_CD 	= S.APPL_ORG_CD 
+					            , T.APPL_SABUN 		= S.APPL_SABUN 
+					            , T.APPL_GUBUN 		= S.APPL_GUBUN
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+					            , T.WORK_ORG_CD
+					            , T.TIME_CD
+					            , T.YMD
+					            , T.REQ_S_HM
+					            , T.REQ_E_HM
+					            , T.REQUEST_HOUR
+					            , T.REASON
+					            , T.APPL_ORG_CD
+					            , T.APPL_SABUN
+					            , T.APPL_GUBUN
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+					            , S.WORK_ORG_CD
+					            , S.TIME_CD
+					            , S.YMD
+					            , S.REQ_S_HM
+					            , S.REQ_E_HM
+					            , S.REQUEST_HOUR
+					            , S.REASON
+					            , S.APPL_ORG_CD
+					            , S.APPL_SABUN
+					            , S.APPL_GUBUN
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteOtWorkOrgAppDet">
+
+				<![CDATA[
+					DELETE FROM TTIM601
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+		</delete>
+
+</mapper>

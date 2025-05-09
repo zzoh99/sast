@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.renewalLst">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getRenewalLstList">
+
+					SELECT Y.ENTER_CD
+					     , X.CODE
+					     , Y.SABUN
+					     , Y.NAME
+					     , Y.STATUS_NM
+					     , Y.ORG_CD
+					     , Y.ORG_NM
+					     , Y.JIKWEE_NM
+					     , Y.JIKCHAK_NM
+					     , Y.JIKGUB_NM
+					     , X.ORD_TYPE_REASON_NM
+					     , X.SDATE
+					     , X.EDATE
+					  FROM (
+					        SELECT A.ENTER_CD
+					             , 'AP'            AS CODE
+					             , A.SABUN
+					             , A.ORD_YMD AS SDATE   /*      발령기간_시작      */
+					             , A.ORD_E_YMD AS EDATE   /*      발령기간_종료      */
+					             , (CASE WHEN A.ORD_REASON_NM IS NULL
+					                     THEN B.ORD_DETAIL_NM
+					                     ELSE B.ORD_DETAIL_NM||'('||A.ORD_REASON_NM||')'
+					                END) AS ORD_TYPE_REASON_NM
+					          FROM THRM191 A       /*      발령    */
+					             , TSYS013 B
+					         WHERE A.ENTER_CD      = B.ENTER_CD
+					           AND A.ORD_DETAIL_CD = B.ORD_DETAIL_CD
+					           AND A.ORD_E_YMD IS NOT NULL
+					        UNION ALL
+					        /* 계약기간 만료 */
+					          SELECT A.ENTER_CD
+					             , 'CT'			AS CODE
+					             , A.SABUN
+					             , A.CON_R_YMD AS SDATE   /*      발령기간_시작      */
+					             , A.CON_E_YMD AS EDATE   /*      발령기간_종료      */
+					             , '계약직' AS ORD_TYPE_REASON_NM
+					          FROM THRM100 A
+					        UNION ALL
+					        /* 연봉계약기간 만료 */
+					        SELECT A.ENTER_CD
+					             , 'PV'            AS CODE
+					             , A.SABUN
+					             , A.SDATE   /*      연봉계약기간_시작      */
+					             , A.EDATE   /*      연봉계약기간_종료      */
+					             , ''              AS ORD_TYPE_REASON_NM
+					          FROM TCPN403 A  /*   연봉관리    */
+					        UNION ALL
+					        /* 면수습기간 만료 */
+					        SELECT A.ENTER_CD
+					             , 'TR'				AS CODE
+					             , A.SABUN
+					             , A.EMP_YMD		AS SDATE   /*     입사일      */
+					             , A.TRA_YMD		AS EDATE   /*    면수습일      */
+					             , C.ORD_DETAIL_NM	AS ORD_TYPE_REASON_NM
+					          FROM THRM100 A
+					               INNER JOIN THRM191 B
+					                      ON B.ENTER_CD = A.ENTER_CD
+					                     AND B.SABUN = A.SABUN
+					                     AND B.ORD_REASON_CD IN ( 'A032', 'A033', 'A040' )
+					               INNER JOIN TSYS013 C
+					                      ON C.ENTER_CD = B.ENTER_CD
+					                     AND C.ORD_DETAIL_CD = B.ORD_DETAIL_CD
+					          WHERE A.TRA_YMD IS NOT NULL
+					       ) X
+					      ,(
+					         SELECT  A.ENTER_CD
+					                ,A.SABUN
+					                ,A.NAME
+					                ,B.STATUS_NM
+					                ,B.STATUS_CD
+					                ,B.ORG_CD
+					                ,F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					                ,B.JIKWEE_NM
+					                ,B.JIKCHAK_NM
+					                ,B.JIKGUB_NM
+					           FROM THRM100 A
+					               ,THRM151 B
+					          WHERE A.ENTER_CD = #{ssnEnterCd}
+					            AND A.ENTER_CD = B.ENTER_CD
+					            AND A.SABUN    = B.SABUN
+					            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+					       ) Y
+					 WHERE X.ENTER_CD = Y.ENTER_CD
+					   AND X.SABUN    = Y.SABUN
+					   AND Y.ORG_CD LIKE #{searchOrgCd} || '%'
+					   AND Y.SABUN LIKE #{searchSabun} || '%'
+					<if test='multiSearchCode !=null and !multiSearchCode.equals("")'>
+					   AND X.CODE IN
+		<foreach collection="multiSearchCode" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					<if test='multiStatusCd !=null and !multiStatusCd.equals("")'>
+					   AND Y.STATUS_CD IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					   AND X.EDATE BETWEEN NVL(REPLACE(#{searchFrom}, '-', ''),'19000101') AND NVL(REPLACE(#{searchTo}, '-', ''),'99991231')
+					ORDER BY X.EDATE DESC, X.CODE
+		</select>
+
+</mapper>

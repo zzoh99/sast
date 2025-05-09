@@ -1,0 +1,266 @@
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="yjungsan.util.*"%>
+<!DOCTYPE html> <html class="hidden"><head> <title>연말정산 PDF 업로드 테스트</title>
+<%@ include file="../common/include/session.jsp"%>
+<%@ include file="../common/include/meta.jsp"%><!-- Meta -->
+<%@ include file="../common/include/jqueryScript.jsp"%>
+<%@ include file="../common/include/ibSheetScript.jsp"%>
+
+<script language="JavaScript">
+<!--
+	var p = eval("<%=popUpStatus%>");
+	var errorCnt = 0; 
+	var exeYn = "N"; //실행여부
+	var limitFileSize = 0; //업로드 제한 파일 사이즈 크기
+	
+	$(function(){
+		
+		var arg = p.window.dialogArguments;
+		
+		var initdata = {};
+        initdata.Cfg = {SearchMode:smLazyLoad,Page:22};
+		initdata.HeaderMode = {Sort:1,ColMove:1,ColResize:1,HeaderCheck:0};
+        initdata.Cols = [
+                        {Header:"No",       Type:"<%=sNoTy%>",  Hidden:Number("<%=sNoHdn%>"),   Width:"<%=sNoWdt%>",    Align:"Center", ColMerge:0, SaveName:"sNo" },
+                        {Header:"에러코드",    Type:"Text",            Hidden:1,  Width:40,     Align:"Center",    ColMerge:0,   SaveName:"error_code",   	KeyField:0,   CalcLogic:"",   Format:"",        PointCount:0,   UpdateEdit:0,   InsertEdit:0,   EditLen:100 },
+                        {Header:"파일명",     Type:"Text",            Hidden:0,  Width:80,    Align:"Left",      ColMerge:0,   SaveName:"file_name",		KeyField:0,   CalcLogic:"",   Format:"",        PointCount:0,   UpdateEdit:0,   InsertEdit:0,   EditLen:100 },
+                        {Header:"크기",      	Type:"Text",            Hidden:0,  Width:50,     Align:"Center",    ColMerge:0,   SaveName:"file_size",     KeyField:0,   CalcLogic:"",   Format:"",  		PointCount:0,   UpdateEdit:0,   InsertEdit:0,   EditLen:100 },
+                        {Header:"타입",      	Type:"Text",            Hidden:0,  Width:40,     Align:"Center",    ColMerge:0,   SaveName:"file_type",     KeyField:0,   CalcLogic:"",   Format:"",        PointCount:0,   UpdateEdit:0,   InsertEdit:0,   EditLen:100 },
+                        {Header:"비고",    	Type:"Text",            Hidden:0,  Width:200,     Align:"Left",    ColMerge:0,   SaveName:"memo",   		KeyField:0,   CalcLogic:"",   Format:"",        PointCount:0,   UpdateEdit:0,   InsertEdit:0,   EditLen:100 }
+        ]; IBS_InitSheet(sheet1, initdata);sheet1.SetEditable(false);sheet1.SetVisible(true);sheet1.SetCountPosition(4);
+        
+        $(window).smartresize(sheetResize); sheetInit();
+		
+
+		if( arg != undefined ) {
+			$("#searchWorkYy").val(arg["searchWorkYy"]) ;
+			$("#searchAdjustType").val(arg["searchAdjustType"]) ;
+			$("#searchSabun").val(arg["searchSabun"]) ;
+			
+			$("#spanYear").html(arg["searchWorkYy"]) ;		
+		}else{
+			var searchWorkYy     = "";
+			var searchAdjustType = "";
+			var searchSabun      = "";
+			
+			searchWorkYy      = p.popDialogArgument("searchWorkYy");
+			searchAdjustType  = p.popDialogArgument("searchAdjustType");
+			searchSabun       = p.popDialogArgument("searchSabun");
+			
+			$("#searchWorkYy").val(searchWorkYy);
+			$("#searchAdjustType").val(searchAdjustType) ;
+			$("#searchSabun").html(searchSabun) ;
+		}
+		
+		//업로드 파일사이즈 설정 조회
+		limitFileSize = ajaxCall("<%=jspPath%>/common/commonCode.jsp?cmd=getCommonNSCodeList&searchStdCd=CPN_YEAREND_LIMIT_SIZE", 'queryId=getSystemStdData',false).codeList[0].code_nm;
+		
+		$("#inptUpload").on('change',function(){
+			changeFile($(this)); 
+		});
+	});
+	
+	function sheet1_OnClick(Row, Col, Value) {
+		try{
+			if(sheet1.ColSaveName(Col) == "memo" ) {
+				if(sheet1.GetCellValue(Row, "error_code") > 0) {
+					if(sheet1.GetCellValue(Row, "error_code") == 2 || sheet1.GetCellValue(Row, "error_code") == 3) {
+						alert("파일명을 확인해 주세요.\n연도 + 정산구분표기(1 연말정산 , 3 퇴직정산) + 사번\nex) 2019120050001.pdf");
+					} else {
+						alert(sheet1.GetCellValue(Row, "memo"));
+					}
+				}
+			}
+		}catch(ex){
+			alert("OnClick Event Error : " + ex);
+		}
+	}
+	
+	function goAction(){
+
+		if(exeYn == 'N') {
+			if($("#inptUpload").val() == "") {
+				alert("소득공제 업로드 파일을 선택해주세요.");
+				return;
+			}
+			
+			if(errorCnt > 0) {
+				alert('업로드 할 수 없는 파일이 존재합니다.\n파일을 확인해 주세요');
+				return;
+			}
+			
+			exeYn = "Y";
+			$("#progressCover").show();
+			$("#uploadForm").attr({"method":"POST","target":"ifrmFileUpload","action":"withHoldRcptFileUploadPopRst.jsp"}).submit();
+		} else {
+			alert("처리중입니다. 잠시만 기다려 주세요.");
+		}
+	}
+	
+	function changeFile(obj){
+		
+		var fileNm = ""; //파일명
+		var ext = ""; //파일 확장자
+		var fFlag = false;
+		errorCnt = 0; //초기화
+		
+		sheet1.RenderSheet(0);
+		
+		if(sheet1.RowCount() > 0) {
+			for(var j = sheet1.RowCount() ; j >= 1; j--){
+				sheet1.RowDelete(j,0);
+			}
+		}
+		
+		for (var i = 0; i < obj[0].files.length; i++) {
+			var file = obj[0].files[i];
+			
+			fileNm = file.name.split('.').shift();
+			ext = file.name.split('.').pop().toLowerCase();
+			
+			sheet1.DataInsert();
+			sheet1.SetCellValue(i+1, "file_name", file.name);
+			sheet1.SetCellValue(i+1, "file_size", comma(file.size));
+			sheet1.SetCellValue(i+1, "file_type", ext.toUpperCase());
+			
+			var adjustType = file.name.substring(4,5);
+
+			if(adjustType == "1"){
+				fFlag = true;
+			}else if(adjustType == "3"){
+				fFlag = true;
+			}else fFlag = false;
+
+			if($.inArray(ext, ['pdf']) == -1) {
+				//파일확장자 체크
+				sheet1.SetRowBackColor(i+1, "#FAD5E6") ;
+				sheet1.SetCellValue(i+1, "error_code", "1");
+				sheet1.SetCellValue(i+1, "memo", "pdf 파일만 업로드 할수 있습니다.");
+				errorCnt++;
+			} else if(fileNm.length < 5){
+				//파일명 체크
+				sheet1.SetRowBackColor(i+1, "#FAD5E6") ;
+				sheet1.SetCellValue(i+1, "error_code", "2");
+				sheet1.SetCellValue(i+1, "memo", "파일명을 확인해 주세요.");
+				errorCnt++;
+			} else if(fFlag == false){
+				//파일명 체크				
+				sheet1.SetRowBackColor(i+1, "#FAD5E6") ;
+				sheet1.SetCellValue(i+1, "error_code", "3");
+				sheet1.SetCellValue(i+1, "memo", "정산구분을 확인해 주세요.(1-연말정산, 3-퇴직정산)");
+				errorCnt++; 
+			} else if(file.size > limitFileSize) {
+				//파일크기 체크
+				sheet1.SetRowBackColor(i+1, "#FAD5E6") ;
+				sheet1.SetCellValue(i+1, "error_code", "4");
+				sheet1.SetCellValue(i+1, "memo", (limitFileSize/(1024*1024))+"MB 이하의 파일만 업로드 할수 있습니다.");
+				errorCnt++;
+			} else {
+				sheet1.SetCellValue(i+1, "error_code", "0");
+			}
+		}
+
+		sheet1.RenderSheet(1);
+		
+	}
+	
+	//콤마찍기
+    function comma(str) {
+        str = String(str);
+        return str.replace(/(\d)(?=(?:\d{3})+(?!\d))/g, '$1,');
+    }
+	
+	function procYn(err,message,memo){
+		$("#progressCover").hide();
+		
+		errorCnt = 0; //초기화
+		exeYn = "N";
+		
+		var rv = $.parseJSON(memo);
+		
+		if(rv != null && rv.length > 0) {
+			for (var i = 0;  i < rv.length; i++) {
+				
+				sheet1.SetCellValue(rv[i].fileIdx+1, "error_code", rv[i].errorCode);
+				sheet1.SetCellValue(rv[i].fileIdx+1, "memo", rv[i].errorMessage);
+				
+				if(rv[i].errorCode > 0) {
+					sheet1.SetRowBackColor(rv[i].fileIdx+1, "#FAD5E6") ;
+					errorCnt++;
+				} else {
+					if(rv[i].errorMessage.length > 0) {
+						sheet1.SetRowBackColor(rv[i].fileIdx+1, "#8FFF6E") ;
+					}
+				}
+			}
+		}
+		
+		if(err=="Y"){
+			alert(message);
+			if (p.window.opener) {
+				p.window.opener.doAction1("Search");
+				//p.window.close();
+		    }
+		} else {
+			alert(message);
+		}
+	}
+//-->
+</script>
+</head>
+<body class="bodywrap">
+	<div id="progressCover" style="display:none;position:absolute;top:0;bottom:0;left:0;right:0;background:url(<%=imagePath%>/common/process.png) no-repeat 50% 50%;"></div>
+    <div class="wrapper">
+        <div class="popup_title">
+            <ul>
+                <li>원천징수영수증PDF 업로드</li>
+                <!--<li class="close"></li>-->
+            </ul>
+        </div>
+        <div class="popup_main">
+		<form id="uploadForm" method="post" enctype="multipart/form-data">
+		<div class="outer">
+			<!-- PDF 등록 파일업로드 Start -->
+			<table border="0" cellpadding="0" cellspacing="0" class="default outer" id="fileUpload">
+			    <colgroup>
+			        <col width="80%" />
+			        <col width="20%" />
+			    </colgroup>
+			    <tr>
+			        <th class="center">파일찾기</th>
+			        <th class="center">업로드</th>
+			    </tr>
+			    <tr>
+			        <td class="center">
+			            <input type="file" multiple="multiple" id="inptUpload" name="upload" class="text" style="width:100%;">
+			        </td>
+			        <td class="center">
+			        	<a href="javascript:goAction();" class="basic" title="전자문서 제출">업로드</a>
+			        </td>
+			    </tr>
+		    </table>
+		    <!-- PDF 등록 파일업로드 End -->
+		</div>
+		</form>
+
+		<div class="outer">
+			<font color='red' size='2'>&nbsp;해당년도 원천징수영수증 데이터가 없을 경우 PDF파일로 대체하기 위한 화면입니다.<p>
+									   &nbsp;파일명규칙은 년도+정산구분(1:연말정산, 3:퇴직정산)+사번 입니다. (ex. 201911234.pdf)</font>
+		</div>
+		<div class="outer">&nbsp;
+		</div>
+		
+		<script type="text/javascript">createIBSheet("sheet1", "100%", "200px"); </script>
+		
+		<iframe id="ifrmFileUpload" name="ifrmFileUpload" width="0" height="0" src="" border="0" frameborder="0" marginwidth="0" marginheight="0"></iframe>
+        <div class="popup_button outer">
+            <ul>
+                <li>
+                    <a href="javascript:p.self.close();" class="gray large">닫기</a>
+                </li>
+            </ul>
+        </div>
+        </div>
+    </div>
+</body>
+</html>

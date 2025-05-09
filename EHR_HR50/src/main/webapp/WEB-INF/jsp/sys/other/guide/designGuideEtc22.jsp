@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html class="bodywrap">
+<head>
+
+<!--   META	 -->
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Cache-Control" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<meta http-equiv="Imagetoolbar" content="no" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+<title><tit:txt mid='104100' mdef='이수시스템(주)'/></title>
+<link rel="stylesheet" href="/common/css/dotum.css" />
+<link rel="stylesheet" href="/common/theme1/css/style.css" />
+
+<!--   JQUERY	 -->
+<script src="/common/js/jquery/1.9.0/jquery.min.js"></script>
+<script src="/common/js/ui/1.10.0/jquery-ui.min.js"></script>
+<script src="/common/js/jquery/datepicker_lang_KR.js"	type="text/javascript" charset="utf-8"></script>
+<script src="/common/js/jquery/jquery.datepicker.js" type="text/javascript" charset="utf-8"></script>
+
+<!--  COMMON SCRIT -->
+<script src="/common/js/common.js"></script>
+<script src="/common/js/commonIBSheet.js"></script>
+<!--   IBSHEET	 -->
+<script type="text/javascript" src="/common/plugin/IBLeaders/Sheet/js/ibsheetinfo.js"></script>
+<script type="text/javascript" src="/common/plugin/IBLeaders/Sheet/js/ibsheet.js"></script>
+
+<link rel="stylesheet" type="text/css" href="/common/plugin/IBLeaders/Sheet/css/style.css">
+<link rel="stylesheet" type="text/css" href="/common/plugin/IBLeaders/Sheet/css/nwe_common.css">
+
+<script type="text/javascript">
+	/*Sheet 기본 설정 */
+	$(function() {
+		var cfg = {};
+		mySheet0.SetConfig(cfg);
+		mySheet1.SetConfig(cfg);
+		mySheet2.SetConfig(cfg);
+		mySheet3.SetConfig(cfg);
+		mySheet4.SetConfig(cfg);
+
+		var cols = [
+
+			{Type:"Seq",    Hidden:0, 	Width:"45",  Align:"Center",  ColMerge:0,   SaveName:"sNo" },
+			{Type:"DelCheck",	Hidden:0,	Width:"45",	Align:"Center",  ColMerge:0,   SaveName:"sDelete" },
+			{Type:"Result",   Hidden:1,	Width:"45",	Align:"Center",  ColMerge:0,   SaveName:"sResult" },
+			{Type:"Status",   Hidden:0,	Width:"45",	Align:"Center",  ColMerge:0,   SaveName:"sStatus" },
+			{Type:"Text",    	Hidden:1,   		Width:0,   			Align:"Left",    ColMerge:0,   SaveName:"viewCd",    KeyField:0,   CalcLogic:"",   Format:"",	PointCount:0,   UpdateEdit:0,   InsertEdit:1,   EditLen:10 },
+			{Type:"Text",    	Hidden:0,   		Width:200,  		Align:"Left",    ColMerge:0,   SaveName:"viewNm",    KeyField:1,   CalcLogic:"",   Format:"", 	PointCount:0,   UpdateEdit:1,   InsertEdit:1,   EditLen:100 },
+			{Type:"Text",    	Hidden:0,   		Width:60,   		Align:"Right",   ColMerge:0,   SaveName:"seq",       KeyField:0,   CalcLogic:"",   Format:"", 	PointCount:0,   UpdateEdit:1,   InsertEdit:1,   EditLen:20 },
+			{Type:"Text",    	Hidden:0,   		Width:220,			Align:"Left",    ColMerge:0,   SaveName:"viewDesc",  KeyField:0,   CalcLogic:"",   Format:"",	PointCount:0,   UpdateEdit:1,   InsertEdit:1,   EditLen:1000 }
+
+		];
+
+		var headers = [
+			{Text:"No|삭제|결과|상태|View코드|View명|순서|View설명", Align:"Center"}
+		];
+
+		mySheet0.InitHeaders(headers);
+		mySheet0.InitColumns(cols);
+		mySheet0.SetCountPosition(4);
+		mySheet0.DataInsert();
+
+		mySheet1.InitHeaders(headers);
+		mySheet1.InitColumns(cols);
+		mySheet1.SetCountPosition(4);
+		mySheet1.DataInsert();
+
+		mySheet2.InitHeaders(headers);
+		mySheet2.InitColumns(cols);
+		mySheet2.SetCountPosition(4);
+		mySheet2.DataInsert();
+
+		mySheet3.InitHeaders(headers);
+		mySheet3.InitColumns(cols);
+		mySheet3.SetCountPosition(4);
+		mySheet3.DataInsert();
+
+		mySheet4.InitHeaders(headers);
+		mySheet4.InitColumns(cols);
+		mySheet4.SetCountPosition(4);
+		mySheet4.DataInsert();
+
+	    $(window).smartresize(sheetResize);
+
+	    sheetInit();
+
+	    $("input[name=radio]").change(function() {
+	    	var radioValue = $(this).val();
+	    	if( radioValue == "Y" ) {
+	    		$("#orgMain").addClass("hide");
+	    		$("#listMain").removeClass("w25p");
+	    		$("#listMain").addClass("w50p");
+	    		$("#nameInput").attr("disabled",false);
+	    		$("#orgInput").attr("disabled",false);
+	    	}
+	    	else {
+	    		$("#orgMain").removeClass("hide");
+	    		$("#listMain").removeClass("w50p");
+	    		$("#listMain").addClass("w25p");
+	    		$("#nameInput").attr("disabled",true);
+	    		$("#orgInput").attr("disabled",true);
+	    	}
+	    	sheetResize();
+	    });
+	});
+
+	function toggleSheet() {
+		if( $("#toggleBtn").text() == "접기" ) hideSheet();
+		else showSheet();
+	}
+
+	function showSheet() {
+		$("#toggleBtn").text("접기");
+		$("#DIV_"+mySheet0.id).show();
+		$("#gap").addClass("outer");
+		$("#gap").show();
+		sheetResize();
+	}
+	function hideSheet() {
+		$("#toggleBtn").text("펴기");
+		$("#DIV_"+mySheet0.id).hide();
+		$("#gap").removeClass("outer");
+		$("#gap").hide();
+		sheetResize();
+	}
+</script>
+
+</head>
+<body class="bodywrap">
+<div class="wrapper">
+	<div class="outer">
+		<div class="sheet_title">
+		<ul>
+			<li class="txt">
+				결재경로
+				<btn:a id="toggleBtn" href="javascript:toggleSheet();" css="cute_gray" mid='111230' mdef="접기"/>
+			</li>
+			<li class="btn">
+				<btn:a css="basic" mid='110700' mdef="입력"/>
+				<btn:a css="basic" mid='110696' mdef="복사"/>
+				<btn:a css="basic" mid='110708' mdef="저장"/>
+			</li>
+		</ul>
+		</div>
+		<script type="text/javascript"> createIBSheet("mySheet0", "100%", "200px", "${ssnLocaleCd}"); </script>
+	</div>
+
+	<div id="gap" class="h15 outer"></div>
+
+	<div class="sheet_search outer">
+		<div>
+		<table>
+		<tr>
+			<th><tit:txt mid='103880' mdef='성명'/></th>
+			<td>
+				<input id="nameInput" type="text" class="text" />
+			</td>
+			<th><tit:txt mid='104279' mdef='소속'/></th>
+			<td>
+				<input id="orgInput" type="text" class="text" />
+			</td>
+			<td>
+				<input id="radio" name="radio" type="radio" class="radio" value="Y" checked/> 리스트
+				<input id="radio" name="radio" type="radio" class="radio" value="N"/> 조직도
+			</td>
+			<td>
+				<btn:a css="button" mid='110697' mdef="조회"/>
+			</td>
+		</tr>
+		</table>
+		</div>
+	</div>
+
+	<table border="0" cellspacing="0" cellpadding="0" class="sheet_main">
+	<tr>
+		<td id="orgMain" class="sheet_left w25p hide">
+			<div class="inner" style="margin-top: -16px;">
+				<div class="sheet_title">
+					<ul>
+						<li class="txt"><tit:txt mid='orgSchemeMgr' mdef='조직도'/></li>
+						<li class="btn">
+						</li>
+					</ul>
+				</div>
+			</div>
+			<script type="text/javascript"> createIBSheet("mySheet1", "25%", "100%", "${ssnLocaleCd}"); </script>
+		</td>
+		<td id="listMain" class="sheet_left w50p">
+			<div class="inner">
+				<div class="sheet_title">
+				<ul>
+					<li class="txt"><tit:txt mid='schAppSabun' mdef='결재자 검색'/></li>
+					<li class="btn">
+					</li>
+				</ul>
+				</div>
+			</div>
+			<script type="text/javascript"> createIBSheet("mySheet2", "25%", "100%", "${ssnLocaleCd}"); </script>
+		</td>
+		<td class="sheet_arrow"></td>
+		<td class="sheet_right w50p">
+			<div class="sheet_button2">
+				<div class="arrow_button">
+					<btn:a href="javascript:mvSearchElement();" 		css="pink" mid='111114' mdef="결재&gt;"/>
+				</div>
+
+				<div class="inner">
+					<div class="sheet_title">
+					<ul>
+						<li class="txt"><tit:txt mid='schAppLine' mdef='결재선 내역'/></li>
+						<li class="btn">
+							<a href="javascript:doAction5('Save');" class="basic"><tit:txt mid='104476' mdef='저장'/></a>
+						</li>
+					</ul>
+					</div>
+				</div>
+				<script type="text/javascript"> createIBSheet("mySheet3", "50%", "50%", "${ssnLocaleCd}"); </script>
+			</div>
+
+			<div class="sheet_button2">
+				<div class="arrow_button">
+					<btn:a href="javascript:mvConfitionElement" 		css="pink" mid='110746' mdef="참조&gt;"/>
+				</div>
+
+				<div class="inner">
+					<div class="sheet_title">
+					<ul>
+						<li class="txt"><tit:txt mid='schRefDetail' mdef='참조 내역'/></li>
+						<li class="btn">
+							<a href="javascript:doAction3('Save');" class="basic"><tit:txt mid='104476' mdef='저장'/></a>
+						</li>
+					</ul>
+					</div>
+				</div>
+				<script type="text/javascript"> createIBSheet("mySheet4", "50%", "50%", "${ssnLocaleCd}"); </script>
+			</div>
+
+		</td>
+	</tr>
+	</table>
+
+</div>
+</body>
+</html>

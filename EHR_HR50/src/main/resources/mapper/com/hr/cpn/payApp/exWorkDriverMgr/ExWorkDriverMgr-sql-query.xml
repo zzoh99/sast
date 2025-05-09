@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.exWorkDriverMgr">
+
+<!-- 시간외근무(기원)신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverMgrList">
+
+				<![CDATA[
+			SELECT A.ENTER_CD
+			           ,A.APPL_SEQ
+			           ,C.NAME
+			           ,A.SABUN
+			           ,F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS ORG_NM 
+			           ,F_COM_GET_JIKWEE_NM(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS JIKWEE_NM
+			           ,B.APPL_STATUS_CD
+			           ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+			           ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'L') AS APPL_STEP  --결재라인
+			           ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'P') AS AGREE_NAME  --최종결재자
+			           ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'Y') AS AGREE_YMD  --결재일
+			           ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'F') AS NEXT_AGREE_NAME  --다음결재자
+			           ,DECODE( A.WORK_GUBUN, 'S', '특근수당', 'N', '야근수당') AS WORK_GUBUN
+			           ,A.SDATE
+			           ,A.REQ_S_HM
+			           ,A.REQ_E_HM
+			           ,A.WORK_HOUR
+			           ,A.MORNING_S_HM
+			           ,A.GOLF_YN
+			           ,A.REASON 
+			           ,A.CHKDATE
+			           ,A.CHKID
+			          ,B.APPL_YMD
+		              , '0' AS DETAIL
+		              ,B.APPL_IN_SABUN			
+			          ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'R') AS RETURN_MEMO --반려사유
+  			FROM TTIM711 A, THRI103 B, THRM100 C
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+				AND B.ENTER_CD = A.ENTER_CD
+				AND B.APPL_SEQ = A.APPL_SEQ
+				        		]]>
+			<if test='searchSabunName != null and !searchSabunName.equals("")'>
+				AND (A.SABUN LIKE '%'||#{searchSabunName} ||'%' OR C.NAME LIKE '%'||#{searchSabunName} ||'%')
+			</if>
+			<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+				AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD) LIKE '%'|| #{searchOrgNm} ||'%'
+			</if>
+			<![CDATA[
+				AND C.ENTER_CD = A.ENTER_CD
+				AND C.SABUN      = A.SABUN
+			    AND B.APPL_STATUS_CD <> '11'
+			   AND SDATE BETWEEN REPLACE(NVL(TRIM(#{searchFromYmd}),'19000101'), '-', '') AND REPLACE(NVL(TRIM(#{searchToYmd}),'99991231'), '-', '')
+			           ]]>
+			<if test='searchWorkGubun != null and !searchWorkGubun.equals("")'>
+				   AND A.WORK_GUBUN = #{searchWorkGubun}
+			</if>
+			<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+			    AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+			</if>
+				ORDER BY B.APPL_YMD DESC, A.SDATE DESC, A.APPL_SEQ DESC
+
+
+
+		</select>
+		
+		<!-- 결재정보 갱신  -->
+		<update parameterType="map" id="updateExWorkDriverMgrThri">
+
+
+						MERGE INTO THRI103	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	APPL_SEQ
+										,	APPL_STATUS_CD
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	APPL_SEQ
+										,	NULL		AS	APPL_STATUS_CD
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="updateRows" >
+													UNION ALL
+														SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+															,	TRIM(#{rm.applSeq})			AS	APPL_SEQ
+															,	TRIM(#{rm.applStatusCd})	AS	APPL_STATUS_CD
+															,	SYSDATE						AS	CHKDATE
+															,	#{ssnSabun}					AS	CHKID
+														FROM	DUAL
+					</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		APPL_SEQ IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.APPL_SEQ				=		S.APPL_SEQ
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.APPL_STATUS_CD	=	S.APPL_STATUS_CD
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+
+
+
+		</update>
+		
+	</mapper>

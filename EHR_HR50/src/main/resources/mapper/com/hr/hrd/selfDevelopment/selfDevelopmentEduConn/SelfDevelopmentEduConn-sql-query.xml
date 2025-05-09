@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.selfDevelopment.selfDevelopmentEduConn">
+<!-- 		조회 -->
+        <select parameterType="map" resultType="cMap" id="getHopeEducationList">
+
+                <![CDATA[
+
+                    SELECT C.ITEM_GUBUN, B.EDUCATION, D.EDUCATIONNM, D.NUM, COUNT(B.SABUN) AS CNT, B.EDUCATION_YN, A.ACTIVE_YYYY, A.HALF_GUBUN_TYPE
+                      FROM TCDPV301 A , TCDPV302 B ,  TCDPT501 C ,
+                           (
+                            SELECT ENTER_CD, EDUCATION, EDUCATIONNM, NUM
+                              FROM (
+                                    SELECT ENTER_CD, TO_CHAR(NUM) AS EDUCATION, EDUCATIONNM,  NUM
+                                      FROM TCDPT101_V
+                                     UNION
+                                    SELECT ENTER_CD, TO_CHAR(SEQ) AS EDUCATION, EDUCATIONNM,  NULL AS NUM
+                                      FROM TCDPT201_V
+                                     UNION
+                                    --SELECT 'HR', ACT_VER_ID  AS EDUCATION , EDUCATIONNM,  NULL AS NUM  FROM  TCDPT309 AAA  -- 'HR' 하드코딩한 이유를 모르겠음.
+                                    SELECT ENTER_CD, ACT_VER_ID  AS EDUCATION , EDUCATIONNM,  NULL AS NUM  FROM  TCDPT309 AAA
+                                     WHERE SDATE = (SELECT MAX(SDATE) FROM  TCDPT309  WHERE ENTER_CD = AAA.ENTER_CD AND ACT_VER_ID = AAA.ACT_VER_ID  GROUP BY ACT_VER_ID)
+                                  ) XX
+                           ) D
+                     WHERE A.ENTER_CD = B.ENTER_CD
+                       AND A.ACTIVE_YYYY =  B.ACTIVE_YYYY
+                       AND A.HALF_GUBUN_TYPE = B.HALF_GUBUN_TYPE
+                       AND A.SABUN = B.SABUN
+                       AND B.ENTER_CD = C.ENTER_CD
+                       AND B.TRM_CD = C.TRM_CD
+                       AND B.EDUCATION = C.EDUCATION
+                       AND C.ENTER_CD = D.ENTER_CD(+)
+                       AND C.EDUCATION = D.EDUCATION(+)
+                       AND A.ENTER_CD = #{ssnEnterCd}
+                       AND A.ACTIVE_YYYY = #{sYear}
+                       AND A.HALF_GUBUN_TYPE = #{searchHalfGubunTypeCd}
+                       AND A.APPROVAL_STATUS = '3'
+                       AND B.CONFIRM_STATUS = '1'
+                               ]]>
+<if test='searchEducationnm != null and !searchEducationnm.equals("")'>
+                       AND D.EDUCATIONNM LIKE '%' || #{searchEducationnm} || '%'
+</if>
+                     GROUP BY  C.ITEM_GUBUN, B.EDUCATION, D.EDUCATIONNM, D.NUM, B.EDUCATION_YN, A.ACTIVE_YYYY, A.HALF_GUBUN_TYPE
+                     ORDER BY C.ITEM_GUBUN, B.EDUCATION, D.EDUCATIONNM
+
+
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getHopePersonList">
+
+                <![CDATA[
+                    SELECT A.ENTER_CD, A.MAIN_ORG_CD, C.MAIN_ORG_NM, B.ORG_CD, NVL(D.ORG_NM, '파트미발령') AS ORG_NM, B.JIKGUB_NM, A.NAME, E.EDU_PRE_YMD
+                         , F_COM_GET_PRIOR_ORG_NM(A.ENTER_CD, B.ORG_CD,  TO_CHAR(SYSDATE, 'YYYYMMDD')) AS PRIOR_ORG_NM
+                      FROM THRM100 A,   THRM151  B,  TCDPW909 C,   TORG101  D  -- TCDPW909(본부부점정보)를 관리하지 않아 OUTER JOIN 하도록 변경 (추후 사용하게 될 수도 있으니 쿼리에서 테이블을 걷어내진 않음)
+                         , (SELECT A.ENTER_CD, B.SABUN, B.EDU_PRE_YMD
+                              FROM TCDPV301 A, TCDPV302 B
+                             WHERE A.ENTER_CD        = B.ENTER_CD
+                               AND A.ACTIVE_YYYY     =  B.ACTIVE_YYYY
+                               AND A.HALF_GUBUN_TYPE = B.HALF_GUBUN_TYPE
+                               AND A.SABUN           = B.SABUN
+                               AND A.ENTER_CD        = #{ssnEnterCd}
+                               AND A.ACTIVE_YYYY     = #{sYear}
+                               AND A.HALF_GUBUN_TYPE = #{searchHalfGubunTypeCd}
+                               AND A.APPROVAL_STATUS = '3'
+                               AND B.CONFIRM_STATUS  = '1'
+                               AND B.EDUCATION       = #{searchEducation}
+                           ) E
+                     WHERE A.ENTER_CD    = #{ssnEnterCd}
+                       AND A.ENTER_CD    = B.ENTER_CD
+                       AND A.SABUN       = B.SABUN
+                       AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                       AND A.ENTER_CD    = C.ENTER_CD(+)
+                       AND A.MAIN_ORG_CD = C.MAIN_ORG_CD(+)
+                       AND B.ENTER_CD    = D.ENTER_CD(+)
+                       AND B.ORG_CD      = D.ORG_CD(+)
+                       AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE(+) AND NVL(D.EDATE(+), '99991231')
+                       AND A.ENTER_CD    = E.ENTER_CD
+                       AND A.SABUN       = E.SABUN
+                       AND B.STATUS_CD   <> 'RA'
+                       AND SUBSTR(A.SABUN, 1, 1) <> '0'
+                       AND C.IT_YN(+)    = 'Y'
+                       AND (A.IT_MOVE_OUT_YMD IS NULL OR A.IT_MOVE_OUT_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                       AND B.JIKWEE_CD <> 'B02'
+                   ORDER BY F_COM_GET_ORG_SEQ(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')), A.NAME
+                ]]>
+
+
+        </select>
+
+
+
+
+        <update parameterType="map" id="saveEducationYn">
+
+                    MERGE INTO TCDPV302 T
+                        USING (
+                                SELECT A.ENTER_CD
+                                     , A.ACTIVE_YYYY
+                                     , A.HALF_GUBUN_TYPE
+                                     , A.EDUCATION
+                                     , A.EDUCATION_YN
+                                     , A.CHKDATE
+                                     , A.CHKID
+                                  FROM (
+                                        SELECT NULL AS ENTER_CD
+                                             , NULL AS ACTIVE_YYYY
+                                             , NULL AS HALF_GUBUN_TYPE
+                                             , NULL AS EDUCATION
+                                             , NULL AS EDUCATION_YN
+                                             , NULL AS CHKDATE
+                                             , NULL AS CHKID
+                                          FROM DUAL
+                                        <foreach item="rm" collection="mergeRows" >
+                                         UNION ALL
+                                        SELECT TRIM( #{ssnEnterCd} )              AS ENTER_CD
+                                             , TRIM( #{rm.activeYyyy})          AS ACTIVE_YYYY
+                                             , TRIM( #{rm.halfGubunType})       AS HALF_GUBUN_TYPE
+                                             , TRIM( #{rm.education})           AS EDUCATION
+                                             , TRIM( #{rm.educationYn})         AS EDUCATION_YN
+                                             , SYSDATE                          AS CHKDATE
+                                             , #{ssnSabun}                        AS CHKID
+                                          FROM DUAL
+                                        </foreach>
+                                       ) A WHERE A.ENTER_CD IS NOT NULL
+                              ) S
+                           ON ( T.ENTER_CD = S.ENTER_CD AND T.ACTIVE_YYYY = S.ACTIVE_YYYY AND T.HALF_GUBUN_TYPE = S.HALF_GUBUN_TYPE AND T.EDUCATION = S.EDUCATION AND T.CONFIRM_STATUS = '1')
+                         WHEN MATCHED THEN
+                              UPDATE SET T.EDUCATION_YN         = S.EDUCATION_YN
+                                       , T.CHKDATE              = S.CHKDATE
+                                       , T.CHKID                = S.CHKID
+        </update>
+
+
+
+
+
+</mapper>

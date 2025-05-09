@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appInternItemMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppInternItemMgrList">
+
+				<![CDATA[
+				SELECT    A.APPRAISAL_CD
+						, A.ITEM_TYPE
+						, A.SEQ
+						, A.SEQ_NM
+						, A.APP_BASIS_POINT
+						, A.MEMO
+						, A.SUNBUN
+				FROM      TPAP110 A
+				WHERE     A.ENTER_CD     = #{ssnEnterCd}
+				AND       A.APPRAISAL_CD = #{searchAppraisalCd}
+				ORDER BY  A.SUNBUN
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppInternItemMgrMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppInternItemMgr">
+
+					MERGE INTO TPAP110 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.SEQ
+									, A.SEQ_NM
+									, A.ITEM_TYPE
+									, A.APP_BASIS_POINT
+									, A.MEMO
+									, A.SUNBUN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS APPRAISAL_CD
+											, NULL		AS SEQ
+											, NULL		AS SEQ_NM
+											, NULL		AS ITEM_TYPE
+											, NULL		AS APP_BASIS_POINT
+											, NULL		AS MEMO
+											, NULL		AS SUNBUN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}                   AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	  AS APPRAISAL_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+											,	TRIM(#{rm.seq}) 		  AS SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+											,	TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM TPAP110 WHERE ENTER_CD = #{ssnEnterCd} AND APPRAISAL_CD = #{rm.appraisalCd} ) )	AS SEQ
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM( #{rm.seqNm})	      AS SEQ_NM
+											, TRIM( #{rm.itemType})	  AS ITEM_TYPE
+											, TRIM( #{rm.appBasisPoint}) AS APP_BASIS_POINT
+											, TRIM( #{rm.memo} )	      AS MEMO
+											, TRIM( #{rm.sunbun})	      AS SUNBUN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.APPRAISAL_CD	= S.APPRAISAL_CD
+					AND  T.SEQ			= S.SEQ
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SEQ_NM         	= S.SEQ_NM
+									, T.ITEM_TYPE      	= S.ITEM_TYPE
+									, T.APP_BASIS_POINT	= S.APP_BASIS_POINT
+									, T.MEMO           	= S.MEMO
+									, T.SUNBUN         	= S.SUNBUN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.SEQ
+							, T.SEQ_NM
+							, T.ITEM_TYPE
+							, T.APP_BASIS_POINT
+							, T.MEMO
+							, T.SUNBUN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.SEQ
+							, S.SEQ_NM
+							, S.ITEM_TYPE
+							, S.APP_BASIS_POINT
+							, S.MEMO
+							, S.SUNBUN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppInternItemMgr">
+
+					DELETE FROM TPAP110
+					WHERE 	(ENTER_CD,APPRAISAL_CD,SEQ) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+										,	TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+										,	TRIM( #{rm.seq} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppInternItemMgr">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppInternItemMgr">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+</mapper>

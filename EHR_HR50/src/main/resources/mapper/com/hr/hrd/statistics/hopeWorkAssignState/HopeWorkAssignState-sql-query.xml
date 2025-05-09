@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.statistics.hopeWorkAssignState">
+		<select parameterType="map" resultType="cMap" id="getHopeWorkAssignStateList">
+
+				<![CDATA[
+					WITH TBL1 AS (
+						SELECT A.ENTER_CD
+							 , A.WORK_ASSIGN_CD AS G_WORK_ASSIGN_CD
+							 , A.WORK_ASSIGN_NM AS G_WORK_ASSIGN_NM
+							 , B.WORK_ASSIGN_CD AS M_WORK_ASSIGN_CD
+							 , B.WORK_ASSIGN_NM AS M_WORK_ASSIGN_NM
+							 , C.WORK_ASSIGN_CD AS S_WORK_ASSIGN_CD
+							 , C.WORK_ASSIGN_NM AS S_WORK_ASSIGN_NM
+						  FROM (SELECT * FROM TCDPW501 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_ASSIGN_TYPE = 'G' AND USE_YN = 'Y') A
+						  LEFT OUTER JOIN (SELECT * FROM TCDPW501 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_ASSIGN_TYPE = 'M' AND USE_YN = 'Y') B
+							ON A.ENTER_CD       = B.ENTER_CD
+						   AND A.WORK_ASSIGN_CD = B.PRIOR_WORK_ASSIGN_CD
+						  LEFT OUTER JOIN (SELECT * FROM TCDPW501 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_ASSIGN_TYPE = 'S' AND USE_YN = 'Y') C
+							ON B.ENTER_CD = C.ENTER_CD
+						   AND B.WORK_ASSIGN_CD = C.PRIOR_WORK_ASSIGN_CD
+					  )
+					, TBL2 AS (
+						SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE, SABUN, WORK_ASSIGN_CD_1 AS WORK_ASSIGN_CD
+						  FROM TCDPV201
+						 WHERE WORK_ASSIGN_CD_1 IS NOT NULL
+						   AND ENTER_CD = #{ssnEnterCd}
+						   AND ACTIVE_YYYY = #{searchActiveYyyy}
+						   AND HALF_GUBUN_TYPE = #{searchHalfGubunType}
+						 UNION ALL
+						SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE, SABUN, WORK_ASSIGN_CD_2
+						  FROM TCDPV201
+						 WHERE WORK_ASSIGN_CD_2 IS NOT NULL
+						   AND ENTER_CD = #{ssnEnterCd}
+						   AND ACTIVE_YYYY = #{searchActiveYyyy}
+						   AND HALF_GUBUN_TYPE = #{searchHalfGubunType}
+						 UNION ALL
+						SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE, SABUN, WORK_ASSIGN_CD_3
+						  FROM TCDPV201
+						 WHERE WORK_ASSIGN_CD_3 IS NOT NULL
+						   AND ENTER_CD = #{ssnEnterCd}
+						   AND ACTIVE_YYYY = #{searchActiveYyyy}
+						   AND HALF_GUBUN_TYPE = #{searchHalfGubunType}
+					)
+					SELECT A.ENTER_CD
+						 , A.G_WORK_ASSIGN_CD
+						 , A.G_WORK_ASSIGN_NM
+						 , A.M_WORK_ASSIGN_CD
+						 , A.M_WORK_ASSIGN_NM
+						 , A.S_WORK_ASSIGN_CD
+						 , A.S_WORK_ASSIGN_NM
+						 , B.ACTIVE_YYYY
+						 , B.HALF_GUBUN_TYPE
+						 , NVL(SUM(CASE WHEN B.WORK_ASSIGN_CD IS NOT NULL THEN 1 ELSE 0 END), 0) AS APP_CNT
+					  FROM TBL1 A INNER JOIN TBL2  B
+						ON A.ENTER_CD = B.ENTER_CD
+					   AND A.S_WORK_ASSIGN_CD = B.WORK_ASSIGN_CD
+					 WHERE LOWER(A.S_WORK_ASSIGN_NM) LIKE '%' || LOWER(#{searchWorkAssignNm}) || '%'
+					 GROUP BY A.ENTER_CD
+							, A.G_WORK_ASSIGN_CD
+							, A.G_WORK_ASSIGN_NM
+							, A.M_WORK_ASSIGN_CD
+							, A.M_WORK_ASSIGN_NM
+							, A.S_WORK_ASSIGN_CD
+							, A.S_WORK_ASSIGN_NM
+							, B.ACTIVE_YYYY
+							, B.HALF_GUBUN_TYPE
+					 ORDER BY A.ENTER_CD
+							, A.G_WORK_ASSIGN_CD
+							, A.M_WORK_ASSIGN_CD
+							, A.S_WORK_ASSIGN_CD
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getHopeWorkAssignStateDetailList">
+
+
+				<![CDATA[
+					SELECT '0' AS DETAIL
+					     , B.SABUN
+						 , B.MOVE_HOPE_TIME
+						 , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD) AS NAME
+						 , F_COM_GET_ORG_CD(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD)                   AS ORG_CD
+						 , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD), A.ACTIVE_START_YMD, #{ssnLocaleCd}) AS ORG_NM
+						 , F_COM_GET_JIKGUB_CD(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD)                AS JIKGUB_CD
+						 , F_COM_GET_JIKWEE_CD(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD)                AS JIKWEE_CD
+						 , F_COM_GET_JIKCHAK_CD(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD)               AS JIKCHAK_CD
+						 , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD, #{ssnLocaleCd})  AS JIKGUB_NM
+						 , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD, #{ssnLocaleCd})  AS JIKWEE_NM
+						 , F_COM_GET_JIKCHAK_NM(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+						 , F_COM_GET_STATUS_CD(B.ENTER_CD, B.SABUN, A.ACTIVE_START_YMD)                AS STATUS_CD
+						 , CASE WHEN B.WORK_ASSIGN_CD_1 = #{searchWorkAssignCd} THEN '1순위'
+								WHEN B.WORK_ASSIGN_CD_2 = #{searchWorkAssignCd} THEN '2순위'
+								WHEN B.WORK_ASSIGN_CD_3 = #{searchWorkAssignCd} THEN '3순위'
+						   END AS RATING
+					  FROM TCDPV000 A INNER JOIN TCDPV201 B
+						ON A.ENTER_CD        = B.ENTER_CD
+					   AND A.ACTIVE_YYYY     = B.ACTIVE_YYYY
+					   AND A.HALF_GUBUN_TYPE = B.HALF_GUBUN_TYPE
+					 WHERE A.ENTER_CD        = #{ssnEnterCd}
+					   AND A.ACTIVE_YYYY     = #{searchActiveYyyy}
+					   AND A.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+					   AND ( (B.WORK_ASSIGN_CD_1 = #{searchWorkAssignCd}) OR
+							 (B.WORK_ASSIGN_CD_2 = #{searchWorkAssignCd}) OR
+							 (B.WORK_ASSIGN_CD_3 = #{searchWorkAssignCd}) )
+				]]>
+
+
+		</select>
+
+</mapper>

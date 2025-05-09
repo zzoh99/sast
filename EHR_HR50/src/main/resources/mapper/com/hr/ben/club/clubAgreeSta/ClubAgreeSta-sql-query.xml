@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubAgreeSta">
+
+	<select id="getClubAgreeStaClubCode" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT CLUB_SEQ AS CODE
+		     , (DECODE( NVL(TEMP_YN,'N'), 'Y', '(임시)', '') || CLUB_NM) AS CODE_NM
+		  FROM TBEN500
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+		   AND REPLACE(TRIM( #{searchYmd} ), '-', '') BETWEEN SDATE AND EDATE
+		<if test="ssnGrpCd eq '99'">
+		   AND ( SABUN_A = #{ssnSabun} OR SABUN_B = #{ssnSabun} OR SABUN_C = #{ssnSabun} )
+		</if>
+		  ORDER BY CLUB_NM
+	</select>
+		
+	<select id="getClubAgreeStaList" parameterType="map" resultType="cMap">
+	<![CDATA[
+          SELECT A.ENTER_CD
+               , A.CLUB_SEQ
+			, A.SABUN
+			, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+			, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+			, B.CLUB_FEE
+			, B.CLUB_NM 
+			, B.SABUN_A
+			, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_A, 'ko_KR' ) AS SABUN_A_NAME  --회장성명
+			, B.SABUN_B
+			, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_B, 'ko_KR' ) AS SABUN_B_NAME  --고문성명
+			, B.SABUN_C
+			, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_C, 'ko_KR' ) AS SABUN_C_NAME  --총무성명
+			, A.SDATE 
+			, A.EDATE 
+			, A.AGREE_DATE 
+			, ('/SignPhotoOut.do' || chr(63) || 'enterCd=' || #{ssnEnterCd} || chr(38) || 'fileSeq=' || A.FILE_SEQ) AS FILE_SEQ_URL
+			, ( 
+				F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN_A, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd})||chr(47)||F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_A, #{ssnLocaleCd} )
+			  ) AS SABUN_A_VIEW
+		 FROM TBEN502 A, TBEN500 B
+		WHERE A.ENTER_CD 	 = #{ssnEnterCd}
+		  AND A.ENTER_CD 	 = B.ENTER_CD 
+		  AND A.CLUB_SEQ 	 = B.CLUB_SEQ ]]>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+		  AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+		</if>
+		<if test="searchClubSeqCd != null and searchClubSeqCd neq ''">
+		  AND A.CLUB_SEQ IN ( #{searchClubSeqCd} ) 
+		</if>
+        <if test="searchYmd != null and searchYmd neq '' ">
+          AND REPLACE(#{searchYmd}, '-','') BETWEEN A.SDATE AND NVL( A.EDATE, '99991231' )
+        </if>
+          ORDER BY B.CLUB_NM, A.EDATE DESC, A.SABUN
+	</select>
+</mapper>

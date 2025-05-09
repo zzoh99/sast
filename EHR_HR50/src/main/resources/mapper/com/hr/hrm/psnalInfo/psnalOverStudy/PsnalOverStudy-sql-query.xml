@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalOverStudy">
+
+		<select id="getPsnalOverStudyList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT	A.ENTER_CD		/*	회사구분(TORG900)		*/
+						,	A.SABUN			/*	사원번호				*/
+						,	A.SEQ			/*	순번					*/
+						,	A.NATION_CD		/*	국가코드(H20290)		*/
+						,	A.CITY_NM		/*	도시					*/
+						,	A.SDATE			/*	시작일				*/
+						,	A.EDATE			/*	종료일				*/
+						,	A.PURPOSE		/*	연수목적				*/
+						,	A.NOTE			/*	연수내용				*/
+						,	A.FILE_SEQ		/*	첨부파일순번(TSYS971)	*/
+						,	A.CHKDATE		/*	최종수정시간			*/
+						,	A.CHKID			/*	최종수정자				*/
+					FROM	THRM131	A
+					WHERE	A.ENTER_CD	=	NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					AND		A.SABUN		=	#{sabun}
+					ORDER	BY
+							A.SDATE	DESC
+				]]>
+
+
+		</select>
+
+		<update id="savePsnalOverStudy" parameterType="map">
+
+						MERGE INTO THRM131	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	SABUN
+										,	SEQ
+										,	NATION_CD
+										,	CITY_NM
+										,	SDATE
+										,	EDATE
+										,	PURPOSE
+										,	NOTE
+										,	FILE_SEQ
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	SABUN
+										,	NULL		AS	SEQ
+										,	NULL		AS	NATION_CD
+										,	NULL		AS	CITY_NM
+										,	NULL		AS	SDATE
+										,	NULL		AS	EDATE
+										,	NULL		AS	PURPOSE
+										,	NULL		AS	NOTE
+										,	NULL		AS	FILE_SEQ
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach collection="mergeRows" item="rm" >
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+										,	TRIM(#{rm.sabun})				AS	SABUN
+										<choose>
+										<when test='rm.seq != null and !rm.seq.equals("")' >
+										,	TRIM(#{rm.seq})			AS SEQ
+										</when>
+										<otherwise>
+										,	TO_CHAR( (
+														SELECT	(NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+														FROM	THRM131
+														WHERE	ENTER_CD	=	TRIM( #{ssnEnterCd} )
+														AND		SABUN		=	TRIM( #{rm.sabun} )
+													) )	AS	SEQ
+											<bind name="icnt" value="icnt + 1" />
+										</otherwise>
+										</choose>
+										,	TRIM(#{rm.nationCd})			AS	NATION_CD
+										,	TRIM(#{rm.cityNm})				AS	CITY_NM
+										,	TRIM(#{rm.sdate})				AS	SDATE
+										,	TRIM(#{rm.edate})				AS	EDATE
+										,	TRIM(#{rm.purpose})				AS	PURPOSE
+										,	TRIM(#{rm.note})				AS	NOTE
+										,	TRIM(#{rm.fileSeq})				AS	FILE_SEQ
+										,	SYSDATE							AS	CHKDATE
+										,	#{ssnSabun}						AS	CHKID
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND	SABUN IS NOT NULL
+										AND	SEQ IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD			=		S.ENTER_CD
+							AND	T.SABUN				=		S.SABUN
+							AND	T.SEQ				=		S.SEQ
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.NATION_CD		=	S.NATION_CD
+						,	T.CITY_NM		=	S.CITY_NM
+						,	T.SDATE			=	S.SDATE
+						,	T.EDATE			=	S.EDATE
+						,	T.PURPOSE		=	S.PURPOSE
+						,	T.NOTE			=	S.NOTE
+						,	T.FILE_SEQ		=	S.FILE_SEQ
+						,	T.CHKDATE		=	S.CHKDATE
+						,	T.CHKID			=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					(
+							T.ENTER_CD
+						,	T.SABUN
+						,	T.SEQ
+						,	T.NATION_CD
+						,	T.CITY_NM
+						,	T.SDATE
+						,	T.EDATE
+						,	T.PURPOSE
+						,	T.NOTE
+						,	T.FILE_SEQ
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.SABUN
+						,	S.SEQ
+						,	S.NATION_CD
+						,	S.CITY_NM
+						,	S.SDATE
+						,	S.EDATE
+						,	S.PURPOSE
+						,	S.NOTE
+						,	S.FILE_SEQ
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+		</update>
+
+
+		<delete id="deletePsnalOverStudy" parameterType="map">
+
+					DELETE	FROM THRM131
+					WHERE	(ENTER_CD, SABUN, SEQ) IN ((NULL, NULL, NULL)
+<foreach collection="deleteRows" item="rm" >
+						,
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+	and rm.sabun != null and !rm.sabun.equals("")
+	and rm.seq != null and !rm.seq.equals("")' >
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.sabun} ) , TRIM( #{rm.seq} ) )
+	</if>
+</foreach>
+										)
+
+
+
+		</delete>
+	</mapper>

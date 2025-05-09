@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanAgrStd">
+
+<!-- 휴가계획기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAgrStdList">
+
+				<![CDATA[
+				SELECT A.ENTER_CD
+				     , A.PLAN_CD
+				     , MAX(CASE WHEN A.PLAN_SEQ = 1 THEN A.ALARM_BF_DAY   ELSE NULL END) AS ALARM_BF_DAY_1
+				     , MAX(CASE WHEN A.PLAN_SEQ = 1 THEN A.ALARM_GUBUN_CD ELSE NULL END) AS ALARM_GUBUN_CD_1
+				     , MAX(CASE WHEN A.PLAN_SEQ = 1 THEN A.PLAN_DAY       ELSE NULL END) AS PLAN_DAY_1
+				     , MAX(CASE WHEN A.PLAN_SEQ = 1 THEN A.NOTE           ELSE NULL END) AS NOTE_1
+				     , MAX(CASE WHEN A.PLAN_SEQ = 1 THEN A.SEND_MAIL_YN   ELSE NULL END) AS SEND_MAIL_YN_1
+				     , MAX(CASE WHEN A.PLAN_SEQ = 1 THEN A.MAIN_NOTI_YN   ELSE NULL END) AS MAIN_NOTI_YN_1
+				     , MAX(CASE WHEN A.PLAN_SEQ = 2 THEN A.ALARM_BF_DAY   ELSE NULL END) AS ALARM_BF_DAY_2
+				     , MAX(CASE WHEN A.PLAN_SEQ = 2 THEN A.ALARM_GUBUN_CD ELSE NULL END) AS ALARM_GUBUN_CD_2
+				     , MAX(CASE WHEN A.PLAN_SEQ = 2 THEN A.PLAN_DAY       ELSE NULL END) AS PLAN_DAY_2
+				     , MAX(CASE WHEN A.PLAN_SEQ = 2 THEN A.NOTE           ELSE NULL END) AS NOTE_2
+				     , MAX(CASE WHEN A.PLAN_SEQ = 2 THEN A.SEND_MAIL_YN   ELSE NULL END) AS SEND_MAIL_YN_2
+				     , MAX(CASE WHEN A.PLAN_SEQ = 2 THEN A.MAIN_NOTI_YN   ELSE NULL END) AS MAIN_NOTI_YN_2
+				  FROM TTIM560 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+                 GROUP BY A.ENTER_CD, A.PLAN_CD
+                 ORDER BY F_COM_GET_GRCODE_SEQ( A.ENTER_CD, 'T56120', A.PLAN_CD)
+				        
+				]]>
+
+
+		</select>
+
+<!-- 휴가계획기준관리 저장 -->
+		<update parameterType="map" id="saveAnnualPlanAgrStd">
+
+					MERGE INTO TTIM560 T
+					USING	(
+							SELECT A.ENTER_CD
+							     , A.PLAN_CD
+							     , A.PLAN_SEQ
+							     , A.ALARM_BF_DAY
+							     , A.ALARM_GUBUN_CD
+							     , A.PLAN_DAY
+							     , A.NOTE
+							     , A.SEND_MAIL_YN
+							     , A.MAIN_NOTI_YN
+							FROM	(
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.planCd}  )		AS  PLAN_CD
+										 , TRIM(  1 )					AS  PLAN_SEQ
+										 , TRIM( #{rm.alarmBfDay1})	AS  ALARM_BF_DAY
+										 , TRIM( #{rm.alarmGubunCd1})	AS  ALARM_GUBUN_CD
+										 , TRIM( #{rm.planDay1})		AS  PLAN_DAY
+										 , TRIM( #{rm.note1})			AS  NOTE
+										 , TRIM( #{rm.sendMailYn1})	AS  SEND_MAIL_YN
+										 , TRIM( #{rm.mainNotiYn1})	AS  MAIN_NOTI_YN
+										 
+									  FROM DUAL
+									UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.planCd}  )		AS  PLAN_CD
+										 , TRIM(  2 )					AS  PLAN_SEQ
+										 , TRIM( #{rm.alarmBfDay2})	AS  ALARM_BF_DAY
+										 , TRIM( #{rm.alarmGubunCd2})	AS  ALARM_GUBUN_CD
+										 , TRIM( #{rm.planDay2})		AS  PLAN_DAY
+										 , TRIM( #{rm.note2})			AS  NOTE
+										 , TRIM( #{rm.sendMailYn2})	AS  SEND_MAIL_YN
+										 , TRIM( #{rm.mainNotiYn2})	AS  MAIN_NOTI_YN
+										 
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD
+					 AND T.PLAN_CD	= S.PLAN_CD
+					 AND T.PLAN_SEQ	= S.PLAN_SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ALARM_BF_DAY	= S.ALARM_BF_DAY
+									, T.ALARM_GUBUN_CD	= S.ALARM_GUBUN_CD
+                                    , T.PLAN_DAY		= S.PLAN_DAY
+                                    , T.NOTE		 	= S.NOTE
+                                    , T.SEND_MAIL_YN 	= S.SEND_MAIL_YN
+                                    , T.MAIN_NOTI_YN 	= S.MAIN_NOTI_YN
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+						    , T.PLAN_CD
+						    , T.PLAN_SEQ
+						    , T.ALARM_BF_DAY
+						    , T.ALARM_GUBUN_CD
+						    , T.PLAN_DAY
+						    , T.NOTE
+						    , T.SEND_MAIL_YN
+						    , T.MAIN_NOTI_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+						    , S.PLAN_CD
+						    , S.PLAN_SEQ
+						    , S.ALARM_BF_DAY
+						    , S.ALARM_GUBUN_CD
+						    , S.PLAN_DAY
+						    , S.NOTE
+						    , S.SEND_MAIL_YN
+						    , S.MAIN_NOTI_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 휴가계획기준관리 삭제 -->
+		<delete parameterType="map" id="deleteAnnualPlanAgrStd">
+
+					DELETE FROM TTIM560
+					 WHERE (ENTER_CD, PLAN_CD) IN 	(  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, ( TRIM( #{ssnEnterCd} ), TRIM( #{rm.planCd} ) )
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

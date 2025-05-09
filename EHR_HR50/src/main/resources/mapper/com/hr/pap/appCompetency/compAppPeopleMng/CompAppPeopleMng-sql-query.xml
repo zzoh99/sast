@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appCompetency.compAppPeopleMng">
+<!-- 		리더십진단대상자관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCompAppPeopleMngList1">
+
+				<![CDATA[
+				SELECT ENTER_CD, COMP_APPRAISAL_CD, W_ENTER_CD, SABUN, NAME, ALIAS, ORG_CD, ORG_NM,
+					Q_ORG_CD, Q_ORG_NM, JIKWEE_CD, JIKWEE_NM, JOB_CD, JOB_NM, JOB_GROUP_CD, JOB_GROUP_NM,
+					JIKCHAK_CD, JIKCHAK_NM, JIKGUB_CD, JIKGUB_NM, MAN_SABUN, MAN_JIKCHAK_NM,
+					MAN_NAME, FINAL_COMMENT, APP_YN, NOTE, COMP_RESULT_CD, APP_STATUS
+					, '0' AS RESULT, F_COM_GET_GRCODE_NAME(ENTER_CD, 'P00004', #{searchAppSeqCd}) AS APP_SEQ_NM  -- 평가차수=>3:상향평가, 4:동료평가
+				FROM(
+						SELECT ENTER_CD, COMP_APPRAISAL_CD, W_ENTER_CD, SABUN, NAME, ALIAS, ORG_CD, ORG_NM,
+							Q_ORG_CD, Q_ORG_NM, JIKWEE_CD, JIKWEE_NM, JOB_CD, JOB_NM, JOB_GROUP_CD, JOB_GROUP_NM,
+							JIKCHAK_CD, JIKCHAK_NM, JIKGUB_CD, JIKGUB_NM, MAN_SABUN, MAN_JIKCHAK_NM,
+							MAN_NAME, FINAL_COMMENT, APP_YN, NOTE, COMP_RESULT_CD,
+							(CASE WHEN APP_COUNT > 0 AND APP_STATUS_COUNT = 0 THEN 'Y' ELSE 'N' END)APP_STATUS
+						FROM(
+							SELECT	T1.ENTER_CD AS ENTER_CD																				/*-- 회사구분(TORG900)*/
+								, T1.COMP_APPRAISAL_CD AS COMP_APPRAISAL_CD											/*-- 역량진단ID*/
+								, T1.W_ENTER_CD													/*--진단대상회사코드*/
+								, T1.SABUN AS SABUN																							/*-- 사원번호*/
+								, T2.NAME AS NAME																							/*-- 사원번호*/
+								, F_COM_GET_NAMES (T1.W_ENTER_CD, T1.SABUN, 'ALIAS') AS ALIAS
+								, T1.ORG_CD AS ORG_CD																						/*-- 조직코드(TORG101)*/
+								, T1.ORG_NM AS ORG_NM																						/*-- 조직명*/
+								, T1.Q_ORG_CD AS Q_ORG_CD																				/*-- 본부코드(TORG101)*/
+								, T1.Q_ORG_NM AS Q_ORG_NM																				/*-- 본부명*/
+								, T1.JIKWEE_CD AS JIKWEE_CD																			/*-- 직위(H20030)*/
+								, T1.JIKWEE_NM AS JIKWEE_NM																			/*-- 직위명*/
+								, T1.JOB_CD AS JOB_CD																						/*-- 직무코드(TORG201)*/
+								, T1.JOB_NM AS JOB_NM																						/*-- 직무명*/
+								, T1.JOB_GROUP_CD AS JOB_GROUP_CD																/*-- 직군코드(TORG201)*/
+								, T1.JOB_GROUP_NM AS JOB_GROUP_NM																/*-- 직군명*/
+								, T1.JIKCHAK_CD AS JIKCHAK_CD																		/*-- 직책(H20020)*/
+								, T1.JIKCHAK_NM AS JIKCHAK_NM																		/*-- 직책명*/
+								, T1.JIKGUB_CD AS JIKGUB_CD																			/*-- 직급(H20010)*/
+								, T1.JIKGUB_NM AS JIKGUB_NM																			/*-- 직급명*/
+								, T1.MAN_SABUN AS MAN_SABUN																			/*-- 최종평가자사번*/
+								, F_COM_GET_JIKCHAK_NM (T1.ENTER_CD,T1.MAN_SABUN,TO_CHAR (SYSDATE, 'YYYYMMDD')) AS MAN_JIKCHAK_NM
+								, F_COM_GET_NAMES(T1.ENTER_CD, T1.MAN_SABUN) AS MAN_NAME
+								, T1.FINAL_COMMENT AS FINAL_COMMENT															/*-- 최종의견*/
+								, T1.APP_YN AS APP_YN																						/*-- 평가포함여부*/
+								, T1.NOTE AS NOTE																								/*-- 비고*/
+								, T1.CHKDATE AS CHKDATE																					/*-- 최종수정시간*/
+								, T1.CHKID AS CHKID																							/*-- 최종수정자*/
+								, (SELECT COUNT(*) FROM TPAP527 WHERE ENTER_CD = T1.ENTER_CD
+																		AND W_ENTER_CD = T1.W_ENTER_CD
+																		AND COMP_APPRAISAL_CD = T1.COMP_APPRAISAL_CD
+																		AND SABUN = T1.SABUN) AS APP_COUNT
+								, (SELECT COUNT(*) FROM TPAP527 WHERE ENTER_CD = T1.ENTER_CD
+																		AND W_ENTER_CD = T1.W_ENTER_CD
+																		AND COMP_APPRAISAL_CD = T1.COMP_APPRAISAL_CD
+																		AND SABUN = T1.SABUN
+																		AND LDS_APP_STATUS_CD = 'N' ) AS APP_STATUS_COUNT
+								,	T1.COMP_RESULT_CD
+							FROM TPAP525 T1		/*-- 역량진단대상자관리(TPAP525)(TABLE)*/
+								, THRM100 T2
+							WHERE T1.W_ENTER_CD = T2.ENTER_CD
+								AND	T1.SABUN = T2.SABUN
+						)
+					)
+				WHERE	ENTER_CD = #{ssnEnterCd}														/*-- 회사구분(TORG900)*/
+					AND	COMP_APPRAISAL_CD = #{searchCompAppraisalCd}								/*-- 역량진단ID*/
+					]]>
+					<if test='searchAppYn  != null and !searchAppYn.equals("") ' >
+					AND	APP_YN = #{searchAppYn}
+					</if>
+					
+					<if test='searchAppStatus  != null and !searchAppStatus.equals("") ' >
+					AND	APP_STATUS = #{searchAppStatus}
+					</if>
+					
+					<if test='searchConditionType != null and searchConditionType.equals("SABUN")'>
+						<if test='searchCondition != null and !searchCondition.equals("") ' >
+						AND	SABUN LIKE '%'|| #{searchCondition} ||'%'
+						</if>
+					</if>
+					
+					<if test='searchConditionType != null and searchConditionType.equals("NAME")'>
+						<if test='searchCondition  != null and !searchCondition.equals("") ' >
+						AND	NAME LIKE '%'|| #{searchCondition} ||'%'
+						</if>
+					</if>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getCompAppPeopleMngList2">
+
+				<![CDATA[
+					SELECT	T1.ENTER_CD AS ENTER_CD										/*-- 회사구분(TORG900)*/
+						, T1.W_ENTER_CD AS W_ENTER_CD
+						, T1.COMP_APPRAISAL_CD AS COMP_APPRAISAL_CD						/*-- 역량진단ID*/
+						, T1.SABUN AS SABUN												/*-- 사원번호*/
+						, F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN) AS NAME
+						, T1.APP_ENTER_CD AS APP_ENTER_CD
+						, T1.APP_SABUN AS APP_SABUN										/*-- 진단자사번*/
+						, F_COM_GET_NAMES(T1.APP_ENTER_CD, T1.APP_SABUN) AS APP_NAME
+						, F_COM_GET_NAMES(T1.APP_ENTER_CD, T1.APP_SABUN, 'ALIAS') AS APP_ALIAS
+						, T1.APP_SEQ_CD AS APP_SEQ_CD									/*-- */
+						, T1.ORG_CD AS ORG_CD											/*-- 조직코드(TORG101)*/
+						, T1.ORG_NM AS ORG_NM											/*-- 조직명*/
+						, T1.Q_ORG_CD AS Q_ORG_CD										/*-- 본부코드(TORG101)*/
+						, T1.Q_ORG_NM AS Q_ORG_NM										/*-- 본부명*/
+						, T1.JIKWEE_CD AS JIKWEE_CD										/*-- 직위(H20030)*/
+						, T1.JIKWEE_NM AS JIKWEE_NM										/*-- 직위명*/
+						, T1.JIKCHAK_CD AS JIKCHAK_CD									/*-- 직책(H20020)*/
+						, T1.JIKCHAK_NM AS JIKCHAK_NM									/*-- 직책명*/
+						, T1.JIKGUB_CD AS JIKGUB_CD										/*-- 직급(H20010)*/
+						, T1.JIKGUB_NM AS JIKGUB_NM										/*-- 직급명*/
+						, T1.A_COMMENT AS A_COMMENT										/*-- 장점의견*/
+						, T1.C_COMMENT AS C_COMMENT										/*-- 개선점의견*/
+						, T1.APP_GROUP
+						, T1.LDS_APP_STATUS_CD AS LDS_APP_STATUS_CD						/*-- 진단상태코드:	03:완료, 01: 임시저장	NULL이면	00: 미진행*/
+						, T1.CHKDATE AS CHKDATE											/*-- 최종수정시간*/
+						, T1.CHKID AS CHKID												/*-- 최종수정자*/
+					FROM	TPAP527 T1	/*-- 역량진단자관리(TPAP527)(TABLE)*/
+					WHERE	T1.ENTER_CD = #{ssnEnterCd}
+						AND	T1.W_ENTER_CD = #{searchWEnterCd}
+						AND	T1.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+						AND	T1.SABUN = #{searchSabun}
+						        ]]>
+<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")' >
+						AND	T1.APP_SEQ_CD = #{searchAppSeqCd}
+</if>
+						ORDER BY APP_SEQ_CD
+
+		</select>
+		
+<!-- 		리더십진단대상자관리 저장 -->	
+		<update parameterType="map" id="saveCompAppPeopleMng1">
+
+				<![CDATA[
+					MERGE INTO TPAP525 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.COMP_APPRAISAL_CD
+									, A.W_ENTER_CD
+									, A.SABUN
+									, A.ORG_CD
+									, A.ORG_NM
+									, A.JIKGUB_CD
+									, A.JIKGUB_NM
+									, A.JIKCHAK_CD
+									, A.JIKCHAK_NM
+									, A.APP_YN
+									, A.NOTE
+									, A.Q_ORG_CD
+									, A.Q_ORG_NM
+									, A.JIKWEE_CD
+									, A.JIKWEE_NM
+									, A.JOB_CD
+									, A.JOB_NM
+									, A.JOB_GROUP_CD
+									, A.JOB_GROUP_NM
+									, A.MAN_SABUN
+									, A.FINAL_COMMENT
+									, A.COMP_RESULT_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+										, NULL		AS COMP_APPRAISAL_CD
+										, NULL		AS W_ENTER_CD
+										, NULL		AS SABUN
+										, NULL		AS ORG_CD
+										, NULL		AS ORG_NM
+										, NULL		AS JIKGUB_CD
+										, NULL		AS JIKGUB_NM
+										, NULL		AS JIKCHAK_CD
+										, NULL		AS JIKCHAK_NM
+										, NULL		AS APP_YN
+										, NULL		AS NOTE
+										, NULL		AS Q_ORG_CD
+										, NULL		AS Q_ORG_NM
+										, NULL		AS JIKWEE_CD
+										, NULL		AS JIKWEE_NM
+										, NULL		AS JOB_CD
+										, NULL		AS JOB_NM
+										, NULL		AS JOB_GROUP_CD
+										, NULL		AS JOB_GROUP_NM
+										, NULL		AS MAN_SABUN
+										, NULL		AS FINAL_COMMENT
+										, NULL		AS COMP_RESULT_CD
+									FROM	DUAL
+									    ]]>
+		   <foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )				AS ENTER_CD
+											, TRIM(  #{searchCompAppraisalCd} )		AS COMP_APPRAISAL_CD
+											, TRIM(  #{rm.wEnterCd} )			AS W_ENTER_CD
+											, TRIM(  #{rm.sabun} )				AS SABUN
+											, TRIM(  #{rm.orgCd} )				AS ORG_CD
+											, TRIM(  #{rm.orgNm} )				AS ORG_NM
+											, TRIM(  #{rm.jikgubCd} )			AS JIKGUB_CD
+											, TRIM(  #{rm.jikgubNm} )			AS JIKGUB_NM
+											, TRIM(  #{rm.jikchakCd} )			AS JIKCHAK_CD
+											, TRIM(  #{rm.jikchakNm} )			AS JIKCHAK_NM
+											, TRIM(  #{rm.appYn} )				AS APP_YN
+											, TRIM(  #{rm.note} )				AS NOTE
+											, TRIM(  #{rm.qOrgCd} )				AS Q_ORG_CD
+											, TRIM(  #{rm.qOrgNm} )				AS Q_ORG_NM
+											, TRIM(  #{rm.jikweeCd} )			AS JIKWEE_CD
+											, TRIM(  #{rm.jikweeNm} )			AS JIKWEE_NM
+											, TRIM(  #{rm.jobCd} )				AS JOB_CD
+											, TRIM(  #{rm.jobNm} )				AS JOB_NM
+											, TRIM(  #{rm.jobGroupCd} )			AS JOB_GROUP_CD
+											, TRIM(  #{rm.jobGroupNm} )			AS JOB_GROUP_NM
+											, TRIM(  #{rm.manSabun} )			AS MAN_SABUN
+											, TRIM(  #{rm.finalComment} )		AS FINAL_COMMENT
+											, TRIM(  #{rm.compResultCd} )		AS COMP_RESULT_CD
+									FROM   DUAL
+		   </foreach>
+								) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.COMP_APPRAISAL_CD = S.COMP_APPRAISAL_CD AND T.W_ENTER_CD = S.W_ENTER_CD AND T.SABUN = S.SABUN)
+					WHEN MATCHED THEN
+						UPDATE SET	T.ORG_CD              =  S.ORG_CD
+									, T.ORG_NM            =  S.ORG_NM
+									, T.JIKGUB_CD         =  S.JIKGUB_CD
+									, T.JIKGUB_NM         =  S.JIKGUB_NM
+									, T.JIKCHAK_CD        =  S.JIKCHAK_CD
+									, T.JIKCHAK_NM        =  S.JIKCHAK_NM
+									, T.APP_YN            =  S.APP_YN
+									, T.NOTE              =  S.NOTE
+									, T.Q_ORG_CD          =  S.Q_ORG_CD
+									, T.Q_ORG_NM          =  S.Q_ORG_NM
+									, T.JIKWEE_CD         =  S.JIKWEE_CD
+									, T.JIKWEE_NM         =  S.JIKWEE_NM
+									, T.JOB_CD            =  S.JOB_CD
+									, T.JOB_NM            =  S.JOB_NM
+									, T.JOB_GROUP_CD      =  S.JOB_GROUP_CD
+									, T.JOB_GROUP_NM      =  S.JOB_GROUP_NM
+									, T.MAN_SABUN         =  S.MAN_SABUN
+									, T.FINAL_COMMENT     =  S.FINAL_COMMENT
+									, T.COMP_RESULT_CD    =  S.COMP_RESULT_CD 
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						     	T.ENTER_CD
+							, T.COMP_APPRAISAL_CD
+							, T.W_ENTER_CD
+							, T.SABUN
+							, T.ORG_CD
+							, T.ORG_NM
+							, T.JIKGUB_CD
+							, T.JIKGUB_NM
+							, T.JIKCHAK_CD
+							, T.JIKCHAK_NM
+							, T.APP_YN
+							, T.NOTE
+							, T.Q_ORG_CD
+							, T.Q_ORG_NM
+							, T.JIKWEE_CD
+							, T.JIKWEE_NM
+							, T.JOB_CD
+							, T.JOB_NM
+							, T.JOB_GROUP_CD
+							, T.JOB_GROUP_NM
+							, T.MAN_SABUN
+							, T.FINAL_COMMENT
+							, T.COMP_RESULT_CD
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+						     	S.ENTER_CD
+							, S.COMP_APPRAISAL_CD
+							, S.W_ENTER_CD
+							, S.SABUN
+							, S.ORG_CD
+							, S.ORG_NM
+							, S.JIKGUB_CD
+							, S.JIKGUB_NM
+							, S.JIKCHAK_CD
+							, S.JIKCHAK_NM
+							, S.APP_YN
+							, S.NOTE
+							, S.Q_ORG_CD
+							, S.Q_ORG_NM
+							, S.JIKWEE_CD
+							, S.JIKWEE_NM
+							, S.JOB_CD
+							, S.JOB_NM
+							, S.JOB_GROUP_CD
+							, S.JOB_GROUP_NM
+							, S.MAN_SABUN
+							, S.FINAL_COMMENT
+							, S.COMP_RESULT_CD        
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		<update parameterType="map" id="saveCompAppPeopleMng2">
+
+				<![CDATA[
+					MERGE INTO TPAP527 T
+					USING	(
+							SELECT	A.ENTER_CD
+								, A.W_ENTER_CD
+								, A.SABUN
+								, A.COMP_APPRAISAL_CD
+								, A.APP_ENTER_CD
+								, A.APP_SABUN
+								, A.APP_SEQ_CD
+								, A.ORG_CD
+								, A.ORG_NM
+								, A.JIKCHAK_CD
+								, A.JIKCHAK_NM
+								, A.JIKGUB_CD
+								, A.JIKGUB_NM
+								, A.A_COMMENT
+								, A.C_COMMENT
+								, A.LDS_APP_STATUS_CD
+								, A.JIKWEE_CD
+								, A.JIKWEE_NM
+								, A.Q_ORG_CD
+								, A.Q_ORG_NM
+								, A.APP_GROUP
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										, NULL AS W_ENTER_CD
+										, NULL AS SABUN
+										, NULL AS COMP_APPRAISAL_CD
+										, NULL AS APP_ENTER_CD
+										, NULL AS APP_SABUN
+										, NULL AS APP_SEQ_CD
+										, NULL AS ORG_CD
+										, NULL AS ORG_NM
+										, NULL AS JIKCHAK_CD
+										, NULL AS JIKCHAK_NM
+										, NULL AS JIKGUB_CD
+										, NULL AS JIKGUB_NM
+										, NULL AS A_COMMENT
+										, NULL AS C_COMMENT
+										, NULL AS LDS_APP_STATUS_CD
+										, NULL AS JIKWEE_CD
+										, NULL AS JIKWEE_NM
+										, NULL AS Q_ORG_CD
+										, NULL AS Q_ORG_NM  
+										, NULL AS APP_GROUP 
+									FROM	DUAL
+									]]>
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											 #{ssnEnterCd}		AS ENTER_CD
+											, TRIM(  #{rm.wEnterCd} )		AS W_ENTER_CD
+											, TRIM(  #{searchSabun} )			AS SABUN
+											, TRIM(  #{searchCompAppraisalCd} )	AS COMP_APPRAISAL_CD
+											, TRIM(  #{rm.appEnterCd} )		AS APP_ENTER_CD
+											, TRIM(  #{rm.appSabun} )		AS APP_SABUN
+											, TRIM(  #{rm.appSeqCd} )		AS APP_SEQ_CD
+											, TRIM(  #{rm.appOrgCd} )			AS ORG_CD
+											, TRIM(  #{rm.appOrgNm} )			AS ORG_NM
+											, TRIM(  #{rm.jikchakCd} )		AS JIKCHAK_CD
+											, TRIM(  #{rm.jikchakNm} )		AS JIKCHAK_NM
+											, TRIM(  #{rm.jikgubCd} )		AS JIKGUB_CD
+											, TRIM(  #{rm.jikgubNm} )		AS JIKGUB_NM
+											, TRIM(  #{rm.aComment} )		AS A_COMMENT
+											, TRIM(  #{rm.cComment} )		AS C_COMMENT
+											, TRIM(  #{rm.ldsAppStatusCd} )	AS LDS_APP_STATUS_CD
+											, TRIM(  #{rm.jikweeCd} )		AS JIKWEE_CD
+											, TRIM(  #{rm.jikweeNm} )		AS JIKWEE_NM
+											, TRIM(  #{rm.qOrgCd} )			AS Q_ORG_CD
+											, TRIM(  #{rm.qOrgNm} )			AS Q_ORG_NM
+											, TRIM(  #{rm.appGroup} )		AS APP_GROUP
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.W_ENTER_CD = S.W_ENTER_CD AND T.SABUN = S.SABUN
+						 AND T.COMP_APPRAISAL_CD = S.COMP_APPRAISAL_CD
+						 AND T.APP_ENTER_CD = S.APP_ENTER_CD
+						 AND T.APP_SABUN = S.APP_SABUN
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	 T.APP_SEQ_CD        = S.APP_SEQ_CD
+									, T.ORG_CD            = S.ORG_CD
+									, T.ORG_NM            = S.ORG_NM
+									, T.JIKCHAK_CD        = S.JIKCHAK_CD
+									, T.JIKCHAK_NM        = S.JIKCHAK_NM
+									, T.JIKGUB_CD         = S.JIKGUB_CD
+									, T.JIKGUB_NM         = S.JIKGUB_NM
+									, T.A_COMMENT         = S.A_COMMENT
+									, T.C_COMMENT         = S.C_COMMENT
+									, T.LDS_APP_STATUS_CD = S.LDS_APP_STATUS_CD
+									, T.JIKWEE_CD         = S.JIKWEE_CD
+									, T.JIKWEE_NM         = S.JIKWEE_NM
+									, T.Q_ORG_CD          = S.Q_ORG_CD
+									, T.Q_ORG_NM          = S.Q_ORG_NM
+									, T.APP_GROUP         = S.APP_GROUP
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+								T.ENTER_CD
+								, T.W_ENTER_CD
+								, T.SABUN
+								, T.COMP_APPRAISAL_CD
+								, T.APP_ENTER_CD
+								, T.APP_SABUN
+								, T.APP_SEQ_CD
+								, T.ORG_CD
+								, T.ORG_NM
+								, T.JIKCHAK_CD
+								, T.JIKCHAK_NM
+								, T.JIKGUB_CD
+								, T.JIKGUB_NM
+								, T.A_COMMENT
+								, T.C_COMMENT
+								, T.LDS_APP_STATUS_CD
+								, T.JIKWEE_CD
+								, T.JIKWEE_NM
+								, T.Q_ORG_CD
+								, T.Q_ORG_NM
+								, T.APP_GROUP
+								, T.CHKDATE
+								, T.CHKID
+						) 
+						VALUES 
+						(
+						      S.ENTER_CD
+							, S.W_ENTER_CD
+							, S.SABUN
+							, S.COMP_APPRAISAL_CD
+							, S.APP_ENTER_CD
+							, S.APP_SABUN
+							, S.APP_SEQ_CD
+							, S.ORG_CD
+							, S.ORG_NM
+							, S.JIKCHAK_CD
+							, S.JIKCHAK_NM
+							, S.JIKGUB_CD
+							, S.JIKGUB_NM
+							, S.A_COMMENT
+							, S.C_COMMENT
+							, S.LDS_APP_STATUS_CD
+							, S.JIKWEE_CD
+							, S.JIKWEE_NM
+							, S.Q_ORG_CD
+							, S.Q_ORG_NM     
+							, S.APP_GROUP    
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		리더십진단대상자관리 삭제 -->
+		<delete parameterType="map" id="deleteCompAppPeopleMng1">
+
+				<![CDATA[
+					DELETE FROM TPAP525 
+					WHERE (ENTER_CD, COMP_APPRAISAL_CD, W_ENTER_CD, SABUN) IN 	(  (NULL, NULL,NULL, NULL)
+					                                                                  ]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{searchCompAppraisalCd},  #{rm.wEnterCd},  #{rm.sabun})
+</foreach>
+						)
+		</delete>
+
+		<delete parameterType="map" id="deleteCompAppPeopleMng1_527">
+
+				<![CDATA[
+					DELETE FROM TPAP527 
+					WHERE (ENTER_CD, W_ENTER_CD, SABUN, COMP_APPRAISAL_CD, APP_SABUN) IN 	(  (NULL, NULL,NULL, NULL, NULL)
+					                                                                  ]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{rm.wEnterCd},  #{rm.sabun},  #{searchCompAppraisalCd}, #{rm.appSabun})
+</foreach>
+						)
+		</delete>
+		
+		<delete parameterType="map" id="deleteCompAppPeopleMng2">
+
+				<![CDATA[
+					DELETE FROM TPAP527 
+					WHERE (ENTER_CD, W_ENTER_CD, SABUN, COMP_APPRAISAL_CD, APP_ENTER_CD, APP_SABUN) IN 	(  (NULL, NULL,NULL, NULL,NULL, NULL)
+			]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{rm.wEnterCd},  #{rm.sabun},  #{rm.compAppraisalCd},  #{rm.appEnterCd},  #{rm.appSabun})
+</foreach>
+						)
+		</delete>
+		
+<!-- 		리더십진단대상자관리 프로시저 -->
+		<update parameterType="map" statementType="CALLABLE" id="prcCompAppPeopleMng">
+
+				<![CDATA[
+					{
+					    CALL P_PAPN_COMP_APP_EMP_INS (
+					        #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+							#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+							#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+							#{searchCompAppraisalCd,mode=IN,jdbcType=VARCHAR},
+							#{ssnSabun,mode=IN,jdbcType=VARCHAR}
+					    )
+					}
+				]]>
+
+		</update>
+</mapper>
+

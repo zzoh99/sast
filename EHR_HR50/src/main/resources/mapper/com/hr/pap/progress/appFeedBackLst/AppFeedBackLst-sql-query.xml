@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appFeedBackLst">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppFeedBackLstList">
+
+				<![CDATA[
+					SELECT * 
+					  FROM (
+					          SELECT B.APPRAISAL_NM
+					               , A.APPRAISAL_CD 
+					               , NVL(B.APP_E_YMD, B.APP_E_YMD) AS APP_E_YMD
+					               , A.APP_ORG_NM
+					               , A.APP_ORG_CD
+					               , A.SABUN
+					               , A.JIKGUB_NM
+					               , A.JIKWEE_NM
+					               , A.JIKCHAK_NM  
+					               , F_PAP_GET_APP_CLASS_NM(A.ENTER_CD, A.APPRAISAL_CD, A.FINAL_MBO_CLASS_CD) AS FINAL_MBO_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM(A.ENTER_CD, A.APPRAISAL_CD, A.FINAL_COMP_CLASS_CD) AS FINAL_COMP_CLASS_NM
+					               , '' AS FINAL_MUTUAL_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM(A.ENTER_CD, A.APPRAISAL_CD, A.FINAL_CLASS_CD) AS FINAL_CLASS_NM
+					               , D.PROTEST_MEMO_MBO
+					               , D.PROTEST_MEMO_COMP
+					               , NVL(B.EXCEPTION_YN, 'N') AS EXCEPTION_YN
+					               , NVL(C.APP_AS_YMD, '') AS EXCEPTION_SDATE
+					               , NVL(C.APP_AE_YMD, '') AS EXCEPTION_EDATE
+					               , '1' AS DETAIL
+					            FROM TPAP551 A
+					               , TPAP101 B
+					               , TPAP103 C
+					               , TPAP567 D
+					           WHERE A.ENTER_CD        = B.ENTER_CD
+					             AND A.APPRAISAL_CD    = B.APPRAISAL_CD
+					             AND B.ENTER_CD        = C.ENTER_CD(+)
+					             AND B.APPRAISAL_CD    = C.APPRAISAL_CD(+)
+					             AND C.APP_STEP_CD(+)  = '5'
+					             AND A.ENTER_CD        = D.ENTER_CD(+)
+					             AND A.APPRAISAL_CD    = D.APPRAISAL_CD(+)
+					             AND A.SABUN           = D.SABUN(+)
+					             AND A.APP_ORG_CD      = D.APP_ORG_CD(+)
+					             AND A.ENTER_CD        = TRIM(#{ssnEnterCd})
+					             AND A.SABUN           = TRIM(#{searchSabun})
+					             AND B.APP_FEEDBACK_YN = 'Y'
+					          UNION
+					          SELECT B.APPRAISAL_NM
+					               , A.APPRAISAL_CD
+					               , NVL(B.APP_E_YMD, B.APP_E_YMD) AS APP_E_YMD
+					               , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, NVL(NVL(D.D_BASE_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS APP_ORG_NM
+					               , '' AS APP_ORG_CD
+					               , A.SABUN
+					               , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, NVL(NVL(D.D_BASE_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKGUB_NM
+					               , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, NVL(NVL(D.D_BASE_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKWEE_NM
+					               , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, NVL(NVL(D.D_BASE_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKCHAK_NM    
+					               , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, '5', '6', A.FINAL_MBO_CLASS_CD) AS FINAL_MBO_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, '5', '6', A.FINAL_COMP_CLASS_CD) AS FINAL_COMP_CLASS_NM
+					               , A.FINAL_MUTUAL_POINT AS FINAL_MUTUAL_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, '5', '6', A.FINAL_GRADE) AS FINAL_CLASS_NM
+					               , '' AS PROTEST_MEMO_MBO
+					               , '' AS PROTEST_MEMO_COMP
+					               , NVL(B.EXCEPTION_YN, 'N') AS EXCEPTION_YN
+					               , NVL(C.APP_AS_YMD, '') AS EXCEPTION_SDATE
+					               , NVL(C.APP_AE_YMD, '') AS EXCEPTION_EDATE
+					               , '1' AS DETAIL
+					            FROM TPAP707 A
+					               , TPAP101 B
+					               , TPAP103 C
+					               , (
+					                     SELECT D1.ENTER_CD
+					                          , D1.APPRAISAL_CD
+					                          , NVL(MAX(D1.D_BASE_YMD),
+					                                CASE WHEN B1.APP_TIME_CD = '01' THEN '20' || SUBSTR(D1.APPRAISAL_CD, 0, 2) || '0630'
+					                                     ELSE '20' || SUBSTR(D1.APPRAISAL_CD, 0, 2) || '1231'
+					                                END
+					                            ) AS D_BASE_YMD
+					                      FROM TPAP105 D1
+					                         , TPAP101 B1
+					                     WHERE D1.ENTER_CD = B1.ENTER_CD
+					                       AND D1.APPRAISAL_CD = B1.APPRAISAL_CD
+					                       AND D1.ENTER_CD = TRIM(#{ssnEnterCd})
+					                     GROUP BY D1.ENTER_CD, D1.APPRAISAL_CD, B1.APP_TIME_CD
+					                 ) D
+					           WHERE A.ENTER_CD        = B.ENTER_CD
+					             AND A.APPRAISAL_CD    = B.APPRAISAL_CD
+					             AND B.ENTER_CD        = C.ENTER_CD(+)
+					             AND B.APPRAISAL_CD    = C.APPRAISAL_CD(+)
+					             AND C.APP_STEP_CD(+)  = '5'
+					             AND B.ENTER_CD        = D.ENTER_CD(+)
+					             AND B.APPRAISAL_CD    = D.APPRAISAL_CD(+)
+					             AND A.ENTER_CD        = TRIM(#{ssnEnterCd})
+					             AND A.SABUN           = TRIM(#{searchSabun})
+					             AND B.APP_FEEDBACK_YN = 'Y'
+					       )   
+					 ORDER BY APPRAISAL_CD DESC, APP_E_YMD DESC  
+				]]>
+
+
+		</select>
+		
+		<!-- 	평가결과피드백(관리자)	조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppFeedBackAllLstList">
+
+				<![CDATA[
+					SELECT * 
+					  FROM (
+					          SELECT B.APPRAISAL_NM
+					               , A.APPRAISAL_CD 
+					               , NVL(B.APP_E_YMD, B.APP_E_YMD) AS APP_E_YMD
+					               , A.APP_ORG_NM
+					               , A.APP_ORG_CD
+                         		   , A.ENTER_CD
+					               , A.SABUN
+                         		   , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)AS NAME
+					               , A.JIKGUB_NM
+					               , A.JIKWEE_NM
+					               , A.JIKCHAK_NM  
+					               , F_PAP_GET_APP_CLASS_NM(A.ENTER_CD, A.APPRAISAL_CD, A.FINAL_MBO_CLASS_CD) AS FINAL_MBO_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM(A.ENTER_CD, A.APPRAISAL_CD, A.FINAL_COMP_CLASS_CD) AS FINAL_COMP_CLASS_NM
+					               , '' AS FINAL_MUTUAL_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM(A.ENTER_CD, A.APPRAISAL_CD, A.FINAL_CLASS_CD) AS FINAL_CLASS_NM
+					               , D.PROTEST_MEMO_MBO
+					               , D.PROTEST_MEMO_COMP
+					               , NVL(B.EXCEPTION_YN, 'N') AS EXCEPTION_YN
+					               , NVL(C.APP_AS_YMD, '') AS EXCEPTION_SDATE
+					               , NVL(C.APP_AE_YMD, '') AS EXCEPTION_EDATE
+					               , '1' AS DETAIL
+                         		   , B.APPRAISAL_YY
+                         		   , B.APP_TYPE_CD
+					            FROM TPAP551 A
+					               , TPAP101 B
+					               , TPAP103 C
+					               , TPAP567 D
+					           WHERE A.ENTER_CD        = B.ENTER_CD
+					             AND A.APPRAISAL_CD    = B.APPRAISAL_CD
+					             AND B.ENTER_CD        = C.ENTER_CD(+)
+					             AND B.APPRAISAL_CD    = C.APPRAISAL_CD(+)
+					             AND C.APP_STEP_CD(+)  = '5'
+					             AND A.ENTER_CD        = D.ENTER_CD(+)
+					             AND A.APPRAISAL_CD    = D.APPRAISAL_CD(+)
+					             AND A.SABUN           = D.SABUN(+)
+					             AND A.APP_ORG_CD      = D.APP_ORG_CD(+)
+					             AND A.ENTER_CD        = TRIM(#{ssnEnterCd})
+					             AND B.APP_FEEDBACK_YN = 'Y'
+					          UNION
+					          SELECT B.APPRAISAL_NM
+					               , A.APPRAISAL_CD
+					               , NVL(B.APP_E_YMD, B.APP_E_YMD) AS APP_E_YMD
+					               , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, NVL(NVL(B.APP_E_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS APP_ORG_NM
+					               , '' AS APP_ORG_CD
+                         		   , A.ENTER_CD
+					               , A.SABUN
+                         		   , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)AS NAME
+					               , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, NVL(NVL(B.APP_E_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKGUB_NM
+					               , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, NVL(NVL(B.APP_E_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKWEE_NM
+					               , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, NVL(NVL(B.APP_E_YMD, B.APP_E_YMD), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKCHAK_NM  
+					               , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, '5', '6', A.FINAL_MBO_CLASS_CD) AS FINAL_MBO_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, '5', '6', A.FINAL_COMP_CLASS_CD) AS FINAL_COMP_CLASS_NM
+					               , A.FINAL_MUTUAL_POINT AS FINAL_MUTUAL_CLASS_NM
+					               , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, '5', '6', A.FINAL_GRADE) AS FINAL_CLASS_NM
+					               , '' AS PROTEST_MEMO_MBO
+					               , '' AS PROTEST_MEMO_COMP
+					               , NVL(B.EXCEPTION_YN, 'N') AS EXCEPTION_YN
+					               , NVL(C.APP_AS_YMD, '') AS EXCEPTION_SDATE
+					               , NVL(C.APP_AE_YMD, '') AS EXCEPTION_EDATE
+					               , '1' AS DETAIL
+                         		   , B.APPRAISAL_YY
+                         		   , B.APP_TYPE_CD
+					            FROM TPAP707 A
+					               , TPAP101 B
+					               , TPAP103 C
+					           WHERE A.ENTER_CD        = B.ENTER_CD
+					             AND A.APPRAISAL_CD    = B.APPRAISAL_CD
+					             AND B.ENTER_CD        = C.ENTER_CD(+)
+					             AND B.APPRAISAL_CD    = C.APPRAISAL_CD(+)
+					             AND C.APP_STEP_CD(+)  = '5'
+					             AND A.ENTER_CD        = TRIM(#{ssnEnterCd})
+					             AND B.APP_FEEDBACK_YN = 'Y'
+					             AND A.ORG_CD IS NOT NULL
+					       )
+		             WHERE 1=1
+		               AND APPRAISAL_YY BETWEEN TRIM(#{searchSYear}) AND NVL(TRIM(#{searchEYear}),'9999')
+		                       ]]>
+		             <if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+					   AND (NAME LIKE '%'|| TRIM(#{searchNameSabun}) ||'%' OR SABUN LIKE '%'|| TRIM(#{searchNameSabun}) ||'%')
+					 </if>
+				     <if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					   AND APP_ORG_NM LIKE '%'|| TRIM(#{searchOrgNm}) ||'%'
+					 </if>
+				     <if test='searchAppTypeCd != null and !searchAppTypeCd.equals("")'>
+					   AND	APP_TYPE_CD	IN
+						 <foreach collection="searchAppTypeCd" item="item" index="index" open="(" close=")" separator=",">
+							 #{item}
+						 </foreach>
+					 </if>
+				     ORDER BY  APPRAISAL_CD DESC,F_COM_JIKJE_SORT(ENTER_CD, SABUN, APP_E_YMD)				
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppFeedBackCommentLstList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+						 , APPRAISAL_CD
+						 , SABUN
+						 , APP_ORG_CD
+						 , CHKDATE
+						 , CHKID
+						 , PROTEST_MEMO_MBO
+						 , PROTEST_MEMO_COMP
+						 , PROTEST_FEEDBACK
+					FROM 	TPAP567
+					WHERE 	ENTER_CD 		= #{ssnEnterCd}
+					AND     APPRAISAL_CD 	= #{searchAppraisalCd}
+					AND  	SABUN 	 		= #{searchSabun}
+					AND  	APP_ORG_CD		= #{searchAppOrgCd}
+				]]>
+
+
+		</select>
+
+<!-- 		이의제기 저장 -->
+		<update parameterType="map" id="saveAppFeedBackLstComment">
+
+					MERGE INTO TPAP567 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.SABUN
+									, A.APP_ORG_CD
+									, A.PROTEST_MEMO_MBO
+									, A.PROTEST_MEMO_COMP
+									, A.PROTEST_FEEDBACK
+							FROM	(
+									SELECT    #{ssnEnterCd}                   AS ENTER_CD
+											, TRIM( #{searchAppraisalCd} )	AS APPRAISAL_CD
+											, TRIM( #{searchSabun} )	   		AS SABUN
+											, TRIM( #{searchAppOrgCd} )	   	AS APP_ORG_CD
+											, TRIM( #{protestMemoMbo} )    	AS PROTEST_MEMO_MBO
+											, TRIM( #{protestMemoComp} )	   	AS PROTEST_MEMO_COMP
+											, TRIM( #{protestFeedback} )		AS PROTEST_FEEDBACK
+									FROM 	DUAL
+
+									) A WHERE A.APPRAISAL_CD IS NOT NULL
+							) S
+					ON (     T.ENTER_CD     = S.ENTER_CD
+					     AND T.APPRAISAL_CD = S.APPRAISAL_CD
+					     AND T.SABUN		= S.SABUN
+					     AND T.APP_ORG_CD	= S.APP_ORG_CD
+					   )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PROTEST_MEMO_MBO	= S.PROTEST_MEMO_MBO
+									, T.PROTEST_MEMO_COMP   = S.PROTEST_MEMO_COMP
+ 									, T.PROTEST_FEEDBACK 	= S.PROTEST_FEEDBACK
+									, T.CHKDATE      		= SYSDATE
+									, T.CHKID        		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						 ENTER_CD
+						,APPRAISAL_CD
+						,SABUN
+						,APP_ORG_CD
+						,CHKDATE
+						,CHKID
+						,PROTEST_MEMO_MBO
+						,PROTEST_MEMO_COMP
+						,PROTEST_FEEDBACK
+						)
+						VALUES
+						(
+						 #{ssnEnterCd}
+						,#{searchAppraisalCd}
+						,#{searchSabun}
+						,#{searchAppOrgCd}
+						, SYSDATE
+						,#{ssnSabun}
+						,#{protestMemoMbo}
+						,#{protestMemoComp}
+						,#{protestFeedback}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppFeedBackLst">
+
+					DELETE FROM ZTST002
+					WHERE 	COL1 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.col1 != null and !rm.col1.equals("")'>
+											TRIM( #{rm.col1} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppFeedBackLst">
+
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppFeedBackLst">
+
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+</mapper>

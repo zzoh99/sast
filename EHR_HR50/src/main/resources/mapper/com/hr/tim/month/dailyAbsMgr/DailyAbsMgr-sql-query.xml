@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.month.dailyAbsMgr">
+
+<!--  조회 -->
+		<select parameterType="map" resultType="cMap" id="getDailyAbsMgrList">
+
+				<![CDATA[
+				SELECT A.*
+                     , F_TIM_GET_DAY_GNT_NM(A.ENTER_CD, A.SABUN, A.YMD) AS GNT_NM
+				FROM (
+						SELECT A.ENTER_CD
+							 , A.SABUN
+							 , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN) AS NAME -- 성명
+							 , F_COM_GET_ORG_NM( B.ENTER_CD, B.ORG_CD, B.SDATE ) AS ORG_NM
+							 , B.JIKGUB_NM
+							 , B.JIKWEE_NM
+							 , B.JIKCHAK_NM
+							 , B.MANAGE_NM
+							 , A.YMD
+							 , A.WORK_ORG_CD
+							 , ( SELECT X.MAP_NM
+							       FROM TORG109 X
+							      WHERE X.ENTER_CD    = A.ENTER_CD
+							        AND X.MAP_TYPE_CD = '500'
+							        AND X.MAP_CD      = A.WORK_ORG_CD
+							        AND A.YMD BETWEEN X.SDATE AND NVL( X.EDATE, '29991231') ) AS WORK_ORG_NM
+							, ( SELECT X.SHORT_TERM
+							      FROM TTIM017 X
+							     WHERE X.ENTER_CD = A.ENTER_CD
+							       AND X.TIME_CD  = A.TIME_CD ) AS TIME_NM
+							, DECODE(E.APPL_SEQ, NULL ,'0', '1') AS IMG
+							, DECODE(E.APPL_SEQ, NULL ,'N', 'Y') AS ABS_YN
+							, DECODE(F.APPL_SEQ, NULL ,'N', 'Y') AS GNT_YN
+							, E.APPL_SEQ
+							 , ( SELECT X.REST_CNT
+							       FROM TTIM511 X
+							      WHERE X.ENTER_CD    = A.ENTER_CD
+							        AND X.SABUN       = A.SABUN
+							        AND X.GNT_CD      = '14'
+							        AND X.USE_S_YMD = (SELECT MAX(USE_S_YMD)
+                                                         FROM TTIM511 XX
+                                                        WHERE XX.ENTER_CD = X.ENTER_CD
+                                                          AND XX.SABUN = X.SABUN
+                                                          AND XX.GNT_CD = X.GNT_CD
+                                                          AND A.YMD BETWEEN XX.USE_S_YMD AND NVL(XX.USE_E_YMD,'29991231')
+                                    )
+                                 ) AS RES_CNT  -- 잔여연차
+							
+						 FROM TTIM120_V A, THRM151 B
+						    , TTIM301 E
+						    , TTIM301 F
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						  AND A.YMD BETWEEN REPLACE(TRIM(#{searchFrom}), '-','') AND REPLACE(TRIM(#{searchTo}), '-','')
+						  AND A.WORK_YN  = 'N'
+						  
+					  	  AND A.ENTER_CD = B.ENTER_CD
+						  AND A.SABUN    = B.SABUN
+						  AND B.STATUS_CD = 'AA'                
+						  AND REPLACE(TRIM(#{searchFrom}), '-','') BETWEEN B.SDATE AND NVL(B.EDATE, '29991231')
+						  AND NOT EXISTS ( SELECT 1
+						                     FROM TTIM337 X, TTIM015 Y
+						                    WHERE X.ENTER_CD = A.ENTER_CD
+						                      AND X.SABUN    = A.SABUN
+						                      AND X.YMD      = A.YMD  
+						                      AND ( NVL(X.WORK_MM,0)  > 0  OR NVL(X.WORK_HH,0)  > 0 )         --인정근무시간이 있으면 결근대상자가 아님.
+						                      AND X.ENTER_CD = Y.ENTER_CD
+						                      AND X.WORK_CD  = Y.WORK_CD
+						                      AND Y.DAY_TYPE = '101'  )    --정규근무
+ 						  
+						  AND A.ENTER_CD = E.ENTER_CD(+)
+						  AND A.SABUN    = E.SABUN(+)
+						  AND A.YMD      = E.S_YMD(+)
+						  AND '999'      = E.GNT_CD(+)
+
+						  AND A.ENTER_CD = F.ENTER_CD(+)
+						  AND A.SABUN    = F.SABUN(+)
+						  AND A.YMD      = F.S_YMD(+)
+						  AND '14'       = F.GNT_CD(+)
+						  ]]>
+<if test='searchAbsYn !=null and searchAbsYn.equals("Y")'>
+						  AND E.APPL_SEQ IS NOT NULL
+</if>
+<if test='searchAbsYn !=null and searchAbsYn.equals("N")'>
+						  AND E.APPL_SEQ IS NULL
+</if>
+					) A    
+				ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE(TRIM(#{searchFrom}), '-','')), YMD
+                 
+
+
+		</select>
+
+<!--  처리대상 임시테이블에 저장 -->
+		<update parameterType="map" id="saveDailyAbsMgr">
+
+				 MERGE INTO TTIM900 T 
+				 USING 
+				( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+				       SELECT TRIM(#{ssnEnterCd}) 	AS ENTER_CD
+				            , TRIM(#{rm.sabun}) 	AS SABUN
+				            , TRIM(#{rm.ymd}) 		AS YMD
+				            , TRIM(#{rm.gntYn}) 	AS GNT_YN
+				            , TRIM(#{rm.absYn}) 	AS ABS_YN
+				        FROM DUAL
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.SABUN 		= S.SABUN 
+				     AND  T.YMD 		= S.YMD 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE		= sysdate 
+				            , T.CHKID	    = #{ssnSabun}
+				            , T.GNT_YN 		= S.GNT_YN 
+				            , T.ABS_YN 		= S.ABS_YN 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.SABUN
+				            , T.YMD
+				            , T.GNT_YN
+				            , T.ABS_YN
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.SABUN
+				            , S.YMD
+				            , S.GNT_YN
+				            , S.ABS_YN
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+				
+
+
+		</update>
+		
+		
+<!--  임시저장 테이블 전체 삭제 -->
+		<delete parameterType="map" id="deleteDailyAbsMgr">
+
+				<![CDATA[
+   					DELETE FROM TTIM900
+					 WHERE ENTER_CD	= #{ssnEnterCd}
+				]]>
+		</delete>
+		
+<!--  임시저장 결근처리 프로시저 -->
+		<update parameterType="map" id="prcDailyAbsMgr">
+
+			<![CDATA[
+					CALL P_TIM_DAILY_ABS_CREATE(#{sqlCode},#{sqlErrm},#{ssnEnterCd},#{ssnSabun})
+			]]>
+		</update>
+
+
+
+
+
+
+
+
+
+
+
+
+<!--  결근 저장 -->
+		<update parameterType="map" id="saveDailyAbsMgr1">
+
+				<![CDATA[
+					 MERGE INTO TTIM301 T 
+					 USING 
+					( 
+					       SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD
+					            , TRIM(#{applSeq})  		AS  APPL_SEQ
+					            , TRIM(#{sabun})  		AS  SABUN
+					            , TRIM('999')  			AS  GNT_CD
+					            , TRIM('29')  			AS  GNT_GUBUN_CD --결근
+					            , TRIM(#{ymd})  			AS  S_YMD
+					            , TRIM(#{ymd})  			AS  E_YMD
+					            , TRIM('1')  			AS  HOL_DAY
+					            , TRIM('1')  			AS  CLOSE_DAY
+					            , TRIM('[결근처리]')  		AS  NOTE
+					        FROM DUAL	
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.APPL_SEQ = S.APPL_SEQ 
+					     AND  T.SABUN    = S.SABUN 
+					) 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+					            , T.GNT_CD
+					            , T.GNT_GUBUN_CD
+					            , T.S_YMD
+					            , T.E_YMD
+					            , T.HOL_DAY
+					            , T.CLOSE_DAY
+					            , T.NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+					            , S.GNT_CD
+					            , S.GNT_GUBUN_CD
+					            , S.S_YMD
+					            , S.E_YMD
+					            , S.HOL_DAY
+					            , S.CLOSE_DAY
+					            , S.NOTE
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+				]]>
+
+		</update>
+		
+<!--  결근 저장2 -->
+		<update parameterType="map" id="saveDailyAbsMgr2">
+
+				<![CDATA[
+						INSERT INTO THRI103 T  
+					   	( 
+			              T.ENTER_CD , T.APPL_SEQ, T.TITLE, T.APPL_CD, T.APPL_YMD, T.APPL_SABUN, T.APPL_IN_SABUN
+			            , T.APPL_STATUS_CD, T.MEMO, T.AGREE_SABUN, T.AGREE_YMD, T.FINISH_YN, T.CHKDATE, T.CHKID
+					   	) 
+				        SELECT TRIM(#{ssnEnterCd})  				AS  ENTER_CD
+				             , TRIM(#{applSeq})  					AS  APPL_SEQ
+				             , TRIM('결근처리')  					AS  TITLE
+				             , TRIM('999')  					AS  APPL_CD
+				             , TO_CHAR(SYSDATE, 'YYYYMMDD')  	AS  APPL_YMD
+				             , TRIM(#{sabun})  					AS  APPL_SABUN
+				             , TRIM(#{ssnSabun}) 	 				AS  APPL_IN_SABUN
+				             , TRIM('99')  						AS  APPL_STATUS_CD
+				             , TRIM('[결근처리]')  				AS  MEMO
+				             , TRIM(#{ssnSabun})  				AS  AGREE_SABUN
+				             , TO_CHAR(SYSDATE, 'YYYYMMDD')  	AS  AGREE_YMD
+				             , TRIM('Y')  						AS  FINISH_YN
+					         , sysdate
+					         , #{ssnSabun}
+				        FROM DUAL
+				
+				]]>
+
+
+		</update>
+
+		
+<!--  결근 저장3 -->
+		<update parameterType="map" id="saveDailyAbsMgr3">
+
+				<![CDATA[
+					   INSERT INTO THRI107 T 
+					   ( 
+			              T.ENTER_CD, T.APPL_SEQ, T.AGREE_SABUN, T.AGREE_SEQ, T.PATH_SEQ, T.APPL_TYPE_CD
+			            , T.AGREE_STATUS_CD, T.AGREE_TIME, T.GUBUN, T.MEMO, T.CHKDATE, T.CHKID
+					   ) 
+					   
+					       SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD
+					            , TRIM(#{applSeq})  		AS  APPL_SEQ
+					            , TRIM(#{sabun})  		AS  AGREE_SABUN
+					            , TRIM('1')  			AS  AGREE_SEQ
+					            , TRIM('-1')  			AS  PATH_SEQ
+					            , TRIM('10')  			AS  APPL_TYPE_CD
+					            , TRIM('20')  			AS  AGREE_STATUS_CD
+					            , SYSDATE  				AS  AGREE_TIME
+					            , TRIM('0')  			AS  GUBUN
+					            , TRIM('[결근처리]')  		AS  MEMO
+								, sysdate
+								, #{ssnSabun}
+					        FROM DUAL
+
+				]]>
+
+
+		</update>
+		
+<!--  결근 삭제 -->
+		<delete parameterType="map" id="deleteDailyAbsMgr1">
+
+				<![CDATA[
+   					DELETE FROM TTIM301
+					 WHERE ENTER_CD	= #{ssnEnterCd}
+					   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+
+		</delete>
+
+</mapper>

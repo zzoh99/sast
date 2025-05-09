@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.appmt.appmtTimelineSrch">
+
+	<!-- 발령 Timeline 조회 다건 조회 -->
+	<select parameterType="map" resultType="cMap" id="getAppmtTimelineList">
+		SELECT *
+		FROM (
+			SELECT DT.ENTER_CD
+				, DT.ORD_TYPE_CD
+				, DT.ORD_DETAIL_CD
+				, DT.ORD_YMD
+				, DT.ORD_DETAIL_NM
+				, RT.SABUN
+				, RT.ORG_NM
+				, F_COM_GET_NAMES(RT.ENTER_CD, RT.SABUN) AS NAME
+				, RT.JIKWEE_NM
+				, NVL(RT.JIKCHAK_NM, '팀원') AS JIKCHAK
+				, DT.CNT
+			FROM (
+				SELECT A.ENTER_CD
+					, A.ORD_TYPE_CD
+					, A.ORD_DETAIL_CD
+					, A.ORD_YMD
+					, B.ORD_DETAIL_NM
+					, MAX(A.SABUN) AS SABUN
+					, COUNT(A.SABUN) AS CNT
+				FROM THRM191 A
+					, TSYS013 B
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.ORD_YMD
+						BETWEEN NVL(REPLACE(#{searchFrom},'-',''), TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYYMMDD'))
+						AND NVL(REPLACE(#{searchTo},'-',''), TO_CHAR(SYSDATE, 'YYYYMMDD'))
+				  	<if test="mainYn != null and mainYn != ''">
+					AND A.ORD_TYPE_CD IN (
+						SELECT ORD_TYPE_CD
+						FROM TSYS011
+						WHERE ENTER_CD = #{ssnEnterCd}
+						AND MAIN_YN = #{mainYn}
+					)
+					</if>
+				  	<if test="ordDetailCd != null and ordDetailCd != ''">
+					AND A.ORD_DETAIL_CD = #{ordDetailCd}
+					</if>
+					AND A.ENTER_CD = B.ENTER_CD
+					AND A.ORD_TYPE_CD = B.ORD_TYPE_CD
+					AND A.ORD_DETAIL_CD = B.ORD_DETAIL_CD
+				GROUP BY A.ENTER_CD
+					, A.ORD_TYPE_CD
+					, A.ORD_DETAIL_CD
+					, A.ORD_YMD
+					, B.ORD_DETAIL_NM
+				) DT
+				, THRM191 RT
+			WHERE DT.ENTER_CD = RT.ENTER_CD
+				AND DT.ORD_TYPE_CD = RT.ORD_TYPE_CD
+				AND DT.ORD_DETAIL_CD = RT.ORD_DETAIL_CD
+				AND DT.ORD_YMD = RT.ORD_YMD
+				AND DT.SABUN = RT.SABUN
+			ORDER BY DT.ORD_YMD DESC
+			)
+		WHERE ROWNUM <![CDATA[<=]]> 10
+	</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppmtTimelineSrchList">
+
+				<![CDATA[
+					WITH T_SUMMARY AS (
+					    SELECT S.ORD_YMD
+					         , LISTAGG('[' || S.ORD_DETAIL_NM || ']' || S.ORG_NM || ' - ' || S.NAME || '(' || S.SABUN || ')', CHR(13)||'<BR/>') WITHIN GROUP (ORDER BY 1) AS ORD_SUMMARY
+					      FROM (
+					            SELECT X.ORD_YMD
+					                 , Y.ORD_TYPE_CD
+					                 , Y.ORD_DETAIL_CD
+					                 , Y.ORD_DETAIL_NM
+					                 , X.SABUN
+					                 , F_COM_GET_NAMES(X.ENTER_CD, X.SABUN) AS NAME
+					                 , X.ORG_NM
+					                 , ROW_NUMBER() OVER(PARTITION BY X.ORD_YMD ORDER BY Y.SEQ, X.APPLY_SEQ) AS RNUM
+					              FROM THRM191 X
+					                 , TSYS013 Y
+					             WHERE X.ENTER_CD = Y.ENTER_CD
+					               AND X.ORD_TYPE_CD = Y.ORD_TYPE_CD
+					               AND X.ORD_DETAIL_CD = Y.ORD_DETAIL_CD
+					               AND X.ENTER_CD = #{ssnEnterCd}
+					               AND X.ORD_YMD BETWEEN NVL(REPLACE(#{searchFrom},'-',''), TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYYMMDD')) AND NVL(REPLACE(#{searchTo},'-',''), TO_CHAR(SYSDATE, 'YYYYMMDD')) ]]>
+								<if test='ordDetailCd != null and !ordDetailCd.equals("")'>
+					   AND X.ORD_DETAIL_CD = #{ordDetailCd}
+					</if>
+					<if test='mainYn != null and !mainYn.equals("")'>
+					   AND x.ORD_TYPE_CD IN (SELECT ORD_TYPE_CD FROM TSYS011 WHERE ENTER_CD = #{ssnEnterCd} AND MAIN_YN = #{mainYn})
+					</if><![CDATA[
+					           ) S
+					     WHERE S.RNUM < 11
+					     GROUP BY S.ORD_YMD
+					)
+					SELECT T.ORD_YMD
+					     , SUBSTR(T.ORD_YMD, 1, 4) AS ORD_YEAR
+					     , TO_CHAR(TO_DATE(T.ORD_YMD, 'YYYYMMDD'), 'MM-DD') AS ORD_MD
+					     , T.TOTAL_CNT
+					     , T.TITLE
+					     , C.ORD_SUMMARY
+					  FROM (
+					        SELECT A.ENTER_CD
+					             , A.ORD_YMD
+					             , LISTAGG(B.ORD_DETAIL_NM || ' ' || A.CNT || '건', ', ') WITHIN GROUP (ORDER BY B.SEQ) AS TITLE
+					             , SUM(A.CNT) AS TOTAL_CNT
+					          FROM (
+					                SELECT ENTER_CD
+					                     , ORD_TYPE_CD
+					                     , ORD_DETAIL_CD
+					                     , ORD_YMD
+					                     , COUNT(SABUN) AS CNT
+					                  FROM THRM191
+					                 WHERE ENTER_CD = #{ssnEnterCd}
+					                   AND ORD_YMD BETWEEN NVL(REPLACE(#{searchFrom},'-',''), TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYYMMDD')) AND NVL(REPLACE(#{searchTo},'-',''), TO_CHAR(SYSDATE, 'YYYYMMDD'))
+					                 GROUP BY ENTER_CD, ORD_TYPE_CD, ORD_DETAIL_CD, ORD_YMD
+					               ) A
+					             , TSYS013 B
+					         WHERE A.ENTER_CD      = B.ENTER_CD
+					           AND A.ORD_TYPE_CD   = B.ORD_TYPE_CD
+					           AND A.ORD_DETAIL_CD = B.ORD_DETAIL_CD
+					         GROUP BY A.ENTER_CD, A.ORD_YMD
+					       ) T
+					     , T_SUMMARY C
+					 WHERE T.ORD_YMD = C.ORD_YMD
+					 ORDER BY T.ORD_YMD DESC
+				]]>
+
+
+		</select>
+
+<!-- 발령 Timeline 조회 상세내역 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtTimelineSrchDetailList">
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.NAME
+					     , A.EMP_YMD
+					     , A.GEMP_YMD
+					     , X.ORD_YMD
+					     , Y.ORD_TYPE_CD
+					     , Y.ORD_DETAIL_CD
+					     , Y.ORD_DETAIL_NM
+					     , X.ORG_NM
+					     , X.JIKCHAK_CD
+					     , X.JIKCHAK_NM
+					     , X.JIKWEE_CD
+					     , X.JIKWEE_NM
+					     , X.JIKGUB_CD
+					     , X.JIKGUB_NM
+					  FROM THRM100 A
+					     , THRM191 X
+					     , TSYS013 Y
+					 WHERE A.ENTER_CD      = X.ENTER_CD
+					   AND A.SABUN         = X.SABUN
+					   AND X.ENTER_CD      = Y.ENTER_CD
+					   AND X.ORD_TYPE_CD   = Y.ORD_TYPE_CD
+					   AND X.ORD_DETAIL_CD = Y.ORD_DETAIL_CD
+					   AND X.ENTER_CD      = #{ssnEnterCd}
+					   AND X.ORD_YMD       = #{ordYmd}
+					 ORDER BY Y.SEQ, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, X.ORD_YMD)
+		</select>
+
+	<select parameterType="map" resultType="cMap" id="getAppmtTimelineDetailList">
+		SELECT A.ENTER_CD
+			, A.SABUN
+			, A.NAME
+			, X.ORD_YMD
+			, Y.ORD_TYPE_CD
+			, Y.ORD_DETAIL_CD
+			, Y.ORD_DETAIL_NM
+			, X.ORG_NM
+			, X.JIKCHAK_NM
+			, X.JIKWEE_NM
+			, X.JIKGUB_NM
+			, F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') AS EMAIL
+		FROM THRM100 A
+			, THRM191 X
+			, TSYS013 Y
+		WHERE A.ENTER_CD = X.ENTER_CD
+			AND A.SABUN = X.SABUN
+			AND X.ENTER_CD = Y.ENTER_CD
+			AND X.ORD_TYPE_CD = Y.ORD_TYPE_CD
+			AND X.ORD_DETAIL_CD = Y.ORD_DETAIL_CD
+			AND X.ENTER_CD = #{ssnEnterCd}
+			AND X.ORD_YMD = #{ordYmd}
+			<if test="mainYn != null and mainYn != ''">
+			AND Y.ORD_TYPE_CD IN (
+				SELECT ORD_TYPE_CD
+				FROM TSYS011
+				WHERE ENTER_CD = #{ssnEnterCd}
+				AND MAIN_YN = #{mainYn}
+			)
+			</if>
+			<if test="ordDetailCd != null and ordDetailCd != ''">
+			AND Y.ORD_DETAIL_CD = #{ordDetailCd}
+			</if>
+		ORDER BY Y.SEQ, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, X.ORD_YMD)
+	</select>
+
+	<select id="getAppmtTimelineOrd" parameterType="map" resultType="cMap">
+		WITH ORD AS (
+			SELECT DT.ENTER_CD
+				, DT.SABUN
+				, DT.MANAGE_CD
+				, DT.MANAGE_NM
+				, DT.ORG_CD
+				, DT.STATUS_CD
+				, MAX(DT.SDATE) AS SDATE
+				, DT.EDATE
+				, RT2.NAME
+				, RT2.RET_YMD
+				, RT2.EMP_YMD
+			FROM THRM151 DT
+				, TSYS005 RT1
+				, THRM100 RT2
+			WHERE DT.ENTER_CD = #{ssnEnterCd}
+				AND DT.ENTER_CD = RT1.ENTER_CD
+				AND RT1.GRCODE_CD = 'H10030'
+				AND RT1.CODE <![CDATA[<>]]> 'ZZ'
+				AND DT.MANAGE_CD = RT1.CODE
+				AND DT.ENTER_CD = RT2.ENTER_CD
+				AND DT.SABUN = RT2.SABUN
+			GROUP BY DT.ENTER_CD
+				, DT.SABUN
+				, DT.MANAGE_CD
+				, DT.MANAGE_NM
+				, DT.ORG_CD
+				, DT.STATUS_CD
+				, DT.EDATE
+				, RT2.NAME
+				, RT2.RET_YMD
+				, RT2.EMP_YMD
+		)
+		SELECT 'ALL' AS CODE
+			, '재직자수' AS CODE_NM
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE #{searchPrevYmd} BETWEEN SDATE AND EDATE
+				AND (RET_YMD IS NULL OR RET_YMD <![CDATA[>]]> #{searchPrevYmd})) AS PREV_MONTH_CNT
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE #{searchYmd} BETWEEN SDATE AND EDATE
+				AND (RET_YMD IS NULL OR RET_YMD <![CDATA[>]]> #{searchYmd})) AS CURR_MONTH_CNT
+		FROM DUAL
+
+		UNION ALL
+
+		SELECT 'EMP' AS CODE
+			, '신규입사자' AS CODE_NM
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE STATUS_CD NOT IN ('RAA', 'XA')
+				AND #{searchPrevYm} || '01' <![CDATA[>=]]> SDATE
+				AND EMP_YMD LIKE #{searchPrevYm} || '%') AS PREV_MONTH_CNT
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE STATUS_CD NOT IN ('RAA', 'XA')
+				AND #{searchYm} || '01' <![CDATA[>=]]> SDATE
+				AND EMP_YMD LIKE #{searchYm} || '%') AS CURR_MONTH_CNT
+		FROM DUAL
+
+		UNION ALL
+
+		SELECT 'RET' AS CODE
+			, '퇴사자' AS CODE_NM
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE STATUS_CD NOT IN ('RAA', 'XA')
+				AND #{searchPrevYm} || '01' <![CDATA[>=]]> SDATE
+				AND RET_YMD LIKE #{searchPrevYm} || '%') AS PREV_MONTH_CNT
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE STATUS_CD NOT IN ('RAA', 'XA')
+				AND #{searchYm} || '01' <![CDATA[>=]]> SDATE
+				AND RET_YMD LIKE #{searchYm} || '%') AS CURR_MONTH_CNT
+		FROM DUAL
+
+		UNION ALL
+
+		SELECT 'PER' AS CODE
+			, '정규직' AS CODE_NM
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE MANAGE_CD = 'E0015'
+				AND #{searchPrevYmd} BETWEEN SDATE AND EDATE
+				AND (RET_YMD IS NULL OR RET_YMD <![CDATA[>]]> #{searchPrevYmd})) AS PREV_MONTH_CNT
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE MANAGE_CD = 'E0015'
+				AND #{searchYmd} BETWEEN SDATE AND EDATE
+				AND (RET_YMD IS NULL OR RET_YMD <![CDATA[>]]> #{searchYmd})) AS CURR_MONTH_CNT
+		FROM DUAL
+
+		UNION ALL
+
+		SELECT 'CON' AS CODE
+			, '계약직' AS CODE_NM
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE MANAGE_CD = 'E0002'
+				AND #{searchPrevYmd} BETWEEN SDATE AND EDATE
+				AND (RET_YMD IS NULL OR RET_YMD <![CDATA[>]]> #{searchPrevYmd})) AS PREV_MONTH_CNT
+			, (SELECT COUNT(SABUN)
+				FROM ORD
+				WHERE MANAGE_CD = 'E0002'
+				AND #{searchYmd} BETWEEN SDATE AND EDATE
+				AND (RET_YMD IS NULL OR RET_YMD <![CDATA[>]]> #{searchYmd})) AS CURR_MONTH_CNT
+		FROM DUAL
+	</select>
+
+</mapper>

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.config.wtmReportItemCdMgr">
+
+	<!-- 리포트항목코드 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmReportItemCdMgrList">
+		<![CDATA[
+			SELECT ENTER_CD, REPORT_ITEM_CD, REPORT_ITEM_NM, CALC_SEQ
+			  FROM TWTM061 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+		]]>
+		<if test='searchReportItemNm != null and !"".equals(searchReportItemNm)'>
+			   AND A.REPORT_ITEM_NM LIKE '%' || TRIM(#{searchReportItemNm}) || '%'
+		</if>
+		<if test='searchUseYn != null and "Y".equals(searchUseYn)'>
+			   AND A.USE_YN = 'Y'
+		</if>
+			 ORDER BY CALC_SEQ, REPORT_ITEM_CD
+	</select>
+
+	<!-- 리포트항목코드 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmReportItemCdMgrOne">
+		<![CDATA[
+			SELECT REPORT_ITEM_CD, REPORT_ITEM_NM, CALC_SEQ, USE_YN
+			     , A.WG_TYPE, A.DAY_TYPE, A.CALC_METHOD, METHOD_CD, CONV_HOUR_YN, A.UPBASE, A.UNIT, A.NOTE
+			     , A.DAYS_COUNT_YN, A.VALID_HOUR_O, A.VALID_HOUR_U
+			     , A.SEARCH_SEQ, ( SELECT SEARCH_DESC FROM THRI201 WHERE ENTER_CD = A.ENTER_CD AND SEARCH_SEQ = A.SEARCH_SEQ ) AS SEARCH_DESC
+			     , A.SUBTRACT_YN
+			  FROM TWTM061 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.REPORT_ITEM_CD = TRIM(#{reportItemCd})
+		]]>
+	</select>
+
+	<!-- 리포트항목코드 저장 -->
+	<update parameterType="map" id="saveWtmReportItemCdMgr">
+		<![CDATA[
+			MERGE INTO TWTM061 T
+			USING
+			(
+				SELECT #{ssnEnterCd} AS ENTER_CD
+		]]>
+				<choose>
+					<when test='reportItemCd == null or "".equals(reportItemCd)'>
+						, NVL(( SELECT MAX(TO_NUMBER(REPORT_ITEM_CD))
+						      FROM TWTM061
+						     WHERE ENTER_CD = #{ssnEnterCd} ), 0) + 1 AS REPORT_ITEM_CD
+					</when>
+				    <otherwise>
+						, TRIM( #{reportItemCd} ) AS REPORT_ITEM_CD
+					</otherwise>
+				</choose>
+		<![CDATA[
+				     , TRIM( #{reportItemNm} ) AS REPORT_ITEM_NM
+				     , TRIM( #{calcSeq} ) AS CALC_SEQ
+				     , TRIM( #{useYn} ) AS USE_YN
+				     , TRIM( #{wgType} ) AS WG_TYPE
+				     , TRIM( #{dayType} ) AS DAY_TYPE
+				     , TRIM( #{calcMethod} ) AS CALC_METHOD
+				     , TRIM( #{methodCd} ) AS METHOD_CD
+				     , TRIM( #{convHourYn} ) AS CONV_HOUR_YN
+				     , TRIM( #{upbase} ) AS UPBASE
+				     , TRIM( #{unit} ) AS UNIT
+				     , TRIM( #{note} ) AS NOTE
+				     , TRIM( #{daysCountYn} ) AS DAYS_COUNT_YN
+				     , TRIM( #{validHourO} ) AS VALID_HOUR_O
+				     , TRIM( #{validHourU} ) AS VALID_HOUR_U
+				     , TRIM( #{searchSeq} ) AS SEARCH_SEQ
+				     , TRIM( #{subtractYn} ) AS SUBTRACT_YN
+				     , SYSDATE AS INSDATE
+				     , TRIM( #{ssnSabun} ) AS INSID
+				     , SYSDATE AS CHKDATE
+				     , TRIM( #{ssnSabun} ) AS CHKID
+				  FROM DUAL
+			) S
+			ON
+			(
+			    T.ENTER_CD = S.ENTER_CD
+			    AND T.REPORT_ITEM_CD = S.REPORT_ITEM_CD
+			)
+			WHEN MATCHED THEN
+				UPDATE SET T.REPORT_ITEM_NM = S.REPORT_ITEM_NM
+			             , T.CALC_SEQ = S.CALC_SEQ
+			             , T.USE_YN = S.USE_YN
+			             , T.WG_TYPE = S.WG_TYPE
+			             , T.DAY_TYPE = S.DAY_TYPE
+			             , T.CALC_METHOD = S.CALC_METHOD
+			             , T.METHOD_CD = S.METHOD_CD
+			             , T.CONV_HOUR_YN = S.CONV_HOUR_YN
+			             , T.UPBASE = S.UPBASE
+			             , T.UNIT = S.UNIT
+			             , T.NOTE = S.NOTE
+			             , T.DAYS_COUNT_YN = S.DAYS_COUNT_YN
+			             , T.VALID_HOUR_O = S.VALID_HOUR_O
+			             , T.VALID_HOUR_U = S.VALID_HOUR_U
+			             , T.SEARCH_SEQ = S.SEARCH_SEQ
+			             , T.SUBTRACT_YN = S.SUBTRACT_YN
+			             , T.CHKDATE = S.CHKDATE
+			             , T.CHKID = S.CHKID
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+				      T.ENTER_CD, T.REPORT_ITEM_CD, T.REPORT_ITEM_NM, T.CALC_SEQ, T.USE_YN
+				    , T.WG_TYPE, T.CALC_METHOD, T.METHOD_CD, T.CONV_HOUR_YN, T.UPBASE, T.UNIT, T.NOTE
+				    , T.DAYS_COUNT_YN, T.VALID_HOUR_O, T.VALID_HOUR_U, T.SEARCH_SEQ, T.SUBTRACT_YN
+				    , T.INSDATE, T.INSID, T.CHKDATE, T.CHKID
+				)
+				VALUES
+				(
+				      S.ENTER_CD, S.REPORT_ITEM_CD, S.REPORT_ITEM_NM, S.CALC_SEQ, S.USE_YN
+				    , S.WG_TYPE, S.CALC_METHOD, S.METHOD_CD, S.CONV_HOUR_YN, S.UPBASE, S.UNIT, S.NOTE
+				    , S.DAYS_COUNT_YN, S.VALID_HOUR_O, S.VALID_HOUR_U, S.SEARCH_SEQ, S.SUBTRACT_YN
+				    , S.INSDATE, S.INSID, S.CHKDATE, S.CHKID
+				)
+		]]>
+	</update>
+
+	<!-- 리포트항목코드 삭제 -->
+	<delete parameterType="map" id="deleteWtmReportItemCdMgr">
+		<![CDATA[
+			DELETE FROM TWTM061
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			   AND REPORT_ITEM_CD IN
+		]]>
+				<foreach collection="deleteRows" item="rm" separator=", " open="(" close=")">
+					#{rm.reportItemCd}
+				</foreach>
+	</delete>
+
+	<!-- 리포트항목관리 계산방법 코드리스트 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmReportItemCdMgrMethodCdList">
+		<choose>
+			<when test='calcMethod != null and "U".equals(calcMethod)'>
+				SELECT UDF_CD AS CODE, UDF_NAME AS CODE_NM
+				  FROM TSYS801
+				 WHERE ENTER_CD = #{ssnEnterCd}
+				   AND BIZ_CD = 'WTM'
+				   AND USE_YN = 'Y'
+			</when>
+			<otherwise>
+				SELECT CODE, CODE_NM
+				  FROM TSYS005
+				 WHERE ENTER_CD = #{ssnEnterCd}
+				   AND GRCODE_CD = 'WT0532'
+				   AND USE_YN = 'Y'
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND NVL(E_YMD, '99991231')
+			</otherwise>
+		</choose>
+	</select>
+
+	<!-- 리포트항목코드 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmReportItemCdMgrCodeList">
+		<![CDATA[
+			SELECT A.REPORT_ITEM_CD AS CODE
+			     , A.REPORT_ITEM_NM AS CODE_NM
+			     , A.USE_YN
+			  FROM TWTM061 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+		]]>
+		<if test='searchReportItemNm != null and !"".equals(searchReportItemNm)'>
+			AND A.REPORT_ITEM_NM LIKE '%' || TRIM(#{searchReportItemNm}) || '%'
+		</if>
+		<if test='searchUseYn != null and "Y".equals(searchUseYn)'>
+			AND A.USE_YN = 'Y'
+		</if>
+	</select>
+</mapper>

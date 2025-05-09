@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perCarMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerCarMgrList">
+			
+				<![CDATA[
+				/*
+				차량소요여부(TCPN445, 급여관리 > 개인급여관리 > 개인급여기준관리 맨 하단에 위치)									체크박스(Default 'N)				
+				회사코드	사번	성명	소속(TORG)	직위(H20030)	직급(H20010)	직책(H20020)	직구분(H10050)	계약유형(H10030)	차량소유여부	시작일자	종료일자	비고
+				*/
+					SELECT  /*+ RULE */
+						A.SABUN
+						, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+					    , F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN, REPLACE(#{searchDate},'-','')) AS ORG_NM
+					    , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20030', C.JIKWEE_CD) AS JIKWEE_NM
+					    , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20010', C.JIKGUB_CD)  AS JIKGUB_NM
+					    , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20020', C.JIKCHAK_CD)AS JIKCHAK_NM 
+					    , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10050', C.WORK_TYPE) AS WORKTYPE_NM --직구분
+					    , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10030', C.MANAGE_CD) AS MANAGE_NM --계약유형
+					    , A.CAR_YN
+					    , A.SDATE
+					    , A.EDATE
+					    , A.BIGO
+					FROM TCPN445 A, (SELECT     SUB1.*     
+				                     FROM     THRM151 SUB1,    
+				                        (SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN    
+				                           FROM THRM151     
+				                         WHERE ENTER_CD = #{ssnEnterCd}
+				                           AND REPLACE(#{searchDate},'-','') BETWEEN SDATE AND NVL(EDATE,'99991231')
+				                         GROUP BY ENTER_CD, SABUN) SUB2    
+				                    WHERE     SUB1.ENTER_CD    = SUB2.ENTER_CD    
+				                     AND SUB1.SABUN = SUB2.SABUN    
+				                     AND SUB1.SDATE = SUB2.SDATE  
+				                	) C 
+		           WHERE    A.ENTER_CD = #{ssnEnterCd}       
+		           AND    A.ENTER_CD = C.ENTER_CD
+		           AND    A.SABUN = C.SABUN ]]>
+		           <if test="searchSabunName != null and searchSabunName neq ''">
+		         		AND    (A.SABUN = #{searchSabunName} OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) LIKE '%' || #{searchSabunName} || '%')
+		           </if>
+		           <if test="searchManageCdHidden != null and searchManageCdHidden neq ''">
+		           		AND    C.MANAGE_CD IN
+		<foreach collection="searchManageCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		           </if>
+		           <if test="searchOrgNm != null and searchOrgNm neq ''">
+					 	AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) LIKE '%'|| TRIM( #{searchOrgNm} ) ||'%'
+				   </if>
+				   <if test="statusCd != null and statusCd neq ''">
+					   AND C.STATUS_CD != #{statusCd}
+              		</if>
+		           AND REPLACE(#{searchDate},'-','') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePerCarMgr">
+			
+					MERGE INTO TCPN445 T
+					USING	(
+							SELECT	  SABUN
+									, SDATE
+									, EDATE
+									, CAR_YN
+									, BIGO
+							FROM	(
+									SELECT	  NULL		AS SABUN
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS CAR_YN
+											, NULL		AS BIGO
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.sabun}) AS SABUN
+											, TRIM( #{rm.sdate}) AS SDATE
+											, TRIM( #{rm.edate}) AS EDATE
+											, TRIM( #{rm.carYn}) AS CAR_YN
+											, TRIM( #{rm.bigo}) AS BIGO
+											FROM   DUAL
+</foreach>
+									) WHERE SABUN IS NOT NULL
+							) S
+					ON (    T.ENTER_CD    = #{ssnEnterCd}
+						AND T.SABUN       = S.SABUN
+						AND T.SDATE       = S.SDATE
+							 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.CAR_YN	= S.CAR_YN
+									, T.BIGO 	= S.BIGO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SDATE
+							, T.EDATE
+							, T.CAR_YN
+							, T.BIGO
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}       
+							, S.SABUN
+							, S.SDATE
+							, S.EDATE
+							, S.CAR_YN
+							, S.BIGO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+			
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePerCarMgr">
+					DELETE FROM TCPN445 
+					WHERE 	(ENTER_CD, SABUN, SDATE) IN 	(  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+											<if test="rm.sabun != null and rm.sabun neq ''">
+												<if test="rm.sdate != null and sdate neq ''">
+													(#{ssnEnterCd}, TRIM( #{rm.sabun} ) ,TRIM( #{rm.sdate} ) )
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+			
+			
+		</delete>
+</mapper>

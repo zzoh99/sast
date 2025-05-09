@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.security.downloadReasonSta">
+	
+<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getDownloadReasonStaList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+					     , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_NM
+					     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKCHAK_NM
+					     , TO_CHAR(TO_TIMESTAMP(A.DOWNLOAD_DATE, 'YYYYMMDDHH24MISSFF'), 'YYYY-MM-DD HH24:MI:SS') AS DOWNLOAD_DATE
+					     , A.PRG_CD
+					     , A.MENU_NM
+					     , A.REASON
+					     , A.FILE_NM
+					     , A.FILE_SEQ
+					     , A.FILE_SEQ_NO
+					     , A.SHEET_ID
+					  FROM TSYS630 A
+					 WHERE 1 = 1
+					   AND TO_CHAR(TO_TIMESTAMP(A.DOWNLOAD_DATE, 'YYYYMMDDHH24MISSFF'), 'YYYYMMDD')
+					       BETWEEN NVL(REPLACE(TRIM(#{searchFromYmd}),'-',''),'00000000') AND NVL(REPLACE(TRIM(#{searchToYmd}),'-',''),'99991231')
+					       ]]>
+<choose><when test='searchEnterCd != null and !searchEnterCd.equals("") '>
+					   AND A.ENTER_CD LIKE '%'||TRIM(#{searchEnterCd})||'%'
+		</when>
+					 <otherwise>
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					 </otherwise>
+</choose>
+<if test='searchName != null and !searchName.equals("") '>
+					   AND F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM(#{searchName})||'%'
+</if>
+<if test='searchPrgNm != null and !searchPrgNm.equals("") '>
+					   AND UPPER(A.MENU_NM) LIKE '%'||UPPER(TRIM(#{searchPrgNm}))||'%'
+</if>
+<if test='searchPrgCd != null and !searchPrgCd.equals("")'>
+					   AND UPPER(A.PRG_CD) LIKE '%'||UPPER(TRIM(#{searchPrgCd}))||'%'
+</if>
+					 ORDER BY A.DOWNLOAD_DATE DESC
+
+
+
+		</select>
+		
+<!-- 임시비밀번호 조회 -->
+		<select parameterType="map" resultType="cMap" id="getDownloadReasonStaTempPasswd">
+
+				<![CDATA[
+					SELECT LPAD(DBMS_RANDOM.VALUE(10000000, 99999999), 8, 0) AS T_PASSWD
+					  FROM DUAL
+				]]>
+
+
+		</select>
+		
+<!-- 등록 -->
+		<insert parameterType="map" id="insertDownloadReasonSta">
+
+					INSERT INTO TSYS630 (
+					       ENTER_CD
+					     , SABUN
+					     , DOWNLOAD_DATE
+					     , PRG_CD
+					     , MENU_NM
+					     , REASON
+					     , FILE_NM
+					     , FILE_SEQ
+					     , FILE_SEQ_NO
+					     , SHEET_ID
+					     , CHKDATE
+					     , CHKID
+					) VALUES (
+					       #{ssnEnterCd}
+					     , #{ssnSabun}
+					     , DECODE(#{downloadDate}, NULL, TO_CHAR(SYSTIMESTAMP, 'YYYYMMDDHH24MISSFF'), #{downloadDate})
+					     , #{prgCd}
+					     , (
+					        SELECT MENU_NM
+					          FROM TSYS311
+					         WHERE ENTER_CD = #{ssnEnterCd}
+					           AND PRG_CD   = #{prgCd}
+					           AND GRP_CD   = #{ssnGrpCd}
+					           AND ROWNUM   = 1
+					       )
+					     , #{reason}
+					     , #{fileNm}
+					     , #{fileSeq}
+					     , #{fileSeqNo}
+					     , #{sheetId}
+					     , SYSDATE
+					     , #{ssnSabun}
+					)
+
+
+		</insert>
+
+
+</mapper>

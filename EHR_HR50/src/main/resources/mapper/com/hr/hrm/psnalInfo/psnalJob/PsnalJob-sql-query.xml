@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalJob">
+
+<!-- 인사기본(직무) 조회 -->
+		<select id="getPsnalJobList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT
+					    X.ENTER_CD -- 회사코드
+					  , X.SABUN -- 사번
+					  , X.JOB_CD -- 직무코드
+					  , (SELECT Y.JOB_NM
+					       FROM TORG201 Y WHERE Y.ENTER_CD = X.ENTER_CD AND Y.JOB_CD = X.JOB_CD AND X.SDATE BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')) AS JOB_NM -- 직무
+					  , X.SDATE -- 시작일
+					  , X.EDATE -- 종료일
+					  , ( SUBSTR(F_CPN_CAL_YMD(X.SDATE, DECODE(X.EDATE, NULL, TO_CHAR(SYSDATE, 'YYYYMMDD'), '99991231', TO_CHAR(SYSDATE, 'YYYYMMDD'), X.EDATE)), 1, 2) || DECODE(#{ssnLocaleCd}, null, '년 ', 'ko_KR', '년 ', 'year ')
+					    || SUBSTR(F_CPN_CAL_YMD(X.SDATE, DECODE(X.EDATE, NULL, TO_CHAR(SYSDATE, 'YYYYMMDD'), '99991231', TO_CHAR(SYSDATE, 'YYYYMMDD'), X.EDATE)), 4, 2) || DECODE(#{ssnLocaleCd}, null, '개월 ', 'ko_KR', '개월 ', 'month ') )  AS WORK_YM_CNT
+					 FROM THRM141 X
+					 WHERE X.ENTER_CD = #{ssnEnterCd}
+					   AND X.SABUN = TRIM( #{sabun} )
+					 ORDER BY X.SDATE DESC
+				]]>
+		</select>
+
+<!-- 인사기본(직무) 변경 저장 -->
+		<update id="savePsnalJob" parameterType="map">
+
+					MERGE INTO THRM141 T
+					USING (
+					    SELECT A.ENTER_CD
+					         , A.SABUN
+					         , A.JOB_CD
+					         , A.SDATE
+					         , A.EDATE
+					      FROM (
+					            SELECT NULL AS ENTER_CD
+					                 , NULL AS SABUN
+					                 , NULL AS JOB_CD
+					                 , NULL AS SDATE
+					                 , NULL AS EDATE
+					              FROM DUAL
+<foreach collection="mergeRows" item="rm" >
+					             UNION ALL
+					            SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+					                 , TRIM( #{rm.sabun} ) AS SABUN
+					                 , TRIM( #{rm.jobCd} ) AS JOB_CD
+					                 , TRIM( #{rm.sdate} ) AS SDATE
+					                 , TRIM( #{rm.edate} ) AS EDATE
+					              FROM DUAL
+</foreach>
+					           ) A
+					     WHERE 1=1
+					       AND A.ENTER_CD IS NOT NULL
+					       AND A.SABUN IS NOT NULL
+					       AND A.JOB_CD IS NOT NULL
+					       AND A.SDATE IS NOT NULL
+					) S
+					ON (
+					        T.ENTER_CD = S.ENTER_CD
+					    AND T.SABUN = S.SABUN
+					    AND T.JOB_CD = S.JOB_CD
+					    AND T.SDATE = S.SDATE
+					)
+					WHEN MATCHED THEN
+					    UPDATE SET
+					          T.EDATE = S.EDATE
+					        , T.CHKDATE = SYSDATE
+					        , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					    INSERT
+					    (
+					          T.ENTER_CD
+					        , T.SABUN
+					        , T.JOB_CD
+					        , T.SDATE
+					        , T.EDATE
+					        , CHKDATE
+					        , CHKID
+					    )
+					    VALUES
+					    (
+					          S.ENTER_CD
+					        , S.SABUN
+					        , S.JOB_CD
+					        , S.SDATE
+					        , S.EDATE
+					        , SYSDATE
+					        , #{ssnSabun}
+					    )
+
+		</update>
+
+
+		<!-- 인사기본(직무) 삭제 -->
+		<delete id="deletePsnalJob" parameterType="map">
+
+					DELETE FROM THRM141
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||SABUN||'_'||JOB_CD||'_'||SDATE IN ( NULL
+				<foreach collection="deleteRows" item="rm" >
+				
+				  <if test=' rm.sabun != null and !rm.sabun.equals("")
+				       and rm.jobCd != null and !rm.jobCd.equals("")
+				       and rm.sdate != null and !rm.sdate.equals("")' >
+					, TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.sdate})
+				  </if>
+				</foreach>
+			)
+		</delete>
+
+		<!-- ////////////////////////////////////// 임시사용 TAB ////////////////////////////////////// -->
+		<!-- 인사기본(직무) 변경 조회 -->
+		<select id="getPsnalJobEditList">
+			<![CDATA[
+				SELECT A.SABUN
+					 , A.SDATE
+					 , A.EDATE
+					 , A.ORG_CD
+					 , F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD,A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+					 , A.WORK_TYPE_NM
+					 , A.JIKCHAK_NM
+					 , A.JIKWEE_NM
+					 , A.JOB_CD
+					 , F_COM_GET_JOB_NM_201(A.ENTER_CD,A.JOB_CD,A.SDATE, #{ssnLocaleCd}) AS JOB_NM
+					 , A.BIGO
+				  FROM THRM151_TEMP A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = TRIM( #{sabun} )
+				ORDER BY A.SDATE DESC
+			]]>
+		</select>
+	</mapper>

@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.certificate.certiStdMgr">
+
+<!-- 제증명신청기준설정 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiStdMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_CD
+					     , A.PUBLISH_ORG_NM
+					     , A.PUBLISH_ORG_E_NM
+					     , A.PUBLISHER_NM
+					     , A.PUBLISHER_E_NM
+					     , A.PUBLISHER_TELNO
+					     , DECODE(A.SELF_PRT_YN,'Y','1','N') AS SELF_PRT_YN
+					     , (SELECT COUNT(*) FROM TBEN407 WHERE ENTER_CD = A.ENTER_CD AND APPL_CD = A.APPL_CD) AS USER_CNT
+					     , DECODE(A.SIGN_PRT_YN, 'Y', '1', 'N') AS SIGN_PRT_YN
+					     , A.SELF_PRT_LIMIT_CNT
+					  FROM TBEN405 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+					<if test='applCd != null and !applCd.equals("")'>
+					   AND A.APPL_CD = #{applCd}
+					</if>
+
+
+		</select>
+
+<!-- 담당자 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiStdMgrUserList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_CD
+					     , A.CHARGE_SABUN
+					     , F_COM_GET_NAMES(A.ENTER_CD,A.CHARGE_SABUN, #{ssnLocaleCd}) AS CHARGE_NAME
+					     , F_COM_GET_NAMES(A.ENTER_CD,A.CHARGE_SABUN, 'ALIAS') AS CHARGE_ALIAS
+					     , F_COM_GET_ORG_NM2(A.ENTER_CD,A.CHARGE_SABUN,A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD,A.CHARGE_SABUN,A.SDATE, #{ssnLocaleCd}) AS JIKGUB_NM
+					     , F_COM_GET_JIKWEE_NM(A.ENTER_CD,A.CHARGE_SABUN,A.SDATE, #{ssnLocaleCd}) AS JIKWEE_NM
+					     , A.SDATE
+					     , A.EDATE
+					  FROM TBEN407 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_CD = #{applCd}
+				]]>
+
+
+		</select>
+
+<!-- 제증명신청기준설정 저장 -->
+		<update parameterType="map" id="saveCertiStdMgr">
+
+					MERGE INTO TBEN405 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.APPL_CD
+							     , A.PUBLISH_ORG_NM
+							     , A.PUBLISH_ORG_E_NM
+							     , A.PUBLISHER_NM
+							     , A.PUBLISHER_E_NM
+							     , A.PUBLISHER_TELNO
+							     , A.SELF_PRT_YN
+							     , A.SIGN_PRT_YN
+							     , A.SELF_PRT_LIMIT_CNT
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS APPL_CD
+										 , NULL AS PUBLISH_ORG_NM
+										 , NULL AS PUBLISH_ORG_E_NM
+										 , NULL AS PUBLISHER_NM
+									     , NULL AS PUBLISHER_E_NM
+									     , NULL as PUBLISHER_TELNO
+									     , NULL AS SELF_PRT_YN
+									     , NULL AS SIGN_PRT_YN
+									     , NULL AS SELF_PRT_LIMIT_CNT
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.applCd} )			AS  APPL_CD
+										 , TRIM( #{rm.publishOrgNm})	AS  PUBLISH_ORG_NM
+										 , TRIM( #{rm.publishOrgENm})	AS  PUBLISH_ORG_E_NM
+										 , TRIM( #{rm.publisherNm})	AS  PUBLISHER_NM
+										 , TRIM( #{rm.publisherENm})	AS  PUBLISHER_E_NM
+										 , TRIM( #{rm.publisherTelno})	AS  PUBLISHER_TELNO
+										 , TRIM( #{rm.selfPrtYn})		AS  SELF_PRT_YN
+										 , TRIM( #{rm.signPrtYn})		AS  SIGN_PRT_YN
+										 , TRIM( #{rm.selfPrtLimitCnt}) AS SELF_PRT_LIMIT_CNT
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.APPL_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.APPL_CD = S.APPL_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PUBLISH_ORG_NM  	= S.PUBLISH_ORG_NM
+									, T.PUBLISH_ORG_E_NM	= S.PUBLISH_ORG_E_NM
+									, T.PUBLISHER_NM    	= S.PUBLISHER_NM
+									, T.PUBLISHER_E_NM  	= S.PUBLISHER_E_NM
+									, T.PUBLISHER_TELNO  	= S.PUBLISHER_TELNO
+									, T.SELF_PRT_YN     	= DECODE(S.SELF_PRT_YN,'1','Y','N')
+									, T.SIGN_PRT_YN     	= DECODE(S.SIGN_PRT_YN,'1','Y','N')
+									, T.SELF_PRT_LIMIT_CNT	= S.SELF_PRT_LIMIT_CNT
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPL_CD
+							, T.PUBLISH_ORG_NM
+							, T.PUBLISH_ORG_E_NM
+							, T.PUBLISHER_NM
+							, T.PUBLISHER_E_NM
+							, T.PUBLISHER_TELNO
+							, T.SELF_PRT_YN
+							, T.SIGN_PRT_YN
+							, T.SELF_PRT_LIMIT_CNT
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPL_CD
+							, S.PUBLISH_ORG_NM
+							, S.PUBLISH_ORG_E_NM
+							, S.PUBLISHER_NM
+							, S.PUBLISHER_E_NM
+							, S.PUBLISHER_TELNO
+							, DECODE(S.SELF_PRT_YN,'1','Y','N')
+							, DECODE(S.SIGN_PRT_YN,'1','Y','N')
+							, S.SELF_PRT_LIMIT_CNT
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 담당자 저장 -->
+		<update parameterType="map" id="saveCertiStdMgrUser">
+
+					MERGE INTO TBEN407 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.APPL_CD
+							     , A.CHARGE_SABUN
+							     , A.SDATE
+							     , A.EDATE
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS APPL_CD
+										 , NULL AS CHARGE_SABUN
+										 , NULL AS SDATE
+										 , NULL AS EDATE
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.applCd} )			AS  APPL_CD
+										 , TRIM( #{rm.chargeSabun})	AS  CHARGE_SABUN
+										 , TRIM( #{rm.sdate} )			AS  SDATE
+										 , TRIM( #{rm.edate} )			AS  EDATE
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.APPL_CD IS NOT NULL
+										  AND A.CHARGE_SABUN IS NOT NULL
+										  AND A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.APPL_CD = S.APPL_CD AND T.CHARGE_SABUN = S.CHARGE_SABUN AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE       	= S.EDATE
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPL_CD
+							, T.CHARGE_SABUN
+							, T.SDATE
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPL_CD
+							, S.CHARGE_SABUN
+							, S.SDATE
+							, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 제증명신청기준설정 삭제 -->
+		<delete parameterType="map" id="deleteCertiStdMgr">
+
+					DELETE FROM TBEN405
+					 WHERE ENTER_CD||'_'||APPL_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applCd != null and !rm.applCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 담당자 삭제 -->
+		<delete parameterType="map" id="deleteCertiStdMgrUser">
+
+					DELETE FROM TBEN407
+					 WHERE ENTER_CD||'_'||APPL_CD||'_'||CHARGE_SABUN||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applCd != null and !rm.applCd.equals("")
+												and rm.chargeSabun != null and !rm.chargeSabun.equals("")
+												and rm.sdate != null and !rm.sdate.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applCd} )||'_'||TRIM( #{rm.chargeSabun})||'_'||TRIM( #{rm.sdate} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

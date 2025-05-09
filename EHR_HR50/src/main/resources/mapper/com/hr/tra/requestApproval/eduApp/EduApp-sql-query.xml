@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.requestApproval.eduApp">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduAppList">
+			
+				<![CDATA[
+				SELECT A.*
+				     
+					 , CASE WHEN NVL(EDU_SATI_SKIP_YN, 'N') = 'N' AND UPDATE_YN = 'N' AND NVL(EDU_SURVEY_YN,'N') = 'N' THEN '1' 
+					 		WHEN NVL(EDU_SATI_SKIP_YN, 'N') = 'N' AND UPDATE_YN = 'N' AND NVL(EDU_SURVEY_YN,'N') = 'Y' THEN '2'
+					        ELSE '' END AS SELECT_IMG
+					 
+					 , DECODE(APPL_STATUS_CD, '11', '<a class="basic">삭제</a>', '') AS BTN_DEL
+					 , 0 AS DETAIL
+					 
+				     , CASE WHEN APPL_STATUS_CD2 = '11' THEN '<a class="basic">삭제</a>'
+						    ELSE '' END AS BTN_DEL2
+				     , CASE WHEN APPL_STATUS_CD <> '99' OR NVL(UPDATE_YN, 'N') = 'Y' OR NVL(RESULT_APP_SKIP_YN, 'N') = 'Y' THEN ''
+				            WHEN RNUM <> 1 THEN ''
+				            WHEN APPL_SEQ2 IS NULL OR APPL_STATUS_CD2 IN ('23', '33') THEN '<a class="basic">신청</a>'
+						    ELSE '' END AS BTN_APP2
+					 , CASE WHEN APPL_SEQ2 IS NULL THEN '' ELSE '0' END AS DETAIL2
+							 
+				  FROM (
+					    SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.SABUN
+						     , A.EDU_SEQ
+						     , A.EDU_EVENT_SEQ
+						     , A.IN_OUT_TYPE
+						     , A.JOB_CD
+						     , A.YEAR_PLAN_YN
+						     , A.EDU_MEMO
+						     , A.NOTE
+						     , A.EDU_SURVEY_YN -- 만족도조사 여부
+							 
+						     , C.EDU_COURSE_NM
+						     , C.EDU_METHOD_CD
+							 , C.EDU_BRANCH_CD
+							 , C.EDU_M_BRANCH_CD
+							 , D.EDU_S_YMD
+							 , D.EDU_E_YMD
+						     , D.EDU_SATI_SKIP_YN
+						     , D.RESULT_APP_SKIP_YN
+
+							 , B.APPL_YMD
+							 , B.APPL_STATUS_CD
+							 , B.AGREE_YMD
+							 , B.APPL_SABUN
+							 , B.APPL_IN_SABUN
+							 
+							 
+							 , E.APPL_SEQ 		AS APPL_SEQ2
+							 , E.APPL_YMD		AS APPL_YMD2
+							 , E.APPL_SABUN		AS APPL_SABUN2
+							 , E.APPL_IN_SABUN 	AS APPL_IN_SABUN2
+							 , E.APPL_STATUS_CD	AS APPL_STATUS_CD2
+							 
+							 , ( SELECT EDU_CONFIRM_TYPE  --수료여부
+							       FROM TTRA301 F
+							      WHERE F.ENTER_CD       = A.ENTER_CD
+			                        AND F.EDU_SEQ        = A.EDU_SEQ
+			                        AND F.EDU_EVENT_SEQ  = A.EDU_EVENT_SEQ
+			                        AND F.SABUN          = A.SABUN
+			                   ) AS EDU_CONFIRM_TYPE     
+							 , DECODE( ( SELECT APPL_STATUS_CD
+							               FROM TTRA205 X, THRI103 Y
+							              WHERE X.ENTER_CD = A.ENTER_CD
+							                AND X.AP_APPL_SEQ = A.APPL_SEQ
+							                AND X.ENTER_CD = Y.ENTER_CD
+							                AND X.APPL_SEQ = Y.APPL_SEQ
+							                AND Y.APPL_STATUS_CD IN ('21', '31', '99') ), NULL, 'N', '99', 'Y', 'ING' ) AS UPDATE_YN   -- 교육취소여부 (결재 진행중인 건 포함)
+							 , DECODE( ( SELECT COUNT(1)
+							               FROM TTRA151 X
+							              WHERE X.ENTER_CD = A.ENTER_CD
+							                AND X.EDU_SEQ = A.EDU_SEQ 
+							                AND X.EDU_EVENT_SEQ = A.EDU_EVENT_SEQ ), 0, 'N', 'Y' ) AS SURVEY_YN 
+							                
+                             , ROW_NUMBER()OVER(PARTITION BY A.ENTER_CD, A.APPL_SEQ ORDER BY E.APPL_SEQ DESC ) AS RNUM
+							
+						  FROM TTRA201 A, THRI103 B, TTRA101 C, TTRA121 D  
+					        , ( SELECT X.AP_APPL_SEQ, Y.*  --교육결과보고
+					              FROM TTRA203 X, THRI103 Y
+					             WHERE X.ENTER_CD     = #{ssnEnterCd}
+					               AND X.ENTER_CD     = Y.ENTER_CD
+					               AND X.APPL_SEQ     = Y.APPL_SEQ
+					               AND X.SABUN        = TRIM( #{searchSabun} )
+					          ) E
+					 	 WHERE A.ENTER_CD       = #{ssnEnterCd}
+				 		   AND A.SABUN          = TRIM( #{searchSabun} )
+			 			   AND A.ENTER_CD       = B.ENTER_CD
+						   AND A.APPL_SEQ       = B.APPL_SEQ
+						   -- 교육과정
+			 			   AND A.ENTER_CD       = C.ENTER_CD
+			 			   AND A.EDU_SEQ        = C.EDU_SEQ
+			 			   -- 교육회차
+			 			   AND A.ENTER_CD       = D.ENTER_CD
+			 			   AND A.EDU_SEQ        = D.EDU_SEQ
+			 			   AND A.EDU_EVENT_SEQ  = D.EDU_EVENT_SEQ
+			 			   -- 교육결과보고
+	                       AND A.ENTER_CD       = E.ENTER_CD(+)
+	                       AND A.APPL_SEQ       = E.AP_APPL_SEQ(+) ]]>
+					<if test='searchSYmd != null and !searchSYmd.equals("") and searchEYmd != null and !searchEYmd.equals("")'>
+						   AND B.APPL_YMD BETWEEN TRIM( REPLACE(#{searchSYmd}, '-', '') ) AND TRIM( REPLACE(#{searchEYmd}, '-', '') )
+					</if>
+			 			) A
+			 	    ORDER BY A.APPL_YMD DESC, A.APPL_SEQ DESC, A.APPL_SEQ2 DESC
+
+			
+			
+		</select>
+
+<!-- 	교육신청(TTRA201) 삭제 -->
+		<delete parameterType="map" id="deleteEduApp1">
+			
+					DELETE FROM TTRA201
+					 WHERE ENTER_CD = #{ssnEnterCd}	
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows">
+						<if test="rm.applSeq != null and rm.applSeq neq ''">
+						,TRIM(#{rm.applSeq}) 
+						</if>
+</foreach>
+						)
+			
+			
+		</delete>
+		
+<!-- 	교육과정(TTRA101) 삭제
+     : foreach 하지만 1건 밖에 안옴.
+-->
+		<delete parameterType="map" id="deleteEduApp2">
+			
+				
+<foreach item="rm" collection="deleteRows">  
+	<if test="rm.applSeq != null and rm.applSeq neq ''">
+		<![CDATA[
+					DELETE FROM TTRA101 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}	
+					   AND A.IN_OUT_TYPE = 'OUT'    -- 사외 만 삭제 가능
+					   AND A.APPL_SEQ IS NOT NULL
+					   AND A.APPL_SEQ = TRIM(#{rm.applSeq})
+					   AND NOT EXISTS ( SELECT 1
+					                      FROM TTRA201 X
+					                     WHERE X.ENTER_CD = A.ENTER_CD
+					                       AND X.APPL_SEQ <> TRIM(#{rm.applSeq})
+					                       AND X.EDU_SEQ  = A.EDU_SEQ )
+		]]>
+	</if>						
+</foreach>
+			
+			
+		</delete>
+		
+<!-- 	교육과정(TTRA121) 삭제
+     : foreach 하지만 1건 밖에 안옴.
+-->
+		<delete parameterType="map" id="deleteEduApp3">
+			
+<foreach item="rm" collection="deleteRows">  
+	<if test="rm.applSeq != null and rm.applSeq neq ''">
+				<![CDATA[
+					DELETE FROM TTRA121 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}	
+					   AND A.APPL_SEQ IS NOT NULL
+					   AND A.APPL_SEQ = TRIM(#{rm.applSeq}) 
+					   AND EXISTS ( SELECT 1
+					                  FROM TTRA101 X
+					                 WHERE X.ENTER_CD = A.ENTER_CD 
+					                   AND X.EDU_SEQ  = A.EDU_SEQ
+					   				   AND X.IN_OUT_TYPE = 'OUT' )   -- 사외 만 삭제 가능
+					   AND NOT EXISTS ( SELECT 1
+					                      FROM TTRA201 X
+					                     WHERE X.ENTER_CD       = A.ENTER_CD
+					                       AND X.APPL_SEQ       <> TRIM(#{rm.applSeq})
+					                       AND X.EDU_SEQ        = A.EDU_SEQ
+					                       AND X.EDU_EVENT_SEQ  = A.EDU_EVENT_SEQ )
+				]]>
+	</if>			
+</foreach>
+				
+			
+			
+		</delete>
+<!-- 	교육기관(TTRA001) 삭제
+     : foreach 하지만 1건 밖에 안옴.
+-->
+		<delete parameterType="map" id="deleteEduApp4">
+			
+<foreach item="rm" collection="deleteRows">  
+	<if test="rm.applSeq != null and rm.applSeq neq ''">
+				<![CDATA[
+					DELETE FROM TTRA001 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}	
+					   AND A.APPL_SEQ IS NOT NULL
+					   AND A.APPL_SEQ = TRIM(#{rm.applSeq}) 
+					   AND NOT EXISTS ( SELECT 1
+					                      FROM TTRA101 X
+					                     WHERE X.ENTER_CD  = A.ENTER_CD 
+					                       AND X.APPL_SEQ   <> TRIM(#{rm.applSeq})
+					                       AND X.EDU_ORG_CD = A.EDU_ORG_CD        )  
+					   AND NOT EXISTS ( SELECT 1
+					                      FROM TTRA121 X
+					                     WHERE X.ENTER_CD   = A.ENTER_CD
+					                       AND X.APPL_SEQ   <> TRIM(#{rm.applSeq})
+					                       AND X.EDU_ORG_CD = A.EDU_ORG_CD)
+				]]>
+	</if>			
+</foreach>
+				
+			
+			
+		</delete>
+		
+<!-- 	교육결과보고(TTRA203) 삭제 -->
+		<delete parameterType="map" id="deleteEduAppResult">
+			
+					DELETE FROM TTRA203
+					 WHERE ENTER_CD = #{ssnEnterCd}	
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows">
+						
+						<if test="rm.applSeq2 != null and rm.applSeq2 neq ''">
+						,TRIM(#{rm.applSeq2}) 
+						</if>
+</foreach>
+						)
+			
+			
+		</delete>
+</mapper>

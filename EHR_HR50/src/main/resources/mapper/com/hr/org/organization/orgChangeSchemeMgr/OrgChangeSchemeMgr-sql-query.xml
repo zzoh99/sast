@@ -1,0 +1,1781 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.orgChangeSchemeMgr">
+<!-- 조직개편관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgChangeSchemeMgrList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD			-- 회사구분
+							, A.SDATE				-- 조직개편일자
+							, A.ORG_CHART_NM		-- 조직도명
+							, A.MEMO				-- 메모
+							, A.CHANGE_YN			-- 확정여부
+						  FROM TORG701 A
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   		AND A.SDATE BETWEEN NVL(REPLACE(TRIM(#{srchSYmd}),'-',''), '00000000') AND NVL(REPLACE(TRIM(#{srchEYmd}),'-',''), '99991231')
+					   		        ]]>
+					   		<if test='srchChangeYn != null and !srchChangeYn.equals("")'>
+					   			AND A.CHANGE_YN = #{srchChangeYn}
+					   		</if>
+						 ORDER BY A.SDATE DESC
+
+
+		</select>
+
+<!-- 조직개편관리 가발령적용 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgChangeSchemeMgrList2">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+							, A.SDATE
+							, A.ORD_GUBUN
+						    , A.ORD_DETAIL_CD
+						    , A.ORD_TYPE_CD
+						    , A.ORD_REASON_CD
+						    , A.ORD_YMD
+						    , A.APPLY_SEQ
+						    , A.USE_YN
+						  FROM TORG702 A
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   	   AND A.SDATE = TRIM(#{searchSdate})
+						 ORDER BY A.ORD_YMD, A.APPLY_SEQ
+				]]>
+
+
+		</select>
+		
+		<!-- 조직개편관리 저장 -->
+		<update parameterType="map" id="saveOrgChangeSchemeMgr">
+
+					MERGE INTO TORG701 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SDATE
+									, A.ORG_CHART_NM
+									, A.MEMO
+									, A.CHANGE_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SDATE
+											, NULL		AS ORG_CHART_NM
+											, NULL		AS MEMO
+											, NULL		AS CHANGE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sdate} )		AS SDATE
+											, TRIM( #{rm.orgChartNm})	AS ORG_CHART_NM
+											, TRIM( #{rm.memo} )		AS MEMO
+											, TRIM( #{rm.changeYn})	AS CHANGE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+									      AND A.SDATE IS NOT NULL
+									      AND A.ORG_CHART_NM IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SDATE = S.SDATE AND T.ORG_CHART_NM = S.ORG_CHART_NM )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CHANGE_YN	= S.CHANGE_YN
+									, T.MEMO		= S.MEMO
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SDATE
+							, T.ORG_CHART_NM
+							, T.CHANGE_YN
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SDATE
+							, S.ORG_CHART_NM
+							, S.CHANGE_YN
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 조직개편관리 저장 -->
+		<update parameterType="map" id="saveOrgChangeSchemeMgr2">
+
+					MERGE INTO TORG702 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SDATE
+									, A.ORD_GUBUN
+									, A.ORD_DETAIL_CD
+									, A.ORD_TYPE_CD
+									, A.ORD_REASON_CD
+									, A.ORD_YMD
+									, A.APPLY_SEQ
+									, A.USE_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SDATE
+											, NULL		AS ORD_GUBUN    
+											, NULL		AS ORD_DETAIL_CD
+											, NULL		AS ORD_TYPE_CD  
+											, NULL		AS ORD_REASON_CD
+											, NULL      AS ORD_YMD
+											, NULL		AS APPLY_SEQ    
+											, NULL		AS USE_YN       
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.sdate} )			AS SDATE
+											, TRIM( #{rm.ordGubun})		AS ORD_GUBUN
+											, TRIM( #{rm.ordDetailCd})		AS ORD_DETAIL_CD
+											,(
+												SELECT ORD_TYPE_CD FROM TSYS013
+                  								 WHERE ENTER_CD = #{ssnEnterCd}
+                  								   AND ORD_DETAIL_CD = TRIM(#{rm.ordDetailCd})
+											 ) AS ORD_TYPE_CD
+											, TRIM( #{rm.ordReasonCd})		AS ORD_REASON_CD
+											, TRIM( #{rm.ordYmd})			AS ORD_YMD
+											, TRIM( #{rm.applySeq})		AS APPLY_SEQ
+											, TRIM( #{rm.useYn})			AS USE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+									      AND A.SDATE IS NOT NULL
+									      AND A.ORD_GUBUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SDATE = S.SDATE AND T.ORD_GUBUN = S.ORD_GUBUN)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ORD_DETAIL_CD		= S.ORD_DETAIL_CD
+									, T.ORD_TYPE_CD			= S.ORD_TYPE_CD
+									, T.ORD_REASON_CD		= S.ORD_REASON_CD
+									, T.ORD_YMD				= S.ORD_YMD
+									, T.APPLY_SEQ			= S.APPLY_SEQ
+									, T.USE_YN				= S.USE_YN
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SDATE
+							, T.ORD_GUBUN
+							, T.ORD_DETAIL_CD
+							, T.ORD_TYPE_CD
+							, T.ORD_REASON_CD
+							, T.ORD_YMD
+							, T.APPLY_SEQ
+							, T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SDATE
+							, S.ORD_GUBUN    
+							, S.ORD_DETAIL_CD
+							, S.ORD_TYPE_CD  
+							, S.ORD_REASON_CD
+							, S.ORD_YMD      
+							, S.APPLY_SEQ    
+							, S.USE_YN       
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 조직개편관리 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeSchemeMgr">
+
+					DELETE FROM TORG701
+					WHERE  ENTER_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )
+	</if>
+</foreach>
+							)
+		</delete>
+
+		<!-- 조직개편관리 가발령관리 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeSchemeMgr2">
+
+					DELETE FROM TORG702
+					WHERE  ENTER_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )
+	</if>
+</foreach>
+							)
+		</delete>
+		
+		<!-- 조직개편관리 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeSchemeAllVersion">
+
+					DELETE FROM TORG703
+					WHERE  ENTER_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )
+	</if>
+</foreach>
+							)
+		</delete>
+
+		<!-- 조직개편관리 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeSchemeAllOrg">
+
+					DELETE FROM TORG705
+					WHERE  ENTER_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )
+	</if>
+</foreach>
+							)
+		</delete>
+
+		<!-- 조직개편관리 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeSchemeMgrAllMoveEmp">
+
+					DELETE FROM TORG707
+					WHERE  ENTER_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )
+	</if>
+</foreach>
+							)
+		</delete>
+
+		<!-- 조직 버전 콤보 리스트 -->
+		<select parameterType="map" resultType="cMap" id="getOrgVerComboList">
+
+				<![CDATA[
+					SELECT VERSION_NM AS CODE
+					     , VERSION_NM AS CODE_NM
+					     , SDATE
+					     , COMP_YN
+					  FROM TORG703
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND SDATE = #{sdate}
+					ORDER BY INSERT_DATE DESC
+				]]>
+
+		</select>
+
+		<!-- 조직 버전에 따른 조직도 데이터 -->
+		<select parameterType="map" resultType="cMap" id="getOrgView">
+
+				<![CDATA[
+					SELECT K.*
+					     , NVL( K.ORG_NM_AFTER , K.ORG_NM_PRE ) AS ORG_NM
+					     , NVL( K.PRIOR_ORG_CD_AFTER , K.PRIOR_ORG_CD_PRE ) AS PRIOR_ORG_CD
+					     , DECODE(K.CHIEF_SABUN_AFTER, 'IS_VACANCY', NULL, NVL( K.CHIEF_NM_AFTER , K.CHIEF_NM_PRE )) AS CHIEF_NM
+					     , DECODE(K.CHIEF_SABUN_AFTER, 'IS_VACANCY', NULL, NVL( K.CHIEF_POSITION_NM_AFTER , K.CHIEF_POSITION_NM_PRE )) AS CHIEF_POSITION_NM
+					     , NVL(K.SEQ, ROWNUM) AS SEQ
+					  FROM (
+					           SELECT CASE WHEN NVL( VERT_YN , 'N' ) = 'Y' AND NVL( LEADER_YN , 'N' ) = 'Y' THEN 'VertLeader'
+					                       WHEN NVL( VERT_YN , 'N' ) = 'Y' AND NVL( LEADER_YN , 'N' ) = 'N' THEN 'VertOrg'
+					                       WHEN NVL( VERT_YN , 'N' ) = 'N' AND NVL( LEADER_YN , 'N' ) = 'Y' THEN 'Org'
+					                       ELSE 'Org2'
+					                  END || CASE WHEN CHANGE_GUBUN IS NULL THEN ''
+					                              WHEN CHANGE_GUBUN = '4' THEN '_Close'
+					                              ELSE '_Move'
+					                  END AS NODEDESIGN
+					                , NUM
+					                , CHANGE_GUBUN
+					                , ORG_CD
+					                , ORG_NM_PRE
+					                , ORG_NM_AFTER
+					                , ORG_ENG_NM_PRE
+					                , ORG_ENG_NM_AFTER
+					                , PRIOR_ORG_CD_PRE
+					                , PRIOR_ORG_NM_PRE
+					                , CHIEF_SABUN_PRE
+					                , F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_PRE, NULL) AS CHIEF_NM_PRE
+					                , F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_PRE, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS CHIEF_POSITION_NM_PRE
+					                , PRIOR_ORG_CD_AFTER
+					                , PRIOR_ORG_NM_AFTER
+					                , CHIEF_SABUN_AFTER
+					                , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_AFTER, NULL)) AS CHIEF_NM_AFTER
+					                , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_AFTER, TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS CHIEF_POSITION_NM_AFTER
+					                , SEQ
+					                , OBJECT_TYPE
+					                , INOUT_TYPE
+					                , ORG_TYPE
+					                , LOCATION_CD
+					                , NVL( DIRECT_YN , 'N' ) AS DIRECT_YN
+					                , NVL ( ORG_LEVEL , LEVEL ) AS ORG_LEVEL
+					                , VERT_YN
+					                , LEADER_YN
+					                , MEMO
+					                , SDATE
+					                , VERSION_NM
+					                , VRTCL_ORDER_YN
+					             FROM TORG705
+					            START WITH NVL( PRIOR_ORG_CD_AFTER , PRIOR_ORG_CD_PRE ) = '0'
+					              AND ENTER_CD = #{ssnEnterCd}
+					              AND SDATE = #{sdate}
+					              AND VERSION_NM = #{versionNm}
+					          CONNECT BY PRIOR ORG_CD = NVL( PRIOR_ORG_CD_AFTER , PRIOR_ORG_CD_PRE )
+					              AND ENTER_CD = #{ssnEnterCd}
+					              AND SDATE = #{sdate}
+					              AND VERSION_NM = #{versionNm}
+					            ORDER SIBLINGS BY SEQ
+					      ) K
+				]]>
+
+		</select>
+
+		<!-- 조직개편 버전관리 리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgChangeVerMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD			-- 회사구분
+						, A.SDATE				-- 조직개편일자
+						, A.VERSION_NM			-- 버전명
+						, A.INSERT_SABUN		-- 입력자
+						, A.INSERT_DATE			-- 입력일자
+						, A.MEMO				-- 메모
+					  FROM TORG703 A
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.SDATE = TRIM(#{sdate})
+					 ORDER BY A.INSERT_DATE DESC
+				]]>
+
+		</select>
+
+		<!-- 조직개편 버전관리 리스트 저장 -->
+		<update parameterType="map" id="saveOrgChangeVerMgrList">
+
+				MERGE INTO TORG703 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SDATE
+									, A.VERSION_NM
+									, A.INSERT_SABUN
+									, A.INSERT_DATE
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SDATE
+											, NULL		AS VERSION_NM
+											, NULL		AS INSERT_SABUN
+											, NULL		AS INSERT_DATE
+											, NULL		AS MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sdate} )		AS SDATE
+											, TRIM( #{rm.versionNm})	AS VERSION_NM
+											, TRIM( #{rm.insertSabun})	AS INSERT_SABUN
+											, TRIM( #{rm.insertDate})	AS INSERT_DATE
+											, TRIM( #{rm.memo} )		AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+									      AND A.SDATE IS NOT NULL
+									      AND A.VERSION_NM IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SDATE = S.SDATE AND T.VERSION_NM = S.VERSION_NM )
+					WHEN MATCHED THEN
+						UPDATE SET	T.INSERT_SABUN	= S.INSERT_SABUN
+									, T.INSERT_DATE = S.INSERT_DATE
+									, T.MEMO		= S.MEMO
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SDATE
+							, T.VERSION_NM
+							, T.INSERT_SABUN
+							, T.INSERT_DATE
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SDATE
+							, S.VERSION_NM
+							, S.INSERT_SABUN
+							, S.INSERT_DATE
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 조직버전관리 버전 리스트 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeVerMgrList">
+
+					DELETE FROM TORG703
+					WHERE  ENTER_CD||'_'||SDATE||'_'||VERSION_NM IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sdate != null and !rm.sdate.equals("")
+											and rm.versionNm != null and !rm.versionNm.equals("")'>
+
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )||'_'||TRIM( #{rm.versionNm})
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!-- 조직버전관리 버전별 조직도 리스트 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeVerMgrOrgList">
+
+					DELETE FROM TORG705
+					WHERE  ENTER_CD||'_'||SDATE||'_'||VERSION_NM IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sdate != null and !rm.sdate.equals("")
+											and rm.versionNm != null and !rm.versionNm.equals("")'>
+
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )||'_'||TRIM( #{rm.versionNm})
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!-- 조직버전관리 버전별 조직이동 대상자 리스트 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeVerMgrMoveEmpList">
+
+					DELETE FROM TORG707
+					WHERE  ENTER_CD||'_'||SDATE||'_'||VERSION_NM IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sdate != null and !rm.sdate.equals("")
+											and rm.versionNm != null and !rm.versionNm.equals("")'>
+
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sdate} )||'_'||TRIM( #{rm.versionNm})
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!-- 조직도 복사 -->
+		<update parameterType="map" id="callPrcCopyOrgView" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_ORG_CHANGE_COPY_CHART(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sdateSrc,mode=IN,jdbcType=VARCHAR},
+				#{sdateTgt,mode=IN,jdbcType=VARCHAR},
+				#{versionNmTgt,mode=IN,jdbcType=VARCHAR},
+				#{chkid,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<!-- 조직 버전 복사 -->
+		<update parameterType="map" id="callPrcCopyOrgVersion" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_ORG_CHANGE_COPY_VERSION(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sdate,mode=IN,jdbcType=VARCHAR},
+				#{versionNmSrc,mode=IN,jdbcType=VARCHAR},
+				#{versionNmTgt,mode=IN,jdbcType=VARCHAR},
+				#{chkid,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<!-- 조직도 콤보 리스트 가져오기 -->
+		<select parameterType="map" resultType="cMap" id="getOrgComboList">
+
+				<![CDATA[
+					SELECT	A.SDATE AS CODE,
+							A.ORG_CHART_NM||'['||TO_CHAR(TO_DATE(A.SDATE,'YYYYMMDD'),'YYYY-MM-DD')||']' AS CODE_NM
+					FROM     TORG103 A
+					WHERE    A.ENTER_CD = TRIM(#{ssnEnterCd})
+					ORDER BY A.SDATE DESC
+				]]>
+
+		</select>
+
+		<!-- 확정된 버전 있는지 확인 -->
+		<select parameterType="map" resultType="cMap" id="chkConfYn">
+
+				<![CDATA[
+					SELECT	COUNT(0) AS CNT
+					FROM	TORG703 A
+					WHERE	A.ENTER_CD = TRIM(#{ssnEnterCd})
+					  AND	A.SDATE = TRIM(#{sdate})
+					  AND	A.COMP_YN = 'Y'
+				]]>
+
+		</select>
+
+		<!-- 가발령적용 사용유무 확인 -->
+		<select parameterType="map" resultType="cMap" id="chkApplyYn">
+
+				<![CDATA[
+					SELECT COUNT(0) AS CNT
+					  FROM TORG702 A
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.SDATE = TRIM(#{sdate})
+					   AND A.USE_YN = 'Y'
+				]]>
+
+		</select>
+		
+		<!-- 조직도 확정 -->
+		<update parameterType="map" id="compOrg">
+
+				<![CDATA[
+					UPDATE	TORG703 A
+					SET		A.COMP_YN = 'Y'
+					WHERE	A.ENTER_CD = TRIM(#{ssnEnterCd})
+					  AND	A.SDATE = #{sdate}
+					  AND	A.VERSION_NM = #{versionNm}
+				]]>
+
+		</update>
+
+		<!-- 조직도 확정 취소 -->
+		<update parameterType="map" id="cancelCompOrg">
+
+				<![CDATA[
+					UPDATE	TORG703 A
+					SET		A.COMP_YN = 'N'
+					WHERE	A.ENTER_CD = TRIM(#{ssnEnterCd})
+					  AND	A.COMP_YN = 'Y'
+				]]>
+
+		</update>
+
+		<!-- 조직도 마감 -->
+		<update parameterType="map" id="callPrcChgConpVer" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_ORG_CHANGE_COMP_VERSION(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sdate,mode=IN,jdbcType=VARCHAR},
+				#{gubun,mode=IN,jdbcType=VARCHAR},
+				#{chkid,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<!-- 사용중인 조직코드가 존재하는지 확인 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationOrgExistOrgCd">
+
+				<![CDATA[
+					SELECT	COUNT(0) AS CNT
+					FROM	TORG101 A
+					WHERE	A.ENTER_CD = TRIM(#{ssnEnterCd})
+					  AND	A.ORG_CD   = TRIM(#{orgCd})
+				]]>
+
+		</select>
+		
+		<!-- 조직개편 시뮬레이션  저장 -->
+		<update parameterType="map" id="saveOrgChangeView">
+
+					MERGE INTO TORG705 T
+					USING (
+					          SELECT A.ENTER_CD
+					               , A.SDATE
+					               , A.VERSION_NM
+					               , A.NUM
+					               , A.CHANGE_GUBUN
+					               , A.ORG_CD
+					               , A.ORG_NM_PRE
+					               , A.ORG_NM_AFTER
+					               , A.ORG_ENG_NM_PRE
+					               , A.ORG_ENG_NM_AFTER
+					               , A.PRIOR_ORG_CD_PRE
+					               , A.PRIOR_ORG_NM_PRE
+					               , A.CHIEF_SABUN_PRE
+					               , A.PRIOR_ORG_CD_AFTER
+					               , A.PRIOR_ORG_NM_AFTER
+					               , A.CHIEF_SABUN_AFTER
+					               , A.OBJECT_TYPE
+					               , A.INOUT_TYPE
+					               , A.ORG_TYPE
+					               , A.LOCATION_CD
+					               , A.DIRECT_YN
+					               , A.SEQ
+					               , A.ORG_LEVEL
+					               , A.VERT_YN
+					               , A.LEADER_YN
+					               , A.MEMO
+					               , A.VRTCL_ORDER_YN
+					            FROM (
+					                     SELECT NULL AS ENTER_CD
+					                          , NULL AS SDATE
+					                          , NULL AS VERSION_NM
+					                          , NULL AS NUM
+					                          , NULL AS CHANGE_GUBUN
+					                          , NULL AS ORG_CD
+					                          , NULL AS ORG_NM_PRE
+					                          , NULL AS ORG_NM_AFTER
+					                          , NULL AS ORG_ENG_NM_PRE
+					                          , NULL AS ORG_ENG_NM_AFTER
+					                          , NULL AS PRIOR_ORG_CD_PRE
+					                          , NULL AS PRIOR_ORG_NM_PRE
+					                          , NULL AS CHIEF_SABUN_PRE
+					                          , NULL AS PRIOR_ORG_CD_AFTER
+					                          , NULL AS PRIOR_ORG_NM_AFTER
+					                          , NULL AS CHIEF_SABUN_AFTER
+					                          , NULL AS OBJECT_TYPE
+					                          , NULL AS INOUT_TYPE
+					                          , NULL AS ORG_TYPE
+					                          , NULL AS LOCATION_CD
+					                          , NULL AS DIRECT_YN
+					                          , NULL AS SEQ
+					                          , NULL AS ORG_LEVEL
+					                          , NULL AS VERT_YN
+					                          , NULL AS LEADER_YN
+					                          , NULL AS MEMO
+					                          , NULL AS VRTCL_ORDER_YN
+					                       FROM DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="mergeRows" >
+					                      UNION ALL
+					                     SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					                          , TRIM(#{rm.sdate}) AS SDATE
+					                          , TRIM(#{rm.versionNm}) AS VERSION_NM
+					
+						<choose><when test='rm.num != null and !rm.num.equals("")'>
+					                          --증가가 되는 키인경우 키가 공백이 아니면 들어온 값을 삽입
+					                          , TRIM(#{rm.num}) AS NUM
+						</when><otherwise>
+					                          --증가가 되는 키인경우 키가 공백이면 증가된 값을 삽입
+					                         , TO_CHAR( NVL((
+					                               SELECT MAX(NUM)
+					                                 FROM TORG705
+					                                WHERE ENTER_CD = #{ssnEnterCd}
+					                                  AND SDATE = #{rm.sdate}
+					                                  AND VERSION_NM = #{rm.versionNm}
+					                           ), 0) + ${icnt} ) AS NUM
+					                          --icnt 증가
+							<bind name="icnt" value="icnt + 1" />
+						</otherwise>
+						</choose>
+					
+					                         , TRIM(#{rm.changeGubun}) AS CHANGE_GUBUN
+					                         , TRIM(#{rm.orgCd}) AS ORG_CD
+					                         , TRIM(#{rm.orgNmPre}) AS ORG_NM_PRE
+					                         , TRIM(#{rm.orgNmAfter}) AS ORG_NM_AFTER
+					                         , TRIM(#{rm.orgEngNmPre}) AS ORG_ENG_NM_PRE
+					                         , TRIM(#{rm.orgEngNmAfter}) AS ORG_ENG_NM_AFTER
+					                         , TRIM(#{rm.priorOrgCdPre}) AS PRIOR_ORG_CD_PRE
+					                         , TRIM(#{rm.priorOrgNmPre}) AS PRIOR_ORG_NM_PRE
+					                         , TRIM(#{rm.chiefSabunPre}) AS CHIEF_SABUN_PRE
+					                         , TRIM(#{rm.priorOrgCdAfter}) AS PRIOR_ORG_CD_AFTER
+					                         , TRIM(#{rm.priorOrgNmAfter}) AS PRIOR_ORG_NM_AFTER
+					                         , TRIM(#{rm.chiefSabunAfter}) AS CHIEF_SABUN_AFTER
+					                         , TRIM(#{rm.objectType}) AS OBJECT_TYPE
+					                         , TRIM(#{rm.inoutType}) AS INOUT_TYPE
+					                         , TRIM(#{rm.orgType}) AS ORG_TYPE
+					                         , TRIM(#{rm.locationCd}) AS LOCATION_CD
+					                         , TRIM(#{rm.directYn}) AS DIRECT_YN
+					                         , TRIM(#{rm.seq}) AS SEQ
+					                         , TRIM(#{rm.orgLevel}) AS ORG_LEVEL
+					                         , TRIM(#{rm.vertYn}) AS VERT_YN
+					                         , TRIM(#{rm.leaderYn}) AS LEADER_YN
+					                         , TRIM(#{rm.memo}) AS MEMO
+					                         , TRIM(#{rm.vrtclOrderYn}) AS VRTCL_ORDER_YN
+					                      FROM DUAL
+					</foreach>
+					                 ) A
+					           WHERE 1 = 1
+					             AND A.ENTER_CD IS NOT NULL
+					             AND A.SDATE IS NOT NULL
+					             AND A.VERSION_NM IS NOT NULL
+					             AND A.NUM IS NOT NULL
+					      ) S
+					   ON (
+					                 T.ENTER_CD = S.ENTER_CD
+					             AND T.SDATE = S.SDATE
+					             AND T.VERSION_NM = S.VERSION_NM
+					             AND T.NUM = S.NUM
+					      )
+					WHEN MATCHED THEN
+					     UPDATE SET
+					            T.CHANGE_GUBUN = S.CHANGE_GUBUN
+					          , T.ORG_CD = S.ORG_CD
+					          , T.ORG_NM_PRE = S.ORG_NM_PRE
+					          , T.ORG_NM_AFTER = S.ORG_NM_AFTER
+					          , T.ORG_ENG_NM_PRE = S.ORG_ENG_NM_PRE
+					          , T.ORG_ENG_NM_AFTER = S.ORG_ENG_NM_AFTER
+					          , T.PRIOR_ORG_CD_PRE = S.PRIOR_ORG_CD_PRE
+					          , T.PRIOR_ORG_NM_PRE = S.PRIOR_ORG_NM_PRE
+					          , T.CHIEF_SABUN_PRE  = S.CHIEF_SABUN_PRE
+					          , T.PRIOR_ORG_CD_AFTER = S.PRIOR_ORG_CD_AFTER
+					          , T.PRIOR_ORG_NM_AFTER = S.PRIOR_ORG_NM_AFTER
+					          , T.CHIEF_SABUN_AFTER  = S.CHIEF_SABUN_AFTER
+					          , T.OBJECT_TYPE = S.OBJECT_TYPE
+					          , T.INOUT_TYPE = S.INOUT_TYPE
+					          , T.ORG_TYPE = S.ORG_TYPE
+					          , T.LOCATION_CD = S.LOCATION_CD
+					          , T.DIRECT_YN = S.DIRECT_YN
+					          , T.SEQ = S.SEQ
+					          , T.ORG_LEVEL = S.ORG_LEVEL
+					          , T.VERT_YN = S.VERT_YN
+					          , T.LEADER_YN = S.LEADER_YN
+					          , T.MEMO = S.MEMO
+					          , T.VRTCL_ORDER_YN = S.VRTCL_ORDER_YN
+					          , T.CHKDATE = SYSDATE
+					          , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					            T.ENTER_CD
+					          , T.SDATE
+					          , T.VERSION_NM
+					          , T.NUM
+					          , T.CHANGE_GUBUN
+					          , T.ORG_CD
+					          , T.ORG_NM_PRE
+					          , T.ORG_NM_AFTER
+					          , T.ORG_ENG_NM_PRE
+					          , T.ORG_ENG_NM_AFTER
+					          , T.PRIOR_ORG_CD_PRE
+					          , T.PRIOR_ORG_NM_PRE
+					          , T.CHIEF_SABUN_PRE
+					          , T.PRIOR_ORG_CD_AFTER
+					          , T.PRIOR_ORG_NM_AFTER
+					          , T.CHIEF_SABUN_AFTER
+					          , T.OBJECT_TYPE
+					          , T.INOUT_TYPE
+					          , T.ORG_TYPE
+					          , T.LOCATION_CD
+					          , T.DIRECT_YN
+					          , T.SEQ
+					          , T.ORG_LEVEL
+					          , T.VERT_YN
+					          , T.LEADER_YN
+					          , T.MEMO
+					          , T.VRTCL_ORDER_YN
+					          , T.CHKDATE
+					          , T.CHKID
+					     ) VALUES (
+					            S.ENTER_CD
+					          , S.SDATE
+					          , S.VERSION_NM
+					          , S.NUM
+					          , S.CHANGE_GUBUN
+					          , S.ORG_CD
+					          , S.ORG_NM_PRE
+					          , S.ORG_NM_AFTER
+					          , S.ORG_ENG_NM_PRE
+					          , S.ORG_ENG_NM_AFTER
+					          , S.PRIOR_ORG_CD_PRE
+					          , S.PRIOR_ORG_NM_PRE
+					          , S.CHIEF_SABUN_PRE
+					          , S.PRIOR_ORG_CD_AFTER
+					          , S.PRIOR_ORG_NM_AFTER
+					          , S.CHIEF_SABUN_AFTER
+					          , S.OBJECT_TYPE
+					          , S.INOUT_TYPE
+					          , S.ORG_TYPE
+					          , S.LOCATION_CD
+					          , S.DIRECT_YN
+					          , S.SEQ
+					          , S.ORG_LEVEL
+					          , S.VERT_YN
+					          , S.LEADER_YN
+					          , S.MEMO
+					          , S.VRTCL_ORDER_YN
+					          , SYSDATE
+					          , #{ssnSabun}
+					     )
+		</update>
+
+		<!-- 조직개편 시뮬레이션 조직 정보 삭제 -->
+		<delete parameterType="map" id="deleteOrgChangeView">
+
+					DELETE FROM TORG705 
+					WHERE (ENTER_CD, SDATE, VERSION_NM, NUM) IN (
+					            (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test=' ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sdate != null and !rm.sdate.equals("") and rm.versionNm != null and !rm.versionNm.equals("") and rm.num != null and !rm.num.equals("") '>
+					          , (TRIM(#{ssnEnterCd}), TRIM(#{rm.sdate}), TRIM(#{rm.versionNm}), TRIM(#{rm.num}))
+	</if>
+</foreach>
+					      )
+		</delete>
+
+		<!-- 조직개편 시뮬레이션 삭제 조직의 조직이동대상자 정보 삭제 [TORG707] -->
+		<delete parameterType="map" id="deleteSchemeSimulationEmpByDeleteOrg">
+
+					DELETE FROM TORG707
+					 WHERE (ENTER_CD, SDATE, VERSION_NM, ORG_CD_AFTER) IN (
+					            (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test=' ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sdate != null and !rm.sdate.equals("") and rm.versionNm != null and !rm.versionNm.equals("") and rm.orgCd != null and !rm.orgCd.equals("") '>
+					          , (TRIM(#{ssnEnterCd}), TRIM(#{rm.sdate}), TRIM(#{rm.versionNm}), TRIM(#{rm.orgCd}))
+	</if>
+</foreach>
+					      )
+		</delete>
+
+<!-- [조직개편 시뮬레이션 > 인사개편안] 조직 목록 조회(Tree) -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationEmpOrgList">
+
+				<![CDATA[
+					 SELECT LEVEL AS "_level"
+					      , A.PRIOR_ORG_CD
+					      , A.ORG_CD
+					      , A.ORG_NM
+					      , A.SDATE
+					      , A.EMP_COUNT
+					      , A.ADD_COUNT
+					      , DECODE(A.CHANGE_GUBUN, '4', A.EMP_COUNT, A.MOVED_TARGET_COUNT) AS MOVED_TARGET_COUNT
+					      , A.CHANGE_GUBUN
+					      , DECODE(
+					              A.CHANGE_GUBUN
+					            , '1', '신규'
+					            , '2', '조직명변경'
+					            , '3', '상위조직변경'
+					            , '4', '폐지'
+					            , NULL
+					        ) AS CHANGE_GUBUN_NM
+					   FROM (
+					            SELECT R.ENTER_CD
+					                 , R.SDATE
+					                 , R.VERSION_NM
+					                 , R.ORG_CD
+					                 , NVL(R.ORG_NM_AFTER, R.ORG_NM_PRE) AS ORG_NM
+					                 , R.ORG_LEVEL
+					                 , NVL(R.PRIOR_ORG_CD_AFTER, R.PRIOR_ORG_CD_PRE) AS PRIOR_ORG_CD
+					                 , R.SEQ
+					                 , (
+					                       SELECT COUNT(E.SABUN)
+					                         FROM THRM151 E
+					                        WHERE E.ENTER_CD = R.ENTER_CD
+					                          AND E.ORG_CD   = R.ORG_CD
+					                          AND E.SDATE    = (
+					                                  SELECT MAX(SDATE)
+					                                    FROM THRM151
+					                                   WHERE ENTER_CD = E.ENTER_CD
+					                                     AND SABUN    = E.SABUN
+					                                     AND R.SDATE BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                              )
+					                          AND E.STATUS_CD NOT LIKE 'RA%'
+					                 ) AS EMP_COUNT
+					                 , (
+					                       SELECT COUNT(E.MOVE_SABUN)
+					                         FROM TORG707 E
+					                        WHERE E.ENTER_CD = R.ENTER_CD
+					                          AND E.SDATE = R.SDATE
+					                          AND E.VERSION_NM = R.VERSION_NM
+					                          AND E.ORG_CD_AFTER = R.ORG_CD
+					                   ) AS ADD_COUNT
+					                 , (
+					                       SELECT COUNT(E.MOVE_SABUN)
+					                         FROM TORG707 E
+					                        WHERE E.ENTER_CD = R.ENTER_CD
+					                          AND E.SDATE = R.SDATE
+					                          AND E.VERSION_NM = R.VERSION_NM
+					                          AND F_COM_GET_ORG_CD(E.ENTER_CD, E.MOVE_SABUN, E.SDATE) = R.ORG_CD
+					                   ) AS MOVED_TARGET_COUNT
+					                 , CASE
+					                        WHEN R.CHANGE_GUBUN = '4' THEN '4'
+					                        WHEN R.PRIOR_ORG_CD_PRE IS NOT NULL AND R.PRIOR_ORG_CD_AFTER IS NOT NULL AND R.PRIOR_ORG_CD_PRE <> R.PRIOR_ORG_CD_AFTER THEN '3'
+					                        WHEN R.ORG_NM_PRE IS NOT NULL AND R.ORG_NM_AFTER IS NOT NULL AND R.ORG_NM_PRE <> R.ORG_NM_AFTER THEN '2'
+					                        WHEN R.ORG_NM_PRE IS NULL AND R.ORG_NM_AFTER IS NOT NULL THEN '1'
+					                        ELSE NULL
+					                   END AS CHANGE_GUBUN
+					              FROM TORG705 R
+					             WHERE R.ENTER_CD = TRIM(#{ssnEnterCd})
+					               AND R.SDATE = TRIM(#{sdate})
+					               AND R.VERSION_NM = TRIM(#{versionNm})
+					        ) A
+					  START WITH A.PRIOR_ORG_CD = '0'
+					CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					       AND PRIOR A.SDATE = A.SDATE
+					       AND PRIOR A.VERSION_NM = A.VERSION_NM
+					       AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+				]]>
+
+
+		</select>
+
+<!-- [조직개편 시뮬레이션 > 인사개편안] 소속 조직원 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationEmpMemberList">
+
+				<![CDATA[
+					SELECT A.*
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM
+					     , (
+					           -- 조직명이 변경이 변경된 경우는 TORG705 테이블의 변경후 부서명을 출력하며
+					           -- 그외 조직 이동의 경우 TORG705 테이블의 변경후 부서명을 출력하며, 존재하지 않는 경우 변경전 부서명을 출력함.
+					           SELECT DECODE(A.GUBUN, '0', ORG_NM_AFTER, DECODE(ORG_NM_AFTER, NULL, ORG_NM_PRE, ORG_NM_AFTER))
+					             FROM TORG705
+					            WHERE ENTER_CD   = A.ENTER_CD
+					              AND SDATE      = A.SDATE
+					              AND VERSION_NM = A.VERSION_NM
+					              AND ORG_CD     = A.ORG_CD_AFTER
+					       ) AS ORG_NM_AFTER
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD) AS JIKWEE_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD) AS JIKCHAK_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD) AS JIKGUB_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10050',A.WORK_TYPE) AS WORK_TYPE_NM
+					     , B.NAME
+					     , D.SEQ AS JIKWEE_SEQ
+					     , E.SEQ AS JIKCHAK_SEQ
+					     , F.SEQ AS JIKGUB_SEQ
+					  FROM (
+					          SELECT '0' AS GUBUN
+					               , SUB1.ENTER_CD
+					               , TRIM(#{sdate}) AS SDATE
+					               , TRIM(#{versionNm}) AS VERSION_NM
+					               , SUB1.SABUN
+					               , SUB1.ORG_CD
+					               , SUB1.ORG_CD AS ORG_CD_AFTER
+					               , SUB1.JIKWEE_CD
+					               , SUB1.JIKCHAK_CD
+					               , SUB1.JIKGUB_CD
+					               , SUB1.WORK_TYPE
+					            FROM THRM151 SUB1
+					           WHERE SUB1.ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SUB1.SDATE    = (
+					                     SELECT MAX(SDATE)
+					                       FROM THRM151
+					                      WHERE ENTER_CD = SUB1.ENTER_CD
+					                        AND SABUN    = SUB1.SABUN
+					                        AND TRIM(#{sdate}) BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                 )
+					             AND SUB1.STATUS_CD NOT LIKE 'RA%'
+					             AND SUB1.ORG_CD = (
+					                      SELECT ORG_CD
+					                        FROM TORG705
+					                       WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					                         AND SDATE = TRIM(#{sdate})
+					                         AND VERSION_NM = TRIM(#{versionNm})
+					                         AND ORG_CD = TRIM(#{orgCd})
+					                         AND NVL(CHANGE_GUBUN, 'NO_CHANGE') <> '4'  /* 폐쇄 조직 제외 */
+					                 )
+					             AND SUB1.SABUN NOT IN (
+					                      SELECT MOVE_SABUN
+					                        FROM TORG707
+					                       WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					                         AND SDATE = TRIM(#{sdate})
+					                         AND VERSION_NM = TRIM(#{versionNm})
+					                         AND NVL(ORG_CD_AFTER, 'NO_ORG') <> TRIM(#{orgCd})
+					                 )
+					          ------------------------------------------------------------------------------------
+					           UNION ALL
+					          ------------------------------------------------------------------------------------
+					          SELECT '1' AS GUBUN
+					               , SUB2.ENTER_CD
+					               , M.SDATE
+					               , M.VERSION_NM
+					               , SUB2.SABUN
+					               , SUB2.ORG_CD
+					               , M.ORG_CD_AFTER
+					               , SUB2.JIKWEE_CD
+					               , SUB2.JIKCHAK_CD
+					               , SUB2.JIKGUB_CD
+					               , SUB2.WORK_TYPE
+					            FROM THRM151 SUB2
+					               , TORG707 M
+					           WHERE SUB2.ENTER_CD = M.ENTER_CD
+					             AND SUB2.SABUN = M.MOVE_SABUN
+					             AND SUB2.ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SUB2.SDATE    = (
+					                     SELECT MAX(SDATE)
+					                       FROM THRM151
+					                      WHERE ENTER_CD = SUB2.ENTER_CD
+					                        AND SABUN    = SUB2.SABUN
+					                        AND TRIM(#{sdate}) BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                 )
+					             AND SUB2.STATUS_CD NOT LIKE 'RA%'
+					             AND M.SDATE = TRIM(#{sdate})
+					             AND M.VERSION_NM = TRIM(#{versionNm})
+					             AND M.ORG_CD_AFTER = TRIM(#{orgCd})
+					       ) A
+					     , THRM100 B
+					     , TSYS005 D
+					     , TSYS005 E
+					     , TSYS005 F
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN = B.SABUN
+					   AND A.ENTER_CD = D.ENTER_CD(+)
+					   AND A.JIKWEE_CD = D.CODE(+)
+					   AND D.GRCODE_CD(+)='H20030'
+					   AND A.ENTER_CD = E.ENTER_CD(+)
+					   AND A.JIKCHAK_CD = E.CODE(+)
+					   AND E.GRCODE_CD(+)='H20020'
+					   AND A.ENTER_CD = F.ENTER_CD(+)
+					   AND A.JIKGUB_CD = F.CODE(+)
+					   AND F.GRCODE_CD(+)='H20010' ]]>
+<if test='searchKeyword1 != null and !searchKeyword1.equals("")'>
+					   AND (
+					              A.SABUN LIKE #{searchKeyword1} || '%'
+					           OR B.NAME LIKE '%' || #{searchKeyword1} || '%'
+					       )
+</if>
+					 ORDER BY A.GUBUN, D.SEQ, E.SEQ, F.SEQ
+		</select>
+
+<!-- [조직개편 시뮬레이션 > 인사개편안] 무소속 조직원 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationEmpIndependentMemberList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.ORG_CD
+					     , A.JIKWEE_CD
+					     , A.JIKCHAK_CD
+					     , A.JIKGUB_CD
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, M.SDATE) AS ORG_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD) AS JIKWEE_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD) AS JIKCHAK_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD) AS JIKGUB_NM
+					     , B.NAME
+					  FROM (
+					            /* 이동 대상자 조회 */
+					            SELECT E1.ENTER_CD
+					                 , E1.SDATE
+					                 , E1.VERSION_NM
+					                 , E1.MOVE_SABUN
+					              FROM TORG707 E1
+					             WHERE E1.ENTER_CD   = TRIM(#{ssnEnterCd})
+					               AND E1.SDATE      = TRIM(#{sdate})
+					               AND E1.VERSION_NM = TRIM(#{versionNm})
+					               AND E1.ORG_CD_AFTER IS NULL
+					               
+					             UNION ALL
+					            
+					            /* TORG707 테이블에 등록되지 않은 폐쇄처리 조직의 조직원 조회 */
+					            SELECT H2.ENTER_CD
+					                 , E2.SDATE
+					                 , E2.VERSION_NM
+					                 , H2.SABUN  AS MOVE_SABUN
+					              FROM TORG705 E2
+					                 , THRM151 H2
+					             WHERE E2.ENTER_CD     = H2.ENTER_CD(+)
+					               AND E2.ORG_CD       = H2.ORG_CD(+)
+					               AND E2.ENTER_CD     = TRIM(#{ssnEnterCd})
+					               AND E2.SDATE        = TRIM(#{sdate})
+					               AND E2.VERSION_NM   = TRIM(#{versionNm})
+					               AND E2.CHANGE_GUBUN = '4'
+					               AND H2.SDATE    = (
+					                       SELECT MAX(SDATE)
+					                         FROM THRM151
+					                        WHERE ENTER_CD = H2.ENTER_CD
+					                          AND SABUN    = H2.SABUN
+					                          AND E2.SDATE BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                   )
+					               AND H2.STATUS_CD NOT LIKE 'RA%'
+					               AND H2.SABUN NOT IN (
+					                       SELECT MOVE_SABUN
+					                         FROM TORG707
+					                        WHERE ENTER_CD   = E2.ENTER_CD
+					                          AND SDATE      = E2.SDATE
+					                          AND VERSION_NM = E2.VERSION_NM
+					                   )
+					       ) M
+					     , THRM151 A
+					     , THRM100 B
+					 WHERE A.ENTER_CD = M.ENTER_CD
+					   AND A.SABUN    = M.MOVE_SABUN
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN    = B.SABUN
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.SDATE    = (
+					           SELECT MAX(SDATE)
+					             FROM THRM151
+					            WHERE ENTER_CD = A.ENTER_CD
+					              AND SABUN    = A.SABUN
+					              AND TRIM(#{sdate}) BETWEEN SDATE AND NVL(EDATE, '99991231')
+					       )
+					   AND A.STATUS_CD NOT LIKE 'RA%' ]]>
+<if test='searchKeyword2 != null and !searchKeyword2.equals("")'>
+					   AND (
+					              A.SABUN LIKE #{searchKeyword2} || '%'
+					           OR B.NAME LIKE '%' || #{searchKeyword2} || '%'
+					       )
+</if>
+<if test='searchOrg2 != null and !searchOrg2.equals("")'>
+					   AND A.ORG_CD IN (
+					           SELECT A1.ORG_CD
+					             FROM TORG101 A1
+					            WHERE A1.ENTER_CD = A.ENTER_CD
+					              AND A1.SDATE  = (
+					                      SELECT MAX(B1.SDATE)
+					                        FROM TORG101 B1
+					                       WHERE B1.ENTER_CD = A1.ENTER_CD
+					                         AND B1.ORG_CD   = A1.ORG_CD
+					                         AND M.SDATE BETWEEN B1.SDATE AND NVL(B1.EDATE, '99991231')
+					                  )
+					              AND A1.ORG_NM LIKE '%' || #{searchOrg}2 || '%'
+					       )
+</if>
+					 ORDER BY A.ORG_CD, F_COM_JIKJE_SORT(A.ENTER_CD, M.MOVE_SABUN, M.SDATE)
+		</select>
+
+<!-- [조직개편 시뮬레이션 > 인사개편안] 검색 조직원 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationEmpMemberSearchList">
+
+				<![CDATA[
+					SELECT A.*
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TRIM(#{sdate})) AS ORG_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD) AS JIKWEE_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD) AS JIKCHAK_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD) AS JIKGUB_NM
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10050',A.WORK_TYPE) AS WORK_TYPE_NM
+					     , B.NAME
+					     , M.ORG_CD_AFTER
+					     , M.ORG_NM_AFTER
+					  FROM (
+					          SELECT SUB1.ENTER_CD
+					               , SUB1.SABUN
+					               , SUB1.ORG_CD
+					               , NULL AS ORG_CD_AFTER
+					               , SUB1.JIKWEE_CD
+					               , SUB1.JIKCHAK_CD
+					               , SUB1.JIKGUB_CD
+					               , SUB1.WORK_TYPE
+					            FROM THRM151 SUB1
+					           WHERE SUB1.ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SUB1.SDATE    = (
+					                     SELECT MAX(SDATE)
+					                       FROM THRM151
+					                      WHERE ENTER_CD = SUB1.ENTER_CD
+					                        AND SABUN    = SUB1.SABUN
+					                        AND TRIM(#{sdate}) BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                 )
+					             AND SUB1.STATUS_CD NOT LIKE 'RA%' ]]>
+<if test='searchOrg3 != null and !searchOrg3.equals("")'>
+					             AND SUB1.ORG_CD IN (
+					                      SELECT A1.ORG_CD
+					                        FROM TORG101 A1
+					                       WHERE A1.ENTER_CD = SUB1.ENTER_CD
+					                         AND A1.SDATE  = (
+					                                 SELECT MAX(B1.SDATE)
+					                                   FROM TORG101 B1
+					                                  WHERE B1.ENTER_CD = A1.ENTER_CD
+					                                    AND B1.ORG_CD   = A1.ORG_CD
+					                                    AND TRIM(#{sdate}) BETWEEN B1.SDATE AND NVL(B1.EDATE, '99991231')
+					                             )
+					                         AND A1.ORG_NM LIKE '%' || #{searchOrg3} || '%'
+					                 )
+</if>
+					       ) A
+					     , THRM100 B
+					     , (
+					          SELECT E.MOVE_SABUN
+					               , E.ORG_CD_AFTER
+					               , NVL(O.ORG_NM_AFTER, O.ORG_NM_PRE) AS ORG_NM_AFTER
+					            FROM TORG707 E
+					               , TORG705 O
+					           WHERE E.ENTER_CD     = O.ENTER_CD
+					             AND E.SDATE        = O.SDATE
+					             AND E.VERSION_NM   = O.VERSION_NM
+					             AND E.ORG_CD_AFTER = O.ORG_CD
+					             AND E.ENTER_CD     = TRIM(#{ssnEnterCd})
+					             AND E.SDATE        = TRIM(#{sdate})
+					             AND E.VERSION_NM   = TRIM(#{versionNm})
+					       ) M
+					 WHERE A.ENTER_CD     = B.ENTER_CD
+					   AND A.SABUN        = B.SABUN
+					   AND A.SABUN        = M.MOVE_SABUN(+)
+<if test='searchKeyword3 != null and !searchKeyword3.equals("")'>
+					   AND (
+					              A.SABUN LIKE #{searchKeyword3} || '%'
+					           OR B.NAME LIKE '%' || #{searchKeyword3} || '%'
+					       )
+</if>
+					 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TRIM(#{sdate}))
+		</select>
+		
+<!-- [조직개편 시뮬레이션 > 인사개편안] 조직이동대상자 정보 등록/수정 -->
+		<update parameterType="map" id="saveSchemeSimulationEmp">
+
+					MERGE INTO TORG707 T
+					USING (
+					         SELECT A.ENTER_CD
+					              , A.SDATE
+					              , A.VERSION_NM
+					              , A.MOVE_SABUN
+					              , A.ORG_CD_AFTER
+					           FROM (
+					                   SELECT NULL AS ENTER_CD
+					                        , NULL AS SDATE
+					                        , NULL AS VERSION_NM
+					                        , NULL AS MOVE_SABUN
+					                        , NULL AS ORG_CD_AFTER
+					                    FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					                   UNION ALL
+					                   SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					                        , TRIM(#{sdate}) AS SDATE
+					                        , TRIM(#{versionNm}) AS VERSION_NM
+					                        , TRIM(#{rm.sabun}) AS MOVE_SABUN
+					                        , TRIM(#{rm.orgCdAfter}) AS ORG_CD_AFTER
+					                    FROM DUAL
+</foreach>
+					                ) A
+					          WHERE 1 = 1
+					            AND A.ENTER_CD   IS NOT NULL
+					            AND A.SDATE      IS NOT NULL
+					            AND A.VERSION_NM IS NOT NULL
+					            AND A.MOVE_SABUN IS NOT NULL
+					      ) S
+					   ON (
+					                T.ENTER_CD     = S.ENTER_CD
+					            AND T.SDATE        = S.SDATE
+					            AND T.VERSION_NM   = S.VERSION_NM
+					            AND T.MOVE_SABUN   = S.MOVE_SABUN
+					      )
+					WHEN MATCHED THEN
+					     UPDATE SET T.CHKID        = #{ssnSabun}
+					              , T.CHKDATE      = SYSDATE
+					              , T.ORG_CD_AFTER = S.ORG_CD_AFTER
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					                T.ENTER_CD
+					              , T.SDATE
+					              , T.VERSION_NM
+					              , T.MOVE_SABUN
+					              , T.ORG_CD_AFTER
+					              , T.CHKDATE
+					              , T.CHKID
+					            )
+					     VALUES (
+					                S.ENTER_CD
+					              , S.SDATE
+					              , S.VERSION_NM
+					              , S.MOVE_SABUN
+					              , S.ORG_CD_AFTER
+					              , SYSDATE
+					              , #{ssnSabun}
+					            )
+		</update>
+<!-- [조직개편 시뮬레이션 > 인사개편안] 조직이동대상자 정보 삭제 -->
+		<delete parameterType="map" id="deleteSchemeSimulationEmp">
+
+
+					DELETE FROM TORG707
+					 WHERE (ENTER_CD, SDATE, VERSION_NM, MOVE_SABUN) IN (
+					             (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("")  != null and sdate != null and !sdate.equals("")  != null and versionNm != null and !versionNm.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+					           , (TRIM(#{ssnEnterCd}), TRIM(#{sdate}), TRIM(#{versionNm}), TRIM(#{rm.sabun}))
+	</if>
+</foreach>
+					      )
+		</delete>
+		
+<!-- [조직개편 시뮬레이션 > 인사개편안] 조직이동대상자 정보 초기화 -->
+		<delete parameterType="map" id="deleteSchemeSimulationEmpAll">
+
+				<![CDATA[
+					DELETE
+					  FROM TORG707
+					 WHERE ENTER_CD    = TRIM(#{ssnEnterCd})
+					   AND SDATE       = TRIM(#{sdate})
+					   AND VERSION_NM  = TRIM(#{versionNm})
+				]]>
+
+
+		</delete>
+		
+		
+<!-- [조직개편 시뮬레이션 > 개편현황] 조직변경 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationReOrgList1">
+
+				<![CDATA[
+					SELECT T.ORG_CD
+					     , T.NUM
+					     , T.CHANGE_GUBUN
+					     , DECODE(T.CHANGE_GUBUN
+					           , '1', '신규'
+					           , '2', '조직명변경'
+					           , '3', '상위조직변경'
+					           , '4', '폐지'
+					           , NULL
+					       ) AS CHANGE_GUBUN_NM
+					     , T.ORG_NM
+					     , T.ORG_CD_PRE
+					     , T.ORG_NM_PRE
+					     , T.ORG_CD_AFTER
+					     , T.ORG_NM_AFTER
+					     , T.ORD
+					  FROM (
+					          /* 1:신규 */ 
+					          SELECT ORG_CD
+					               , NUM
+					               , '1' AS CHANGE_GUBUN
+					               , ORG_NM_AFTER AS ORG_NM
+					               , NULL AS ORG_CD_PRE
+					               , NULL AS ORG_CD_AFTER
+					               , NULL AS ORG_NM_PRE
+					               , ORG_NM_AFTER
+					               , 1 AS ORD
+					            FROM TORG705
+					           WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SDATE = TRIM(#{sdate})
+					             AND VERSION_NM = TRIM(#{versionNm})
+					             AND ORG_NM_PRE IS NULL
+					             AND ORG_NM_AFTER IS NOT NULL
+					             
+					           UNION ALL
+					
+					          /* 2:조직명변경 */ 
+					          SELECT ORG_CD
+					               , NUM
+					               , '2' AS CHANGE_GUBUN
+					               , ORG_NM_PRE AS ORG_NM
+					               , NULL AS ORG_CD_PRE
+					               , NULL AS ORG_CD_AFTER
+					               , ORG_NM_PRE
+					               , ORG_NM_AFTER
+					               , 4 AS ORD
+					            FROM TORG705
+					           WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SDATE = TRIM(#{sdate})
+					             AND VERSION_NM = TRIM(#{versionNm})
+					             AND ORG_NM_PRE IS NOT NULL
+					             AND ORG_NM_AFTER IS NOT NULL
+					             AND ORG_NM_PRE <> ORG_NM_AFTER
+					             
+					           UNION ALL
+					
+					          /* 3:상위조직변경 */ 
+					          SELECT ORG_CD
+					               , NUM
+					               , '3' AS CHANGE_GUBUN
+					               , NVL(ORG_NM_PRE, ORG_NM_AFTER) AS ORG_NM
+					               , PRIOR_ORG_CD_PRE AS ORG_CD_PRE
+					               , PRIOR_ORG_CD_AFTER AS ORG_CD_AFTER
+					               , PRIOR_ORG_NM_PRE AS ORG_NM_PRE
+					               , PRIOR_ORG_NM_AFTER AS ORG_NM_AFTER
+					               , 3 AS ORD
+					            FROM TORG705
+					           WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SDATE = TRIM(#{sdate})
+					             AND VERSION_NM = TRIM(#{versionNm})
+					             AND PRIOR_ORG_CD_PRE IS NOT NULL
+					             AND PRIOR_ORG_CD_AFTER IS NOT NULL
+					             AND PRIOR_ORG_CD_PRE <> PRIOR_ORG_CD_AFTER
+					             
+					           UNION ALL
+					
+					          /* 4:폐쇄 */ 
+					          SELECT ORG_CD
+					               , NUM
+					               , '4' AS CHANGE_GUBUN
+					               , NVL(ORG_NM_PRE, ORG_NM_AFTER) AS ORG_NM
+					               , NULL AS ORG_CD_PRE
+					               , NULL AS ORG_CD_AFTER
+					               , NVL(ORG_NM_PRE, ORG_NM_AFTER) AS ORG_NM_PRE
+					               , NULL AS ORG_NM_AFTER
+					               , 2 AS ORD
+					            FROM TORG705
+					           WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SDATE = TRIM(#{sdate})
+					             AND VERSION_NM = TRIM(#{versionNm})
+					             AND CHANGE_GUBUN = '4'
+					       ) T
+					 WHERE 1 = 1
+					           ]]>
+<if test='searchChangeGubun != null and !searchChangeGubun.equals("")'>
+					   AND T.CHANGE_GUBUN = TRIM(#{searchChangeGubun})
+</if>
+<if test='searchOrg != null and !searchOrg.equals("")'>
+					   AND (
+					              T.ORG_CD_PRE   LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_CD_AFTER LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_NM       LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_NM_PRE   LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_NM_AFTER LIKE '%'||TRIM(#{searchOrg})||'%'
+					       )
+</if>
+					 ORDER BY T.ORD, T.NUM
+
+		</select>
+		
+<!-- [조직개편 시뮬레이션 > 개편현황] 조직장변경 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationReOrgList2">
+
+				<![CDATA[
+					SELECT T.ORG_CD
+					     , T.NUM
+					     , T.CHANGE_GUBUN
+					     , DECODE(T.CHANGE_GUBUN
+					           , '1', '신규'
+					           , '2', '변경'
+					           , '4', '폐지'
+					           , NULL
+					       ) AS CHANGE_GUBUN_NM
+					     , T.ORG_NM
+					     , T.CHIEF_SABUN_PRE
+					     , T.CHIEF_NM_PRE
+					     , T.CHIEF_JIKWEE_NM_PRE
+					     , T.CHIEF_JIKGUB_NM_PRE
+					     , T.CHIEF_JIKCHAK_NM_PRE
+					     , DECODE(T.CHIEF_SABUN_AFTER, 'IS_VACANCY', '', T.CHIEF_SABUN_AFTER) AS CHIEF_SABUN_AFTER
+					     , T.CHIEF_NM_AFTER
+					     , T.CHIEF_JIKWEE_NM_AFTER
+					     , T.CHIEF_JIKGUB_NM_AFTER
+					     , T.CHIEF_JIKCHAK_NM_AFTER
+					     , T.ORD
+					  FROM (
+					          /* 1:신규 */ 
+					          SELECT ENTER_CD
+					               , SDATE
+					               , ORG_CD
+					               , NUM
+					               , '1' AS CHANGE_GUBUN
+					               , NVL(ORG_NM_PRE, ORG_NM_AFTER) AS ORG_NM
+					               , CHIEF_SABUN_PRE
+					               , F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_PRE, NULL) AS CHIEF_NM_PRE
+					               , F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKWEE_NM_PRE
+					               , F_COM_GET_JIKGUB_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKGUB_NM_PRE
+					               , F_COM_GET_JIKCHAK_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKCHAK_NM_PRE
+					               , CHIEF_SABUN_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_AFTER, NULL)) AS CHIEF_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKWEE_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKGUB_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKGUB_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKCHAK_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKCHAK_NM_AFTER
+					               , 1 AS ORD
+					            FROM TORG705
+					           WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SDATE = TRIM(#{sdate})
+					             AND VERSION_NM = TRIM(#{versionNm})
+					             AND CHIEF_SABUN_PRE IS NULL
+					             AND CHIEF_SABUN_AFTER IS NOT NULL
+					             
+					           UNION ALL
+					
+					          /* 2:변경 */ 
+					          SELECT ENTER_CD
+					               , SDATE
+					               , ORG_CD
+					               , NUM
+					               , '2' AS CHANGE_GUBUN
+					               , NVL(ORG_NM_PRE, ORG_NM_AFTER) AS ORG_NM
+					               , CHIEF_SABUN_PRE
+					               , F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_PRE, NULL) AS CHIEF_NM_PRE
+					               , F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKWEE_NM_PRE
+					               , F_COM_GET_JIKGUB_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKGUB_NM_PRE
+					               , F_COM_GET_JIKCHAK_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKCHAK_NM_PRE
+					               , CHIEF_SABUN_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_AFTER, NULL)) AS CHIEF_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKWEE_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKGUB_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKGUB_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKCHAK_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKCHAK_NM_AFTER
+					               , 2 AS ORD
+					            FROM TORG705
+					           WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SDATE = TRIM(#{sdate})
+					             AND VERSION_NM = TRIM(#{versionNm})
+					             AND CHIEF_SABUN_PRE IS NOT NULL
+					             AND CHIEF_SABUN_AFTER IS NOT NULL
+					             AND CHIEF_SABUN_PRE <> CHIEF_SABUN_AFTER
+					             
+					           UNION ALL
+					           
+					          /* 4:폐쇄 */ 
+					          SELECT ENTER_CD
+					               , SDATE
+					               , ORG_CD
+					               , NUM
+					               , '4' AS CHANGE_GUBUN
+					               , NVL(ORG_NM_PRE, ORG_NM_AFTER) AS ORG_NM
+					               , CHIEF_SABUN_PRE
+					               , F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_PRE, NULL) AS CHIEF_NM_PRE
+					               , F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKWEE_NM_PRE
+					               , F_COM_GET_JIKGUB_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKGUB_NM_PRE
+					               , F_COM_GET_JIKCHAK_NM(ENTER_CD, CHIEF_SABUN_PRE, SDATE, NULL) AS CHIEF_JIKCHAK_NM_PRE
+					               , CHIEF_SABUN_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_NAMES(ENTER_CD, CHIEF_SABUN_AFTER, NULL)) AS CHIEF_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKWEE_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKWEE_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKGUB_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKGUB_NM_AFTER
+					               , DECODE(CHIEF_SABUN_AFTER, NULL, NULL, 'IS_VACANCY', NULL, F_COM_GET_JIKCHAK_NM(ENTER_CD, CHIEF_SABUN_AFTER, SDATE, NULL)) AS CHIEF_JIKCHAK_NM_AFTER
+					               , 3 AS ORD
+					            FROM TORG705
+					           WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					             AND SDATE = TRIM(#{sdate})
+					             AND VERSION_NM = TRIM(#{versionNm})
+					             AND CHANGE_GUBUN = '4'
+					             AND CHIEF_SABUN_PRE IS NOT NULL
+					       ) T
+					 WHERE 1 = 1
+					           ]]>
+<if test='searchChangeGubun != null and !searchChangeGubun.equals("")'>
+					   AND T.CHANGE_GUBUN = TRIM(#{searchChangeGubun})
+</if>
+<if test='searchOrg != null and !searchOrg.equals("")'>
+					   AND (
+					              T.ORG_CD  LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_NM  LIKE '%'||TRIM(#{searchOrg})||'%'
+					       )
+</if>
+<if test='searchEmp != null and !searchEmp.equals("")'>
+					   AND (
+					              T.CHIEF_SABUN_PRE   LIKE '%'||TRIM(#{searchEmp})||'%'
+					           OR T.CHIEF_SABUN_AFTER LIKE '%'||TRIM(#{searchEmp})||'%'
+					           OR T.CHIEF_NM_PRE      LIKE '%'||TRIM(#{searchEmp})||'%'
+					           OR T.CHIEF_NM_AFTER    LIKE '%'||TRIM(#{searchEmp})||'%'
+					       )
+</if>
+					 ORDER BY T.ORD, T.NUM
+
+		</select>
+		
+<!-- [조직개편 시뮬레이션 > 개편현황] 인사이동 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationReOrgList3">
+
+				<![CDATA[
+					SELECT T.MOVE_SABUN AS SABUN
+					     , T.NAME
+					     , T.JIKWEE_NM
+					     , T.JIKCHAK_NM
+					     , T.JIKGUB_NM
+					     , T.ORG_CD_PRE
+					     , T.ORG_NM_PRE
+					     , T.ORG_CD_AFTER
+					     , T.ORG_NM_AFTER
+					     , T.CHANGE_GUBUN
+					     , T.CHANGE_GUBUN_NM
+					  FROM (
+					          SELECT M.ENTER_CD
+					               , M.SDATE
+					               , M.VERSION_NM
+					               , M.MOVE_SABUN
+					               , B.NAME
+					               , F_COM_GET_GRCODE_NAME(M.ENTER_CD,'H20030',M.JIKWEE_CD) AS JIKWEE_NM
+					               , F_COM_GET_GRCODE_NAME(M.ENTER_CD,'H20020',M.JIKCHAK_CD) AS JIKCHAK_NM
+					               , F_COM_GET_GRCODE_NAME(M.ENTER_CD,'H20010',M.JIKGUB_CD) AS JIKGUB_NM
+					               , M.ORG_CD AS ORG_CD_PRE
+					               , F_COM_GET_ORG_NM(M.ENTER_CD, M.ORG_CD, M.SDATE) AS ORG_NM_PRE
+					               , M.ORG_CD_AFTER
+					               , DECODE(M.CHANGE_GUBUN
+					                     , '1', NVL(O.ORG_NM_PRE, O.ORG_NM_AFTER)
+					                     , '2', O.ORG_NM_AFTER
+					                     , NULL
+					                 ) AS ORG_NM_AFTER
+					               , M.CHANGE_GUBUN
+					               , DECODE(M.CHANGE_GUBUN
+					                     , '1', '이동'
+					                     , '2', '조직명변경'
+					                     , NULL
+					                 ) AS CHANGE_GUBUN_NM
+					            FROM (
+					                    SELECT E1.ENTER_CD
+					                         , E1.SDATE
+					                         , E1.VERSION_NM
+					                         , E1.MOVE_SABUN
+					                         , E1.ORG_CD_AFTER
+					                         , '1' AS CHANGE_GUBUN
+					                         , H1.JIKWEE_CD
+					                         , H1.JIKCHAK_CD
+					                         , H1.JIKGUB_CD
+					                         , H1.ORG_CD
+					                      FROM TORG707 E1
+					                         , THRM151 H1
+					                     WHERE E1.ENTER_CD   = H1.ENTER_CD
+					                       AND E1.MOVE_SABUN = H1.SABUN
+					                       AND E1.ENTER_CD   = TRIM(#{ssnEnterCd})
+					                       AND E1.SDATE      = TRIM(#{sdate})
+					                       AND E1.VERSION_NM = TRIM(#{versionNm})
+					                       AND E1.ORG_CD_AFTER IS NOT NULL
+					                       AND H1.SDATE      = (
+					                               SELECT MAX(SDATE)
+					                                 FROM THRM151
+					                                WHERE ENTER_CD = H1.ENTER_CD
+					                                  AND SABUN    = H1.SABUN
+					                                  AND E1.SDATE BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                           )
+					                       AND H1.STATUS_CD NOT LIKE 'RA%'
+
+					                     UNION ALL
+
+					                    SELECT E2.ENTER_CD
+					                         , E2.SDATE
+					                         , E2.VERSION_NM
+					                         , H2.SABUN  AS MOVE_SABUN
+					                         , H2.ORG_CD AS ORG_CD_AFTER
+					                         , '2' AS CHANGE_GUBUN
+					                         , H2.JIKWEE_CD
+					                         , H2.JIKCHAK_CD
+					                         , H2.JIKGUB_CD
+					                         , H2.ORG_CD
+					                      FROM TORG705 E2
+					                         , THRM151 H2
+					                     WHERE E2.ENTER_CD   = H2.ENTER_CD(+)
+					                       AND E2.ORG_CD     = H2.ORG_CD(+)
+					                       AND E2.ENTER_CD   = TRIM(#{ssnEnterCd})
+					                       AND E2.SDATE      = TRIM(#{sdate})
+					                       AND E2.VERSION_NM = TRIM(#{versionNm})
+					                       AND E2.ORG_NM_PRE IS NOT NULL
+					                       AND E2.ORG_NM_AFTER IS NOT NULL
+					                       AND E2.ORG_NM_PRE <> E2.ORG_NM_AFTER
+					                       AND H2.SDATE    = (
+					                               SELECT MAX(SDATE)
+					                                 FROM THRM151
+					                                WHERE ENTER_CD = H2.ENTER_CD
+					                                  AND SABUN    = H2.SABUN
+					                                  AND E2.SDATE BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                           )
+					                       AND H2.STATUS_CD NOT LIKE 'RA%'
+					                       AND H2.SABUN NOT IN (
+					                               SELECT MOVE_SABUN
+					                                 FROM TORG707
+					                                WHERE ENTER_CD   = E2.ENTER_CD
+					                                  AND SDATE      = E2.SDATE
+					                                  AND VERSION_NM = E2.VERSION_NM
+					                                  AND ORG_CD_AFTER IS NOT NULL
+					                           )
+					                 ) M
+					               , THRM100 B
+					               , TORG705 O
+					           WHERE M.ENTER_CD     = B.ENTER_CD
+					             AND M.MOVE_SABUN   = B.SABUN
+					             AND M.ENTER_CD     = O.ENTER_CD(+)
+					             AND M.SDATE        = O.SDATE(+)
+					             AND M.VERSION_NM   = O.VERSION_NM(+)
+					             AND M.ORG_CD_AFTER = O.ORG_CD
+					       ) T
+					 WHERE 1 = 1
+					           ]]>
+<if test='searchChangeGubun != null and !searchChangeGubun.equals("")'>
+					   AND T.CHANGE_GUBUN = TRIM(#{searchChangeGubun})
+</if>
+<if test='searchOrg != null and !searchOrg.equals("")'>
+					   AND (
+					              T.ORG_CD_PRE    LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_CD_AFTER  LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_NM_PRE    LIKE '%'||TRIM(#{searchOrg})||'%'
+					           OR T.ORG_NM_AFTER  LIKE '%'||TRIM(#{searchOrg})||'%'
+					       )
+</if>
+<if test='searchEmp != null and !searchEmp.equals("")'>
+					   AND (
+					              T.MOVE_SABUN   LIKE '%'||TRIM(#{searchEmp})||'%'
+					           OR T.NAME         LIKE '%'||TRIM(#{searchEmp})||'%'
+					       )
+</if>
+					 ORDER BY T.CHANGE_GUBUN, F_COM_JIKJE_SORT(T.ENTER_CD, T.MOVE_SABUN, T.SDATE)
+
+
+		</select>
+
+<!-- [조직개편 시뮬레이션 > 최종확인] 조직 목록 조회(Tree) -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationOrgCurLastTreeList">
+
+				<![CDATA[
+					 SELECT LEVEL AS "_level"
+					      , A.SDATE
+					      , A.PRIOR_ORG_CD
+					      , A.ORG_CD
+					      , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM
+					      , A.SEQ
+					      , A.ORDER_SEQ
+					      , NVL(A.ORG_LEVEL, LEVEL) AS ORG_LEVEL
+					      , (
+					            SELECT COUNT(E.SABUN)
+					              FROM THRM151 E
+					             WHERE E.ENTER_CD = A.ENTER_CD
+					               AND E.ORG_CD   = A.ORG_CD
+					               AND E.SDATE    = (
+					                       SELECT MAX(SDATE)
+					                         FROM THRM151
+					                        WHERE ENTER_CD = E.ENTER_CD
+					                          AND SABUN    = E.SABUN
+					                          AND A.SDATE BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                   )
+					               AND E.STATUS_CD NOT LIKE 'RA%'
+					        ) AS EMP_COUNT
+					   FROM (
+					            SELECT ENTER_CD, ORG_CD, SDATE, PRIOR_ORG_CD
+					                 , SEQ, ORDER_SEQ, ORG_LEVEL
+					              FROM TORG105
+					             WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					               AND SDATE = TRIM(#{preSdate})
+					        ) A, TORG101 B
+					  WHERE A.ENTER_CD = B.ENTER_CD
+					    AND A.ORG_CD = B.ORG_CD
+					    AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					  START WITH A.PRIOR_ORG_CD = '0'
+					CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					    AND PRIOR A.SDATE = A.SDATE
+					    AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					  ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+				]]>
+
+
+		</select>
+
+
+<!-- 가발령적용 처리 -->
+		<update parameterType="map" id="callPrcOrgSimulAppmtApply" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_ORG_SIMUL_APPMT_APPLY(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sdate,mode=IN,jdbcType=VARCHAR},
+				#{versionNm,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+		
+<!-- 조직개편관리 확정마감처리 -->
+		<update parameterType="map" id="callPrcOrgApplyReorg" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_ORG_APPLY_REORG(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sdate,mode=IN,jdbcType=VARCHAR},
+				#{versionNm,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+		<!-- 시뮬레이션 정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchemeSimulationInfo">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SDATE
+					     , A.ORG_CHART_NM
+					     , A.MEMO
+					     , A.CHANGE_YN
+					     , (
+					           SELECT MAX(B.SDATE)
+					             FROM TORG105 B
+					            WHERE B.ENTER_CD = A.ENTER_CD
+					              AND B.SDATE < A.SDATE
+					       ) AS PRE_SDATE
+					  FROM TORG701 A
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.SDATE = TRIM(#{sdate})
+				]]>
+
+		</select>
+		
+
+</mapper>

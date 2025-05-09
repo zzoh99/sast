@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appSubCommitteeMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSubCommitteeMgrList">
+
+				<![CDATA[
+					SELECT	/*	AppCommitteeMgr-mapping-query.getAppCommitteeMgrList	*/
+							X.*
+						,	RANK() OVER(ORDER BY X.APP_F_POINT ASC)	AS	SEQ	/* 순위 */
+					FROM
+         		 (SELECT P.* FROM
+          						(
+								SELECT	A.ENTER_CD
+									,	A.APPRAISAL_CD
+									,	A.SABUN
+									,	D.NAME
+									,	E.ORG_CD
+									,	F_COM_GET_ORG_NM(E.ENTER_CD, E.ORG_CD, E.SDATE) AS ORG_NM
+									,	E.JIKWEE_CD
+									,	E.JIKGUB_CD
+									,	E.JIKCHAK_CD
+									,	E.JIKWEE_NM
+									,	E.JIKGUB_NM
+									,	E.JIKCHAK_NM
+									,	E.JOB_CD
+									,	F_COM_GET_JOB_NM_201(E.ENTER_CD, E.JOB_CD, E.SDATE)  AS JOB_NM
+									,	E.WORK_TYPE
+									,	E.WORK_TYPE_NM
+									,	C.APP_GROUP_CD
+									,(
+											SELECT	APP_GROUP_NM
+											FROM	TPAP133
+											WHERE	ENTER_CD		=	C.ENTER_CD
+											AND		APPRAISAL_CD	=	C.APPRAISAL_CD
+											AND		APP_GROUP_CD	=	C.APP_GROUP_CD
+										)	AS APP_GROUP_NM -- 평가그룹명
+									,	(SELECT COMPETENCE FROM TPAP202
+                                          WHERE ENTER_CD=C.ENTER_CD
+                                             AND APPRAISAL_CD=C.APPRAISAL_CD
+                                             AND APP_STEP_CD ='5'
+                                             AND APP_SEQ_CD ='1'
+                                             AND SABUN= C.SABUN) AS APP_C_POINT /* 종합평가점수(COMPETENCE) */
+									,	(SELECT  ATTITUDE FROM TPAP202
+                                          WHERE ENTER_CD=C.ENTER_CD
+                                             AND APPRAISAL_CD=C.APPRAISAL_CD
+                                             AND APP_STEP_CD ='5'
+                                             AND APP_SEQ_CD ='1'
+                                             AND SABUN= C.SABUN) AS APP_A_POINT /* 종합평가점수 (ATTITUE)*/
+									,	A.APP_POINT	 AS APP_S_POINT			/* 종합평가점수 (종합점수)*/
+									,	A.ADJ_POINT	 AS APP_F_POINT			/* 종합평가점수 (조정점수)*/
+									,	A.APP_CLASS_CD			/* 종합평가등급코드(P00001) */
+									,	A.MEMO					/* 비고 */
+									,	A.FB_YN					/* 개별평가결과F/B여부 */
+									,	FINAL_CLASS_CD			/*최종평가등급코드*/
+								FROM	TPAP571 A
+									,	TPAP201 C
+									,	THRM100 D
+									,	THRM151 E
+								WHERE	A.ENTER_CD = C.ENTER_CD
+								AND		A.APPRAISAL_CD = C.APPRAISAL_CD
+								AND		A.SABUN = C.SABUN
+								AND		C.APP_STEP_CD = '5'		/*최종평가*/
+								AND		C.APP_YN   = 'Y'
+								AND		A.ENTER_CD = D.ENTER_CD
+								AND		A.SABUN = D.SABUN
+								AND		A.ENTER_CD = E.ENTER_CD
+								AND		A.SABUN = E.SABUN
+								AND		E.SDATE = (
+													SELECT	MAX(SDATE)
+													FROM	THRM151
+													WHERE	ENTER_CD	=	A.ENTER_CD
+													AND		SABUN		=	A.SABUN
+													AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+												)
+								AND		A.ENTER_CD		=	#{ssnEnterCd}
+								         ]]>
+								<if test='searchAppraisalCd != null and !searchAppraisalCd.equals("")'>
+								AND		A.APPRAISAL_CD	=	#{searchAppraisalCd}
+								</if>					)	 P,
+                ( SELECT 0 LVL, 0 AS SEQ, '0' AS ORG_CD, F_COM_GET_ORG_NM(#{ssnEnterCd},'0', TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					          FROM DUAL
+					        UNION ALL
+					        SELECT LVL, SEQ, ORG_CD, ORG_NM
+					          FROM (
+					                SELECT LEVEL AS LVL, ORG_CD, SEQ, F_COM_GET_ORG_NM(#{ssnEnterCd}, ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					                  FROM TORG105
+					                 WHERE ENTER_CD = #{ssnEnterCd}
+					                   AND SDATE = (SELECT SDATE
+					                                                  FROM TORG103
+					                                                 WHERE ENTER_CD = #{ssnEnterCd}
+					                                                   AND SDATE = (SELECT MAX(SDATE)
+					                                                                  FROM TORG103
+					                                                                 WHERE ENTER_CD = #{ssnEnterCd}
+					                                                                  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND EDATE))
+					                START WITH ORG_CD = #{orgCd}
+					                CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					                       AND PRIOR SDATE = SDATE
+					                       AND PRIOR ORG_CD = PRIOR_ORG_CD)) K
+                WHERE K.ORG_CD = P.ORG_CD
+                )       X
+					WHERE	1=1
+				ORDER BY F_ORG_ORG_CHART_SORT(X.ENTER_CD, X.ORG_CD,TO_CHAR(SYSDATE,'YYYYMMDD'))
+						, 	F_COM_GET_GRCODE_SEQ(X.ENTER_CD, 'H20030', X.JIKWEE_CD)
+						,	X.SABUN
+		</select>
+
+       <select parameterType="map" resultType="cMap" id="getAppSubCommitteeMgrList2">
+
+				<![CDATA[
+					SELECT	/*	AppCommitteeMgr-mapping-query.getAppCommitteeMgrList2	*/
+				           A.APPRAISAL_CD,
+						   A.APP_ORG_CD,
+						   A.APP_CLASS_CD,
+						   A.TOT_CNT,
+						   A.APP_GROUP_S_CNT,
+						   A.APP_GROUP_A_CNT,
+						   A.APP_GROUP_B_CNT,
+						   A.APP_GROUP_C_CNT,
+						   A.APP_GROUP_D_CNT,
+						   A.APP_SEQ_CD,
+					       A.NOTE
+					  FROM TPAP223 A
+					 WHERE A.ENTER_CD   =  #{ssnEnterCd}
+					           ]]>
+					   <if test='searchAppraisalCd != null and !searchAppraisalCd.equals("")'>
+						AND	A.APPRAISAL_CD	=	#{searchAppraisalCd}
+					   </if>
+                       AND A.APP_ORG_CD =  #{orgCd}
+			       	ORDER BY A.APPRAISAL_CD DESC, A.APP_ORG_CD
+
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppSubCommitteeMgrMap">
+				<![CDATA[
+					SELECT	/*	AppCommitteeMgr-mapping-query.getAppCommitteeMgrMap	*/
+							CLOSE_YN
+						,	CON_YN
+					FROM TPAP101
+					WHERE ENTER_CD		=	#{ssnEnterCd}
+					AND APPRAISAL_CD	=	#{searchAppraisalCd}
+				]]>
+		</select>
+		
+<!--  조직코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSubCommitteeOrgList">
+				<![CDATA[
+					--조직가져오기
+					SELECT ORG_CD AS CODE, ORG_NM AS CODE_NM
+					  FROM (
+					      SELECT A.ORG_CD, F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					       FROM TORG111 A
+					      WHERE A.ENTER_CD = #{ssnEnterCd}
+					        AND A.SABUN    = #{ssnSabun}
+					        AND A.SDATE = (SELECT MAX(B.SDATE)
+					                         FROM TORG111 B
+					                        WHERE B.ENTER_CD = A.ENTER_CD
+					                          AND B.ORG_CD = A.ORG_CD
+					                          AND B.SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD'))
+					      )				
+				]]>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getAppSubCommitteeOrgListAdmin">
+				<![CDATA[
+					--조직가져오기_ADMIN
+					SELECT ORG_CD AS CODE, ORG_NM AS CODE_NM
+					  FROM (
+					      SELECT A.ORG_CD, F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					       FROM TORG111 A
+					      WHERE A.ENTER_CD = #{ssnEnterCd}
+					        AND A.SDATE = (SELECT MAX(B.SDATE)
+					                         FROM TORG111 B
+					                        WHERE B.ENTER_CD = A.ENTER_CD
+					                          AND B.ORG_CD = A.ORG_CD
+					                          AND B.SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD'))
+					      )				
+				]]>
+		</select>
+			
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppSubCommitteeMgr">
+					MERGE INTO	/*	AppCommitteeMgr-mapping-query.saveAppCommitteeMgr	*/
+								TPAP571 T
+					USING	(
+							SELECT		A.ENTER_CD
+									,	A.APPRAISAL_CD
+									,	A.SABUN
+									,	A.APP_POINT
+									,	A.APP_CLASS_CD
+									,	A.SEQ
+									,	A.MEMO
+									,	A.FB_YN
+									,	A.FINAL_CLASS_CD
+									,	A.APP_GROUP_CD
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	APPRAISAL_CD
+										,	NULL		AS	SABUN
+										,	NULL		AS	APP_POINT
+										,	NULL		AS	APP_CLASS_CD
+										,	NULL		AS	SEQ
+										,	NULL		AS	MEMO
+										,	NULL		AS	FB_YN
+										,	NULL		AS	FINAL_CLASS_CD
+										,	NULL		AS	APP_GROUP_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}						AS	ENTER_CD
+										,	TRIM(#{rm.appraisalCd}		) 	AS	APPRAISAL_CD
+										,	TRIM(#{rm.sabun}			)	AS	SABUN
+										,	TRIM(#{rm.appFPoint})	AS	APP_POINT
+										,	TRIM(#{rm.appClassCd}		)	AS	APP_CLASS_CD
+										,	TRIM(#{rm.seq}				)	AS	SEQ
+										,	TRIM(#{rm.memo}				)	AS	MEMO
+										,	TRIM(#{rm.fbYn}				)	AS	FB_YN
+										,	TRIM(#{rm.finalClassCd})	AS	FINAL_CLASS_CD
+										,	TRIM(#{rm.appGroupCd}		)	AS	APP_GROUP_CD
+									FROM	DUAL
+</foreach>
+									) A WHERE	A.ENTER_CD		IS NOT NULL
+										AND		A.APPRAISAL_CD	IS NOT NULL
+										AND		A.SABUN			IS NOT NULL
+							) S
+					ON	(
+								T.ENTER_CD			=	S.ENTER_CD
+							AND	T.APPRAISAL_CD		=	S.APPRAISAL_CD
+							AND	T.SABUN				=	S.SABUN
+
+						)
+					WHEN MATCHED THEN
+						UPDATE SET
+								T.APP_POINT				=	S.APP_POINT
+							,	T.APP_CLASS_CD			=	S.APP_CLASS_CD
+							,	T.SEQ					=	S.SEQ
+							,	T.MEMO					=	S.MEMO
+							,	T.FB_YN					=	S.FB_YN
+							,	T.FINAL_CLASS_CD		=	S.FINAL_CLASS_CD
+							,	T.APP_GROUP_CD			=	S.APP_GROUP_CD
+							,	T.CHKDATE				=	SYSDATE
+							,	T.CHKID					=	#{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+								T.ENTER_CD
+							,	T.APPRAISAL_CD
+							,	T.SABUN
+							,	T.APP_POINT
+							,	T.APP_CLASS_CD
+							,	T.SEQ
+							,	T.MEMO
+							,	T.FB_YN
+							,	T.FINAL_CLASS_CD
+							,	T.APP_GROUP_CD
+							,	T.CHKDATE
+							,	T.CHKID
+						)
+						VALUES
+						(
+								S.ENTER_CD
+							,	S.APPRAISAL_CD
+							,	S.SABUN
+							,	S.APP_POINT
+							,	S.APP_CLASS_CD
+							,	S.SEQ
+							,	S.MEMO
+							,	S.FB_YN
+							,	S.FINAL_CLASS_CD
+							,	S.APP_GROUP_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppSubCommitteeMgr">
+
+					DELETE FROM ZTST002
+					WHERE 	COL1 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.col1 != null and !rm.col1.equals("")'>
+											TRIM( #{rm.col1} )
+										</if>
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppSubCommitteeMgr">
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppSubCommitteeMgr">
+
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+	<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+
+</mapper>

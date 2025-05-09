@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.exWorkDriverCalcN">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverCalcNList">
+
+				<![CDATA[
+					SELECT  A.ENTER_CD 
+					           ,B.NAME           
+					           ,A.SABUN 
+					           ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.SDATE) AS ORG_NM 
+					       --    ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.SDATE) AS JIKWEE_NM
+					       ,F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, A.SDATE) AS JIKWEE_CD 
+					           ,A.WORK_GUBUN --(S:특근수당, N:야근수당)
+					           ,A.SDATE
+					           ,A.REQ_S_HM
+					           ,A.REQ_E_HM
+					           ,A.OT_OVER_TIME
+					           ,A.OT_NIGHT_TIME
+					           ,A.TG_DAY_TIME
+					           ,A.TG_NIGHT_TIME
+					           ,A.TG_OVER_TIME
+					           ,A.GASAN
+					           ,A.SIGUB
+					           ,A.PAY_MON 
+					           ,A.MORNING_S_HM
+					           ,A.GOLF_YN
+					           ,A.REASON 
+					           ,TO_CHAR(A.CHKDATE, 'YYYY-MM-DD HH24:MI') AS CHKDATE
+					           ,A.CHKID
+					  FROM TTIM713 A, THRM100 B
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					          	]]>
+					<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					   AND (A.SABUN LIKE '%'|| #{searchSabunName} ||'%' OR B.NAME LIKE '%'|| #{searchSabunName} ||'%')
+					</if>
+				  <if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					   AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.SDATE) LIKE '%'|| #{searchOrgNm} ||'%' --변수, 신청자 소속
+				  </if>
+					   AND B.ENTER_CD = A.ENTER_CD
+					   AND B.SABUN      = A.SABUN
+					   AND A.WORK_GUBUN = 'N' --메뉴별로 고정(S:특근수당, N:야근수당)
+			         AND A.SDATE BETWEEN REPLACE(NVL(TRIM(#{searchFromYmd}),'19000101'), '-', '') AND REPLACE(NVL(TRIM(#{searchToYmd}),'99991231'), '-', '')
+			         <if test='searchStatusCdHidden != null and !searchStatusCdHidden.equals("")'>
+					   AND F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, A.SDATE) IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					 </if>
+					ORDER BY B.NAME ASC, A.SDATE ASC
+
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveExWorkDriverCalcN">
+
+
+					MERGE INTO TTIM713 T
+					USING	(
+							SELECT	ENTER_CD
+                                  , SABUN
+   								  , WORK_GUBUN
+	  							  , SDATE
+		  						  , REQ_S_HM
+			  					  , REQ_E_HM
+				  				  , SIGUB
+				  				  , PAY_MON
+					  			  , MORNING_S_HM
+						  		  , REASON
+							FROM	(
+									SELECT	    NULL AS ENTER_CD    
+									          , NULL AS SABUN       
+									          , NULL AS WORK_GUBUN  
+									          , NULL AS SDATE       
+									          , NULL AS REQ_S_HM    
+									          , NULL AS REQ_E_HM    
+									          , NULL AS SIGUB
+									          , NULL AS PAY_MON              
+									          , NULL AS MORNING_S_HM
+									          , NULL AS	REASON
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT      TRIM( #{ssnEnterCd} )    AS ENTER_CD
+									          , TRIM( #{rm.sabun})      AS SABUN
+								            , 'N'								  AS WORK_GUBUN   
+								            , TRIM( #{rm.sdate})      AS SDATE
+								            , TRIM( #{rm.reqSHm})     AS REQ_S_HM     
+								            , TRIM( #{rm.reqEHm})     AS REQ_E_HM     
+								            , TRIM( #{rm.sigub})      AS SIGUB
+								            , TRIM( #{rm.payMon})      AS PAY_MON                
+								            , TRIM( #{rm.morningSHm}) AS MORNING_S_HM 
+								            , TRIM( #{rm.reason})     AS REASON      
+											FROM   DUAL
+</foreach>
+									)  WHERE SABUN IS NOT NULL 
+							) S
+					ON (  T.ENTER_CD         = #{ssnEnterCd}
+				   AND   T.SABUN              = S.SABUN
+				   AND   T.WORK_GUBUN  = 'N'
+				   AND   T.SDATE               = S.SDATE
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	T.REQ_S_HM     = S.REQ_S_HM    
+									          , T.REQ_E_HM     = S.REQ_E_HM    
+									          , T.SIGUB        = S.SIGUB       
+									          , T.PAY_MON = S.PAY_MON
+									          , T.MORNING_S_HM = S.MORNING_S_HM
+									          , T.REASON       = S.REASON                     
+											  , T.CHKDATE	= SYSDATE
+											  , T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+					            T.ENTER_CD    
+					          , T.SABUN       
+					          , T.WORK_GUBUN  
+					          , T.SDATE       
+					          , T.REQ_S_HM    
+					          , T.REQ_E_HM    
+					          , T.SIGUB       
+					          , T.PAY_MON
+					          , T.MORNING_S_HM
+					          , T.REASON
+					          , T.CHKDATE
+					          , T.CHKID
+						)
+						VALUES
+						(
+						   S.ENTER_CD    
+					     , S.SABUN       
+					     , 'N'   
+					     , S.SDATE       
+					     , S.REQ_S_HM    
+					     , S.REQ_E_HM    
+					     , S.SIGUB       
+					     , S.PAY_MON
+					     , S.MORNING_S_HM
+					     , S.REASON      
+					     , SYSDATE
+						 , #{ssnSabun}
+						)
+
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteExWorkDriverCalcN">
+
+
+					DELETE FROM TTIM713
+					WHERE 	(ENTER_CD, SABUN, WORK_GUBUN, SDATE) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+											<if test='rm.sabun != null and !rm.sabun.equals("")'>
+                                                    <if test='rm.sdate != null and !rm.sdate.equals("")'>
+											    	(#{ssnEnterCd}, TRIM( #{rm.sabun} ), 'N' , TRIM( #{rm.sdate} ))
+													</if>
+											</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+		
+	<!-- 1.기원신청내역반영  -->
+
+		<update id="prcExWorkDriverCalcN" parameterType="map" statementType="CALLABLE">
+
+				<![CDATA[
+					CALL P_CPN_OT_DRIVER_CRE(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{searchFromYmd,mode=IN,jdbcType=VARCHAR},
+						#{searchToYmd,mode=IN,jdbcType=VARCHAR},
+						'N',
+						#{step,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR}
+					    )
+				]]>
+
+		</update>
+		
+		
+		
+		
+	</mapper>

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.lectureFee.lectureFeeAppDet">
+	
+	<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLectureFeeAppDetMap">
+			
+				<![CDATA[
+				   SELECT B.EDU_SEQ
+				        , C.EDU_EVENT_SEQ
+				        , B.EDU_COURSE_NM
+						, C.EDU_EVENT_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10010', B.EDU_BRANCH_CD) AS EDU_BRANCH_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10015', B.EDU_M_BRANCH_CD) AS EDU_M_BRANCH_NM
+						, (SELECT X.EDU_ORG_NM FROM TTRA001 X WHERE X.ENTER_CD = C.ENTER_CD AND X.EDU_ORG_CD = C.EDU_ORG_CD) AS EDU_ORG_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L20020', B.IN_OUT_TYPE) AS IN_OUT_TYPE_NM
+						, B.EDU_MEMO
+						, TO_CHAR(TO_DATE(C.EDU_S_YMD,'YYYYMMDD'),'YYYY-MM-DD') || ' ~ ' ||TO_CHAR(TO_DATE(C.EDU_E_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS EDU_YMD
+						, C.REAL_EXPENSE_MON
+						, C.EDU_PLACE
+					    , E.LECTURE_FEE
+					    , E.NOTE
+					    , E.PAY_MON
+					    , E.PAY_YM
+					    , E.PAY_NOTE
+					    , E.CLOSE_YN
+					    , E.APPL_SEQ AS APPED_APPL_SEQ
+					FROM TTRA101 B
+					   , TTRA121 C
+					   , ( 
+					       SELECT *
+					         FROM TTRA521
+					        WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					          AND APPL_SEQ = TRIM(#{searchApplSeq})  
+					     ) E
+			       WHERE B.ENTER_CD      = TRIM(#{ssnEnterCd}) ]]>
+<choose><when test="eduSeq != null and eduSeq neq ''">
+			       	 AND B.EDU_SEQ	     = TRIM(#{eduSeq})
+</when><otherwise>
+					 AND B.EDU_SEQ	     = (SELECT EDU_SEQ
+									         FROM TTRA521
+									        WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+									          AND APPL_SEQ = TRIM(#{searchApplSeq}))
+</otherwise></choose>
+<choose><when test="eduEventSeq != null and eduEventSeq neq ''">
+					 AND C.EDU_EVENT_SEQ = TRIM(#{eduEventSeq})
+</when><otherwise>
+					 AND C.EDU_EVENT_SEQ = (SELECT EDU_EVENT_SEQ
+									         FROM TTRA521
+									        WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+									          AND APPL_SEQ = TRIM(#{searchApplSeq}))
+</otherwise></choose>
+			         AND B.ENTER_CD      = C.ENTER_CD
+					 AND B.EDU_SEQ	     = C.EDU_SEQ
+					 /*신청서*/
+					 AND C.ENTER_CD      = E.ENTER_CD(+)
+                     AND C.EDU_SEQ       = E.EDU_SEQ(+)
+                     AND C.EDU_EVENT_SEQ = E.EDU_EVENT_SEQ(+)
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getLectureFeeAppDetInfo">
+			
+				<![CDATA[
+				   	   SELECT A.EDU_SEQ
+							, A.EDU_EVENT_SEQ
+							, SUM(NVL(A.LECTURE_FEE,0)) AS LECTURE_FEE
+							, LISTAGG(A.SUBJECT_LECTURE, ', ') WITHIN GROUP (ORDER BY A.SEQ) AS SUBJECT_LECTURE
+						 FROM TTRA122 A, TTRA002 B
+						WHERE A.ENTER_CD 	= #{ssnEnterCd}
+						  AND A.ENTER_CD	= B.ENTER_CD
+						  AND A.TEACHER_SEQ = B.TEACHER_SEQ
+						  AND A.EDU_SEQ	     = TRIM(#{eduSeq})
+					 	  AND A.EDU_EVENT_SEQ = TRIM(#{eduEventSeq})
+						  AND B.TEACHER_GB 	= 'IN'
+						  AND B.TEACHER_NO 	= TRIM( #{searchApplSabun} )
+						GROUP BY A.EDU_SEQ, A.EDU_EVENT_SEQ
+				]]>
+		</select>
+
+<!-- 사내강사료신청 중복 체크  -->
+		<select parameterType="map" resultType="cMap" id="getLectureFeeAppDetDupChk">
+			
+				<![CDATA[
+
+				   SELECT COUNT(1) AS CNT
+				     FROM TTRA521 A
+				    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+				      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+				      AND A.SABUN   	= TRIM( #{searchApplSabun} )   
+				   	  AND EDU_SEQ    	= TRIM(#{eduSeq})             
+				   	  AND EDU_EVENT_SEQ = TRIM(#{eduEventSeq})                
+                      AND EXISTS ( SELECT 1
+                                     FROM THRI103 X
+                                    WHERE X.ENTER_CD = A.ENTER_Cd
+                                       AND X.APPL_SEQ = A.APPL_SEQ
+                                       AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+                                  )            
+				]]>
+			
+			
+		</select>
+		
+<!-- 		사내강사료신청 저장 -->
+		<update parameterType="map" id="saveLectureFeeAppDet">
+				 MERGE INTO TTRA521 T 
+				 USING ( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">					
+						SELECT	  TRIM( #{ssnEnterCd} ) 						AS ENTER_CD
+								, TRIM( #{rm.searchApplSeq} ) 				AS APPL_SEQ
+								, TRIM( #{rm.searchApplSabun} )				AS SABUN
+								, TRIM( #{rm.eduSeq} )  					AS EDU_SEQ
+	            				, TRIM( #{rm.eduEventSeq} )  				AS EDU_EVENT_SEQ
+	            				, REPLACE(TRIM(#{rm.lectureFee}),',','')	AS LECTURE_FEE
+					            , TRIM( #{rm.note} )  						AS NOTE
+						 FROM   DUAL
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE			= sysdate 
+				            , T.CHKID			= #{ssnSabun} 
+				            , T.EDU_SEQ 		= S.EDU_SEQ 
+				            , T.EDU_EVENT_SEQ 	= S.EDU_EVENT_SEQ 
+				            , T.LECTURE_FEE 	= S.LECTURE_FEE 
+				            , T.NOTE 			= S.NOTE 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.APPL_SEQ
+				            , T.SABUN
+				            , T.EDU_SEQ
+				            , T.EDU_EVENT_SEQ
+				            , T.LECTURE_FEE
+				            , T.NOTE
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.APPL_SEQ
+				            , S.SABUN
+				            , S.EDU_SEQ
+				            , S.EDU_EVENT_SEQ
+				            , S.LECTURE_FEE
+				            , S.NOTE
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+				
+<!--  세부내역 저장(관리자) -->
+		<update parameterType="map" id="saveLectureFeeAppDetAdmin">
+					MERGE INTO TTRA521 T
+					USING  (
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">								
+							 SELECT   TRIM( #{ssnEnterCd} )					AS ENTER_CD
+							   	 	, TRIM( #{rm.searchApplSeq} )			AS APPL_SEQ
+									, TRIM( #{rm.searchApplSabun} )			AS SABUN
+									, REPLACE(TRIM(#{rm.payYm}),'-','') 	AS PAY_YM
+									, REPLACE(TRIM(#{rm.payMon}),',','')	AS PAY_MON
+									, TRIM( #{rm.payNote} ) 				AS PAY_NOTE
+								FROM DUAL
+</foreach>		
+								
+							) S
+					ON (      T.ENTER_CD = S.ENTER_CD
+					      AND T.APPL_SEQ = S.APPL_SEQ
+					   )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAY_YM 	    	= S.PAY_YM
+									, T.PAY_MON     	= S.PAY_MON
+									, T.PAY_NOTE     	= S.PAY_NOTE
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+		</update>
+		
+</mapper>

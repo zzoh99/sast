@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.empContract.empContractEleMgr">
+
+		<!-- 계약서항목 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpContractEleMgrList">
+
+					SELECT ENTER_CD
+					     , CONT_TYPE
+					     , ELE_CD
+					     , ELE_NM
+					     , ELE_FORMAT_CD
+					     , SEQ
+					     , NOTE
+					  FROM THRM415
+					 WHERE ENTER_CD = #{ssnEnterCd}
+<if test=' searchContType != null and !searchContType.equals("") '>
+					  AND CONT_TYPE = TRIM( #{searchContType} )
+</if>
+					ORDER BY SEQ
+
+
+		</select>
+
+
+		<!-- 계약서항목 저장 -->
+		<update parameterType="map" id="saveEmpContractEleMgr">
+
+					MERGE INTO THRM415 T
+					USING (
+					    SELECT A.ENTER_CD
+					         , A.CONT_TYPE
+					         , A.ELE_CD
+					         , A.ELE_NM
+					         , A.ELE_FORMAT_CD
+					         , A.SEQ
+					         , A.NOTE
+					      FROM (
+					            SELECT NULL      AS ENTER_CD
+					                 , NULL      AS CONT_TYPE
+					                 , NULL      AS ELE_CD
+					                 , NULL      AS ELE_NM
+					                 , NULL      AS ELE_FORMAT_CD
+					                 , NULL      AS SEQ
+					                 , NULL      AS NOTE
+					              FROM DUAL
+				<bind name="icnt" value="1" />
+				<foreach item="rm" collection="mergeRows" >
+					             UNION ALL
+					            SELECT TRIM( #{ssnEnterCd} )    AS ENTER_CD
+					                 , TRIM( #{rm.contType} ) AS CONT_TYPE
+					                 , TRIM( #{rm.eleCd} )    AS ELE_CD
+					                 , TRIM( #{rm.eleNm} )  AS ELE_NM
+					                 , TRIM( #{rm.eleFormatCd} )  AS ELE_FORMAT_CD
+					                 , TRIM( #{rm.seq} )  AS SEQ
+					                 , TRIM( #{rm.note} )  AS NOTE
+					              FROM DUAL
+				</foreach>
+					          ) A
+					    WHERE 1=1
+					      AND A.ENTER_CD IS NOT NULL
+					      AND A.CONT_TYPE IS NOT NULL
+					      AND A.ELE_NM IS NOT NULL
+					) S
+					ON (
+					        T.ENTER_CD  = S.ENTER_CD
+					    AND T.CONT_TYPE = S.CONT_TYPE
+					    AND T.ELE_NM    = S.ELE_NM
+					)
+					WHEN MATCHED THEN
+					    UPDATE SET
+					          T.ELE_FORMAT_CD = S.ELE_FORMAT_CD
+					        , T.SEQ = S.SEQ
+					        , T.NOTE = S.NOTE
+					        , T.CHKDATE = SYSDATE
+					        , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					    INSERT
+					    (
+					          T.ENTER_CD
+					        , T.CONT_TYPE
+					        , T.ELE_CD
+					        , T.ELE_NM
+					        , T.ELE_FORMAT_CD
+					        , T.SEQ
+					        , T.NOTE
+					        , CHKDATE
+					        , CHKID
+					    )
+					    VALUES
+					    (
+					          S.ENTER_CD
+					        , S.CONT_TYPE
+					        , S.ELE_CD
+					        , S.ELE_NM
+					        , S.ELE_FORMAT_CD
+					        , S.SEQ
+					        , S.NOTE
+					        , SYSDATE
+					        , #{ssnSabun}
+					    )
+		</update>
+
+		<!-- 계약서항목 삭제 -->
+		<delete parameterType="map" id="deleteEmpContractEleMgr">
+
+					DELETE FROM THRM415
+					 WHERE ENTER_CD||'_'||CONT_TYPE||'_'||ELE_NM IN ( NULL
+				<foreach item="rm" collection="deleteRows" >
+					<if test=' rm.contType != null and !rm.contType.equals("") and rm.eleNm != null and !rm.eleNm.equals("") '>
+					           , TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.contType})||'_'||TRIM(#{rm.eleNm})
+					</if>
+				</foreach>
+					       )
+		</delete>
+
+
+</mapper>

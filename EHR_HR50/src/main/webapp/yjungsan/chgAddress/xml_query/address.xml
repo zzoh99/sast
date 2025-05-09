@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	주소변경
+ -->
+<root>
+
+	<!-- 주소변경 대상여부 조회 -->
+	<query id="getChkChgAddressMap">
+		<![CDATA[
+            SELECT  A.SABUN
+                  , A.ADD_TYPE
+              FROM THRM123 A
+             WHERE A.ENTER_CD = #ssnEnterCd#
+               AND A.SABUN    = #sabun#
+               AND A.CHG_STATUS   = '1'
+		]]> 
+	</query>
+	
+	<!-- 변경 대상 주소 조회 -->
+	<query id="getChgAddressPopupList">
+		<![CDATA[
+			SELECT A.SABUN
+			     , A.ADD_TYPE
+			     , A.ZIP
+			     , A.ADDR1 ||' '|| A.ADDR2 AS ADDR1
+			     , A.MOD_ZIP
+			     , A.MOD_ADDR1
+			  FROM THRM123 A                                                    
+             WHERE A.ENTER_CD = #ssnEnterCd#
+               AND A.SABUN    = #sabun#
+               AND DECODE(#add_type#, '', 'ALL', A.ADD_TYPE) = DECODE(#add_type#, '', 'ALL', #add_type#)
+               AND DECODE(#authPg#, 'R', 'ALL', A.CHG_STATUS) = DECODE(#authPg#, 'R', 'ALL', '1')
+		]]>
+	</query>
+
+	<!-- 주소 조회 -->
+	<query id="getAddressList">
+		<![CDATA[
+			SELECT A.SABUN
+			     , B.NAME
+			     , C.STATUS_NM
+			     , A.ADD_TYPE
+			     , A.ZIP AS ZIP
+			     , A.ADDR1 ||' '|| A.ADDR2 AS ADDR1
+			     , A.CHG_STATUS
+			     , A.MOD_RESULT
+			     , A.MOD_ZIP
+			     , A.MOD_ADDR1
+			  FROM THRM123 A
+			 INNER JOIN THRM100 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN	  = A.SABUN
+			 INNER JOIN THRM151 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.SABUN	  = A.SABUN
+			   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE,'99991231')
+             WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND DECODE(#add_type#, '', 'ALL', A.ADD_TYPE) = DECODE(#add_type#, '', 'ALL', #add_type#)
+			   AND DECODE(#chg_status#, '', 'ALL', A.CHG_STATUS) = DECODE(#chg_status#, '', 'ALL', #chg_status#)
+			   AND DECODE( #searchStatusCd#, 'A', NULL, 'RA', B.RET_YMD)  IS  NULL
+			   AND (A.SABUN LIKE '%'||#searchSbNm#||'%' OR B.NAME LIKE '%'||#searchSbNm#||'%')
+		]]>
+	</query>
+
+	<!-- 변경 주소 조회(다건 반환) -->
+	<query id="getAddressMappingList">
+		<![CDATA[
+			SELECT ZIPCODE AS ZIP
+			     , SIDO
+			      ||DECODE(SIGUNGU,NULL,'',' '||SIGUNGU)
+			      ||DECODE(UPMYON,NULL,'',' '||UPMYON)
+			      ||DECODE(ROAD_NAME,NULL,'',' '||ROAD_NAME)
+			      ||DECODE(BDNO_M,NULL,'',' '||BDNO_M)
+			      ||DECODE(BDNO_S,NULL,'',0,'','-'||BDNO_S)
+			      ||DECODE(#dongho#,NULL,'',', '||#dongho#)
+			      ||DECODE(LAW_DONG_NAME,NULL,'',' ('||LAW_DONG_NAME||DECODE(SIGUNGUBD_NAME,NULL,'',', '||SIGUNGUBD_NAME)||')')
+			       AS ADDR1
+			     , 0 AS SET_VALUE
+			  FROM TZIP006 A
+			 WHERE A.SIDO = #sido#
+			   AND DECODE(#sigungu#,'','ALL',A.SIGUNGU) = DECODE(#sigungu#,'','ALL',#sigungu#)
+			   AND DECODE(#upmyon#,'','ALL',A.UPMYON) = DECODE(#upmyon#,'','ALL',#upmyon#)
+			   AND DECODE(#road_name#,'','ALL',A.ROAD_NAME) = DECODE(#road_name#,'','ALL',#road_name#)
+			   AND DECODE(#dong#,'','ALL',A.LAW_DONG_NAME||A.GOV_DONG_NAME) LIKE DECODE(#dong#,'','ALL','%'||#dong#||'%')
+			   AND DECODE(#ri#,'','ALL',A.RI) = DECODE(#ri#,'','ALL',#ri#)
+			   AND DECODE(#jibun_m#,'','ALL',A.JIBUN_M||A.JIBUN_S) = DECODE(#jibun_m#,'','ALL',#jibun_m#||DECODE(#jibun_s#,'','0',#jibun_s#))
+			   AND DECODE(#bdno_m#,'','ALL',A.BDNO_M||A.BDNO_S) = DECODE(#bdno_m#,'','ALL',#bdno_m#||DECODE(#bdno_s#,'','0',#bdno_s#))
+			   AND DECODE(#remain_address#,'','ALL',A.SIGUNGUBD_NAME) LIKE DECODE(#remain_address#,'','ALL','%'||REPLACE(#remain_address#,'아파트','')||'%')
+		]]>
+	</query>
+
+	<!-- 일괄변경 주소 조회(단건 반환) -->
+	<query id="getSelectAddressMapping">
+		<![CDATA[
+			SELECT X.BDNO_D
+			     , X.CNT
+				 , Y.ZIPCODE AS ZIP
+				 , Y.SIDO
+			      ||DECODE(Y.SIGUNGU,NULL,'',' '||Y.SIGUNGU)
+			      ||DECODE(Y.UPMYON,NULL,'',' '||Y.UPMYON)
+			      ||DECODE(Y.ROAD_NAME,NULL,'',' '||Y.ROAD_NAME)
+			      ||DECODE(Y.BDNO_M,NULL,'',' '||Y.BDNO_M)
+			      ||DECODE(Y.BDNO_S,NULL,'',0,'','-'||Y.BDNO_S)
+			      ||DECODE(#dongho#,NULL,'',', '||#dongho#)
+			      ||DECODE(Y.LAW_DONG_NAME,NULL,'',' ('||Y.LAW_DONG_NAME||DECODE(Y.SIGUNGUBD_NAME,NULL,'',', '||Y.SIGUNGUBD_NAME)||')')
+			      AS ADDR1
+			FROM 
+			(
+				SELECT MAX(BDNO_D) AS BDNO_D, COUNT(*) AS CNT
+				  FROM TZIP006 A
+				 WHERE A.SIDO = #sido#
+				   AND DECODE(#sigungu#,'','ALL',A.SIGUNGU) = DECODE(#sigungu#,'','ALL',#sigungu#)
+				   AND DECODE(#upmyon#,'','ALL',A.UPMYON) = DECODE(#upmyon#,'','ALL',#upmyon#)
+				   AND DECODE(#road_name#,'','ALL',A.ROAD_NAME) = DECODE(#road_name#,'','ALL',#road_name#)
+				   AND DECODE(#dong#,'','ALL',A.LAW_DONG_NAME||A.GOV_DONG_NAME) LIKE DECODE(#dong#,'','ALL','%'||#dong#||'%')
+				   AND DECODE(#ri#,'','ALL',A.RI) = DECODE(#ri#,'','ALL',#ri#)
+				   AND DECODE(#jibun_m#,'','ALL',A.JIBUN_M||A.JIBUN_S) = DECODE(#jibun_m#,'','ALL',#jibun_m#||DECODE(#jibun_s#,'','0',#jibun_s#))
+				   AND DECODE(#bdno_m#,'','ALL',A.BDNO_M||A.BDNO_S) = DECODE(#bdno_m#,'','ALL',#bdno_m#||DECODE(#bdno_s#,'','0',#bdno_s#))
+				   AND DECODE(#remain_address#,'','ALL',A.SIGUNGUBD_NAME) LIKE DECODE(#remain_address#,'','ALL','%'||REPLACE(#remain_address#,'아파트','')||'%')
+	         ) X
+	         INNER JOIN TZIP006 Y
+	            ON Y.BDNO_D = X.BDNO_D
+
+		]]>
+	</query>
+	
+	<!-- 변경주소 저장 -->
+	<query id="saveChgAddress">
+		<![CDATA[
+			UPDATE THRM123
+			   SET CHG_STATUS = '5'
+			     , MOD_RESULT = '임직원변경'
+			     , MOD_ADDR1  = #mod_addr1#
+			     , MOD_ZIP    = #mod_zip#    
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN    = #sabun#
+			   AND ADD_TYPE = #add_type#
+		]]> 
+	</query>	
+
+	<!-- 주소변경관리 저장 -->
+	<query id="saveAddressChgStatus">
+		<![CDATA[
+			UPDATE THRM123
+			   SET CHG_STATUS = #chg_status#
+			     , ZIP		  = DECODE(#chg_status#,'9',DECODE(MOD_RESULT,NULL,ZIP,#mod_zip#), ZIP) 
+			     , ADDR1	  = DECODE(#chg_status#,'9',DECODE(MOD_RESULT,NULL,ADDR1 ||' '|| ADDR2,#mod_addr1#), ADDR1 ||' '|| ADDR2)
+			     , ADDR2      = NULL
+			     , MOD_RESULT = DECODE(#chg_status#,'9',NULL,#mod_result#)
+			     , MOD_ZIP    = DECODE(#chg_status#,'9',NULL,#mod_zip#)
+			     , MOD_ADDR1  = DECODE(#chg_status#,'9',NULL,#mod_addr1#)
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN    = #sabun#
+			   AND ADD_TYPE = #add_type#
+		]]> 
+	</query>	
+
+
+	<!-- 업로드 대상자 저장 -->
+	<query id="saveUploadAddressChgStatus">
+		<![CDATA[
+			UPDATE THRM123
+			   SET CHG_STATUS = #chg_status#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN    = #sabun#
+			   AND ADD_TYPE = #add_type#
+		]]>
+	</query>
+</root>

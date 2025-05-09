@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.boardMgr">
+<!-- 		조직도관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="tsys700SelectBoardList">
+
+				<![CDATA[
+
+						SELECT 	LVL AS "_level",
+								A.MAIN_MENU_CD, A.PRIOR_MENU_CD, A.MENU_CD, A.BBS_CD, A.BBS_NM, A.TYPE, A.SEQ, A.CNT, DECODE(A.TYPE,'B', 0,null) AS ADMIN_IMG,
+						        A.BIGO,A.MANAGE_ALL_YN,A.MANAGE_ALL_SEQ,A.MANAGE_IMG,A.MANAGE_JIKCHAK_CD,A.MANAGE_JIKCHAK_NM,A.MANAGE_ORG_CD,A.MANAGE_ORG_NM,A.MANAGE_JOB_CD,A.MANAGE_JOB_NM,
+						        A.SEARCH_ALL_YN,A.SEARCH_ALL_SEQ,A.SEARCH_IMG,A.SEARCH_JIKCHAK_CD,A.SEARCH_JIKCHAK_NM,A.SEARCH_ORG_CD,A.SEARCH_ORG_NM,A.SEARCH_JOB_CD,A.SEARCH_JOB_NM,A.USE_YN,A.NOTIFY_YN,
+						        A.REPLY_YN, A.COMMENT_YN, A.FILE_NAME, A.FILE_YN,
+								(SELECT X.SEARCH_DESC FROM THRI201 X WHERE X.ENTER_CD = A.ENTER_CD AND X.SEARCH_SEQ = A.MANAGE_ALL_SEQ) AS MANAGE_ALL_DESC,
+							    (SELECT X.SEARCH_DESC FROM THRI201 X WHERE X.ENTER_CD = A.ENTER_CD AND X.SEARCH_SEQ = A.SEARCH_ALL_SEQ) AS SEARCH_ALL_DESC
+						  FROM (
+							SELECT F_SYS_MAIN_BOARD_PRG_LEVEL_SEQ(ENTER_CD, MAIN_MENU_CD, PRIOR_MENU_CD, MENU_CD) AS LEVEL_SEQ,
+							       LEVEL AS LVL, ENTER_CD, MAIN_MENU_CD, PRIOR_MENU_CD, MENU_CD, BBS_CD, BBS_NM, TYPE, SEQ, CNT,
+						           BIGO,MANAGE_ALL_YN, MANAGE_ALL_SEQ,
+						           DECODE(MANAGE_ALL_YN,'N', 0,null) AS MANAGE_IMG,MANAGE_JIKCHAK_CD,MANAGE_JIKCHAK_NM,MANAGE_ORG_CD,MANAGE_ORG_NM,MANAGE_JOB_CD,MANAGE_JOB_NM,
+						           SEARCH_ALL_YN,SEARCH_ALL_SEQ,
+						           DECODE(SEARCH_ALL_YN,'N', 0,null) AS SEARCH_IMG,SEARCH_JIKCHAK_CD,SEARCH_JIKCHAK_NM,SEARCH_ORG_CD,SEARCH_ORG_NM,SEARCH_JOB_CD,SEARCH_JOB_NM,USE_YN,NOTIFY_YN,
+						           REPLY_YN, COMMENT_YN, FILE_NAME, FILE_YN
+							  FROM TSYS700
+							 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+							 START WITH PRIOR_MENU_CD = '0'
+							 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+								AND PRIOR MAIN_MENU_CD = MAIN_MENU_CD
+								AND PRIOR MENU_CD = PRIOR_MENU_CD
+                              UNION ALL
+		              		 SELECT ' ',0 , NULL, '20', '0' , '0', NULL, '게시판', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+		                    	  , NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,NULL, NULL, NULL, NULL, NULL, NULL, NULL
+							   FROM DUAL
+							) A
+						 ORDER BY A.LEVEL_SEQ, SEQ
+				]]>
+
+
+		</select>
+
+		<!-- 		조직도관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBoardAdminPopMgr">
+
+				<![CDATA[
+				SELECT ENTER_CD,
+				        F_COM_GET_NAMES(ENTER_CD,VALUE, #{ssnLocaleCd}) AS NAME,
+				        F_COM_GET_JIKWEE_CD(ENTER_CD,VALUE,TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_CD,
+				        VALUE AS SABUN,
+				        BBS_CD,
+				        GB_CD,
+				        SDATE,
+				        EDATE
+				FROM TSYS701
+				WHERE ENTER_CD = #{ssnEnterCd}
+				  AND KEY = 'SABUN'
+				  AND BBS_CD = #{searchBbsCd}
+
+				]]>
+
+
+		</select>
+
+		<!-- 		게시판 권한관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBoardAuthPopMgr">
+
+				<![CDATA[
+					SELECT ENTER_CD,
+					        KEY,
+					        VALUE,
+					        CASE KEY WHEN 'ORG_CD' THEN F_COM_GET_ORG_NM(ENTER_CD, VALUE, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd})
+					                       WHEN 'JIKCHAK_CD' THEN F_COM_GET_GRCODE_NAME(ENTER_CD, 'H20020', VALUE, #{ssnLocaleCd})
+					                       WHEN 'WORK_TYPE' THEN F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10050', VALUE, #{ssnLocaleCd})
+					        END AS VALUE_NM,
+					        BBS_CD,
+					        GB_CD,
+					        SDATE,
+					        EDATE
+					FROM TSYS701
+					WHERE ENTER_CD =  #{ssnEnterCd}
+					  AND KEY IN ( 'ORG_CD', 'JIKCHAK_CD', 'WORK_TYPE')
+					  AND GB_CD = #{searchGbCd}
+					  AND BBS_CD =  #{searchBbsCd}
+				]]>
+
+
+		</select>
+
+<!-- 		조직도관리 sheet1 저장 -->
+		<update parameterType="map" id="tsys700MergeBoardMgr">
+
+
+					MERGE INTO TSYS700 T
+					USING	(
+							SELECT	  A.ENTER_CD
+        							, A.MAIN_MENU_CD
+									, A.PRIOR_MENU_CD
+									, A.MENU_CD
+									, A.TYPE
+        							, A.BBS_CD
+        							, A.BBS_NM
+									, A.SEQ
+									, A.USE_YN
+									, A.NOTIFY_YN
+									, A.MANAGE_ALL_YN
+        							, A.SEARCH_ALL_YN
+        							, A.MANAGE_ALL_SEQ
+        							, A.SEARCH_ALL_SEQ
+									, A.BIGO
+									, A.MANAGE_ORG_CD
+									, A.MANAGE_ORG_NM
+									, A.MANAGE_JOB_CD
+									, A.MANAGE_JOB_NM
+									, A.MANAGE_JIKCHAK_CD
+									, A.MANAGE_JIKCHAK_NM
+									, A.SEARCH_ORG_CD
+									, A.SEARCH_ORG_NM
+									, A.SEARCH_JOB_CD
+									, A.SEARCH_JOB_NM
+									, A.SEARCH_JIKCHAK_CD
+									, A.SEARCH_JIKCHAK_NM
+									, A.REPLY_YN
+									, A.COMMENT_YN
+									, A.FILE_NAME
+									, A.FILE_YN
+							FROM	(
+									SELECT	  NULL  	AS ENTER_CD
+        									, NULL  	AS MAIN_MENU_CD
+											, NULL  	AS PRIOR_MENU_CD
+											, NULL  	AS MENU_CD
+											, NULL  	AS TYPE
+        									, NULL  	AS BBS_CD
+        									, NULL  	AS BBS_NM
+											, NULL  	AS SEQ
+											, NULL  	AS USE_YN
+											, NULL  	AS NOTIFY_YN
+											, NULL  	AS MANAGE_ALL_YN
+        									, NULL  	AS SEARCH_ALL_YN
+        									, NULL  	AS MANAGE_ALL_SEQ
+        									, NULL  	AS SEARCH_ALL_SEQ
+											, NULL  	AS BIGO
+											, NULL  	AS MANAGE_ORG_CD
+											, NULL  	AS MANAGE_ORG_NM
+											, NULL  	AS MANAGE_JOB_CD
+											, NULL  	AS MANAGE_JOB_NM
+											, NULL  	AS MANAGE_JIKCHAK_CD
+											, NULL  	AS MANAGE_JIKCHAK_NM
+											, NULL  	AS SEARCH_ORG_CD
+											, NULL  	AS SEARCH_ORG_NM
+											, NULL  	AS SEARCH_JOB_CD
+											, NULL  	AS SEARCH_JOB_NM
+											, NULL  	AS SEARCH_JIKCHAK_CD
+											, NULL  	AS SEARCH_JIKCHAK_NM
+											, NULL  	AS REPLY_YN
+											, NULL  	AS COMMENT_YN
+											, NULL  	AS FILE_NAME
+											, NULL  	AS FILE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+								    SELECT   #{ssnEnterCd}			AS ENTER_CD
+        									, TRIM( #{rm.mainMenuCd}) AS MAIN_MENU_CD
+											, TRIM( #{rm.priorMenuCd}) AS PRIOR_MENU_CD
+											, TRIM( #{rm.menuCd}) AS MENU_CD
+											, TRIM( #{rm.type}) AS TYPE
+        									, TRIM( #{rm.bbsCd}) AS BBS_CD
+        									, TRIM( #{rm.bbsNm}) AS BBS_NM
+											, TRIM( #{rm.seq}) AS SEQ
+											, TRIM( #{rm.useYn}) AS USE_YN
+											, TRIM( #{rm.notifyYn}) AS NOTIFY_YN
+											, TRIM( #{rm.manageAllYn}) AS MANAGE_ALL_YN
+        									, TRIM( #{rm.searchAllYn}) AS SEARCH_ALL_YN
+        									, TRIM( #{rm.manageAllSeq}) AS MANAGE_ALL_SEQ
+        									, TRIM( #{rm.searchAllSeq}) AS SEARCH_ALL_SEQ
+											, TRIM( #{rm.bigo}) AS BIGO
+											, TRIM( #{rm.manageOrgCd}) AS MANAGE_ORG_CD
+											, TRIM( #{rm.manageOrgNm}) AS MANAGE_ORG_NM
+											, TRIM( #{rm.manageJobCd}) AS MANAGE_JOB_CD
+											, TRIM( #{rm.manageJobNm}) AS MANAGE_JOB_NM
+											, TRIM( #{rm.manageJikchakCd}) AS MANAGE_JIKCHAK_CD
+											, TRIM( #{rm.manageJikchakNm}) AS MANAGE_JIKCHAK_NM
+											, TRIM( #{rm.searchOrgCd}) AS SEARCH_ORG_CD
+											, TRIM( #{rm.searchOrgNm}) AS SEARCH_ORG_NM
+											, TRIM( #{rm.searchJobCd}) AS SEARCH_JOB_CD
+											, TRIM( #{rm.searchJobNm}) AS SEARCH_JOB_NM
+											, TRIM( #{rm.searchJikchakCd}) AS SEARCH_JIKCHAK_CD
+											, TRIM( #{rm.searchJikchakNm}) AS SEARCH_JIKCHAK_NM
+											, TRIM( #{rm.replyYn}) AS REPLY_YN
+											, TRIM( #{rm.commentYn}) AS COMMENT_YN
+											, TRIM( #{rm.fileName}) AS FILE_NAME
+											, TRIM( #{rm.fileYn}) AS FILE_YN
+        								FROM DUAL
+
+</foreach>
+									) A WHERE A.BBS_NM IS NOT NULL
+							) S
+					ON (       T.ENTER_CD   	= S.ENTER_CD
+						   AND T.MAIN_MENU_CD	= S.MAIN_MENU_CD
+						   AND T.PRIOR_MENU_CD  = S.PRIOR_MENU_CD
+						   AND T.MENU_CD        = S.MENU_CD   		   		)
+					WHEN MATCHED THEN
+ 						UPDATE SET   T.TYPE 				= S.TYPE
+ 								   , T.BBS_NM 				= S.BBS_NM
+ 								   , T.SEQ 					= S.SEQ
+ 								   , T.USE_YN				= S.USE_YN
+ 								   , T.NOTIFY_YN			= S.NOTIFY_YN
+ 								   , T.MANAGE_ALL_YN 		= S.MANAGE_ALL_YN
+ 								   , T.SEARCH_ALL_YN		= S.SEARCH_ALL_YN
+ 								   , T.MANAGE_ALL_SEQ 		= S.MANAGE_ALL_SEQ
+ 								   , T.SEARCH_ALL_SEQ		= S.SEARCH_ALL_SEQ
+ 								   , T.BIGO 				= S.BIGO
+ 								   , T.MANAGE_ORG_CD		= S.MANAGE_ORG_CD
+ 								   , T.MANAGE_ORG_NM		= S.MANAGE_ORG_NM
+ 								   , T.MANAGE_JOB_CD 		= S.MANAGE_JOB_CD
+ 								   , T.MANAGE_JOB_NM		= S.MANAGE_JOB_NM
+ 								   , T.MANAGE_JIKCHAK_CD	= S.MANAGE_JIKCHAK_CD
+ 								   , T.MANAGE_JIKCHAK_NM	= S.MANAGE_JIKCHAK_NM
+ 								   , T.SEARCH_ORG_CD		= S.SEARCH_ORG_CD
+ 								   , T.SEARCH_ORG_NM 		= S.SEARCH_ORG_NM
+ 								   , T.SEARCH_JOB_CD		= S.SEARCH_JOB_CD
+ 								   , T.SEARCH_JOB_NM 		= S.SEARCH_JOB_NM
+ 								   , T.SEARCH_JIKCHAK_CD	= S.SEARCH_JIKCHAK_CD
+ 								   , T.SEARCH_JIKCHAK_NM	= S.SEARCH_JIKCHAK_NM
+ 								   , T.REPLY_YN	 			= S.REPLY_YN
+ 								   , T.COMMENT_YN	 		= S.COMMENT_YN
+ 								   , T.FILE_NAME	 		= S.FILE_NAME
+ 								   , T.FILE_YN	 			= S.FILE_YN
+ 								   , T.CHKDATE 				= SYSDATE
+ 								   , T.CHKID 				= #{ssnSabun}
+
+					WHEN NOT MATCHED THEN
+				        INSERT
+				        (
+							T.ENTER_CD,
+        					T.MAIN_MENU_CD,
+							T.PRIOR_MENU_CD,
+							T.MENU_CD,
+							T.TYPE,
+        					T.BBS_CD,
+        					T.BBS_NM,
+							T.SEQ,
+							T.USE_YN,
+							T.NOTIFY_YN,
+							T.MANAGE_ALL_YN,
+        					T.SEARCH_ALL_YN,
+							T.MANAGE_ALL_SEQ,
+        					T.SEARCH_ALL_SEQ,
+							T.BIGO,
+							T.MANAGE_ORG_CD,
+							T.MANAGE_ORG_NM,
+							T.MANAGE_JOB_CD,
+							T.MANAGE_JOB_NM,
+							T.MANAGE_JIKCHAK_CD,
+							T.MANAGE_JIKCHAK_NM,
+							T.SEARCH_ORG_CD,
+							T.SEARCH_ORG_NM,
+							T.SEARCH_JOB_CD,
+							T.SEARCH_JOB_NM,
+							T.SEARCH_JIKCHAK_CD,
+							T.SEARCH_JIKCHAK_NM,
+							T.REPLY_YN,
+							T.COMMENT_YN,
+							T.FILE_NAME,
+							T.FILE_YN,
+        					T.CHKDATE,
+        					T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+        					, S.MAIN_MENU_CD
+							, S.PRIOR_MENU_CD
+							, S.MENU_CD
+							, S.TYPE
+        					, S.BBS_CD
+        					, S.BBS_NM
+							, S.SEQ
+							, S.USE_YN
+							, S.NOTIFY_YN
+							, S.MANAGE_ALL_YN
+        					, S.SEARCH_ALL_YN
+        					, S.MANAGE_ALL_SEQ
+        					, S.SEARCH_ALL_SEQ
+							, S.BIGO
+							, S.MANAGE_ORG_CD
+							, S.MANAGE_ORG_NM
+							, S.MANAGE_JOB_CD
+							, S.MANAGE_JOB_NM
+							, S.MANAGE_JIKCHAK_CD
+							, S.MANAGE_JIKCHAK_NM
+							, S.SEARCH_ORG_CD
+							, S.SEARCH_ORG_NM
+							, S.SEARCH_JOB_CD
+							, S.SEARCH_JOB_NM
+							, S.SEARCH_JIKCHAK_CD
+							, S.SEARCH_JIKCHAK_NM
+							, S.REPLY_YN
+							, S.COMMENT_YN
+							, S.FILE_NAME
+							, S.FILE_YN
+							, SYSDATE
+							, #{ssnSabun}
+
+						)
+
+		</update>
+
+
+		<delete parameterType="map"  id="tsys700DeleteBoard">
+
+			DELETE FROM TSYS700
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND ( MAIN_MENU_CD,PRIOR_MENU_CD,MENU_CD ) IN ( ( NULL,NULL,NULL)
+			<foreach item="rm" collection="deleteRows">
+				<if test="rm.mainMenuCd != null and !rm.mainMenuCd neq '' and rm.priorMenuCd != null and !rm.priorMenuCd neq '' and rm.menuCd != null and !rm.menuCd neq '' ">
+					, ( TRIM( #{rm.mainMenuCd} ),TRIM( #{rm.priorMenuCd} ),TRIM( #{rm.menuCd} ) )
+				</if>
+			</foreach>
+			)
+
+
+		</delete>
+
+
+<!-- 		관리자 팝업 저장 -->
+		<update parameterType="map" id="saveBoardAdminPopMgr">
+
+
+					MERGE INTO TSYS701 T
+					USING	(
+							SELECT	  A.ENTER_CD
+        							, A.BBS_CD
+									, A.GB_CD
+									, A.KEY
+									, A.VALUE
+        							, A.SDATE
+        							, A.EDATE
+							FROM	(
+									SELECT	  NULL  	AS ENTER_CD
+        									, NULL  	AS BBS_CD
+											, NULL  	AS GB_CD
+											, NULL  	AS KEY
+											, NULL  	AS VALUE
+        									, NULL  	AS SDATE
+        									, NULL  	AS EDATE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+								    SELECT   #{ssnEnterCd}			AS ENTER_CD
+        									, TRIM( #{rm.bbsCd}) 	AS BBS_CD
+        									, TRIM( #{rm.gbCd}) 	AS GB_CD
+        									, TRIM( 'SABUN') 		AS KEY
+        									, TRIM( #{rm.sabun}) 	AS VALUE
+        									, TRIM( #{rm.sdate}) 	AS SDATE
+        									, TRIM( #{rm.edate}) 	AS EDATE
+        								FROM DUAL
+
+</foreach>
+									) A WHERE A.BBS_CD IS NOT NULL
+							) S
+					ON (       T.ENTER_CD   = S.ENTER_CD
+						   AND T.BBS_CD		= S.BBS_CD
+						   AND T.GB_CD  	= S.GB_CD
+						   AND T.KEY    	= S.KEY
+						   AND T.VALUE    	= S.VALUE
+					)
+					WHEN MATCHED THEN
+ 						UPDATE SET   T.SDATE		= S.SDATE
+ 								   , T.EDATE		= S.EDATE
+ 								   , T.CHKDATE 		= SYSDATE
+ 								   , T.CHKID 		= #{ssnSabun}
+
+					WHEN NOT MATCHED THEN
+				        INSERT
+				        (
+							T.ENTER_CD,
+        					T.BBS_CD,
+							T.GB_CD,
+							T.KEY,
+							T.VALUE,
+        					T.SDATE,
+        					T.EDATE,
+        					T.CHKDATE,
+        					T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+        					, S.BBS_CD
+							, S.GB_CD
+							, S.KEY
+							, S.VALUE
+        					, S.SDATE
+        					, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+
+						)
+
+		</update>
+
+
+<!-- 		게시판 권한 팝업 저장 -->
+		<update parameterType="map" id="saveBoardAuthPopMgr">
+
+
+					MERGE INTO TSYS701 T
+					USING	(
+							SELECT	  A.ENTER_CD
+        							, A.BBS_CD
+									, A.GB_CD
+									, A.KEY
+									, A.VALUE
+        							, A.SDATE
+        							, A.EDATE
+							FROM	(
+									SELECT	  NULL  	AS ENTER_CD
+        									, NULL  	AS BBS_CD
+											, NULL  	AS GB_CD
+											, NULL  	AS KEY
+											, NULL  	AS VALUE
+        									, NULL  	AS SDATE
+        									, NULL  	AS EDATE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+								    SELECT   #{ssnEnterCd}			AS ENTER_CD
+        									, TRIM( #{rm.bbsCd}) 	AS BBS_CD
+        									, TRIM( #{rm.gbCd}) 	AS GB_CD
+        									, TRIM( #{rm.key}) 		AS KEY
+        									, TRIM( #{rm.value}) 	AS VALUE
+        									, TRIM( #{rm.sdate}) 	AS SDATE
+        									, TRIM( #{rm.edate}) 	AS EDATE
+        								FROM DUAL
+
+</foreach>
+									) A WHERE A.BBS_CD IS NOT NULL
+							) S
+					ON (       T.ENTER_CD   = S.ENTER_CD
+						   AND T.BBS_CD		= S.BBS_CD
+						   AND T.GB_CD  	= S.GB_CD
+						   AND T.KEY    	= S.KEY
+						   AND T.VALUE    	= S.VALUE
+					)
+					WHEN MATCHED THEN
+ 						UPDATE SET   T.SDATE		= S.SDATE
+ 								   , T.EDATE		= S.EDATE
+ 								   , T.CHKDATE 		= SYSDATE
+ 								   , T.CHKID 		= #{ssnSabun}
+
+					WHEN NOT MATCHED THEN
+				        INSERT
+				        (
+							T.ENTER_CD,
+        					T.BBS_CD,
+							T.GB_CD,
+							T.KEY,
+							T.VALUE,
+        					T.SDATE,
+        					T.EDATE,
+        					T.CHKDATE,
+        					T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+        					, S.BBS_CD
+							, S.GB_CD
+							, S.KEY
+							, S.VALUE
+        					, S.SDATE
+        					, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+
+						)
+
+		</update>
+
+
+		<delete parameterType="map" id="deleteBoardAdminPopMgr">
+			DELETE FROM TSYS701
+			WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			AND ( BBS_CD,GB_CD,KEY,VALUE ) IN ( ( NULL,NULL,NULL,NULL)
+			<foreach item="rm" collection="deleteRows">
+				<if test="rm.bbsCd != null and !rm.bbsCd neq '' and rm.gbCd != null and !rm.gbCd neq '' and rm.sabun != null and !rm.sabun neq '' ">
+					, ( TRIM( #{rm.bbsCd} ),TRIM( #{rm.gbCd} ),TRIM( 'SABUN' ),TRIM( #{rm.sabun} ) )
+				</if>
+			</foreach>
+			)
+		</delete>
+
+		<!-- 	게시판 권한 삭제 -->
+		<delete parameterType="map" id="deleteBoardAuthPopMgr">
+			DELETE FROM TSYS701
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND ( BBS_CD,GB_CD,KEY,VALUE ) IN ( ( NULL,NULL,NULL,NULL)
+			<foreach item="rm" collection="deleteRows">
+				<if test="rm.bbsCd != null and !rm.bbsCd neq '' and rm.gbCd != null and !rm.gbCd neq '' and rm.key != null and !rm.key neq '' and rm.value != null and !rm.value neq '' ">
+					, ( TRIM( #{rm.bbsCd} ),TRIM( #{rm.gbCd} ),TRIM( #{rm.key} ),TRIM( #{rm.value} ) )
+				</if>
+			</foreach>
+			)
+		</delete>
+
+
+</mapper>

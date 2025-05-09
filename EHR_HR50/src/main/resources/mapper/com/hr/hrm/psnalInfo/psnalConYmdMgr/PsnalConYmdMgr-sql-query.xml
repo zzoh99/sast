@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalConYmdMgr">
+		<!-- 개인별계약기간 다건 조회 -->
+		<select id="getPsnalConYmdMgrList" parameterType="map" resultType="cMap">
+
+					SELECT
+					         A.ENTER_CD,
+					         A.SABUN,
+					         F_COM_GET_ORG_NM2 (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM,
+					         F_COM_GET_JIKCHAK_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM,
+					         F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME,
+					         F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM,
+					         F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM,
+					         F_COM_GET_MANAGE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS MANAGE_NM,
+					         A.CON_R_YMD,
+					         A.CON_E_YMD
+					  FROM THRM100 A
+					<choose>
+					<when test='ssnSearchType != null and ssnSearchType.equals("O")' >
+					-- 관리자 권한범위 체크
+					INNER JOIN ${query} B
+					   ON B.ENTER_CD = A.ENTER_CD
+					  AND B.SABUN = A.SABUN
+					</when>
+				  	<otherwise>
+					, THRM151 B
+					</otherwise>
+				  </choose>
+					  WHERE A.ENTER_CD = B.ENTER_CD
+					    AND A.SABUN = B.SABUN
+					    AND A.ENTER_CD = #{ssnEnterCd}
+					    AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+					    AND B.SDATE = (SELECT MAX(X.SDATE) FROM THRM151 X
+					                    WHERE X.ENTER_CD = B.ENTER_CD
+					                      AND X.SABUN = B.SABUN
+					                      AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+					                   )
+					<if test='searchSabunNameAlias != null and !searchSabunNameAlias.equals("")' >
+										  AND ( A.SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+										     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%')
+					</if>
+					<if test='multiManageCd != null and !multiManageCd.equals("")' >
+					    AND B.MANAGE_CD IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					    AND B.STATUS_CD NOT IN ('RA','ZA')
+					  ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+		</select>
+	</mapper>

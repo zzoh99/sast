@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.foreignFradeMgr">
+<!-- 외국어리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getForeignGradeMgrList1">
+
+					SELECT A.ENTER_CD
+						 , A.CODE
+						 , A.CODE_NM
+					     , A.CODE_IDX
+						 , A.NOTE2
+						 , A.NOTE3
+						 , A.LANGUAGE_CD
+					     , A.S_YMD
+					     , A.E_YMD
+						 , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys001',  A.LANGUAGE_CD,#{ssnLocaleCd}) AS LANGUAGE_NM
+					  FROM TSYS005 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.GRCODE_CD = 'H20307' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.S_YMD AND A.E_YMD
+				<if test='searchCodeNm != null and !searchCodeNm.equals("")'>
+					   AND A.CODE_NM LIKE '%'|| #{searchCodeNm} ||'%'
+				</if>
+					 ORDER BY  A.CODE
+		</select>
+
+
+
+<!-- 등급맵핑리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getForeignGradeMgrList2">
+
+					SELECT A.ENTER_CD
+						 , A.F_TEST_CD
+						 , A.LEVEL_CD
+						 , A.SEQ
+						 , A.MIN_POINT
+						 , A.MAX_POINT
+						 , A.NOTE
+						 , A.ORDER_SEQ
+						 , F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'H20307', A.F_TEST_CD, 2) AS POINT_TYPE
+					  FROM THRM351 A
+					 WHERE 1 = 1
+<choose><when test='enterCd != null and !enterCd.equals("")'>
+					  AND A.ENTER_CD = #{enterCd}
+</when>
+					   <otherwise>
+					  AND A.ENTER_CD = #{ssnEnterCd}
+					   </otherwise>
+</choose>
+					   AND A.F_TEST_CD = #{searchFTestCd}
+					 ORDER BY A.ORDER_SEQ
+
+
+
+		</select>
+
+		<!-- 등급맵핑리스트 ALL 조회 -->
+		<select parameterType="map" resultType="cMap" id="getForeignGradeMgrList3">
+
+				<![CDATA[
+					SELECT	A.ENTER_CD
+					, 		A.F_TEST_CD
+					, 		A.LEVEL_CD
+					, 		A.SEQ
+					, 		A.MIN_POINT
+					, 		A.MAX_POINT
+					, 		A.NOTE
+					, 		A.ORDER_SEQ
+					, 		F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'H20307', A.F_TEST_CD, 2) AS POINT_TYPE
+					FROM 	THRM351 A
+					WHERE 	A.ENTER_CD = #{ssnEnterCd}
+				 ORDER BY 	A.F_TEST_CD, A.ORDER_SEQ
+				]]>
+
+
+		</select>
+
+<!-- 외국어리스트 저장 -->
+		<update parameterType="map" id="saveForeignGradeMgr1">
+
+					MERGE INTO TSYS005 T
+					USING	(
+							SELECT	  A.ENTER_CD
+								    , A.GRCODE_CD
+									, A.CODE
+									, A.CODE_NM
+									, A.CODE_IDX
+									, A.NOTE2
+									, A.NOTE3
+									, A.LANGUAGE_CD
+									, A.S_YMD
+									, A.E_YMD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS GRCODE_CD
+											, NULL		AS CODE
+											, NULL		AS CODE_NM
+											, NULL		AS CODE_IDX
+											, NULL		AS NOTE2
+											, NULL		AS NOTE3
+											, NULL		AS LANGUAGE_CD
+											, NULL		AS S_YMD
+											, NULL		AS E_YMD
+									FROM	DUAL
+<bind name="cnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( 'H20307' )			AS GRCODE_CD
+											, TRIM( #{rm.code} )		AS CODE
+											, TRIM( #{rm.codeNm} )		AS CODE_NM
+											, TO_NUMBER(TRIM(#{rm.codeIdx}))  AS CODE_IDX
+											, TRIM( #{rm.note2} )		AS NOTE2
+											, TRIM( #{rm.note3} )		AS NOTE3
+											, TRIM( #{rm.languageCd} )	AS LANGUAGE_CD
+											, TRIM(#{rm.sYmd})			AS S_YMD
+											, TRIM(#{rm.eYmd})			AS E_YMD
+									FROM DUAL
+<bind name="cnt" value="cnt + 1" />
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.GRCODE_CD IS NOT NULL
+										  AND A.CODE IS NOT NULL
+										  AND A.CODE_NM IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GRCODE_CD = S.GRCODE_CD AND T.CODE = S.CODE AND T.CODE_IDX	= S.CODE_IDX)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CODE_NM			= S.CODE_NM
+									, T.NOTE2			= S.NOTE2
+									, T.NOTE3			= S.NOTE3
+									, T.LANGUAGE_CD		= S.LANGUAGE_CD
+									, T.S_YMD		= S.S_YMD
+									, T.E_YMD		= S.E_YMD
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.GRCODE_CD
+							, T.CODE
+							, T.CODE_NM
+							, T.CODE_IDX
+							, T.NOTE2
+							, T.NOTE3
+							, T.S_YMD
+							, T.E_YMD
+							, T.LANGUAGE_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.GRCODE_CD
+							, S.CODE
+							, S.CODE_NM
+							, S.CODE_IDX
+							, S.NOTE2
+							, S.NOTE3
+							, S.S_YMD
+							, S.E_YMD
+							, S.LANGUAGE_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+<!-- 등급맵핑리스트 저장 -->
+		<update parameterType="map" id="saveForeignGradeMgr2">
+
+					MERGE INTO THRM351 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.F_TEST_CD
+									, A.LEVEL_CD
+									, A.SEQ
+									, A.MIN_POINT
+									, A.MAX_POINT
+									, A.NOTE
+									, A.ORDER_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS F_TEST_CD
+											, NULL		AS LEVEL_CD
+											, NULL		AS SEQ
+											, NULL		AS MIN_POINT
+											, NULL		AS MAX_POINT
+											, NULL		AS NOTE
+											, NULL		AS ORDER_SEQ
+									FROM	DUAL
+<bind name="cnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.fTestCd} )		AS F_TEST_CD
+											, TRIM( #{rm.levelCd} )		AS LEVEL_CD
+											<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+											, TRIM( #{rm.seq} )			AS SEQ
+											</when>
+
+											<otherwise>
+											, TO_CHAR( (
+															SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + #{cnt})
+															  FROM THRM351
+															 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+															   AND F_TEST_CD = TRIM( #{rm.fTestCd} )
+															   AND LEVEL_CD = TRIM( #{rm.levelCd} )
+														) )	AS SEQ
+												<bind name="cnt" value="cnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM( #{rm.minPoint} )	AS MIN_POINT
+											, TRIM( #{rm.maxPoint} )	AS MAX_POINT
+											, TRIM( #{rm.note} )		AS NOTE
+											, TRIM( #{rm.orderSeq} )	AS ORDER_SEQ
+									FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.F_TEST_CD = S.F_TEST_CD AND T.LEVEL_CD = S.LEVEL_CD AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MAX_POINT		= S.MAX_POINT
+									, T.MIN_POINT		= S.MIN_POINT
+									, T.NOTE			= S.NOTE
+									, T.ORDER_SEQ		= S.ORDER_SEQ
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.F_TEST_CD
+							, T.LEVEL_CD
+							, T.SEQ
+							, T.MIN_POINT
+							, T.MAX_POINT
+							, T.NOTE
+							, T.ORDER_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.F_TEST_CD
+							, S.LEVEL_CD
+							, S.SEQ
+							, S.MIN_POINT
+							, S.MAX_POINT
+							, S.NOTE
+							, S.ORDER_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+<!-- 외국어리스트 삭제 -->
+		<delete parameterType="map" id="deleteForeignGradeMgr1">
+
+					DELETE FROM TSYS005
+					WHERE  (ENTER_CD,GRCODE_CD,CODE, CODE_IDX) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.code != null and !rm.code.equals("")'>
+											,(TRIM( #{ssnEnterCd} ),TRIM( 'H20307' ),TRIM( #{rm.code} ), TO_NUMBER(TRIM(#{rm.codeIdx})))
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+<!-- 등급맵핑리스트 삭제 -->
+		<delete parameterType="map" id="deleteForeignGradeMgr2">
+
+					DELETE FROM THRM351
+<choose><when test='deleteType != null and deleteType.equals("A")'>
+					WHERE  (ENTER_CD,F_TEST_CD) IN 	(  (NULL,NULL)
+	<foreach item="rm" collection="deleteRows" >
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.code != null and !rm.code.equals("")'>
+											,(TRIM( #{ssnEnterCd} ),TRIM( #{rm.code} ))
+										</if>
+	</foreach>
+										)
+</when>
+<otherwise>
+					WHERE  (ENTER_CD,F_TEST_CD,LEVEL_CD,MIN_POINT) IN 	(  (NULL,NULL,NULL,NULL)
+	<foreach item="rm" collection="deleteRows" >
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.fTestCd != null and !rm.fTestCd.equals("")
+											and rm.levelCd != null and !rm.levelCd.equals("")
+											and rm.minPoint != null and !rm.minPoint.equals("")'>
+											,(TRIM( #{ssnEnterCd} ),TRIM( #{rm.fTestCd} ),TRIM( #{rm.levelCd} ),TRIM( #{rm.minPoint} ))
+										</if>
+	</foreach>
+										)
+</otherwise>
+</choose>
+
+
+		</delete>
+
+
+</mapper>

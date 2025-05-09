@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.selfDevelopment.selfDevelopmentStat">
+        <select parameterType="map" resultType="cMap" id="getSelfDevelopmentStat">
+
+                <![CDATA[
+					SELECT Z.TRM_TYPE, Z.CODE, Z.CODE_NM, Z.ITEM_GUBUN, Z.EDUCATION, Z.EDUCATIONNM, Z.TIME, Z.EDU_PRE_YMD, Z.SDATE, Z.EDATE, Z.SIL_TIME, Z.NUM
+						   , Z.SABUN, Z.EDUCATION_YN
+					FROM (
+					
+						SELECT X.TRM_TYPE, X.CODE, Y.CODE_NM, X.ITEM_GUBUN, X.EDUCATION, X.EDUCATIONNM, X.TIME, X.EDU_PRE_YMD, X.SDATE, X.EDATE, X.SIL_TIME, X.NUM
+							   , X.SABUN, X.EDUCATION_YN
+						FROM    (
+					
+								SELECT AA.ENTER_CD, AA.SABUN, AA.EDUCATION, AA.ITEM_GUBUN, AA.EDUCATIONNM, AA.TIME, AA.EDU_PRE_YMD
+										    , BB.SDATE, BB.EDATE, BB.TIME AS SIL_TIME, AA.TRM_CD AS CODE, AA.TRM_TYPE, AA.NUM, AA.EDUCATION_YN
+									FROM
+										(
+											SELECT  A.ENTER_CD, A.SABUN, B.EDUCATION,  C.ITEM_GUBUN, D.EDUCATIONNM, D.TIME, B.EDU_PRE_YMD, B.TRM_CD, C.TRM_TYPE, D.NUM, B.EDUCATION_YN
+											FROM TCDPV301 A , TCDPV302 B ,  TCDPT501 C ,
+												 	  (	SELECT ENTER_CD, EDUCATION, EDUCATIONNM, TIME, NUM
+														FROM (
+															SELECT ENTER_CD, TO_CHAR(NUM) AS EDUCATION, EDUCATIONNM, NVL(TIME,0) AS TIME,  NUM
+															FROM TCDPT101_V
+															UNION
+															SELECT ENTER_CD, TO_CHAR(SEQ) AS EDUCATION, EDUCATIONNM, NVL(TOTAL_TIME,0) AS TIME, NULL AS NUM
+															FROM TCDPT201_V
+															UNION
+															--SELECT   'HR', ACT_VER_ID  AS EDUCATION , EDUCATIONNM,  TIME, NULL AS NUM  FROM  TCDPT309 AAA  -- 'HR' 하드코딩한 이유를 모르겠음.
+															SELECT ENTER_CD, ACT_VER_ID  AS EDUCATION , EDUCATIONNM,  TIME, NULL AS NUM  FROM  TCDPT309 AAA
+															WHERE  SDATE = (SELECT MAX(SDATE) FROM  TCDPT309  WHERE ENTER_CD = AAA.ENTER_CD AND ACT_VER_ID = AAA.ACT_VER_ID  GROUP BY ACT_VER_ID)
+														) XX
+													   ) D
+											WHERE A.ENTER_CD = B.ENTER_CD
+												  AND A.ACTIVE_YYYY =  B.ACTIVE_YYYY
+												  AND A.HALF_GUBUN_TYPE = B.HALF_GUBUN_TYPE
+												  AND A.SABUN = B.SABUN
+												  AND B.ENTER_CD = C.ENTER_CD
+												  AND B.TRM_CD = C.TRM_CD
+												  AND B.EDUCATION = C.EDUCATION
+												  AND C.ENTER_CD = D.ENTER_CD
+												  AND C.EDUCATION = D.EDUCATION
+												  AND A.ENTER_CD = #{ssnEnterCd}
+												  AND A.ACTIVE_YYYY = #{sYear}
+												  AND A.HALF_GUBUN_TYPE = #{searchHalfGubunTypeCd}
+												  AND A.SABUN = #{ssnSabun}
+												  AND A.APPROVAL_STATUS = '3'
+												  AND B.CONFIRM_STATUS = '1'
+										) AA ,
+					
+										( SELECT 	ENTER_CD, SABUN, EDUCATION, SDATE, EDATE, TIME, NUM
+											FROM (
+												SELECT  ENTER_CD, SABUN, EDUCATION, SDATE, EDATE, TIME, NUM
+												FROM(
+													SELECT A.ENTER_CD, A.SABUN, A.EDUCATION, MAX(A.SEQ) AS SEQ, MAX(B.SDATE) AS SDATE, MAX(B.EDATE) AS EDATE , MAX(C.TIME) AS TIME, A.NUM
+													FROM TCDPT303 A, TCDPT109 B, TCDPT101_V C
+													WHERE A.ENTER_CD = #{ssnEnterCd}
+														AND A.GUBUN='내부'
+														AND A.SABUN = #{ssnSabun}
+														AND A.STATUS = '11'
+														AND A.USE = 'Y'
+														AND A.ENTER_CD = B.ENTER_CD
+														AND A.EDUCATION = B.EDUCATION
+														AND A.SEQ = B.SEQ
+														AND A.NUM = B.NUM
+														AND B.ENTER_CD = C.ENTER_CD
+														AND B.EDUCATION = C.EDUCATION
+														AND B.NUM = C.NUM
+														AND B.SDATE  BETWEEN  #{sYear} || '0101' AND #{sYear} || '1231'
+													GROUP BY A.ENTER_CD, A.SABUN, A.EDUCATION, A.NUM
+													UNION ALL
+													SELECT A.ENTER_CD, A.SABUN, A.EDUCATION, MAX(A.SEQ) AS SEQ, MAX(B.SDATE) AS SDATE, MAX(B.EDATE) AS EDATE , MAX(C.TIME) AS TIME, A.NUM
+													FROM TCDPT303 A, TCDPT201_V B, TCDPT101_V C
+													WHERE A.ENTER_CD = #{ssnEnterCd}
+														AND A.GUBUN='외부'
+														AND A.SABUN = #{ssnSabun}
+														AND A.STATUS = '11'
+														AND A.USE = 'Y'
+														AND A.ENTER_CD = B.ENTER_CD
+														AND A.EDUCATION = B.EDUCATION
+														AND A.SEQ = B.SEQ
+														AND A.NUM = B.NUM
+														AND B.ENTER_CD = C.ENTER_CD
+														AND B.EDUCATION = C.EDUCATION
+														AND B.NUM = C.NUM
+														AND B.SDATE  BETWEEN  #{sYear} || '0101' AND #{sYear} || '1231'
+													GROUP BY A.ENTER_CD, A.SABUN, A.EDUCATION, A.NUM
+												)
+					
+												UNION ALL
+					
+												SELECT ENTER_CD, SABUN, ACT_VER_ID, SDATE, EDATE, TIME, NULL AS NUM
+												FROM TCDPT307
+												WHERE ENTER_CD= #{ssnEnterCd}
+													AND SABUN = #{ssnSabun}
+													AND STATUS = '수강완료'
+													AND SDATE BETWEEN #{sYear} || '0101' AND #{sYear} || '1231'
+											)) BB
+					
+									WHERE AA.ENTER_CD = BB.ENTER_CD(+)
+										AND AA.SABUN = BB.SABUN(+)
+										AND AA.EDUCATION = BB.EDUCATION(+)
+								) X,
+								(   SELECT  ENTER_CD, TECH_BIZ_TYPE AS GUBUN_CODE,  KNOWLEDGE_CD AS CODE , KNOWLEDGE_NM AS CODE_NM
+									FROM TCDPW201  A  WHERE ENTER_CD = #{ssnEnterCd}  AND USE_YN = 'Y'
+									UNION ALL
+									SELECT ENTER_CD, 'S' AS GUBUN_CODE,  SKILL_CD AS CODE,  SKILL_NM AS CODE_NM
+									FROM TCDPW203  B		WHERE ENTER_CD = #{ssnEnterCd} AND USE_YN = 'Y'
+								) Y
+						WHERE X.ENTER_CD = Y.ENTER_CD
+							  AND X.TRM_TYPE = Y.GUBUN_CODE
+							  AND X.CODE = Y.CODE
+					
+					
+						UNION ALL
+					
+						SELECT '' AS TRM_TYPE, '' AS CODE, '기타' AS CODE_NM,  	ITEM_GUBUN, EDUCATION, EDUCATIONNM
+							   	     , NULL AS TIME, '' AS EDU_PRE_YMD,  SDATE, EDATE, TIME AS SIL_TIME, NUM, SABUN, '' AS EDUCATION_YN
+						FROM (
+							SELECT  ITEM_GUBUN, EDUCATION, SDATE, EDATE, TIME, NUM, SABUN, EDUCATIONNM
+							FROM(
+								SELECT '1' AS ITEM_GUBUN, A.SABUN, A.EDUCATION
+									   		   , MAX(A.SEQ) AS SEQ, MAX(B.SDATE) AS SDATE, MAX(B.EDATE) AS EDATE , MAX(C.TIME) AS TIME, A.NUM
+											   , C.EDUCATIONNM
+								FROM TCDPT303 A, TCDPT109 B, TCDPT101_V C
+								WHERE A.ENTER_CD = #{ssnEnterCd}
+									AND A.GUBUN='내부'
+									AND A.SABUN = #{ssnSabun}
+									AND A.STATUS = '11'
+									AND A.USE = 'Y'
+									AND A.ENTER_CD = B.ENTER_CD
+									AND A.EDUCATION = B.EDUCATION
+									AND A.SEQ = B.SEQ
+									AND A.NUM = B.NUM
+									AND B.ENTER_CD = C.ENTER_CD
+									AND B.EDUCATION = C.EDUCATION
+									AND B.NUM = C.NUM
+									AND B.SDATE  BETWEEN  #{sYear} || '0101' AND #{sYear} || '1231'
+								GROUP BY A.ENTER_CD, A.SABUN, A.EDUCATION, A.NUM, C.EDUCATIONNM
+								UNION ALL
+								SELECT '2' AS ITEM_GUBUN, A.SABUN, A.EDUCATION
+									   		   , MAX(A.SEQ) AS SEQ, MAX(B.SDATE) AS SDATE, MAX(B.EDATE) AS EDATE , MAX(C.TIME) AS TIME, A.NUM
+											   , C.EDUCATIONNM
+								FROM TCDPT303 A, TCDPT201_V B, TCDPT101_V C
+								WHERE A.ENTER_CD = #{ssnEnterCd}
+									AND A.GUBUN='외부'
+									AND A.SABUN = #{ssnSabun}
+									AND A.STATUS = '11'
+									AND A.USE = 'Y'
+									AND A.ENTER_CD = B.ENTER_CD
+									AND A.EDUCATION = B.EDUCATION
+									AND A.SEQ = B.SEQ
+									AND A.NUM = B.NUM
+									AND B.ENTER_CD = C.ENTER_CD
+									AND B.EDUCATION = C.EDUCATION
+									AND B.NUM = C.NUM
+									AND B.SDATE  BETWEEN  #{sYear} || '0101' AND #{sYear} || '1231'
+								GROUP BY A.ENTER_CD, A.SABUN, A.EDUCATION, A.NUM, C.EDUCATIONNM
+							)
+					
+							UNION ALL
+					
+							SELECT '3' AS ITEM_GUBUN, ACT_VER_ID, SDATE, EDATE, TIME, NULL AS NUM, SABUN, EDUCATIONNM
+							FROM TCDPT307
+							WHERE ENTER_CD= #{ssnEnterCd}
+								AND SABUN = #{ssnSabun}
+								AND STATUS = '수강완료'
+								AND SDATE  BETWEEN  #{sYear} || '0101' AND #{sYear} || '1231'
+						)
+					
+					) Z
+					WHERE 1=1
+					          ]]>
+					<if test='searchEducationnm != null and !searchEducationnm.equals("")'>
+					  AND Z.EDUCATIONNM LIKE '%' || #{searchEducationnm} || '%'
+                    </if>
+					
+					ORDER BY Z.SDATE DESC
+
+
+
+
+        </select>
+
+
+</mapper>

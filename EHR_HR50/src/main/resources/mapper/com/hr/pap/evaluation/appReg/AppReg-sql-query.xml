@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.evaluation.appReg">
+
+
+	<select id="getAppRegAppSeqSelfMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT A.APP_SABUN
+			     , B.NAME AS APP_NAME
+			     , A.APPRAISAL_YN AS STATUS_CD
+			     , DECODE(A.APPRAISAL_YN, 'Y', '평가완료', '미완료') AS STATUS_NM
+			     , (
+			           SELECT DECODE(COUNT(*),0,'N','Y')
+			             FROM TPAP357
+			            WHERE ENTER_CD     = A.ENTER_CD
+			              AND APPRAISAL_CD = A.APPRAISAL_CD
+			              AND SABUN        = A.SABUN
+			              AND APP_ORG_CD   = A.APP_ORG_CD
+			              AND APP_STEP_CD  = A.APP_STEP_CD
+			       ) AS COMMENT_IMG
+			     , D.APP_ORG_CD
+			     , D.APP_ORG_NM
+				 , D.APP_STEP_CD
+			     , F_COM_GET_GRCODE_NAME(D.ENTER_CD, 'P00005', D.APP_STEP_CD) AS APP_STEP_NM
+			     , A.APP_SEQ_CD
+			     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00003', A.APP_SEQ_CD) AS APP_SEQ_NM
+			     , D.APP_METHOD_CD
+				 , D.APP_SHEET_TYPE
+				 , D.APP_YN
+				 , D.NAME
+				 , D.JIKWEE_NM
+				 , D.JIKGUB_NM
+				 , C.LAST_STATUS_CD
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'P10018' , C.LAST_STATUS_CD) AS LAST_STATUS_NM
+				 , D.MBO_TARGET_YN
+				 , D.WORK_TARGET_YN
+				 , D.COMP_TARGET_YN
+				 , (
+                               SELECT NVL(MAX(T.APP_SEQ_CD), '-1')
+                                 FROM TPAP202 T
+                                WHERE T.ENTER_CD = A.ENTER_CD
+                                  AND T.APPRAISAL_CD = A.APPRAISAL_CD
+                                  AND T.APP_STEP_CD = A.APP_STEP_CD
+                                  AND T.SABUN = A.SABUN
+                                  AND T.APP_ORG_CD = A.APP_ORG_CD
+				   ) AS LAST_APP_SEQ_CD
+			     , C.MBO_T_APP_SELF_POINT -- 성과평가점수_본인
+			     , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, A.APP_STEP_CD, A.APP_SEQ_CD, C.MBO_T_APP_SELF_CLASS_CD, E.APP_TYPE_CD) AS MBO_T_APP_SELF_CLASS_CD -- 성과평가등급_본인
+				 , C.COMP_T_APP_SELF_POINT -- 역량평가점수_본인
+				 , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, A.APP_STEP_CD, A.APP_SEQ_CD, C.COMP_T_APP_SELF_CLASS_CD, E.APP_TYPE_CD) AS COMP_T_APP_SELF_CLASS_CD -- 역량평가등급_본인
+				 , C.APP_SELF_POINT -- 종합평가점수_본인
+				 , F_PAP_GET_APP_CLASS_NM2(A.ENTER_CD, A.APPRAISAL_CD, A.APP_STEP_CD, A.APP_SEQ_CD, C.APP_SELF_CLASS_CD, E.APP_TYPE_CD) AS APP_SELF_CLASS_CD -- 종합평가등급_본인
+			  FROM TPAP202 A, THRM100 B, TPAP350 C, TPAP201 D, TPAP101 E, TPAP105 F
+			 WHERE A.ENTER_CD     = B.ENTER_CD
+			   AND A.APP_SABUN    = B.SABUN
+			   AND A.ENTER_CD     = C.ENTER_CD
+			   AND A.APPRAISAL_CD = C.APPRAISAL_CD
+			   AND A.SABUN        = C.SABUN
+			   AND A.APP_ORG_CD   = C.APP_ORG_CD
+
+			   AND A.ENTER_CD     = D.ENTER_CD
+			   AND A.APPRAISAL_CD = D.APPRAISAL_CD
+			   AND A.APP_ORG_CD   = D.APP_ORG_CD
+			   AND A.APP_STEP_CD  = D.APP_STEP_CD
+			   AND A.SABUN        = D.SABUN
+
+			   AND A.ENTER_CD     = E.ENTER_CD
+			   AND A.APPRAISAL_CD = E.APPRAISAL_CD
+
+			   AND A.ENTER_CD     = F.ENTER_CD
+			   AND A.APPRAISAL_CD = F.APPRAISAL_CD
+			   AND A.APP_STEP_CD  = F.APP_STEP_CD
+			   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN F.APP_AS_YMD AND NVL(F.APP_AE_YMD, '99991231')
+
+			   AND A.ENTER_CD     = TRIM(#{ssnEnterCd})
+			   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+			   AND A.SABUN        = TRIM(#{searchSabun})
+			   AND A.APP_ORG_CD   = TRIM(#{searchAppOrgCd})
+			   AND A.APP_STEP_CD  = TRIM(#{searchAppStepCd})
+		]]>
+		<choose>
+			<when test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+			   AND A.APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+			</when>
+			<otherwise>
+			   AND A.APP_SEQ_CD = '1'
+			</otherwise>
+		</choose>
+		<![CDATA[
+			   AND D.APP_YN = 'Y'
+		]]>
+	</select>
+
+	<!-- N차평가 조회 -->
+	<select parameterType="map" resultType="cMap" id="getAppRegAppSeqNthMap">
+		<![CDATA[
+		SELECT APP_SABUN
+			 , APP_NAME
+			 , APP_SEQ_CD
+			 , APP_SEQ_NM
+			 , TOT_CNT
+			 , FIN_CNT
+			 , CASE WHEN TOT_CNT = FIN_CNT THEN 'Y' ELSE 'N' END      AS STATUS_CD
+			 , CASE WHEN TOT_CNT = FIN_CNT THEN '평가완료' ELSE '미완료' END AS STATUS_NM
+		FROM ( WITH APP_EMP AS
+						( SELECT A.SABUN, NVL(B.APPRAISAL_YN, 'N') AS APPRAISAL_YN
+						FROM TPAP201 A
+						   , TPAP202 B
+						   , TPAP350 C
+						   , TPAP104 D
+						WHERE A.ENTER_CD = B.ENTER_CD
+						  AND A.APPRAISAL_CD = B.APPRAISAL_CD
+						  AND A.APP_STEP_CD = B.APP_STEP_CD
+						  AND A.SABUN = B.SABUN
+						  AND A.APP_ORG_CD = B.APP_ORG_CD
+						  AND A.ENTER_CD = C.ENTER_CD
+						  AND A.APPRAISAL_CD = C.APPRAISAL_CD
+						  AND A.SABUN = C.SABUN
+						  AND A.APP_ORG_CD = C.APP_ORG_CD
+						  AND A.ENTER_CD = D.ENTER_CD
+						  AND A.APPRAISAL_CD = D.APPRAISAL_CD
+						  AND A.APP_STEP_CD = D.APP_STEP_CD
+						  AND B.APP_SEQ_CD = D.APPRAISAL_SEQ
+						  AND A.APP_YN = 'Y'
+						  AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						  AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+						  AND A.APP_STEP_CD = TRIM(#{searchAppStepCd})
+						  AND B.APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+						  AND B.APP_SABUN = TRIM(#{searchSabun}) )
+		SELECT TRIM(#{searchSabun})                                                          AS APP_SABUN
+			 , F_COM_GET_NAMES(TRIM(#{ssnEnterCd}), TRIM(#{searchSabun}))                    AS APP_NAME
+			 , TRIM(#{searchAppSeqCd})                                                       AS APP_SEQ_CD
+			 , F_COM_GET_GRCODE_NAME(TRIM(#{ssnEnterCd}), 'P00003', TRIM(#{searchAppSeqCd})) AS APP_SEQ_NM
+			 , ( SELECT COUNT(1) FROM APP_EMP )                                              AS TOT_CNT -- N차평가 총 인원수
+			 , ( SELECT COUNT(1) FROM APP_EMP WHERE NVL(APPRAISAL_YN, 'N') = 'Y' )           AS FIN_CNT -- N차평가 평가완료 인원수
+		FROM DUAL
+		WHERE EXISTS
+				  (
+					  SELECT 1
+					  FROM APP_EMP
+				  ) )
+		]]>
+	</select>
+</mapper>

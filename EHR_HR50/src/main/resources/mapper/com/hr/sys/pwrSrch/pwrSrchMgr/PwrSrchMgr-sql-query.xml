@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.pwrSrch.pwrSrchMgr">
+		<select parameterType="map" resultType="cMap" id="getPwrSrchMgrList">
+
+				<![CDATA[/* thri211 */
+					SELECT	0 AS DB_ITEM_DESC
+							, A.SEARCH_SEQ
+							, A.BIZ_CD
+							, A.CHART_TYPE
+							, A.CHART_DIS_VALUE
+							, A.SEARCH_TYPE
+							, A.COMMON_USE_YN
+							, A.SEARCH_DESC
+							, A.CONDITION_DESC
+							, A.DISTR_SEARCH_SEQ
+							, TO_CHAR(A.CHKDATE,'YYYYMMDD') AS CHKDATE
+							, A.VIEW_CD
+							, A.INDIVIDUAL_YN
+							, C.VIEW_NM
+							, C.VIEW_DESC
+		         	FROM THRI201 A, THRI205 C
+			   	 	WHERE 1=1
+                  	AND A.ENTER_CD	= TRIM(#{ssnEnterCd})
+                  	        ]]>
+                	<if test='srchType != null and !srchType.equals("")'>
+                  		AND A.SEARCH_TYPE	LIKE '%'||TRIM(#{srchType})||'%'
+                  	</if>
+				  	<if test='srchBizCd != null and !srchBizCd.equals("")'>
+                  		AND A.BIZ_CD	LIKE '%'||TRIM(#{srchBizCd})||'%'
+					</if>
+				  	<if test='srchDesc != null and !srchDesc.equals("")'>
+                  		AND A.SEARCH_DESC||'_'||A.SEARCH_SEQ	LIKE '%'||TRIM(#{srchDesc})||'%'
+					</if>
+				  	AND A.VIEW_CD     	= C.VIEW_CD(+)
+              		ORDER BY A.SEARCH_SEQ
+
+
+
+		</select>
+		<update parameterType="map" id="savePwrSrchMgr">
+
+   					MERGE INTO THRI201 TARGETTABLE
+                  	USING (
+               				SELECT    A.SEARCH_SEQ   	AS SEARCH_SEQ
+                                	, A.BIZ_CD       	AS BIZ_CD
+                                	, A.CHART_TYPE      AS CHART_TYPE
+                                	, A.CHART_DIS_VALUE AS CHART_DIS_VALUE
+                                	, A.SEARCH_TYPE  	AS SEARCH_TYPE
+                                	, A.COMMON_USE_YN	AS COMMON_USE_YN
+                                	, A.SEARCH_DESC  	AS SEARCH_DESC
+                                	, A.VIEW_CD			AS VIEW_CD
+                                	, A.INDIVIDUAL_YN	AS INDIVIDUAL_YN
+                     		FROM   (
+                               		SELECT    NULL			AS SEARCH_SEQ
+                                			, NULL			AS BIZ_CD
+                                			, NULL			AS CHART_TYPE
+                                			, NULL			AS CHART_DIS_VALUE
+                                			, NULL			AS SEARCH_TYPE
+                                			, NULL			AS COMMON_USE_YN
+                                			, NULL			AS SEARCH_DESC
+                                			, NULL			AS VIEW_CD
+                                			, NULL			AS INDIVIDUAL_YN
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" index="idx" >
+                  	UNION ALL
+                                	SELECT
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.searchSeq != null and !rm.searchSeq.equals("")'>
+												TRIM(#{rm.searchSeq}) 			AS SEARCH_SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when>
+												<otherwise>
+												TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEARCH_SEQ)),10000) + (${idx} + 1)) FROM THRI201 WHERE ENTER_CD = #{ssnEnterCd}) )	AS SEARCH_SEQ
+												</otherwise>
+											</choose>
+                                       		, TRIM(#{rm.bizCd})			AS BIZ_CD
+                                       		, TRIM(#{rm.chartType})		AS CHART_TYPE
+                                       		, TRIM(#{rm.chartDisValue})	AS CHART_DIS_VALUE
+                                       		, TRIM(#{rm.searchType})	AS SEARCH_TYPE
+                                       		, TRIM(#{rm.commonUseYn})	AS COMMON_USE_YN
+                                       		, TRIM(#{rm.searchDesc})	AS SEARCH_DESC
+                                       		, TRIM(#{rm.viewCd})	AS VIEW_CD
+                                       		, TRIM(#{rm.individualYn})	AS INDIVIDUAL_YN
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.SEARCH_SEQ IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               	   TARGETTABLE.ENTER_CD = #{ssnEnterCd}
+                               AND TARGETTABLE.SEARCH_SEQ = SOURCETABLE.SEARCH_SEQ
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.BIZ_CD        	= SOURCETABLE.BIZ_CD
+                                  	, TARGETTABLE.CHART_TYPE   		= SOURCETABLE.CHART_TYPE
+                                  	, TARGETTABLE.CHART_DIS_VALUE   = SOURCETABLE.CHART_DIS_VALUE
+                                  	, TARGETTABLE.SEARCH_TYPE   	= SOURCETABLE.SEARCH_TYPE
+                                  	, TARGETTABLE.COMMON_USE_YN 	= SOURCETABLE.COMMON_USE_YN
+                                  	, TARGETTABLE.SEARCH_DESC   	= SOURCETABLE.SEARCH_DESC
+                                  	, TARGETTABLE.VIEW_CD   	= SOURCETABLE.VIEW_CD
+                                  	, TARGETTABLE.INDIVIDUAL_YN	= SOURCETABLE.INDIVIDUAL_YN
+                                  	, TARGETTABLE.CHKDATE			= SYSDATE
+                                  	, TARGETTABLE.CHKID				= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SEARCH_SEQ
+               				, TARGETTABLE.BIZ_CD
+               				, TARGETTABLE.CHART_TYPE
+               				, TARGETTABLE.CHART_DIS_VALUE
+                			, TARGETTABLE.SEARCH_TYPE
+                          	, TARGETTABLE.COMMON_USE_YN
+                          	, TARGETTABLE.SEARCH_DESC
+                          	, TARGETTABLE.VIEW_CD
+                          	, TARGETTABLE.INDIVIDUAL_YN
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, SOURCETABLE.SEARCH_SEQ
+               				, SOURCETABLE.BIZ_CD
+               				, SOURCETABLE.CHART_TYPE
+               				, SOURCETABLE.CHART_DIS_VALUE
+               				, SOURCETABLE.SEARCH_TYPE
+               				, SOURCETABLE.COMMON_USE_YN
+               				, SOURCETABLE.SEARCH_DESC
+               				, SOURCETABLE.VIEW_CD
+               				, SOURCETABLE.INDIVIDUAL_YN
+               			    , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+		</update>
+		<update parameterType="map" id="savePwrSrchMgr211_BAK">
+
+   					MERGE INTO THRI211 TARGETTABLE
+                  	USING (
+               				SELECT    A.SEARCH_SEQ   	AS SEARCH_SEQ
+                                	, A.VIEW_CD      	AS VIEW_CD
+                     		FROM   (
+                               		SELECT
+                               		        , ENTER_CD
+                                      		, SEARCH_SEQ
+                                       		, TRIM(#{rm.viewCd})			AS VIEW_CD
+                                       		, SYSDATE AS CHKDATE
+                                       		, #{ssnSabun} AS CHKID
+                                	FROM   THRI201
+									) A
+							WHERE A.SEARCH_SEQ IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               	   TARGETTABLE.ENTER_CD = #{ssnEnterCd}
+                               AND TARGETTABLE.SEARCH_SEQ = SOURCETABLE.SEARCH_SEQ
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.VIEW_CD        	= SOURCETABLE.VIEW_CD
+                                  	, TARGETTABLE.CHKDATE			= SYSDATE
+                                  	, TARGETTABLE.CHKID				= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SEARCH_SEQ
+               				, TARGETTABLE.VIEW_CD
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, SOURCETABLE.SEARCH_SEQ
+               				, SOURCETABLE.VIEW_CD
+               			    , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+		</update>
+		<update parameterType="map" id="updatePwrSrchMgr211">
+
+			/* thri211 */
+					UPDATE THRI201 T SET
+					( SEARCH_SEQ, VIEW_CD, CHKDATE, CHKID )
+					=
+					(	SELECT 	  S.SEARCH_SEQ 	AS SEARCH_SEQ
+ 								, S.VIEW_CD		AS VIEW_CD
+								, SYSDATE 		AS CHKDATE
+								, #{ssnSabun} 	AS CHKID
+						FROM (
+								SELECT    NULL 	AS SEARCH_SEQ
+										, NULL 	AS VIEW_CD
+								FROM	DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT	  TO_NUMBER( TRIM(#{rm.searchSeq}) )			AS SEARCH_SEQ
+										, TRIM(#{rm.viewCd})							AS VIEW_CD
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE 	S.SEARCH_SEQ IS NOT NULL
+					)
+					WHERE EXISTS (
+						SELECT S.SEARCH_SEQ
+						FROM (
+								SELECT	S.SEARCH_SEQ
+								FROM (
+										SELECT	NULL	AS SEARCH_SEQ
+										FROM	DUAL
+<foreach item="rm" collection="updateRows" >
+						UNION ALL
+										SELECT SEARCH_SEQ	AS SEARCH_SEQ
+										FROM	THRI201
+										WHERE 	ENTER_CD	=  #{ssnEnterCd}
+										AND	  	SEARCH_SEQ 	=  TO_NUMBER( TRIM( #{rm.searchSeq} ) )
+</foreach>
+								) S
+								WHERE S.SEARCH_SEQ IS NOT NULL
+						) S
+						WHERE T.SEARCH_SEQ = S.SEARCH_SEQ
+					)
+
+
+		</update>
+
+
+		<delete parameterType="map" id="deletePwrSrchMgr217">
+
+   					DELETE FROM THRI217
+					WHERE ( ENTER_CD,SEARCH_SEQ ) IN (
+							( NULL, NULL )
+<foreach item="rm" collection="deleteRows" >
+,
+							( TRIM( #{ssnEnterCd} ) , 	TRIM( #{rm.searchSeq})   )
+</foreach>
+)
+
+
+		</delete>
+		<delete parameterType="map" id="deletePwrSrchMgr213">
+
+   					DELETE FROM THRI213
+					WHERE ( ENTER_CD,SEARCH_SEQ ) IN (
+							( NULL, NULL )
+<foreach item="rm" collection="deleteRows" >
+,
+							( TRIM( #{ssnEnterCd} ) , 	TRIM( #{rm.searchSeq})   )
+</foreach>
+)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deletePwrSrchMgr215">
+
+   					DELETE FROM THRI215
+					WHERE ( ENTER_CD,SEARCH_SEQ ) IN (
+							( NULL, NULL )
+<foreach item="rm" collection="deleteRows" >
+,
+							( TRIM( #{ssnEnterCd} ) , 	TRIM( #{rm.searchSeq})   )
+</foreach>
+)
+
+
+		</delete>
+		<delete parameterType="map" id="deletePwrSrchMgr211">
+
+   					DELETE FROM THRI211
+					WHERE ( ENTER_CD,SEARCH_SEQ ) IN (
+							( NULL, NULL )
+<foreach item="rm" collection="deleteRows" >
+,
+							( TRIM( #{ssnEnterCd} ) , 	TRIM( #{rm.searchSeq})   )
+</foreach>
+)
+
+
+		</delete>
+		<delete parameterType="map" id="deletePwrSrchMgr201">
+
+   					DELETE FROM THRI201
+					WHERE ( ENTER_CD,SEARCH_SEQ ) IN (
+							( NULL, NULL )
+<foreach item="rm" collection="deleteRows" >
+,
+							( TRIM( #{ssnEnterCd} ) , 	TRIM( #{rm.searchSeq})   )
+</foreach>
+)
+
+
+		</delete>
+
+		<update id="PwrSrchMgrCopyDataPrcCall" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_COM_SEARCH_COPY(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrorMsg,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{copySearchSeq,mode=IN,jdbcType=VARCHAR},
+				#{searchSeq,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+	<select parameterType="map" resultType="cMap" id="getPwrSrchMgrSearchSeq">
+		SELECT (NVL(MAX(TO_NUMBER(SEARCH_SEQ)),10000) + 1) AS SEARCH_SEQ
+		  FROM THRI201
+		 WHERE ENTER_CD = #{ssnEnterCd}
+	</select>
+
+</mapper>
+

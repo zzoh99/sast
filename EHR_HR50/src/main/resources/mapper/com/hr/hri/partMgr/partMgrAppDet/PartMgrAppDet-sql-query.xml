@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.partMgr.partMgrAppDet">
+
+<!-- 서무권한변경신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPartMgrAppDet">
+
+				<![CDATA[
+				SELECT A.ENTER_CD, A.APPL_SEQ, A.APPL_ORG_CD 
+				          ,B.APPL_YMD --신청일자
+				          ,B.APPL_STATUS_CD --신청상태
+				          , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM --신청상태명
+				          ,A.APPL_TYPE_CD, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H90501', A.APPL_TYPE_CD) AS APPL_TYPE_NM --변경구분명
+				          ,A.S_YMD --적용시작일
+				          ,A.CUR_SABUN , F_COM_GET_NAMES(A.ENTER_CD, A.CUR_SABUN) AS CUR_NAME --기존서무
+				          ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.CUR_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS CUR_ORG_NM
+				          ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.CUR_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS CUR_JIKWEE_NM
+				          ,F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.CUR_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS CUR_JIKCHAK_NM                       
+				          ,A.NEW_SABUN, F_COM_GET_NAMES(A.ENTER_CD, A.NEW_SABUN) AS NEW_NAME --신규서무
+				          ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.NEW_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS NEW_ORG_NM
+				          ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.NEW_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS NEW_JIKWEE_NM
+				          ,F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.NEW_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS NEW_JIKCHAK_NM             
+				          ,A.BIGO
+				          , '0' AS DETAIL
+				  FROM TSYS351 A, THRI103 B
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+				    AND B.ENTER_CD = A.ENTER_CD
+				    AND B.APPL_SEQ = A.APPL_SEQ
+				    AND B.APPL_SEQ = #{searchApplSeq}
+					ORDER BY B.APPL_YMD DESC ,A.APPL_SEQ DESC
+				]]>
+
+
+		</select>
+		
+		<!-- 변경구분Cd List Combo  -->
+		<select parameterType="map" resultType="cMap" id="getPartMgrAppDetAtCdList">
+
+				<![CDATA[
+				SELECT  CODE
+							, CODE_NM
+					FROM TSYS005
+					WHERE 1=1
+					AND ENTER_CD = #{ssnEnterCd}
+					AND GRCODE_CD = 'H90501' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+				]]>
+
+
+		</select>
+		
+		<!--  기존 서무 대상 List Combo  -->
+		<select parameterType="map" resultType="cMap" id="getPartMgrAppDetCurEmpList">
+
+				<![CDATA[
+						SELECT A.SABUN AS CODE 
+						     , B.NAME  AS CODE_NM
+						 FROM TSYS319 A, THRM100 B
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND A.GRP_CD     = '35' --서무권한
+						   AND A.SCOPE_VALUE = #{searchOrgCd}
+						   AND B.ENTER_CD  = A.ENTER_CD
+						   AND B.SABUN       = A.SABUN
+						   ORDER BY A.CHKDATE DESC
+				]]>
+
+
+		</select>
+		
+		
+<!-- 현서무정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPartMgrAppDetCurEmp">
+
+				<![CDATA[
+					SELECT A.ENTER_CD, A.SABUN
+							  , B.NAME
+					          ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+					          ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+					          ,F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+					          ,(SELECT MAX(S_YMD)
+					              FROM TSYS351 C, THRI103 D
+					            WHERE C.ENTER_CD = A.ENTER_CD 
+					                AND C.NEW_SABUN = A.SABUN
+					                AND C.S_YMD <= TO_CHAR(SYSDATE, 'YYYYMMDD')
+					                AND C.APPL_TYPE_CD <> '3' --삭제신청이 아닌것
+					                AND D.ENTER_CD = C.ENTER_CD
+					                AND D.APPL_SEQ = C.APPL_SEQ
+					            ) AS APPL_DATE
+					  FROM TSYS319 A, THRM100 B
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.GRP_CD     = '35' --서무권한
+					    AND A.SABUN = #{sabun}
+					   AND B.ENTER_CD  = A.ENTER_CD
+					   AND B.SABUN       = A.SABUN
+					   ORDER BY A.CHKDATE DESC
+				]]>
+
+
+		</select>
+				
+
+<!-- 서무권한변경신청 테이블 저장 -->
+		<update parameterType="map" id="savePartMgrApp">
+
+     MERGE INTO TSYS351 T
+					USING (
+							SELECT #{ssnEnterCd} AS ENTER_CD
+							    , #{searchApplSeq} AS APPL_SEQ
+							    , '35'           AS GRP_CD
+							    , #{applTypeCd}       AS APPL_TYPE_CD
+                                , #{searchOrgCd}         AS APPL_ORG_CD
+                                , #{searchApplSabun}   AS  APPL_SABUN
+								, #{newSabun}		AS NEW_SABUN
+                                , #{curEmp}		AS CUR_SABUN
+                                , NVL(REPLACE(TRIM( #{sYmd} ), '-', ''),'')         AS S_YMD
+                                , #{bigo}         AS BIGO                          
+							  FROM DUAL
+                            ) S
+                    ON (
+                    		T.ENTER_CD	=	S.ENTER_CD
+                        AND T.APPL_SEQ	=	S.APPL_SEQ                    	
+                   		)
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.GRP_CD		    = S.GRP_CD
+                                    , T.APPL_TYPE_CD	= S.APPL_TYPE_CD
+                                    , T.APPL_ORG_CD		= S.APPL_ORG_CD
+                                    , T.APPL_SABUN		= S.APPL_SABUN
+                                    , T.NEW_SABUN       = S.NEW_SABUN
+                                    , T.CUR_SABUN       = S.CUR_SABUN
+                                    , T.S_YMD           = S.S_YMD
+                                    , T.BIGO            = S.BIGO
+                                    , T.CHKDATE    		= SYSDATE
+                                    , T.CHKID      		= #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                                T.ENTER_CD
+                              , T.APPL_SEQ
+                              , T.GRP_CD
+                              , T.APPL_TYPE_CD
+                              , T.APPL_ORG_CD
+                              , T.APPL_SABUN
+                              , T.NEW_SABUN 
+                              , T.CUR_SABUN 
+                              , T.S_YMD     
+                              , T.BIGO      
+                              , T.CHKDATE   
+                              , T.CHKID     
+                        )
+                        VALUES
+                        (
+                                S.ENTER_CD
+                              , S.APPL_SEQ
+                              , S.GRP_CD
+                              , S.APPL_TYPE_CD
+                              , S.APPL_ORG_CD
+                              , S.APPL_SABUN
+                              , S.NEW_SABUN 
+                              , S.CUR_SABUN 
+                              , S.S_YMD     
+                              , S.BIGO      
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+        </update>
+		<!--  동일부서 인원 List 조회  -->
+		<select parameterType="map" resultType="cMap" id="getPartMgrAppDetOrgEmpList">
+
+				<![CDATA[
+						SELECT SABUN AS EMP_SABUN
+							, ORG_CD
+							, F_COM_GET_NAMES(ENTER_CD, SABUN, #{ssnLocaleCd}) AS EMP_NAME
+							, F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, SDATE, #{ssnLocaleCd}) AS ORG_NM
+							, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020', A.JIKCHAK_CD, 'ko_KR') AS JIKCHAK_NM
+							, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010', A.JIKGUB_CD, 'ko_KR') AS JIKGUB_NM
+							, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10010', A.STATUS_CD, 'ko_KR') AS STATUS_NM 
+						FROM THRM151 A
+						WHERE ENTER_CD =  #{ssnEnterCd}
+						AND ORG_CD = #{searchOrgCd}
+						AND (F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) LIKE '%'|| #{searchKeyword} ||'%' OR A.SABUN LIKE '%'|| #{searchKeyword} ||'%')
+						AND STATUS_CD = 'AA'
+						AND TO_CHAR(SYSDATE , 'YYYYMMDD') BETWEEN SDATE AND EDATE
+				]]>
+
+
+		</select>
+
+
+
+</mapper>

@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmt.recCheck">
+
+		<select parameterType="map" resultType="cMap" id="getRecCheckOrgTypeCd">
+
+				<![CDATA[
+
+					SELECT ORD_TYPE_CD AS CODE
+					     , ORD_TYPE_NM AS CODE_NM
+					  FROM TSYS011
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND ORD_TYPE_CD IN ('110', '330')
+					 ORDER BY SEQ
+
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getRecCheckCompanyList">
+
+				<![CDATA[
+
+					SELECT ENTER_CD AS CODE
+					     , ENTER_NM AS CODE_NM
+					  FROM TORG900
+					 WHERE ENTER_CD NOT IN ('ISU_CM', 'ISU_UB')
+					 ORDER BY SEQ
+
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getRecCheckOrgDetailCd">
+
+				<![CDATA[
+
+					SELECT ORD_DETAIL_CD AS CODE
+					     , ORD_DETAIL_NM AS CODE_NM
+					  FROM TSYS013
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND ORD_TYPE_CD = #{ordTypeCd}
+					 ORDER BY SEQ
+
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getRecCheckList">
+
+				<![CDATA[
+
+				SELECT G.ENTER_CD
+				     , G.ENTER_NM
+				     , A.ORD_TYPE_CD
+				     , A.ORD_DETAIL_CD
+				     , A.APPLY_SEQ
+				     , (
+		               SELECT ORD_TYPE_NM
+		                 FROM TSYS011
+		                WHERE ENTER_CD = A.ENTER_CD
+		                  AND ORD_TYPE_CD = A.ORD_TYPE_CD
+		             ) AS ORD_TYPE_NM
+					 , (
+		                SELECT ORD_DETAIL_NM
+		                  FROM TSYS013
+		                 WHERE ENTER_CD = A.ENTER_CD
+		                   AND ORD_DETAIL_CD = A.ORD_DETAIL_CD
+		                   AND ORD_TYPE_CD = A.ORD_TYPE_CD
+		             ) AS ORD_DETAIL_NM
+				     , A.SABUN
+				     , decode(B.name , null, (select max(name) from tstf901 where enter_cd = A.enter_cd and sabun = A.sabun), B.name) as NAME
+				     , A.ORD_YMD
+				     , A.MANAGE_CD
+				     , A.WORK_TYPE
+				     , A.JIKGUB_CD
+				     , A.ORD_YN
+				     , A.ORD_CHECK_YN
+				  FROM THRM221 A
+				     , THRM100 B
+				     , TORG900 G
+				 WHERE 1 = 1
+				]]>
+				  <if test='enterCd != null and !enterCd.equals("")'>
+				   AND A.ENTER_CD = #{enterCd}
+				  </if>
+
+				  <if test='ordSYmd != null and !ordSYmd.equals("")'>
+				   AND A.ORD_YMD <![CDATA[ >= ]]> REPLACE(TRIM( #{ordSYmd} ),'-','')
+				  </if>
+
+				  <if test='ordEYmd != null and !ordEYmd.equals("")'>
+				   AND A.ORD_YMD <![CDATA[ <= ]]> REPLACE(TRIM( #{ordEYmd} ),'-','')
+				  </if>
+
+				  <if test='ordYn != null and !ordYn.equals("")'>
+				   AND A.ORD_YN = #{ordYn}
+				  </if>
+
+				  <if test='ordTypeCd!= null  and !ordTypeCd.equals("")'>
+				   AND A.ORD_TYPE_CD = #{ordTypeCd}
+				  </if>
+
+				  <if test='ordDetailCd != null and !ordDetailCd.equals("")'>
+				   AND A.ORD_DETAIL_CD = #{ordDetailCd}
+				  </if>
+
+		          <if test='name != null and !name.equals("")'>
+		           and decode(B.name, null, (select max(name) from tstf901 where enter_cd = A.enter_cd and sabun = A.sabun), B.name) like #{name} || '%'
+		          </if>
+
+				   AND A.ENTER_CD = B.ENTER_CD(+)
+				   AND A.SABUN = B.SABUN(+)
+				   AND A.ENTER_CD = G.ENTER_CD
+				   AND A.ORD_TYPE_CD IN ('110', '330')
+				   AND A.ENTER_CD NOT IN ('ISU_CM', 'ISU_UB')
+				 ORDER BY A.ORD_YMD DESC
+
+
+
+		</select>
+
+		<update parameterType="map" id="saveRecCheckList">
+
+
+					MERGE INTO THRM221 T
+					USING (
+					   SELECT A.ENTER_CD
+					        , A.ORD_DETAIL_CD
+					        , A.SABUN
+					        , A.ORD_YMD
+					        , A.APPLY_SEQ
+					        , A.ORD_TYPE_CD
+					        , A.ORD_CHECK_YN
+					        FROM (
+					       SELECT NULL AS ENTER_CD
+					            , NULL AS ORD_DETAIL_CD
+					            , NULL AS SABUN
+					            , NULL AS ORD_YMD
+					            , NULL AS APPLY_SEQ
+					            , NULL AS ORD_TYPE_CD
+					            , NULL AS ORD_CHECK_YN
+					         FROM DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="mergeRows" >
+					            UNION ALL
+					       SELECT TRIM(#{rm.enterCd}) AS ENTER_CD
+					            , TRIM(#{rm.ordDetailCd}) AS ORD_DETAIL_CD
+					            , TRIM(#{rm.sabun}) AS SABUN
+					            , TRIM(#{rm.ordYmd}) AS ORD_YMD
+					            , TRIM(#{rm.applySeq}) AS APPLY_SEQ
+					            , TRIM(#{rm.ordTypeCd}) AS ORD_TYPE_CD
+					            , TRIM(#{rm.ordCheckYn}) AS ORD_CHECK_YN
+					         FROM DUAL
+					</foreach>
+					 ) A  WHERE 1 = 1
+					        AND A.ENTER_CD IS NOT NULL
+					        AND A.ORD_DETAIL_CD IS NOT NULL
+					        AND A.SABUN IS NOT NULL
+					        AND A.ORD_YMD IS NOT NULL
+					        AND A.APPLY_SEQ IS NOT NULL
+					        AND A.ORD_TYPE_CD IS NOT NULL
+					        ) S     ON (
+					          T.ENTER_CD = S.ENTER_CD
+					      AND T.ORD_DETAIL_CD = S.ORD_DETAIL_CD
+					      AND T.SABUN = S.SABUN
+					      AND T.ORD_YMD = S.ORD_YMD
+					      AND T.APPLY_SEQ = S.APPLY_SEQ
+					      AND T.ORD_TYPE_CD = S.ORD_TYPE_CD
+					)
+				WHEN MATCHED THEN
+					 UPDATE SET T.ORD_CHECK_YN = S.ORD_CHECK_YN
+					          , T.CHKDATE = SYSDATE
+					          , T.CHKID = #{ssnSabun}
+
+
+		</update>
+
+
+</mapper>

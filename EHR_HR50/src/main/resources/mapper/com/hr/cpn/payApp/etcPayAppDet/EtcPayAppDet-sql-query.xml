@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.etcPayAppDet">
+
+<!-- 근태신청 세부내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEtcPayAppDetList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					          ,A.APPL_SEQ
+					          ,C.SABUN
+					          ,A.BENEFIT_BIZ_CD
+					          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'B10230', A.BENEFIT_BIZ_CD,  #{ssnLocaleCd}) AS BENEFIT_BIZ_NM
+					          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD,  #{ssnLocaleCd}) AS APPL_STATUS_NM
+					          ,B.APPL_YMD
+					          ,TO_CHAR(TO_DATE(A.PAY_YM, 'YYYYMM') , 'YYYY-MM') AS PAY_YM
+					          ,A.TOT_MON
+					          ,A.BIGO
+					  FROM TCPN431 A, THRI103 B, TCPN433 C
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND B.ENTER_CD = A.ENTER_CD
+					    AND B.APPL_SEQ = A.APPL_SEQ
+					    AND C.ENTER_CD = A.ENTER_CD
+					    AND C.APPL_SEQ = A.APPL_SEQ
+					    AND B.APPL_SABUN = #{searchApplSabun}
+					    AND A.APPL_SEQ = #{searchApplSeq}
+					    AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD
+					                               FROM TCPN980
+					                              WHERE ENTER_CD = A.ENTER_CD
+					                                AND NVL(ETC_PAY_YN, 'N') = 'Y')
+				]]>
+
+
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getEtcPayAppDetDetailList">
+
+				<![CDATA[
+					 SELECT A.ENTER_CD
+						          ,A.APPL_SEQ
+						          ,C.SABUN
+          						  ,A.SEQ
+						          ,D.NAME
+						          ,F_COM_GET_JIKGUB_NM(C.ENTER_CD, C.SABUN, B.APPL_YMD,  #{ssnLocaleCd}) AS JIKGUB_NM
+						          ,F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, B.APPL_YMD,  #{ssnLocaleCd}) AS ORG_NM
+						          ,A.BENEFIT_BIZ_CD
+						          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'B10230', A.BENEFIT_BIZ_CD,  #{ssnLocaleCd}) AS BENEFIT_BIZ_NM
+						          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD,  #{ssnLocaleCd}) AS APPL_STATUS_NM
+						          ,B.APPL_YMD
+						          ,A.PAY_YM
+						          ,C.PAY_MON
+						          ,C.DETAIL_BIGO
+						  FROM TCPN431 A, THRI103 B, TCPN433 C, THRM100 D
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						    AND B.ENTER_CD = A.ENTER_CD
+						    AND B.APPL_SEQ = A.APPL_SEQ
+						    AND C.ENTER_CD = A.ENTER_CD
+						    AND C.APPL_SEQ = A.APPL_SEQ
+						    AND A.APPL_SEQ = #{searchApplSeq}
+						    AND D.ENTER_CD = C.ENTER_CD
+						    AND D.SABUN      = C.SABUN
+						    AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD
+						                               FROM TCPN980
+						                              WHERE ENTER_CD = A.ENTER_CD
+						                                AND NVL(ETC_PAY_YN, 'N') = 'Y')
+						ORDER BY D.NAME ASC
+				]]>
+
+
+		</select>
+
+
+<!-- 기타지급신청 Master 테이블 저장 -->
+		<update parameterType="map" id="saveEtcPayApp">
+
+
+                  MERGE INTO TCPN431 T
+					USING (
+							SELECT #{ssnEnterCd} AS ENTER_CD
+							    , #{searchApplSeq} AS APPL_SEQ
+							    , #{benefitBizCd} AS BENEFIT_BIZ_CD
+							    , NVL(REPLACE(TRIM( #{payYm} ), '-', ''),'') AS PAY_YM
+								, TRIM( #{bigo})		AS BIGO
+								, #{searchApplSabun} AS SABUN
+							  FROM DUAL
+                            ) S
+                    ON (
+                    		T.ENTER_CD	=	S.ENTER_CD
+                        AND T.APPL_SEQ	=	S.APPL_SEQ
+                   		)
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.BENEFIT_BIZ_CD		= S.BENEFIT_BIZ_CD
+                                    , T.PAY_YM			= S.PAY_YM
+                                    , T.BIGO			= S.BIGO
+                                    , T.SABUN			= S.SABUN
+                                    , T.CHKDATE    		= SYSDATE
+                                    , T.CHKID      		= #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.APPL_SEQ
+                            , T.BENEFIT_BIZ_CD
+                            , T.PAY_YM
+                            , T.BIGO
+                            , T.SABUN
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.APPL_SEQ
+                            , S.BENEFIT_BIZ_CD
+                            , S.PAY_YM
+                            , S.BIGO
+                            , S.SABUN
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+
+		</update>
+
+
+<!-- 기타지급신청 Detail 테이블 저장 -->
+		<update parameterType="map" id="saveEtcPayAppDet">
+
+					MERGE INTO TCPN433 T
+					USING	(
+							SELECT	 ENTER_CD
+                                    , APPL_SEQ
+                                    , SABUN
+                                    , SEQ
+                                    , BENEFIT_BIZ_CD
+                                    , PAY_YM
+                                    , PAY_MON
+                                    , DETAIL_BIGO
+                                    , CHKDATE
+                                    , CHKID
+							FROM	(
+									SELECT	      NULL AS ENTER_CD
+                                                , NULL AS APPL_SEQ
+									                  , NULL AS SABUN
+									                  , NULL AS SEQ
+									                  , NULL AS BENEFIT_BIZ_CD
+									                  , NULL AS PAY_YM
+                                                      , NULL AS PAY_MON
+                                                      , NULL AS DETAIL_BIGO
+                                                      , NULL AS CHKDATE
+									                  , NULL AS CHKID
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )     AS ENTER_CD
+                                                  , TRIM( #{searchApplSeq}) AS APPL_SEQ
+                                                  , TRIM( #{rm.sabun}) AS SABUN
+									     			<choose>
+														<when test='rm.seq != null and !rm.seq.equals("")'>
+															, TRIM(#{rm.seq}) 			AS SEQ
+														</when>
+									     				<otherwise>
+															, TO_CHAR( (
+															SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+															FROM TCPN433
+															WHERE ENTER_CD = TRIM( #{ssnEnterCd}  )
+															AND APPL_SEQ = TRIM( #{searchApplSeq} )
+															AND SABUN = TRIM( #{rm.sabun} )
+															) )	AS SEQ
+															<bind name="icnt" value="icnt + 1" />
+										 				</otherwise>
+													</choose>
+
+                                                  , TRIM( #{benefitBizCd}) AS BENEFIT_BIZ_CD
+                                                  , NVL(REPLACE(TRIM( #{payYm} ), '-', ''),'') 	AS  PAY_YM
+                                                  , TRIM( #{rm.payMon} ) AS PAY_MON
+                                                  , TRIM( #{rm.detailBigo} ) AS DETAIL_BIGO
+                                                  , SYSDATE AS CHKDATE
+                                                  , #{ssnSabun} AS CHKID
+											FROM   DUAL
+</foreach>
+									)  WHERE SABUN IS NOT NULL
+							) S
+					ON (  T.ENTER_CD     = #{ssnEnterCd}
+				   AND   T.APPL_SEQ  = S.APPL_SEQ
+                   AND   T.SABUN        = S.SABUN
+                   AND   T.SEQ        = S.SEQ
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	T.BENEFIT_BIZ_CD   = S.BENEFIT_BIZ_CD
+                                  , T.PAY_YM   = S.PAY_YM
+                                  , T.PAY_MON   = S.PAY_MON
+                                  , T.DETAIL_BIGO   = S.DETAIL_BIGO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+                              T.ENTER_CD
+                            , T.APPL_SEQ
+                            , T.SABUN
+                            , T.SEQ
+                            , T.BENEFIT_BIZ_CD
+                            , T.PAY_YM
+                            , T.PAY_MON
+                            , T.DETAIL_BIGO
+                            , T.CHKDATE
+                            , T.CHKID
+						)
+						VALUES
+						(
+                              S.ENTER_CD
+                            , S.APPL_SEQ
+                            , S.SABUN
+                            , S.SEQ
+                            , S.BENEFIT_BIZ_CD
+                            , S.PAY_YM
+                            , S.PAY_MON
+                            , S.DETAIL_BIGO
+							  , SYSDATE
+							  , #{ssnSabun}
+						)
+
+
+
+
+		</update>
+
+	</mapper>

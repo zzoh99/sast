@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepBase1YmdMgr">
+
+<!-- 퇴직기산시작일 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSepBase1YmdMgrList">
+
+				<![CDATA[
+						SELECT B.ORG_NM
+						 , B.WORK_TYPE
+						 , B.JIKCHAK_CD
+						 , B.JIKWEE_CD
+						 , B.SABUN
+						 , B.NAME
+						 , B.MANAGE_CD
+						 , B.STATUS_CD
+						 , B.EMP_YMD
+						 , B.RES_NO
+						 , B.BASE1_YMD
+					  FROM (
+							SELECT X.ENTER_CD
+								 , Y.ORG_CD
+								 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+								 , Y.WORK_TYPE
+								 , Y.JIKCHAK_CD
+								 , Y.JIKWEE_CD
+								 , Y.MANAGE_CD
+								 , Y.STATUS_CD
+								 , X.SABUN
+								 , TRIM(X.NAME) AS NAME
+								 , X.EMP_YMD
+								 , X.GEMP_YMD
+								 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+								 , X.RET_YMD
+								 , X.BASE1_YMD
+							  FROM THRM100 X
+								 , THRM151 Y
+							 WHERE X.ENTER_CD	= Y.ENTER_CD
+							   AND X.SABUN		= Y.SABUN
+							   AND X.ENTER_CD	= #{ssnEnterCd}
+							           		]]>
+							<if test='orgCd != null and !orgCd.equals("")'>
+							   AND Y.ORG_CD		= #{orgCd}
+							</if>
+							<if test='multiManageCd != null and !multiManageCd.equals("")'>
+							   AND Y.MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+							</if>
+							<if test='multiStatusCd != null and !multiStatusCd.equals("")'>
+							   AND Y.STATUS_CD	IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+							</if>
+							<if test='sabunName != null and !sabunName.equals("")'>
+							   AND X.SABUN||X.NAME LIKE '%'||trim(#{sabunName})||'%'
+							</if>
+							   AND Y.SDATE		= (	SELECT MAX(SDATE)
+													  FROM THRM151
+													 WHERE ENTER_CD	= Y.ENTER_CD
+													   AND SABUN	= Y.SABUN
+													   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+							) B
+					 WHERE B.ENTER_CD		= #{ssnEnterCd}
+					ORDER BY B.ORG_NM,B.WORK_TYPE,B.JIKCHAK_CD,B.JIKWEE_CD,B.NAME
+
+
+
+		</select>
+
+		
+<!-- 퇴직기산시작일 저장 -->
+		<update parameterType="map" id="saveSepBase1YmdMgr">
+
+
+				MERGE INTO THRM100 T
+					USING	(
+							SELECT	A.ENTER_CD
+									,A.BASE1_YMD
+									,A.SABUN
+							FROM	(
+									SELECT	 
+									NULL		AS ENTER_CD
+									, NULL		AS BASE1_YMD
+									, NULL		AS SABUN
+									FROM	DUAL
+						<bind name="icnt" value="1" />
+						<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+									#{ssnEnterCd}                 	AS ENTER_CD
+									,TRIM( #{rm.base1Ymd})		AS BASE1_YMD
+									,TRIM( #{rm.sabun})		AS SABUN
+									FROM   DUAL
+						</foreach>
+									) A WHERE 
+									A.ENTER_CD IS NOT NULL
+									AND A.SABUN IS NOT NULL
+							) S
+					ON ( 
+									T.ENTER_CD		= S.ENTER_CD
+									AND	T.SABUN		= S.SABUN
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  
+									T.BASE1_YMD		= S.BASE1_YMD
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+
+
+
+		</update>
+		
+	</mapper>
+

@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.famInfoMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getFamInfoMgrList">
+
+				<![CDATA[
+					SELECT   F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					        ,C.SABUN
+					        ,F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+					        ,F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+					        ,F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+				    		,F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+					        ,B.STATUS_CD
+					        ,A.FOREIGN_YN
+					        ,A.HANDICAP_YN
+					        ,A.WOMAN_YN
+					        ,A.SPOUSE_YN
+					        ,A.FAMILY_CNT_1
+					        ,A.FAMILY_CNT_2
+					        ,A.OLD_CNT_1
+					        ,A.OLD_CNT_2
+					        ,A.HANDICAP_CNT
+					        ,A.CHILD_CNT
+					        ,A.ADD_CHILD_CNT
+					        ,A.SDATE
+					        ,A.EDATE
+					 FROM TCPN101 A
+					INNER JOIN THRM151 B
+					   ON B.ENTER_CD = A.ENTER_CD
+					  AND B.SABUN = A.SABUN
+					  AND B.SDATE = (SELECT MAX(X.SDATE) FROM THRM151 X WHERE X.ENTER_CD = B.ENTER_CD AND X.SABUN = B.SABUN AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'29991231'))
+					INNER JOIN THRM100 C
+					   ON B.ENTER_CD = C.ENTER_CD
+					  AND B.SABUN = C.SABUN
+					          ]]>
+				<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+				INNER JOIN ${query} AUTH
+				   ON AUTH.ENTER_CD = A.ENTER_CD
+				  AND AUTH.SABUN = A.SABUN
+				</if>
+					WHERE B.ENTER_CD = #{ssnEnterCd}
+					  AND (B.SABUN = TRIM(#{searchSabunName}) OR F_COM_GET_NAMES(C.ENTER_CD,C.SABUN) LIKE '%'||TRIM(#{searchSabunName})||'%')
+                  <if test='searchStatusCdHidden != null and !searchStatusCdHidden.equals("")'>
+   					  AND B.STATUS_CD IN
+		<foreach collection="searchStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				  </if>
+					ORDER BY B.STATUS_CD, F_COM_JIKJE_SORT(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveFamInfoMgr">
+
+
+					MERGE INTO TCPN101 T
+                    USING   (
+                            SELECT    A.SABUN
+                                    , A.FOREIGN_YN
+                                    , A.HANDICAP_YN
+									, A.WOMAN_YN
+									, A.SPOUSE_YN
+									, A.FAMILY_CNT_1
+									, A.FAMILY_CNT_2
+									, A.OLD_CNT_1
+									, A.OLD_CNT_2
+									, A.HANDICAP_CNT
+									, A.CHILD_CNT
+									, A.ADD_CHILD_CNT
+									, A.SDATE
+									, A.EDATE
+                            FROM    (
+                                    SELECT    NULL AS SABUN
+                                            , NULL AS FOREIGN_YN
+                                            , NULL AS HANDICAP_YN
+                                            , NULL AS WOMAN_YN
+                                            , NULL AS SPOUSE_YN
+                                            , NULL AS FAMILY_CNT_1
+                                            , NULL AS FAMILY_CNT_2
+                                            , NULL AS OLD_CNT_1
+                                            , NULL AS OLD_CNT_2
+                                            , NULL AS HANDICAP_CNT
+                                            , NULL AS CHILD_CNT
+                                            , NULL AS ADD_CHILD_CNT
+                                            , NULL AS SDATE
+                                            , NULL AS EDATE
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT   TRIM(#{rm.sabun})        AS SABUN
+											,TRIM(#{rm.foreignYn})    AS FOREIGN_YN
+                                            ,TRIM(#{rm.handicapYn})   AS HANDICAP_YN
+											,TRIM(#{rm.womanYn})      AS WOMAN_YN
+											,TRIM(#{rm.spouseYn})     AS SPOUSE_YN
+											,TRIM(#{rm.familyCnt1})   AS FAMILY_CNT_1
+											,TRIM(#{rm.familyCnt2})   AS FAMILY_CNT_2
+											,TRIM(#{rm.oldCnt1})      AS OLD_CNT_1
+											,TRIM(#{rm.oldCnt2})      AS OLD_CNT_2
+											,TRIM(#{rm.handicapCnt})  AS HANDICAP_CNT
+											,TRIM(#{rm.childCnt})     AS CHILD_CNT
+											,TRIM(#{rm.addChildCnt})  AS ADD_CHILD_CNT
+											,TRIM(#{rm.sdate})  	  AS SDATE
+											,TRIM(#{rm.edate})  	  AS EDATE
+                                        FROM   DUAL
+</foreach>
+                                    ) A WHERE A.SABUN IS NOT NULL
+                            ) S
+                    ON (    T.ENTER_CD  = #{ssnEnterCd}
+                        AND T.SABUN = S.SABUN
+                        AND T.SDATE = S.SDATE
+                       )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.FOREIGN_YN    =  S.FOREIGN_YN
+                                    , T.HANDICAP_YN   =  S.HANDICAP_YN
+                                    , T.WOMAN_YN      =  S.WOMAN_YN
+                                    , T.SPOUSE_YN     =  S.SPOUSE_YN
+                                    , T.FAMILY_CNT_1  =  S.FAMILY_CNT_1
+                                    , T.FAMILY_CNT_2  =  S.FAMILY_CNT_2
+                                    , T.OLD_CNT_1     =  S.OLD_CNT_1
+                                    , T.OLD_CNT_2     =  S.OLD_CNT_2
+                                    , T.HANDICAP_CNT  =  S.HANDICAP_CNT
+                                    , T.CHILD_CNT     =  S.CHILD_CNT
+                                    , T.ADD_CHILD_CNT =  S.ADD_CHILD_CNT
+                                    , T.EDATE	      =  S.EDATE
+                                    , T.CHKDATE       =  SYSDATE
+                                    , T.CHKID         =  #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD -- KEY
+							, T.SABUN -- KEY
+							, T.FOREIGN_YN
+							, T.HANDICAP_YN
+							, T.WOMAN_YN
+							, T.SPOUSE_YN
+							, T.FAMILY_CNT_1
+							, T.FAMILY_CNT_2
+							, T.OLD_CNT_1
+							, T.OLD_CNT_2
+							, T.HANDICAP_CNT
+							, T.CHILD_CNT
+							, T.ADD_CHILD_CNT
+							, T.SDATE -- KEY
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+                        )
+                        VALUES
+                        (
+                              #{ssnEnterCd}
+                            , S.SABUN -- KEY
+                            , S.FOREIGN_YN
+                            , S.HANDICAP_YN
+                            , S.WOMAN_YN
+                            , S.SPOUSE_YN
+                            , S.FAMILY_CNT_1
+                            , S.FAMILY_CNT_2
+                            , S.OLD_CNT_1
+                            , S.OLD_CNT_2
+                            , S.HANDICAP_CNT
+                            , S.CHILD_CNT
+                            , S.ADD_CHILD_CNT
+                            , S.SDATE -- KEY
+                            , S.EDATE
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteFamInfoMgr">
+                    DELETE FROM TCPN101
+                    WHERE   (ENTER_CD, SABUN) IN   (  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+                                                (#{ssnEnterCd}, TRIM(#{rm.sabun}))
+                                        </if>
+</foreach>
+                     )
+		</delete>
+
+<!-- 세율 관리 - 전년도 자료복사 -->
+
+        <update id="prcFamilyInfoCreateCall" parameterType="map" statementType="CALLABLE">
+                <![CDATA[
+                    CALL P_CPN_FAM_INFO_INS(
+                        #{pSqlcode,mode=OUT,jdbcType=VARCHAR},
+                        #{pSqlerrm,mode=OUT,jdbcType=VARCHAR},
+                        #{pCnt,mode=OUT,jdbcType=VARCHAR},
+                        #{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+                        #{searchWorkYy,mode=IN,jdbcType=VARCHAR},
+                        #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+                ]]>
+
+       </update>
+	</mapper>

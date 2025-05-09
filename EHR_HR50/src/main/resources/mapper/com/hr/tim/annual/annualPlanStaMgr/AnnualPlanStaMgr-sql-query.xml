@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanStaMgr">
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAppReceiveList">
+
+		   <![CDATA[
+		       SELECT SEQ AS CODE
+			        , VAC_PLAN_NM AS CODE_NM
+			   FROM TTIM541
+			   WHERE ENTER_CD = #{ssnEnterCd}
+			   ORDER BY VAC_RECEIVE_SYMD DESC
+			]]>
+
+
+		</select>
+
+				<select parameterType="map" resultType="cMap" id="getAnnualPlanAppReceiveList2">
+
+		   <![CDATA[
+			   SELECT '' AS CODE, decode(#{ssnLocaleCd}, null, '전체', 'ko_KR', '전체', 'All') AS CODE_NM
+               FROM DUAL
+               UNION ALL
+               SELECT TO_CHAR(SEQ) AS CODE
+			        , VAC_PLAN_NM AS CODE_NM
+			   FROM TTIM541
+			   WHERE ENTER_CD = #{ssnEnterCd}
+			]]>
+
+
+		</select>
+<!-- 연차휴가계획관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanStaMgrList">
+				<![CDATA[
+				SELECT
+					*
+				FROM
+					(
+						SELECT ENTER_CD, SABUN
+							,F_COM_GET_NAMES(ENTER_CD, SABUN, #{ssnLocaleCd}) AS NAME
+							,F_COM_GET_ORG_NM2(ENTER_CD, SABUN, VAC_STD_SYMD, #{ssnLocaleCd}) AS ORG_NM
+							,F_COM_GET_ORG_CD(ENTER_CD, SABUN,VAC_STD_SYMD) AS ORG_CD
+							,F_COM_GET_JIKGUB_NM(ENTER_CD, SABUN, VAC_STD_SYMD, #{ssnLocaleCd}) AS JIKGUB_NM
+							,F_COM_GET_JIKCHAK_NM(ENTER_CD, SABUN, VAC_STD_SYMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							,F_COM_GET_JIKWEE_NM(ENTER_CD, SABUN, VAC_STD_SYMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							,F_COM_GET_MANAGE_NM(ENTER_CD, SABUN, VAC_STD_SYMD, #{ssnLocaleCd}) AS MANAGE_NM
+							,CRE_CNT, USE_CNT, USED_CNT, REST_CNT, COM_CNT, DAYS, VAC_STD_SYMD,YY, CONFIRM_YN
+						FROM (
+							SELECT E.ENTER_CD, E.SABUN, VAC_STD_SYMD, DAYS, CRE_CNT, USE_CNT, USED_CNT, REST_CNT, COM_CNT, YY, CONFIRM_YN
+							FROM (
+								SELECT B.ENTER_CD, B.SABUN, A.VAC_STD_SYMD, SUM(DAYS) AS DAYS, MIN(B.CLOSE_YN) AS CONFIRM_YN
+								FROM TTIM541 A, TTIM542 B, THRI103 C
+								WHERE A.ENTER_CD = #{ssnEnterCd}
+								AND A.SEQ = #{vSeq}
+								AND B.ENTER_CD = A.ENTER_CD
+								AND B.SEQ = A.SEQ
+								AND C.ENTER_CD = B.ENTER_CD
+								AND C.APPL_SEQ = B.APPL_SEQ
+								AND C.APPL_STATUS_CD = '99'
+								GROUP BY B.ENTER_CD, B.SABUN, A.VAC_STD_SYMD
+							) D
+							,TTIM511 E
+							WHERE D.ENTER_CD = E.ENTER_CD
+							AND D.SABUN = E.SABUN
+							AND SUBSTR(D.VAC_STD_SYMD, 1, 4) = E.YY
+							AND E.GNT_CD = '14'
+						)
+	   				) A
+				WHERE 1=1
+				    ]]>
+				<if test='orgNm != null and orgNm neq ""'>
+					AND ORG_NM LIKE '%' || TRIM(#{orgNm}) || '%'
+				</if>
+				<if test='name != null and !name.equals("")'>
+					AND ( NAME LIKE '%'||TRIM( #{name} )||'%' OR SABUN LIKE '%'||TRIM( #{name} )||'%')
+				</if>
+				<if test='multiManageCd != null and multiManageCd neq ""'>
+					AND F_COM_GET_MANAGE_CD(ENTER_CD, SABUN, VAC_STD_SYMD) IN
+				  	<foreach collection="multiManageCd" item="item" open="(" close=")" separator=", ">
+						#{item}
+					</foreach>
+				</if>
+
+				ORDER BY F_COM_JIKJE_SORT(#{ssnEnterCd}, SABUN, VAC_STD_SYMD)
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanStaMgrList2">
+
+				<![CDATA[
+				SELECT
+						 ENTER_CD
+						,SDATE
+						,EDATE
+						,DAYS
+						,NOTE
+						,SEQ
+						,SABUN
+						,APPL_SEQ
+						,TRUNC(TO_DATE(EDATE,'yyyymmdd')) - TRUNC(TO_DATE(SDATE,'yyyymmdd')) + 1  TOTAL_DAYS
+					FROM
+						TTIM542
+					WHERE
+						ENTER_CD = #{ssnEnterCd}
+					AND SABUN = #{sabun}
+					AND SEQ=#{seq}
+				]]>
+
+
+		</select>
+
+<!-- 연차휴가계획관리 저장 -->
+		<update parameterType="map" id="saveAnnualPlanStaMgr">
+
+					MERGE INTO TTIM542 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SEQ
+									, A.SDATE
+									, A.EDATE
+									, A.DAYS
+									, A.NOTE
+									, A.APPL_SEQ
+									, A.CHKDATE
+									, A.CHKID
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS SEQ
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS DAYS
+											, NULL		AS NOTE
+											, NULL		AS APPL_SEQ
+											, NULL		AS CHKDATE
+											, NULL		AS CHKID
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.seq} )				AS SEQ
+											, TRIM( #{rm.sdate} )			AS SDATE
+											, TRIM( #{rm.edate} )			AS EDATE
+											, TRIM( #{rm.days} )			AS DAYS
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.applSeq} )			AS APPL_SEQ
+											, SYSDATE						AS CHKDATE
+											, TRIM( #{ssnSabun} )			AS CHKID
+											FROM   DUAL
+</foreach>
+									) A
+									WHERE
+										A.ENTER_CD IS NOT NULL
+									AND	A.SABUN IS NOT NULL
+									AND	A.SEQ IS NOT NULL
+									AND	A.SDATE IS NOT NULL
+							) S
+					ON ( 	T.ENTER_CD	= S.ENTER_CD
+						AND T.SABUN = S.SABUN
+						AND T.SEQ = S.SEQ
+						AND T.SDATE = S.SDATE)
+					WHEN MATCHED THEN
+						UPDATE SET
+								 T.EDATE	= S.EDATE
+								,T.DAYS 	= S.DAYS
+								,T.NOTE 	= S.NOTE
+								,T.CHKDATE	= S.CHKDATE
+								,T.CHKID	= S.CHKID
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SEQ
+							, T.SDATE
+							, T.EDATE
+							, T.DAYS
+							, T.NOTE
+							, T.APPL_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SEQ
+							, S.SDATE
+							, S.EDATE
+							, S.DAYS
+							, S.NOTE
+							, S.APPL_SEQ
+							, S.CHKDATE
+							, S.CHKID
+						)
+		</update>
+
+
+
+		<update parameterType="map" id="CallAnnualPlanStaMgrConfirm">
+
+				<![CDATA[
+					CALL P_TIM_VACATION_PLAN_INS(#{sqlCode},#{sqlErrm},#{ssnEnterCd},#{vSeq},#{ssnSabun})
+				]]>
+		</update>
+
+		<update parameterType="map" id="saveAnnualPlanStaMgrConfirm">
+
+				<![CDATA[
+				UPDATE TTIM542 T SET
+					 CLOSE_YN='Y'
+					,CHKDATE=SYSDATE
+					,CHKID=#{ssnSabun}
+				WHERE
+					ENTER_CD=#{ssnEnterCd}
+				AND SEQ=#{vSeq}
+				AND SABUN IN
+				    ]]>
+					(''
+					<foreach item="rm" collection="updateRows" >
+						,#{rm.sabun}
+					</foreach>
+					)
+
+		</update>
+
+<!-- 연차휴가계획관리 삭제 -->
+		<delete parameterType="map" id="deleteAnnualPlanStaMgr">
+
+					DELETE FROM TTIM542
+					 WHERE ENTER_CD||'_'||SABUN||'_'||SEQ||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.seq != null and !rm.seq.equals("")
+												and rm.sdate != null and !rm.sdate.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.seq} )||'_'||TRIM( #{rm.sdate} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

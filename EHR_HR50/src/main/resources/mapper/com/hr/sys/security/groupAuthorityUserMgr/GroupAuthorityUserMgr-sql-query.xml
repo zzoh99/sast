@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+	<mapper namespace="sys.security.groupAuthorityUserMgr">
+		<select parameterType="map" resultType="cMap" id="getGroupAuthorityUserMgrList">
+
+				<![CDATA[
+				SELECT
+					 A.GRP_EMP_TYPE
+					,A.FR_ENTER_CD
+					,(SELECT ENTER_NM FROM TORG900 WHERE ENTER_CD = A.FR_ENTER_CD) AS  FR_ENTER_NM
+					,A.SABUN
+					,F_COM_GET_NAMES(A.FR_ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					,F_COM_GET_NAMES(A.FR_ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+					,F_COM_GET_JIKWEE_NM (A.FR_ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+             		,F_COM_GET_JIKGUB_NM (A.FR_ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_NM
+					,F_COM_GET_ORG_NM2(A.FR_ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					,A.TO_ENTER_CD
+					,A.HR_DATA_YN
+					,DECODE(F_COM_GET_GRCODE_NOTE_VAL(A.FR_ENTER_CD, 'R90000', A.GRP_EMP_TYPE, 1),'Y','2','1') AS CREATE_IMG
+				FROM
+					TSYS399 A
+				WHERE 1=1 ]]>
+				<if test='searchGrpEmpType != null and !searchGrpEmpType.equals("") '>
+					AND A.GRP_EMP_TYPE LIKE '%'|| #{searchGrpEmpType} ||'%'
+				</if>
+				<if test='searchKeyWord != null and !searchKeyWord.equals("") '>
+					AND ( A.SABUN LIKE '%'|| #{searchKeyWord} ||'%' OR F_COM_GET_NAMES(A.FR_ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'|| #{searchKeyWord} ||'%' )
+				</if>
+				ORDER BY
+					 A.GRP_EMP_TYPE
+					,A.FR_ENTER_CD
+					,A.SABUN
+					,A.TO_ENTER_CD
+
+
+		</select>
+
+
+
+		<update parameterType="map" id="saveGroupAuthorityUserMgr">
+
+   					MERGE INTO TSYS399 T
+                  	USING (
+               				SELECT    A.GRP_EMP_TYPE
+                                	, A.FR_ENTER_CD
+                                	, A.SABUN
+                                	, A.TO_ENTER_CD
+                                	, A.HR_DATA_YN
+                                	, A.CHKDATE
+                                	, A.CHKID
+                     		FROM   (
+                               		SELECT    NULL			AS GRP_EMP_TYPE
+                                			, NULL			AS FR_ENTER_CD
+                                			, NULL			AS SABUN
+                                			, NULL			AS TO_ENTER_CD
+                                			, NULL			AS HR_DATA_YN
+                                			, NULL			AS CHKDATE
+                                			, NULL			AS CHKID
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT    TRIM(#{rm.grpEmpType})  	AS GRP_EMP_TYPE
+                                       		, TRIM(#{rm.frEnterCd})		AS FR_ENTER_CD
+                                       		, TRIM(#{rm.sabun})			AS SABUN
+                                       		, TRIM(#{rm.toEnterCd})		AS TO_ENTER_CD
+                                       		, TRIM(#{rm.hrDataYn})		AS HR_DATA_YN
+                                       		, SYSDATE					AS CHKDATE
+                                       		, #{ssnSabun}					AS CHKID
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.GRP_EMP_TYPE IS NOT NULL
+							AND   A.FR_ENTER_CD IS NOT NULL
+							AND   A.SABUN IS NOT NULL
+							AND   A.TO_ENTER_CD IS NOT NULL
+                           ) S
+                        ON (		T.GRP_EMP_TYPE 	= S.GRP_EMP_TYPE
+                               AND	T.FR_ENTER_CD 	= S.FR_ENTER_CD
+                               AND	T.SABUN 		= S.SABUN
+                               AND	T.TO_ENTER_CD 	= S.TO_ENTER_CD
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET
+                           	  T.HR_DATA_YN	= S.HR_DATA_YN
+                           	 ,T.CHKDATE		= SYSDATE
+                           	 ,T.CHKID		= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  T.GRP_EMP_TYPE
+               				, T.FR_ENTER_CD
+               				, T.SABUN
+                          	, T.TO_ENTER_CD
+                          	, T.HR_DATA_YN
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			)
+               			VALUES
+               			(
+               				  S.GRP_EMP_TYPE
+               				, S.FR_ENTER_CD
+               				, S.SABUN
+               				, S.TO_ENTER_CD
+               				, S.HR_DATA_YN
+               				, S.CHKDATE
+               				, S.CHKID
+               			)
+
+
+
+
+		</update>
+
+		<!-- 그룹사권한사용자관리 삭제  -->
+		<delete parameterType="map" id="deleteGroupAuthorityUserMgr">
+
+   					DELETE FROM TSYS399
+					WHERE GRP_EMP_TYPE||'_'||FR_ENTER_CD||'_'||SABUN||'_'||TO_ENTER_CD
+							IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+
+		             	<if test='rm.grpEmpType != null and !rm.grpEmpType.equals("") and rm.frEnterCd != null and !rm.frEnterCd.equals("")
+		             		and rm.sabun != null and !rm.sabun.equals("") and rm.toEnterCd != null and !rm.toEnterCd.equals("")'>
+		             		,TRIM(#{rm.grpEmpType})||'_'||TRIM(#{rm.frEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.toEnterCd})
+						</if>
+</foreach>
+					)
+
+
+
+		</delete>
+
+
+		<!-- 로그인정보 생성  -->
+		<update id="callP_SYS_GRP_USER_INS" parameterType="map" statementType="CALLABLE" >
+		<![CDATA[
+			{CALL P_SYS_GRP_USER_INS(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{grpEmpType,mode=IN,jdbcType=VARCHAR},
+				#{frEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{toEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{gubun,mode=IN,jdbcType=VARCHAR},
+				#{chkid,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>
+

@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	재계산대상자관리
+ -->
+<root>
+
+	<!-- 재계산 대상자 조회  -->
+	<query id="selectYeaReCalcPeopleList">
+		<![CDATA[
+		SELECT SUB.*
+		FROM (
+			SELECT A.WORK_YY
+				 , A.ADJUST_TYPE
+				 , SUBSTR(A.ADJUST_TYPE, 1, 1) AS ADJUST_TYPE_NM 
+				 , A.SABUN
+				 , A.BUSINESS_PLACE_CD
+				 , A.PAY_ACTION_CD
+				 , A.ZIP
+				 , A.ADDR1
+				 , A.ADDR2
+				 , A.ORG_CD
+				 , F_COM_GET_ORG_NM(A.ENTER_CD, F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, A.WORK_YY || '1231'), A.WORK_YY || '1231') AS ORG_NM
+				 , A.INPUT_CLOSE_YN
+				 , A.APPRV_YN
+				 , B.FAM_NM AS NAME
+			     , A.HOUSE_OWNER_YN
+			     , NVL(A.FOREIGN_TAX_TYPE,'3') AS FOREIGN_TAX_TYPE
+			     , A.REDUCE_S_YMD
+			     , A.REDUCE_E_YMD
+			     , A.HOUSE_GET_YMD
+			     , A.HOUSE_AREA
+			     , A.OFFICIAL_PRICE
+			     , A.NATIONAL_CD
+			     , A.NATIONAL_NM
+			     , A.RESULT_CONFIRM_YN
+			     , A.HOUSE_CNT 
+			     , A.TAX_TYPE
+			     , C.ADJ_S_YMD
+			     , C.ADJ_E_YMD
+			     , A.EXCEPT_YN
+			     , D.BUSINESS_PLACE_NM
+			     , F_CPN_YEA_RECAL_SEQ_CHECK (A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, 'TCPN811', 'GUBUN')  AS GUBUN   -- 재정산 구분
+                 , F_CPN_YEA_RECAL_SEQ_CHECK (A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, 'TCPN811', 'RE_SEQ') AS RE_SEQ  -- 재정산 차수
+                 , CASE WHEN Z.RE_CALC_YN = 'D' THEN '-DDD' /* 실제 삭제할 경우 원본 자료 매핑에 문제가 있음. 플래그 처리로 변경. 20241119 */
+                        ELSE Z.PAY_PEOPLE_STATUS END AS PAY_PEOPLE_STATUS
+				 , Z.FINAL_CLOSE_YN
+                 , Z.RE_YMD
+                 , Z.RE_REASON
+                 , Z.MEMO
+			  FROM TCPN811 A
+			  JOIN TCPN823 B
+                ON A.ENTER_CD	 = B.ENTER_CD
+			   AND A.SABUN		 = B.SABUN
+			   AND A.WORK_YY	 = B.WORK_YY
+			   AND A.ADJUST_TYPE = B.ADJUST_TYPE
+			   AND B.FAM_CD      = '0'
+			  JOIN TCPN884 Z
+                ON Z.ENTER_CD    = A.ENTER_CD
+               AND Z.WORK_YY     = A.WORK_YY
+               AND Z.SABUN       = A.SABUN
+               AND Z.ADJUST_TYPE = A.ADJUST_TYPE
+	     LEFT JOIN TCPN841 C
+                ON A.ENTER_CD	 = C.ENTER_CD
+			   AND A.SABUN		 = C.SABUN
+			   AND A.WORK_YY	 = C.WORK_YY
+			   AND A.ADJUST_TYPE = C.ADJUST_TYPE
+         LEFT JOIN TCPN121 D
+                ON A.ENTER_CD           = D.ENTER_CD
+               AND A.BUSINESS_PLACE_CD  = D.BUSINESS_PLACE_CD
+               AND NVL(C.ADJ_E_YMD, A.WORK_YY || '1231') BETWEEN D.SDATE AND D.EDATE
+			 WHERE A.ENTER_CD      		= #ssnEnterCd#
+			   AND A.WORK_YY			= #searchWorkYy#
+			   AND A.BUSINESS_PLACE_CD  LIKE #searchBizPlaceCd# || '%'
+		       AND ( #searchSbNm# IS NULL OR LOWER(A.SABUN) LIKE '%'||LOWER(#searchSbNm#)||'%' OR LOWER(B.FAM_NM) LIKE '%'||LOWER(#searchSbNm#)||'%' )
+	           AND ( #search884# IS NULL OR (#search884#='Y' AND Z.ENTER_CD IS NOT NULL ) ) -- 조회조건 : 재계산인원
+	           AND ( #searchPayPeopleStatus# IS NULL OR Z.PAY_PEOPLE_STATUS = #searchPayPeopleStatus# ) -- 조회조건 : 작업상태
+	           AND ( #searchCloseYn# IS NULL OR Z.FINAL_CLOSE_YN = #searchCloseYn# ) -- 조회조건 : 마감상태
+	           AND ( #searchDDD# IS NULL OR 1 = CASE WHEN #searchDDD# = '1' AND NVL(Z.RE_CALC_YN, '%') <> 'D' THEN 1 
+	                                                 WHEN #searchDDD# = '2' AND Z.RE_CALC_YN = 'D' THEN 1 END) -- 조회조건 : 삭제자료포함하여조회
+		       AND REGEXP_LIKE(A.ADJUST_TYPE, '^[139]')
+			   AND A.ADJUST_TYPE LIKE #searchAdjustType# || '%'
+			   AND 1 = CASE WHEN #searchGubun# IS NULL THEN 1       
+		                    WHEN #searchGubun# = 'F' AND A.ADJUST_TYPE IN ('1', '3') THEN 1  
+		                    WHEN #searchGubun# = 'H' AND REGEXP_LIKE(A.ADJUST_TYPE, '^[139]R') THEN 1                   
+		               END
+			) SUB
+			WHERE 1=1
+			$mSearchReSeqSQL$
+			ORDER BY ADJUST_TYPE_NM, NAME, SABUN, GUBUN, TO_NUMBER(RE_SEQ) DESC
+		]]>
+	</query>
+
+	<!-- 재계산 대상자 저장  -->
+	<query id="updateYeaReCalcPeople">
+		<![CDATA[
+			UPDATE TCPN811
+			   SET TAX_TYPE             = #tax_type#	
+			     , FOREIGN_TAX_TYPE  	= #foreign_tax_type#
+                 , REDUCE_S_YMD      	= #reduce_s_ymd#
+                 , REDUCE_E_YMD      	= #reduce_e_ymd#
+                 , NATIONAL_CD       	= #national_cd#
+                 , NATIONAL_NM       	= F_COM_GET_GRCODE_NAME(#ssnEnterCd#, 'H20295', #national_cd#, NULL, NVL(#adj_e_ymd#, #work_yy#||'1231'))
+			     , EXCEPT_YN            = #except_yn#
+				 , CHKDATE	    	  	= SYSDATE
+				 , CHKID    	  		= #ssnSabun#
+				 , PAY_ACTION_CD        = #pay_action_cd#
+			 WHERE ENTER_CD    = #ssnEnterCd#
+			   AND WORK_YY     = #work_yy#
+			   AND ADJUST_TYPE = #adjust_type#
+			   AND SABUN       = #sabun# 
+			   AND (   NVL(TAX_TYPE,         'N/A') <> NVL(#tax_type#, 'N/A')
+			        OR NVL(FOREIGN_TAX_TYPE, 'N/A') <> NVL(#foreign_tax_type#, 'N/A')
+			        OR NVL(REDUCE_S_YMD,     'N/A') <> NVL(#reduce_s_ymd#, 'N/A')
+			        OR NVL(REDUCE_E_YMD,     'N/A') <> NVL(#reduce_e_ymd#, 'N/A')
+			        OR NVL(NATIONAL_CD,      'N/A') <> NVL(#national_cd#, 'N/A')
+			        OR NVL(EXCEPT_YN,        'N/A') <> NVL(#except_yn#, 'N/A')
+			        OR NVL(PAY_ACTION_CD,    'N/A') <> NVL(#pay_action_cd#, 'N/A') )
+		]]>
+	</query>
+	
+	<!-- 재계산 계산결과 수정 TCPN841 -->
+	<query id="updateYeaReCalcPeopleAdjYmd">
+		<![CDATA[
+			MERGE INTO TCPN841 A
+			USING (
+                     SELECT X.ENTER_CD
+			              , X.WORK_YY
+			              , X.ADJUST_TYPE
+			              , X.SABUN
+			              , #adj_s_ymd#   AS ADJ_S_YMD
+			              , #adj_e_ymd#   AS ADJ_E_YMD
+			              , X.BUSINESS_PLACE_CD
+			              , ( /* INSERT 시, NOT NULL 필드 */
+			                  SELECT REPLACE(RTRIM(Z.REGINO),'-','') AS ENTER_NO
+					            FROM TCPN121 Z
+					           WHERE Z.ENTER_CD = #ssnEnterCd#
+					             AND Z.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+					             AND Z.SDATE = (SELECT MAX(Y.SDATE) 
+					                              FROM TCPN121 Y
+					                             WHERE Y.ENTER_CD = #ssnEnterCd#
+					                               AND Y.BUSINESS_PLACE_CD = Z.BUSINESS_PLACE_CD
+					                               AND #work_yy# || '1231' BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+					        ) AS ENTER_NO
+			           FROM TCPN811 X
+			          WHERE X.ENTER_CD    = #ssnEnterCd#
+			            AND X.WORK_YY     = #work_yy#
+			            AND X.ADJUST_TYPE = #adjust_type#
+			            AND X.SABUN       = #sabun#
+			          
+			      ) B
+			   ON (     A.ENTER_CD    = B.ENTER_CD
+			        AND A.WORK_YY     = B.WORK_YY
+			        AND A.ADJUST_TYPE = B.ADJUST_TYPE
+			        AND A.SABUN       = B.SABUN
+			      )
+             WHEN MATCHED THEN
+			   UPDATE SET A.ADJ_S_YMD  = CASE WHEN NVL(A.ADJ_S_YMD, 'N/A') <> NVL(B.ADJ_S_YMD, 'N/A') 
+			                                  THEN B.ADJ_S_YMD
+			                                  ELSE A.ADJ_S_YMD 
+			                             END
+				        , A.ADJ_E_YMD  = CASE WHEN NVL(A.ADJ_E_YMD, 'N/A') <> NVL(B.ADJ_E_YMD, 'N/A') 
+			                                  THEN B.ADJ_E_YMD
+			                                  ELSE A.ADJ_E_YMD 
+			                             END
+				        , A.CHKDATE    = CASE WHEN NVL(A.ADJ_S_YMD, 'N/A') <> NVL(B.ADJ_S_YMD, 'N/A') 
+				                                OR NVL(A.ADJ_E_YMD, 'N/A') <> NVL(B.ADJ_E_YMD, 'N/A') 
+			                                  THEN SYSDATE
+			                                  ELSE A.CHKDATE 
+			                             END
+				        , A.CHKID      = CASE WHEN NVL(A.ADJ_S_YMD, 'N/A') <> NVL(B.ADJ_S_YMD, 'N/A') 
+				                                OR NVL(A.ADJ_E_YMD, 'N/A') <> NVL(B.ADJ_E_YMD, 'N/A') 
+			                                  THEN #ssnSabun#
+			                                  ELSE A.CHKID 
+			                             END
+             WHEN NOT MATCHED THEN
+               INSERT (A.ENTER_CD
+			         , A.WORK_YY
+			         , A.ADJUST_TYPE
+			         , A.SABUN
+			         , A.BUSINESS_PLACE_CD
+			         , A.ENTER_NO         
+			         , A.ADJ_S_YMD
+				     , A.ADJ_E_YMD
+				     , A.CHKDATE
+				     , A.CHKID
+			           ) 
+			   VALUES (B.ENTER_CD
+			         , B.WORK_YY
+			         , B.ADJUST_TYPE
+			         , B.SABUN
+			         , B.BUSINESS_PLACE_CD
+			         , B.ENTER_NO
+			         , B.ADJ_S_YMD
+			         , B.ADJ_E_YMD
+			         , SYSDATE
+			         , #ssnSabun#
+			           )
+		]]>
+	</query>
+	
+	<!-- 재계산 기준테이블 저장  -->
+	<query id="updateYeaReCalc884">
+		<![CDATA[
+			UPDATE TCPN884
+			   SET PAY_ACTION_CD        = #pay_action_cd#
+				 , PAY_PEOPLE_STATUS    = 'PM'
+				 , RE_CALC_YN           = 'N'
+				 , CHKDATE	    	  	= SYSDATE
+				 , CHKID    	  		= #ssnSabun#
+			 WHERE ENTER_CD    = #ssnEnterCd#
+			   AND WORK_YY     = #work_yy#
+			   AND ADJUST_TYPE = #adjust_type#
+			   AND SABUN       = #sabun# 
+		]]>
+	</query>
+	
+</root>

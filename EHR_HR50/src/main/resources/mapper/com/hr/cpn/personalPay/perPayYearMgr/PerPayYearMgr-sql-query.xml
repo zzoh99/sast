@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayYearLst">
+
+		<!-- 연봉항목그룹명 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerPayYearEleGroupCodeList">
+			
+				<![CDATA[
+					SELECT A.PAY_GROUP_CD AS CODE
+					     , PAY_GROUP_NM AS CODE_NM
+					  FROM TCPN401 A
+					 WHERE 1=1
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					  ORDER BY A.SEQ
+				]]>
+			
+		</select>
+		
+<!-- 		연봉관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerPayYearMgrTitleList">
+			
+				<![CDATA[
+					SELECT /* PerPayYearMgr-mapping-query.getPerPayYearMgrTitleList */
+					       LISTAGG(ELEMENT_CD_CAMEL, '|') WITHIN GROUP ( ORDER BY PAY_GROUP_CD, PRIORITY)            AS ELEMENT_CD_CAMEL
+					     , LISTAGG(ELEMENT_CD, '|') WITHIN GROUP ( ORDER BY PAY_GROUP_CD, PRIORITY)                  AS ELEMENT_CD
+					     , LISTAGG(ELEMENT_NM, '|') WITHIN GROUP ( ORDER BY PAY_GROUP_CD, PRIORITY)                  AS ELEMENT_NM
+					     , ','||LISTAGG('ele'||ELEMENT_CD_CAMEL,',') WITHIN GROUP ( ORDER BY PAY_GROUP_CD, PRIORITY) AS ELE_VALUES
+					     , LISTAGG(ELEMENT_CD, ',') WITHIN GROUP ( ORDER BY PAY_GROUP_CD, PRIORITY)                  AS REAL_VALUES
+					     , LISTAGG(PRIORITY, ',') WITHIN GROUP ( ORDER BY PAY_GROUP_CD, PRIORITY)                    AS ORDER_VALUES
+					     , LISTAGG(PAY_GROUP_CD, ',') WITHIN GROUP ( ORDER BY PAY_GROUP_CD, PRIORITY)                AS SET_VALUES
+					  FROM (
+					        SELECT A.PAY_GROUP_CD
+					             , C.ELEMENT_CD_CAMEL
+					             , C.ELEMENT_CD
+					             , C.ELEMENT_NM
+					             , NVL(B.SEQ, C.PRIORITY) AS PRIORITY
+					          FROM TCPN401 A
+					             , TCPN402 B
+					             , (
+					                SELECT ENTER_CD
+					                     , ELEMENT_CD
+					                     , ELEMENT_NM
+					                     , SUBSTR(REPLACE(INITCAP(ELEMENT_CD),'_'),1,1)||
+					                       LOWER(SUBSTR(REPLACE(INITCAP(ELEMENT_CD),'_'),2,0))||
+					                       SUBSTR(REPLACE(INITCAP(ELEMENT_CD),'_'),2) AS ELEMENT_CD_CAMEL
+					                     , PRIORITY
+					                  FROM TCPN011
+					                 WHERE ENTER_CD = #{ssnEnterCd}
+					                   AND NVL(REPLACE(#{searchSDate}, '-', ''),'99991231') BETWEEN SDATE AND NVL(EDATE,'99991231')
+					               ) C
+					         WHERE A.ENTER_CD     = B.ENTER_CD
+					           AND A.PAY_GROUP_CD = B.PAY_GROUP_CD
+					           AND B.ENTER_CD     = C.ENTER_CD
+					           AND B.ELEMENT_CD   = C.ELEMENT_CD
+					           AND A.ENTER_CD     = #{ssnEnterCd}
+					           AND NVL(REPLACE(#{searchSDate}, '-', ''),'99991231') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231') ]]>
+<choose><when test="searchPayGroupCd != null and searchPayGroupCd neq ''">
+					           AND A.PAY_GROUP_CD = #{searchPayGroupCd}
+</when><when test="sabun != null and sabun neq ''">
+					           AND A.PAY_GROUP_CD = (SELECT PAY_GROUP_CD
+					                                   FROM TCPN403
+					                                  WHERE ENTER_CD = #{ssnEnterCd}
+					                                    AND SABUN = #{sabun}
+					                                    AND NVL(REPLACE(#{searchSDate}, '-', ''),TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN SDATE AND NVL(EDATE, '29991231'))
+</when></choose>
+			)
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayYearMgrList">
+			
+				<![CDATA[
+				SELECT /* PerPayYearMgr-mapping-query.getPerPayYearMgrList */
+					     F_COM_GET_MANAGE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS MANAGE_NM
+			        ,    A.EDATE
+			        ,    F_COM_GET_ORG_NM2 ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+			        ,    F_COM_GET_JIKCHAK_NM( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+			        ,    F_COM_GET_JIKWEE_NM ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+			        ,    F_COM_GET_JIKGUB_NM ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+			        ,    F_COM_GET_WORKTYPE(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS WORK_TYPE
+			        ,    F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS WORK_TYPE_NM
+			        ,    F_COM_GET_STATUS_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_NM
+			        ,    F_COM_GET_NAMES(A.ENTER_CD, A.SABUN ) AS NAME
+			        ,    A.BIGO
+			        ,    A.PAY_GROUP_CD
+			        ,    B.* ]]>
+				FROM	TCPN403 A
+<if test='ssnSearchType eq "O"'>
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = A.ENTER_CD
+  AND AUTH.SABUN = A.SABUN 
+</if> <![CDATA[
+					,	(
+							SELECT	*
+							FROM	(
+										SELECT ENTER_CD, SABUN, SDATE, ELEMENT_CD, ELEMENT_MON
+										FROM TCPN404 
+									    WHERE ENTER_CD = #{ssnEnterCd}
+									)
+							PIVOT	(
+										SUM(ELEMENT_MON) FOR ELEMENT_CD IN 
+										]]>
+
+							<foreach collection="elementCd" item="item" index="index" open="(" close=")" separator=",">
+									'${item}' AS ${elementAlias[index]}
+							</foreach>
+												<![CDATA[
+
+									)
+						)	B
+				WHERE	A.ENTER_CD	=	B.ENTER_CD
+				AND		A.SABUN		=	B.SABUN
+				AND		A.SDATE		=	B.SDATE
+				AND		A.ENTER_CD	=	#{ssnEnterCd}
+				AND (  NVL(REPLACE(#{searchSDate},'-',''), '00000000') BETWEEN  A.SDATE AND NVL(A.EDATE, '99991231')
+		               OR NVL(REPLACE(#{searchEDate},'-',''), '99991231') BETWEEN  A.SDATE AND NVL(A.EDATE, '99991231')
+		               OR ( NVL(REPLACE(#{searchSDate},'-',''), '00000000') <= A.SDATE AND NVL(REPLACE(#{searchEDate},'-',''), '99991231') >= A.EDATE )		 
+                     ) ]]>
+				<if test="searchOrgNm != null and searchOrgNm neq ''">
+				AND		F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))	LIKE	'%' || #{searchOrgNm} || '%'
+				</if>
+				<if test="searchNm != null and searchNm neq ''">
+				AND	(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN ) LIKE '%' || #{searchNm} || '%' OR A.SABUN LIKE '%' || #{searchNm} || '%')
+				</if>
+				<if test="searchManageCdHidden != null and searchManageCdHidden neq ''">
+				AND  F_COM_GET_MANAGE_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchManageCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchStatusCdHidden != null and searchStatusCdHidden neq ''">
+				AND F_COM_GET_STATUS_CD( A.ENTER_CD,A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchJikchakCdHidden != null and searchJikchakCdHidden neq ''">
+				AND  F_COM_GET_JIKCHAK_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchJikchakCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchJikweeCdHidden != null and searchJikweeCdHidden neq ''">
+				AND F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchJikweeCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchJikgubCdHidden != null and searchJikgubCdHidden neq ''">
+				AND F_COM_GET_JIKGUB_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchJikgubCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchPayGroupCd != null and searchPayGroupCd neq ''"> 
+                AND PAY_GROUP_CD = #{searchPayGroupCd}
+                </if>
+				ORDER	BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.SDATE)
+			
+		</select>
+
+<!-- 		연봉관리 저장 -->
+		<update parameterType="map" id="savePerPayYearMgr">
+					MERGE INTO /* PerPayYearMgr-mapping-query.savePerPayYearMgr */
+								TCPN404 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SDATE
+									, A.ELEMENT_CD
+									, A.ELEMENT_MON
+							FROM	(
+									SELECT	  NULL AS ENTER_CD
+											, NULL AS SABUN
+											, NULL AS SDATE
+											, NULL AS ELEMENT_CD
+											, NULL AS ELEMENT_MON
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT
+												TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											,	TRIM(#{rm.sabun})	 		AS SABUN
+											,	TRIM(#{rm.sdate})	 		AS SDATE
+											,	TRIM(#{rm.elementCd}) 		AS ELEMENT_CD
+											,	TRIM(#{rm.elementMon}) 		AS ELEMENT_MON
+										FROM	DUAL
+</foreach>
+									) A WHERE A.ENTER_CD  	IS NOT NULL
+										  AND A.SABUN     	IS NOT NULL
+										  AND A.SDATE     	IS NOT NULL
+										  AND A.ELEMENT_CD	IS NOT NULL
+							) S
+					ON (
+							T.ENTER_CD  	=	S.ENTER_CD
+						AND T.SABUN     	=	S.SABUN
+						AND T.SDATE     	=	S.SDATE
+						AND T.ELEMENT_CD	=	S.ELEMENT_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ELEMENT_MON     = S.ELEMENT_MON
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SDATE
+							, T.ELEMENT_CD
+							, T.ELEMENT_MON
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SDATE
+							, S.ELEMENT_CD
+							, S.ELEMENT_MON
+							, SYSDATE
+							, #{ssnSabun}
+						)
+			
+		</update>
+		
+<!-- 		연봉관리 저장 -->
+		<update parameterType="map" id="savePerPayYearMgrSecond">
+			
+					MERGE INTO /* PerPayYearMgr-mapping-query.savePerPayYearMgrSecond */
+								TCPN403 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SDATE
+									, A.EDATE
+									, A.PAY_GROUP_CD
+									, A.BIGO
+							FROM	(
+									SELECT	  NULL AS ENTER_CD
+											, NULL AS SABUN
+											, NULL AS SDATE
+											, NULL AS EDATE
+											, NULL AS PAY_GROUP_CD
+											, NULL AS BIGO
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT
+												TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											,	TRIM(#{rm.sabun})	 		AS SABUN
+											,	TRIM(#{rm.sdate})	 		AS SDATE
+											,	TRIM(#{rm.edate}) 			AS EDATE
+											,	TRIM(#{rm.payGroupCd}) 		AS PAY_GROUP_CD
+											,	TRIM(#{rm.bigo}) 			AS BIGO
+										FROM	DUAL
+</foreach>
+									) A WHERE A.ENTER_CD  	IS NOT NULL
+										  AND A.SABUN     	IS NOT NULL
+										  AND A.SDATE     	IS NOT NULL
+							) S
+					ON (
+							T.ENTER_CD  	=	S.ENTER_CD
+						AND T.SABUN     	=	S.SABUN
+						AND T.SDATE     	=	S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE			= S.EDATE
+									, T.PAY_GROUP_CD	= S.PAY_GROUP_CD
+									, T.BIGO			= S.BIGO
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SDATE
+							, T.EDATE
+							, T.PAY_GROUP_CD
+							, T.BIGO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SDATE
+							, S.EDATE
+							, S.PAY_GROUP_CD
+							, S.BIGO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		연봉관리 삭제 -->
+		<delete parameterType="map" id="deletePerPayYearMgrFirst">
+					DELETE FROM /* PerPayYearMgr-mapping-query.deletePerPayYearMgrFirst */
+								TCPN404
+					 WHERE (ENTER_CD, SABUN, SDATE) IN ( (NULL, NULL, NULL)
+					<foreach item="rm" collection="deleteRows">
+					,
+						<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq '' and rm.sdate != null and rm.sdate neq ''">
+								( #{ssnEnterCd}, TRIM(#{rm.sabun}) , TRIM(#{rm.sdate}) )
+						</if>
+					</foreach>
+					)
+		</delete>
+		
+		<delete parameterType="map" id="deletePerPayYearMgrSecond">
+					DELETE FROM /* PerPayYearMgr-mapping-query.deletePerPayYearMgrSecond */
+								TCPN403
+					 WHERE (ENTER_CD, SABUN, SDATE) IN ( (NULL, NULL, NULL)
+					<foreach item="rm" collection="deleteRows">
+					,
+						<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq '' and rm.sdate != null and rm.sdate neq ''">
+								( #{ssnEnterCd}, TRIM(#{rm.sabun}) , TRIM(#{rm.sdate}) )
+						</if>
+					</foreach>
+					)
+		</delete>
+		
+		<!-- 연봉관리종료일자 UPDATE -->
+		<update id="prcP_CPN403_EDATE_UPDATE" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_CPN403_EDATE_UPDATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+</mapper>

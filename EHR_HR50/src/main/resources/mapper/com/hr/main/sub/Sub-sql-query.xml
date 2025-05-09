@@ -1,0 +1,798 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="main.sub">
+	
+	<select id="getSubLowMenuList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT DM.*
+			     , REPLACE(REPLACE(
+			           ISU_BLOCK_ENCRYPT('{
+			               "url": "'||PRG_CD||'"
+			              ,"dataPrgType":"'||DATA_PRG_TYPE||'"
+			              ,"dataRwType":"'||DATA_RW_TYPE||'"
+			              ,"cnt":"'||CNT||'"
+			              ,"mainMenuCd":"'||MAIN_MENU_CD||'"
+			              ,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+			              ,"type":"'||TYPE||'"
+			              ,"menuCd":"'||MENU_CD||'"
+			              ,"menuSeq":"'||MENU_SEQ||'"
+			              ,"grpCd":"'||GRP_CD||'"
+			              ,"prgCd":"'||PRG_CD||'"
+			              ,"srchSeq":"'||SRCH_SEQ||'"
+			              ,"popupUseYn":"'||POPUP_USE_YN||'"
+			              ,"helpUseYn":"'||HELP_USE_YN||'"
+			              ,"myMenu":"'||MY_MENU||'"
+			              ,"searchUseYn":"'||SEARCH_USE_YN||'"
+			              ,"applCd":"'||APPL_CD||'"
+			              }', #{ssnEncodedKey})
+			       , CHR(13), ''), CHR(10), '') AS SURL
+			      , MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD AS MENU_ID
+			  FROM (
+			        SELECT LEVEL AS LVL
+			             , F_COM_GET_SUBSUM ( A.ENTER_CD, A.MAIN_MENU_CD, A.GRP_CD, A.MENU_CD, A.MENU_SEQ, #{searchMenuSeq}) AS SUB_MENU_ON
+			             , A.MAIN_MENU_CD
+			             , A.PRIOR_MENU_CD
+			             , A.MENU_CD
+			             , A.MENU_SEQ
+			             , A.GRP_CD
+			             , A.TYPE
+			             , CASE WHEN NVL(#{ssnLocaleCd},'') = '' THEN A.MENU_NM
+			                    ELSE NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, DECODE(A.LANGUAGE_CD, NULL, 'tsys303', 'tsys311'), NVL(A.LANGUAGE_CD,C.LANGUAGE_CD), #{ssnLocaleCd}), A.MENU_NM)
+			                END AS MENU_NM
+			             , C.PRG_CD
+			             , NVL(C.SEARCH_SEQ, '') AS SRCH_SEQ
+			             , A.DATA_RW_TYPE
+			             , A.DATA_PRG_TYPE
+			             , A.SEQ
+			             , A.CNT
+			             , A.USE_YN
+			             , A.INQ_S_YMD
+			             , A.INQ_E_YMD
+			             , (SELECT NVL(F_COM_GET_LANGUAGE_MAPPING(ENTER_CD,'tsys309',LANGUAGE_CD,#{ssnLocaleCd}),MAIN_MENU_NM) AS MAIN_MENU_NM
+			                  FROM TSYS309
+			                 WHERE MAIN_MENU_CD = A.MAIN_MENU_CD
+			                   AND ENTER_CD	=	#{ssnEnterCd}
+			                   AND USE_YN = '1') AS MAIN_MENU_NM
+			             , POPUP_USE_YN
+			             , LAST_SESSION_USE_YN
+			             , SEARCH_USE_YN
+			             , CASE WHEN INSTR(NVL(H.MGR_HELP_YN, 'N')||NVL(H.EMP_HELP_YN, 'N'), 'Y') > 0 THEN '1' ELSE '0' END AS HELP_USE_YN
+			             , DECODE((SELECT 'Y'
+			                         FROM TSYS331 D
+			                        WHERE D.ENTER_CD = A.ENTER_CD
+			                          AND D.MENU_SEQ = A.MENU_SEQ
+			                          AND D.PRIOR_MENU_CD = A.PRIOR_MENU_CD
+			                          AND D.MENU_CD       = A.MENU_CD
+			                          AND D.MAIN_MENU_CD  = A.MAIN_MENU_CD
+			                          AND D.GRP_CD = A.GRP_CD
+			                          AND D.SABUN  = #{ssnSabun}
+			                          AND D.GRP_CD = #{ssnGrpCd}
+			                          AND ROWNUM = 1 ),NULL, 'N','Y') AS MY_MENU
+			             , CASE WHEN A.AUTH_SEARCH_SEQ IS NOT NULL THEN F_COM_GET_SEARCH_YN(A.ENTER_CD, #{ssnSabun}, A.AUTH_SEARCH_SEQ, TO_CHAR(sysdate,'YYYYMMDD') ) ELSE 1 END AS AUTH_YN
+			             , C.APPL_CD
+			          FROM TSYS311 A
+			             , TSYS303 C
+			             , TSYS395 H
+			         WHERE A.ENTER_CD      = C.ENTER_CD
+			           AND A.MENU_SEQ      = C.MENU_SEQ
+			           AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+			           AND A.MENU_CD       = C.MENU_CD
+			           AND A.MAIN_MENU_CD  = C.MAIN_MENU_CD
+			           AND C.ENTER_CD      = H.ENTER_CD(+)
+			           AND C.PRG_CD        = H.PRG_CD(+)
+			           AND A.USE_YN = '1'
+			           AND A.TYPE <> 'T'
+			         START WITH A.PRIOR_MENU_CD = '0'
+			                AND A.ENTER_CD      =  #{ssnEnterCd}
+			                AND A.MAIN_MENU_CD  =  #{mainMenuCd}
+			                AND A.GRP_CD        =  #{ssnGrpCd}
+			        CONNECT BY PRIOR A.ENTER_CD  = A.ENTER_CD
+			               AND PRIOR A.MAIN_MENU_CD = A.MAIN_MENU_CD
+			               AND PRIOR A.GRP_CD       = A.GRP_CD
+			               AND PRIOR A.MENU_CD      = A.PRIOR_MENU_CD
+			               AND PRIOR A.USE_YN       = A.USE_YN
+			         ORDER SIBLINGS BY A.PRIOR_MENU_CD, A.SEQ
+			       ) DM
+			 WHERE DM.AUTH_YN > 0
+		]]>
+	</select>
+	
+	<select id="getSubLowBoardList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT DM.*
+				, REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+				"url": "'||PRG_CD||'"
+				,"dataPrgType":"'||DATA_PRG_TYPE||'"
+				,"dataRwType":"'||DATA_RW_TYPE||'"
+				,"cnt":"'||CNT||'"
+				,"mainMenuCd":"'||MAIN_MENU_CD||'"
+				,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+				,"type":"'||TYPE||'"
+				,"menuCd":"'||MENU_CD||'"
+				,"menuSeq":"'||MENU_SEQ||'"
+				,"grpCd":"'||GRP_CD||'"
+				,"prgCd":"'||PRG_CD||'"
+				,"srchSeq":"'||SEARCH_SEQ||'"
+				,"popupUseYn":"'||POPUP_USE_YN||'"
+				,"helpUseYn":"'||HELP_USE_YN||'"
+				,"myMenu":"'||MY_MENU||'"
+				,"searchUseYn":"'||SEARCH_USE_YN||'"
+				}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'') AS SURL
+				,MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+		FROM (
+		SELECT LVL
+		     , A.MAIN_MENU_CD
+		     , A.PRIOR_MENU_CD AS PRIOR_MENU_CD
+		     , A.MENU_CD
+		     , TO_NUMBER(A.MENU_CD) AS MENU_SEQ
+		     , TRIM(#{ssnGrpCd}) AS GRP_CD
+		     , A.TYPE
+		     , A.BBS_NM AS MENU_NM
+		     , CASE A.TYPE WHEN 'M' THEN NULL
+		                   WHEN 'P' THEN '/Board.do'||CHR(63)||'cmd=getListBoard&bbsCd='||A.BBS_CD
+		        END AS PRG_CD
+		     , NULL AS SEARCH_SEQ
+		     , NULL AS DATA_RW_TYPE
+		     , CASE A.TYPE WHEN 'M' THEN NULL
+		                   WHEN 'P' THEN 'U'
+		        END AS DATA_PRG_TYPE
+		     , A.SEQ
+		     , A.CNT
+		     , CASE A.TYPE WHEN 'M' THEN NULL
+		                   WHEN 'P' THEN '/sys/other/'
+		        END AS PRG_PATH
+		     , A.USE_YN
+		     , TO_CHAR(SYSDATE, 'YYYYMMDD') AS INQ_S_YMD
+		     , '99991231' AS INQ_E_YMD
+		     , CASE A.TYPE WHEN 'M' THEN NULL
+		                   WHEN 'P' THEN 'N'
+		        END AS DATE_TRACK_YN
+		     , (SELECT MAIN_MENU_NM
+		          FROM TSYS309
+		         WHERE ENTER_CD	= #{ssnEnterCd}
+		           AND MAIN_MENU_CD = A.MAIN_MENU_CD
+		           AND USE_YN = '1') AS MAIN_MENU_NM
+		     , NULL AS POPUP_USE_YN
+		     , NULL AS LAST_SESSION_USE_YN
+		     , NULL AS SEARCH_USE_YN
+		     , NVL('1','0') AS HELP_USE_YN
+		     , 'N' AS MY_MENU
+		  FROM (
+			SELECT F_SYS_MAIN_BOARD_PRG_LEVEL_SEQ(ENTER_CD, MAIN_MENU_CD, PRIOR_MENU_CD, MENU_CD) AS LEVEL_SEQ
+			     , LEVEL AS LVL
+			     , ENTER_CD
+			     , MAIN_MENU_CD
+			     , PRIOR_MENU_CD
+			     , MENU_CD
+			     , BBS_CD
+			     , NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys700', LANGUAGE_CD, #{ssnLocaleCd}), BBS_NM) AS BBS_NM
+			     , DECODE(TYPE,'C','M','B','P') AS TYPE
+			     , SEQ
+			     , CNT
+			     , BIGO
+			     , MANAGE_ALL_YN
+			     , CASE WHEN MANAGE_ALL_YN = 'Y' THEN -1 ELSE 0 END AS MANAGE_IMG
+			     , MANAGE_JIKCHAK_CD
+			     , MANAGE_JIKCHAK_NM
+			     , MANAGE_ORG_CD
+			     , MANAGE_ORG_NM
+			     , MANAGE_JOB_CD
+			     , MANAGE_JOB_NM
+			     , SEARCH_ALL_YN
+			     , CASE WHEN SEARCH_ALL_YN = 'Y' THEN -1 ELSE 0 END AS SEARCH_IMG
+			     , SEARCH_JIKCHAK_CD
+			     , SEARCH_JIKCHAK_NM
+			     , SEARCH_ORG_CD
+			     , SEARCH_ORG_NM
+			     , SEARCH_JOB_CD
+			     , SEARCH_JOB_NM
+			     , USE_YN
+			  FROM TSYS700 AA
+			 WHERE AA.ENTER_CD = #{ssnEnterCd}
+			   AND AA.MAIN_MENU_CD = #{mainMenuCd}
+			   AND (AA.USE_YN = 'Y' OR AA.USE_YN IS NULL)
+			   AND (('Y' = CASE WHEN AA.TYPE = 'C' THEN 'Y'
+			                    WHEN AA.SEARCH_ALL_YN = 'Y' THEN 'Y'
+			                    ELSE NVL(F_COM_GET_SEARCH_SEQ_YN(AA.ENTER_CD, TRIM(#{ssnSabun}), AA.SEARCH_ALL_SEQ, TO_CHAR(sysdate, 'YYYYMMDD')), 'N')
+			                END
+			         AND 'Y' = NVL((SELECT CASE WHEN SUM(CASE WHEN F_COM_GET_SEARCH_SEQ_YN(X.ENTER_CD, TRIM(#{ssnSabun}), X.SEARCH_ALL_SEQ, TO_CHAR(sysdate, 'YYYYMMDD')) = 'Y' THEN 1
+			                                                  WHEN X.SEARCH_ALL_YN = 'Y' THEN 1
+			                                                  ELSE 0 END) > 0 THEN 'Y'
+			                                    WHEN COUNT(*) = 0 THEN 'Y'
+			                                    ELSE 'N' END
+			                          FROM TSYS700 X
+			                         WHERE X.ENTER_CD = #{ssnEnterCd}
+			                           AND X.PRIOR_MENU_CD = AA.MENU_CD), 'Y' ))
+			        OR
+			        (SELECT COUNT(*)
+			           FROM TSYS701 X
+			          WHERE ENTER_CD = AA.ENTER_CD
+			            AND BBS_CD   = AA.BBS_CD
+			            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+			            AND KEY = 'SABUN'
+			            AND VALUE=TRIM(#{ssnSabun})) > 0
+			        OR
+			        (SELECT COUNT(*)
+			           FROM TSYS701 X
+			              , TSYS700 Y
+			          WHERE X.ENTER_CD = Y.ENTER_CD
+			            AND X.BBS_CD   = Y.BBS_CD
+			            AND X.ENTER_CD = AA.ENTER_CD
+			            AND Y.PRIOR_MENU_CD = AA.MENU_CD
+			            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+			            AND X.KEY   = 'SABUN'
+			            AND X.VALUE = TRIM(#{ssnSabun}) ) > 0 ) ]]>
+	<if test="ssnGrpCd != null and ssnGrpCd != '' and ssnGrpCd != '10'">
+		<![CDATA[
+						AND DECODE(AA.BBS_CD, '10015', 'Y', 'N') = DECODE(TRIM(#{ssnGrpCd}), '10', 'Y', 'N')
+		]]>
+	</if>
+	<![CDATA[ START WITH PRIOR_MENU_CD = '0'
+			CONNECT BY PRIOR ENTER_CD = AA.ENTER_CD
+				   AND PRIOR MAIN_MENU_CD = AA.MAIN_MENU_CD
+				   AND PRIOR MENU_CD = AA.PRIOR_MENU_CD
+			) A
+		WHERE 1 = 1 ]]>
+	<if test="ssnGrpCd != null and ssnGrpCd != '' and ssnGrpCd != '10'">
+	<![CDATA[
+		AND DECODE(A.TYPE
+		          , 'M'
+		          , DECODE(A.MENU_CD, (SELECT X.PRIOR_MENU_CD FROM TSYS700 X WHERE X.ENTER_CD = A.ENTER_CD AND X.BBS_CD = '10015'), 0, 1)
+		          , DECODE(A.MENU_CD, '10015', 0, 1)
+		      ) = 1
+	]]>
+	</if>
+	<![CDATA[ ORDER BY A.LEVEL_SEQ ) DM ]]>
+	</select>
+	
+	<select id="getSubLowWorkflowList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT DM.*
+					, REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+					"url": "'||PRG_CD||'"
+					,"dataPrgType":"'||DATA_PRG_TYPE||'"
+					,"dataRwType":"'||DATA_RW_TYPE||'"
+					,"cnt":"'||CNT||'"
+					,"mainMenuCd":"'||MAIN_MENU_CD||'"
+					,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+					,"type":"'||TYPE||'"
+					,"menuCd":"'||MENU_CD||'"
+					,"menuSeq":"'||MENU_SEQ||'"
+					,"grpCd":"'||GRP_CD||'"
+					,"prgCd":"'||PRG_CD||'"
+					,"popupUseYn":"'||POPUP_USE_YN||'"
+					,"helpUseYn":"'||HELP_USE_YN||'"
+					,"myMenu":"'||MY_MENU||'"
+					,"searchUseYn":"'||SEARCH_USE_YN||'"
+					}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'')AS SURL
+					,MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+				FROM
+				(
+					SELECT *
+					FROM
+					(
+					SELECT LEVEL AS LVL
+							, A.MAIN_MENU_CD
+							, A.PRIOR_MENU_CD
+							, A.MENU_CD
+							, A.MENU_SEQ AS MENU_SEQ
+							, A.GRP_CD
+							, A.TYPE
+							, A.MENU_NM
+							, C.PRG_CD
+							, A.DATA_RW_TYPE
+							, A.DATA_PRG_TYPE
+							, A.SEQ
+							, A.CNT
+							,'' AS PRG_PATH
+							, A.USE_YN
+							, A.INQ_S_YMD
+							, A.INQ_E_YMD
+							, '' DATE_TRACK_YN
+							, (SELECT MAIN_MENU_NM
+								FROM TSYS309
+								WHERE MAIN_MENU_CD = A.MAIN_MENU_CD
+								AND ENTER_CD = #{ssnEnterCd}
+								AND USE_YN = '1'
+								) AS MAIN_MENU_NM
+							, POPUP_USE_YN
+							, LAST_SESSION_USE_YN
+							, SEARCH_USE_YN
+							, NVL('1','0') HELP_USE_YN
+							, DECODE( (	SELECT 'Y'
+										FROM TSYS331 D
+										WHERE D.ENTER_CD	= A.ENTER_CD
+										AND D.MENU_SEQ		= A.MENU_SEQ
+										AND D.PRIOR_MENU_CD	= A.PRIOR_MENU_CD
+										AND D.MENU_CD		= A.MENU_CD
+										AND D.MAIN_MENU_CD	= A.MAIN_MENU_CD
+										AND D.GRP_CD		= A.GRP_CD
+										AND D.SABUN			= #{ssnSabun}
+										AND D.GRP_CD        = #{ssnGrpCd}
+										AND ROWNUM =1 ),NULL, 'N','Y') AS MY_MENU
+						FROM TSYS311 A,  TSYS303 C
+						WHERE 1 = 1
+						AND A.ENTER_CD   	= C.ENTER_CD
+						AND A.MENU_SEQ 		= C.MENU_SEQ
+						AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+						AND A.MENU_CD 		= C.MENU_CD
+						AND A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+						AND A.TYPE <> 'T'
+						AND A.USE_YN = '1'
+					START WITH A.PRIOR_MENU_CD = '0'
+						AND A.ENTER_CD      = #{ssnEnterCd}
+						AND A.MAIN_MENU_CD  = #{mainMenuCd}
+						AND A.GRP_CD        = #{ssnGrpCd}
+					CONNECT BY PRIOR A.ENTER_CD     = A.ENTER_CD
+						AND PRIOR A.MAIN_MENU_CD     = A.MAIN_MENU_CD
+						AND PRIOR A.GRP_CD           = A.GRP_CD
+						AND PRIOR A.MENU_CD          = A.PRIOR_MENU_CD
+						AND PRIOR A.USE_YN			 = A.USE_YN
+					ORDER SIBLINGS BY A.PRIOR_MENU_CD, A.SEQ
+				)
+			UNION ALL
+			SELECT *
+				FROM
+				(
+				SELECT 2 AS LVL
+						, #{mainMenuCd} AS MAIN_MENU_CD
+						, '1' AS PRIOR_MENU_CD
+						, A.PRO_CD AS MENU_CD
+						, 1 AS MENU_SEQ
+						, B.GRP_CD
+						, 'P' AS TYPE
+						, A.PRO_NM AS MENU_NM
+						, '/View.do?cmd=viewWorkflow' AS PRG_CD
+						, '' AS DATA_RW_TYPE
+						, '' AS DATA_PRG_TYPE
+						, NULL AS SEQ
+						, NULL AS CNT
+						, '/sys/other/' AS PRG_PATH
+						, '1' AS USE_YN
+						, TO_CHAR(SYSDATE,'YYYYMMDD') AS INQ_S_YMD
+						, '99991231' AS INQ_E_YMD
+						, '' AS DATE_TRACK_YN
+						, (SELECT MAIN_MENU_NM
+								FROM TSYS309
+								WHERE MAIN_MENU_CD = #{mainMenuCd}
+								AND ENTER_CD = #{ssnEnterCd}
+								AND USE_YN = '1'
+							) AS MAIN_MENU_NM
+						, '' AS POPUP_USE_YN
+						, '' AS LAST_SESSION_USE_YN
+						, '' AS SEARCH_USE_YN
+						, NVL('1','0') AS HELP_USE_YN
+						, 'N' AS MY_MENU
+				FROM TSYS451 A, TSYS453 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+				AND A.ENTER_CD = #{ssnEnterCd}
+				AND A.PRO_CD = B.PRO_CD
+				AND B.GRP_CD = #{ssnGrpCd}
+				ORDER BY A.SORT_SEQ )
+			) DM
+		]]>
+	</select>
+	
+	<select id="getDirectSubMenuMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT 'openSubMenuCd('''|| REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+					"mainMenuCd":"'||MAIN_MENU_CD||'"
+					,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+					,"menuCd":"'||MENU_CD||'"
+					,"menuSeq":"'||MENU_SEQ||'"
+					,"prgCd":"'||PRG_CD||'"
+					,"applCd":"'||APPL_CD||'"
+					}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'') ||''', '''|| MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD ||''')' AS JS_PARAM
+			FROM
+			(
+				SELECT 	A.MAIN_MENU_CD
+				, 		A.PRIOR_MENU_CD
+				,		A.MENU_CD
+				,		A.MENU_SEQ
+				, 		C.PRG_CD
+				, 		A.GRP_CD
+				, 		C.APPL_CD
+				FROM 	TSYS311 A, TSYS303 C
+				WHERE 	1=1
+				AND 	A.ENTER_CD   	= C.ENTER_CD
+				AND 	A.MENU_SEQ 		= C.MENU_SEQ
+				AND 	A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+				AND 	A.MENU_CD 		= C.MENU_CD
+				AND 	A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+				AND 	A.USE_YN 		= 1
+				AND 	A.TYPE <> 'T'
+				AND 	A.ENTER_CD 		= #{ssnEnterCd}
+				AND 	C.PRG_CD   		= REPLACE(#{prgCd},'||','&')
+				AND 	A.GRP_CD   		= #{ssnGrpCd} ]]>
+	<if test="menuSeq != null and menuSeq != ''">
+	<![CDATA[	AND 	A.MENU_SEQ   	= #{menuSeq}]]>
+	</if>
+	<![CDATA[	AND 	ROWNUM = 1
+				UNION ALL
+				SELECT	MAIN_MENU_CD
+				, 		PRIOR_MENU_CD
+				, 		MENU_CD
+				, 		TO_NUMBER(MENU_CD) AS MENU_SEQ
+				, 		REPLACE(#{prgCd},'||','&') AS PRG_CD, TRIM(#{ssnGrpCd}) AS GRP_CD
+				,		NULL AS APPL_CD
+				FROM 	TSYS700
+				WHERE 	ENTER_CD = #{ssnEnterCd}
+				AND 	BBS_CD   = SUBSTR(#{prgCd}, INSTR(#{prgCd}, 'bbsCd=')+6)
+				AND 	ROWNUM   = 1
+			) DM
+	]]>
+	</select>
+	
+	<select id="geSubDirectMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT DM.*
+					, REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+					"mainMenuCd":"'||MAIN_MENU_CD||'"
+					,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+					,"menuCd":"'||MENU_CD||'"
+					,"prgCd":"'||PRG_CD||'"
+					,"menuSeq":"'||MENU_SEQ||'"
+					,"searchUseYn":"'||SEARCH_USE_YN||'"
+					,"applCd":"'||APPL_CD||'"
+					}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'') AS SURL
+					, MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+			FROM (
+				SELECT 	A.MAIN_MENU_CD
+				, 		A.PRIOR_MENU_CD
+				, 		A.MENU_CD
+				, 		A.MENU_SEQ
+				,  		REPLACE(C.PRG_CD,'&','||') AS PRG_CD
+				, 		A.GRP_CD
+				, 		A.SEARCH_USE_YN
+				, 		C.APPL_CD
+				FROM 	TSYS311 A, TSYS303 C
+				WHERE 	1=1
+				AND 	A.ENTER_CD   	= C.ENTER_CD
+				AND 	A.MENU_SEQ 		= C.MENU_SEQ
+				AND 	A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+				AND 	A.MENU_CD 		= C.MENU_CD
+				AND 	A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+				AND 	A.USE_YN 		= '1'
+				AND 	A.TYPE <> 'T'
+				AND 	A.ENTER_CD 		= #{ssnEnterCd}
+				AND 	C.PRG_CD   		= REPLACE(#{prgCd}, '||', '&')
+				AND 	A.GRP_CD   		= #{ssnGrpCd} ]]>
+		<if test="mainMenuCd != null and mainMenuCd != ''">
+		<![CDATA[
+				AND 	A.MAIN_MENU_CD  = #{mainMenuCd}
+		]]>
+		</if>
+		<![CDATA[
+				AND ROWNUM = 1
+				UNION ALL
+				SELECT	MAIN_MENU_CD
+				, 		PRIOR_MENU_CD
+				, 		MENU_CD
+				, 		TO_NUMBER(MENU_CD) AS MENU_SEQ
+				,  		REPLACE(#{prgCd}, '&' ,'||') AS PRG_CD, TRIM(#{ssnGrpCd}) AS GRP_CD, '0' AS SEARCH_USE_YN
+				,		NULL AS APPL_CD
+				FROM 	TSYS700
+				WHERE 	ENTER_CD     = #{ssnEnterCd}
+				AND 	BBS_CD       = SUBSTR(#{prgCd}, INSTR(#{prgCd}, 'bbsCd=')+6)
+		]]>
+		<if test="mainMenuCd != null and mainMenuCd != ''">
+		<![CDATA[
+				AND 	MAIN_MENU_CD  = #{mainMenuCd}
+		]]>
+		</if>
+		<![CDATA[
+				AND 	ROWNUM = 1
+			) DM
+		]]>
+	</select>
+	
+	<select id="tsys331SelectMyMenuList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT DM.*
+					, REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+					"url": "'||PRG_CD||'"
+					,"dataPrgType":"'||DATA_PRG_TYPE||'"
+					,"dataRwType":"'||DATA_RW_TYPE||'"
+					,"cnt":"'||CNT||'"
+					,"mainMenuCd":"'||MAIN_MENU_CD||'"
+					,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+					,"type":"'||TYPE||'"
+					,"menuCd":"'||MENU_CD||'"
+					,"menuSeq":"'||MENU_SEQ||'"
+					,"grpCd":"'||GRP_CD||'"
+					,"prgCd":"'||PRG_CD||'"
+					,"srchSeq":"'||SEARCH_SEQ||'"
+					,"popupUseYn":"'||POPUP_USE_YN||'"
+					,"helpUseYn":"'||HELP_USE_YN||'"
+					,"myMenu":"'||MY_MENU||'"
+					,"searchUseYn":"'||SEARCH_USE_YN||'"
+					}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'')AS SURL
+					, MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+				FROM
+				(SELECT A.MAIN_MENU_CD
+						, A.PRIOR_MENU_CD
+						, A.MENU_CD
+						, A.MENU_SEQ
+						, A.GRP_CD
+						, A.TYPE
+						, A.MENU_NM
+						, B.PRG_CD
+						, A.SEARCH_SEQ
+						, A.DATA_RW_TYPE
+						, A.DATA_PRG_TYPE
+						, A.SEQ, A.CNT
+						, B.PRG_PATH
+						, A.USE_YN
+						, A.INQ_S_YMD, A.INQ_E_YMD
+						, B.DATE_TRACK_YN
+						, '나의메뉴' AS MAIN_MENU_NM
+						, A.PRIOR_MENU_CD AS PRIOR_MENU_CD_REAL
+						, POPUP_USE_YN, LAST_SESSION_USE_YN
+						, SEARCH_USE_YN, NVL('1','0') HELP_USE_YN
+						, 'Y' AS MY_MENU
+					FROM
+     					(SELECT  *
+						   FROM (
+							SELECT A.*
+							FROM TSYS311 A, TSYS331 B, TSYS303 C
+                            		WHERE 1 = 1
+                            		AND A.ENTER_CD   	= C.ENTER_CD
+                            		AND A.MENU_SEQ 		= C.MENU_SEQ
+                            		AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+                            		AND A.MENU_CD 		= C.MENU_CD
+                            		AND A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+                            		AND A.TYPE 			<>'T'
+							AND A.ENTER_CD 		= B.ENTER_CD
+							AND A.MAIN_MENU_CD 	= B.MAIN_MENU_CD
+							AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+							AND A.MENU_CD 		= B.MENU_CD
+							AND A.MENU_SEQ 		= B.MENU_SEQ
+							AND A.GRP_CD 		= B.GRP_CD
+							AND A.ENTER_CD 		= #{ssnEnterCd}
+							AND A.GRP_CD 		= #{ssnGrpCd}
+							AND B.SABUN 		= #{ssnSabun}
+							AND A.USE_YN 		= '1' )
+					)A, TSYS301 B
+				WHERE A.PRG_CD = B.PRG_CD(+)
+				) DM
+		]]>
+	</select>
+	
+	<insert id="tsys331InsertMyMenu" parameterType="map">
+		<![CDATA[
+			INSERT INTO TSYS331 VALUE(
+			SELECT C.ENTER_CD,
+					#{ssnSabun},
+					C.MAIN_MENU_CD,
+					C.PRIOR_MENU_CD,
+					C.MENU_CD,
+					C.MENU_SEQ,
+					A.GRP_CD,
+					C.PRG_CD,
+					'' AS BIGO,
+					SYSDATE,
+					#{ssnSabun}
+			FROM TSYS311 A, TSYS303 C
+			WHERE 1 = 1
+			AND A.ENTER_CD   	= C.ENTER_CD
+			AND A.MENU_SEQ 		= C.MENU_SEQ
+			AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+			AND A.MENU_CD 		= C.MENU_CD
+			AND A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+			AND A.USE_YN 		= '1'
+			AND A.TYPE <> 'T'
+			AND A.ENTER_CD = #{ssnEnterCd}
+			AND A.GRP_CD   = #{ssnGrpCd}
+			AND A.MENU_SEQ = #{menuSeq}
+			AND C.PRG_CD   = TRIM(#{prgCd})
+			AND A.SEARCH_SEQ IS NULL
+			AND ROWNUM = 1
+			)
+		]]>
+	</insert>
+	
+	<delete id="tsys331DeleteMyMenu" parameterType="map">
+		<![CDATA[
+			DELETE FROM TSYS331
+			WHERE ENTER_CD = #{ssnEnterCd}
+				AND SABUN    = #{ssnSabun}
+				AND PRG_CD   = TRIM(#{prgCd})
+				AND GRP_CD   = #{ssnGrpCd}
+				AND MENU_SEQ = #{menuSeq}
+				AND ROWNUM   = 1
+		]]>
+	</delete>
+	
+	<select id="getSearchMenuList" parameterType="map" resultType="cMap">
+		<![CDATA[
+				  SELECT T1.*
+				        , REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+				                            "url": "'||PRG_CD||'"
+				                            ,"dataPrgType":"'||DATA_PRG_TYPE||'"
+				                            ,"dataRwType":"'||DATA_RW_TYPE||'"
+				                            ,"cnt":"'||CNT||'"
+				                            ,"mainMenuCd":"'||MAIN_MENU_CD||'"
+				                            ,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+				                            ,"type":"'||TYPE||'"
+				                            ,"menuCd":"'||MENU_CD||'"
+				                            ,"menuSeq":"'||MENU_SEQ||'"
+				                            ,"grpCd":"'||GRP_CD||'"
+				                            ,"prgCd":"'||PRG_CD||'"
+				                            ,"srchSeq":"'||SEARCH_SEQ||'"
+				                            ,"popupUseYn":"'||POPUP_USE_YN||'"
+				                            ,"helpUseYn":"'||HELP_USE_YN||'"
+				                            ,"myMenu":"'||MY_MENU||'"
+				                            ,"applCd":"'||APPL_CD||'"
+				                            }', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'')AS SURL
+				                            ,MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+				    FROM (           SELECT SUBSTR (SYS_CONNECT_BY_PATH (AA.MENU_NM, ' > '), 3) SYS_MENU_NM
+				                           ,CONNECT_BY_ROOT(MENU_NM) AS ROOT_MENU_NM
+				                           ,CONNECT_BY_ISLEAF ISLEAF
+				                           ,LEVEL AS "_level"
+				                           ,ROWNUM AS rnum
+				                           ,AA.*
+				                           ,DECODE( AA.SEARCH_SEQ, NULL, DECODE(AA.PRG_CD, AA.PRG_CD, DECODE(AA.PRG_CD, NULL, NULL, 'Y'), NULL), 'N')AS MY_MENU
+				                           , NVL('1','0') HELP_USE_YN
+				                       FROM (SELECT TRIM (#{ssnEnterCd}) AS ENTER_CD
+				                                   ,MAIN_MENU_CD
+				                                   ,TO_NUMBER(SEQ) AS MAIN_MENU_SEQ
+				                                   ,'' AS PRIOR_MENU_CD
+				                                   ,'0' AS MENU_CD
+				                                   ,0 AS MENU_SEQ
+				                                   ,MAIN_MENU_NM AS MENU_NM
+				                                   ,'' AS TYPE
+				                                   ,'' AS PRG_CD
+				                                   ,0 AS SEARCH_SEQ
+				                                   ,0 AS CNT
+				                                   ,0 AS SEQ
+				                                   ,'' AS DATA_RW_TYPE
+				                                   ,'' AS DATA_PRG_TYPE
+				                                   ,'' AS LANGUAGE_CD
+				                                   ,'' AS GRP_CD
+				                                   ,'' AS INQ_S_YMD
+				                                   ,'' AS INQ_E_YMD
+				                                   ,'' AS POPUP_USE_YN
+				                                   ,'' AS LAST_SESSION_USE_YN
+				                                   ,'' AS SEARCH_USE_YN
+				                                   ,'' AS USE_YN
+				                                   ,'' AS TMP_USE_YN
+				                                   ,'' AS APPL_CD
+				                               FROM TSYS309
+				                              WHERE USE_YN = '1'
+				                             UNION ALL
+				                             SELECT A.ENTER_CD
+				                                   ,A.MAIN_MENU_CD
+				                                   ,TO_NUMBER(C.SEQ) AS MAIN_MENU_SEQ
+				                                   ,A.PRIOR_MENU_CD
+				                                   ,A.MENU_CD
+				                                   ,A.MENU_SEQ
+				                                   ,NVL (B.MENU_NM, A.MENU_NM) AS MENU_NM
+				                                   ,A.TYPE
+				                                   ,A.PRG_CD
+				                                   ,NVL (B.SEARCH_SEQ, A.SEARCH_SEQ) AS SEARCH_SEQ
+				                                   ,NVL (B.CNT, A.CNT) AS CNT
+				                                   ,NVL (B.SEQ, A.SEQ) AS SEQ
+				                                   ,NVL (B.DATA_RW_TYPE, A.DATA_RW_TYPE) AS DATA_RW_TYPE
+				                                   ,NVL (B.DATA_PRG_TYPE, A.DATA_PRG_TYPE) AS DATA_PRG_TYPE
+				                                   ,NVL (B.LANGUAGE_CD, A.LANGUAGE_CD) AS LANGUAGE_CD
+				                                   ,NVL (B.GRP_CD, #{ssnGrpCd}) AS GRP_CD
+				                                   ,B.INQ_S_YMD
+				                                   ,B.INQ_E_YMD
+				                                   ,B.POPUP_USE_YN
+				                                   ,B.LAST_SESSION_USE_YN
+				                                   ,B.SEARCH_USE_YN
+				                                   ,B.USE_YN
+				                                   ,B.USE_YN AS TMP_USE_YN
+				                                   ,A.APPL_CD
+				                               FROM TSYS311 B
+		                                       LEFT OUTER JOIN TSYS309 C
+		                                         ON C.MAIN_MENU_CD = B.MAIN_MENU_CD
+		                                        AND C.ENTER_CD = B.ENTER_CD
+		                                       LEFT OUTER JOIN TSYS303 A
+		                                         ON A.ENTER_CD = B.ENTER_CD
+		                                        AND A.MAIN_MENU_CD = B.MAIN_MENU_CD
+		                                        AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+		                                        AND A.MENU_CD = B.MENU_CD
+		                                        AND A.MENU_SEQ = B.MENU_SEQ
+				                              WHERE B.ENTER_CD = #{ssnEnterCd}
+				                                AND B.GRP_CD = #{ssnGrpCd}) AA
+				                      WHERE 1 = 1 AND MENU_NM LIKE '%'|| #{menuKeyword} ||'%'
+				                 START WITH AA.PRIOR_MENU_CD = '0'
+				                 CONNECT BY     PRIOR AA.ENTER_CD = AA.ENTER_CD
+				                            AND PRIOR AA.MAIN_MENU_CD = AA.MAIN_MENU_CD
+				                            AND PRIOR AA.MENU_CD = AA.PRIOR_MENU_CD
+				          ORDER SIBLINGS BY AA.MAIN_MENU_SEQ, AA.SEQ) T1
+				   WHERE PRG_CD IS NOT NULL ]]>
+				<if test="searchPrgCd != null and searchPrgCd != ''">
+					AND PRG_CD = TRIM(#{searchPrgCd})
+				</if>
+		<![CDATA[ORDER BY RNUM ]]>
+	</select>
+	
+	<select id="getAlertInfoList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT
+			       A.ENTER_CD
+			      ,A.EDATE
+			      ,A.N_CONTENT
+			      ,A.N_JOB_CD
+			      ,A.N_TITLE
+			      ,A.READ_YN
+			      ,A.SABUN
+			      ,A.SDATE
+			      ,A.SEQ
+				  ,A.CHKDATE
+			      ,A.CHKID
+			      ,TO_CHAR(A.CHKDATE, 'YYYY-MM-DD HH24:MI') AS REG_DATE
+			      ,A.N_LINK
+				  ,REGEXP_SUBSTR(A.N_LINK, '[^&]+', 1, 1)	AS PATH
+			  FROM TSYS920 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.SABUN = #{ssnSabun}
+			   AND (TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.SDATE AND A.EDATE
+			        OR (A.READ_YN = 'N' AND TO_CHAR(SYSDATE,'YYYYMMDD') >= A.SDATE))
+			 ORDER BY A.SDATE DESC, A.CHKDATE DESC
+		]]>
+	</select>
+
+	<select id="getAlertInfoCnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT COUNT(*) AS CNT
+			  FROM TSYS920 A
+			  WHERE A.ENTER_CD = #{ssnEnterCd}
+			    AND A.SABUN = #{ssnSabun}
+			    AND READ_YN = 'N'
+			    AND TO_CHAR(SYSDATE,'YYYYMMDD') >= A.SDATE
+		]]>
+	</select>
+	
+	<select id="getRecentAlert" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT B.N_TITLE
+				 , B.N_CONTENT
+				 , B.N_LINK
+				 , B.SEQ
+			  FROM TSYS920 B
+			  WHERE B.ENTER_CD = #{ssnEnterCd}
+			    AND B.SABUN = #{ssnSabun}
+			    AND B.READ_YN = 'N'
+			    AND B.SEQ=(SELECT MAX(A.SEQ) FROM TSYS920 A WHERE A.ENTER_CD = #{ssnEnterCd} AND A.SABUN = #{ssnSabun} AND A.READ_YN = 'N')
+		]]>
+	</select>
+	
+	<update id="updateAlertInfoReadYn" parameterType="map">
+		<![CDATA[
+			UPDATE TSYS920 A SET READ_YN = 'Y'
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+		      AND A.SABUN = #{ssnSabun}
+		      AND A.SEQ = #{seq}
+		]]>
+	</update>
+	
+	<delete id="deleteAllAlert" parameterType="map">
+		<![CDATA[
+			DELETE TSYS920 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+		      AND A.SABUN = #{ssnSabun}
+		]]>
+		<if test="seq != null and seq != 'all'">
+		<![CDATA[
+			  AND A.SEQ = #{seq}
+		]]>
+		</if>
+	</delete>
+	
+	<select id="getSubMenuContents" parameterType="map" resultType="cMap">
+		<![CDATA[
+		  SELECT MGR_HELP
+			FROM TSYS310
+		   WHERE ENTER_CD = #{ssnEnterCd}
+			 AND MAIN_MENU_CD = #{mainMenuCd}
+			 AND MGR_HELP_YN = 'Y'
+		]]>
+	</select>
+	
+</mapper>

@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.timUsingMgr">
+
+<!-- 근무코드관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkCdMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.WORK_CD
+					     , A.WORK_NM
+					     , A.WORK_S_NM
+					     , A.SUBTRACT_YN
+					     , A.WORK_CD_TYPE
+					     , A.DAY_TYPE
+					     , A.STD_APPLY_HOUR
+					     , A.REQUEST_USE_YN
+					     , A.SEQ
+					     , A.AUTO_GNT_CD
+					     , A.NOTE1
+					     , A.RGB_CD
+					     , A.EXEMPTION_YN
+					  FROM TTIM015 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+<if test='searchWorkNm != null and !searchWorkNm.equals("")'>
+					   AND LOWER(A.WORK_NM) LIKE '%'||LOWER(TRIM( #{searchWorkNm} ))||'%'
+</if>
+<if test='searchDayType != null and !searchDayType.equals("")'>
+					   AND A.DAY_TYPE = #{searchDayType}
+</if>
+<if test='searchWorkCdType != null and !searchWorkCdType.equals("")'>
+					   AND A.WORK_CD_TYPE = #{searchWorkCdType}
+</if>
+ 					ORDER BY A.SEQ
+
+		</select>
+
+<!-- 근무코드관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkCdDayTypeMap">
+
+				<![CDATA[
+					SELECT	  DAY_TYPE
+							, EXEMPTION_YN
+					FROM 	TTIM015
+					WHERE	ENTER_CD = #{ssnEnterCd}
+					  AND	WORK_CD = #{workCd}
+				]]>
+
+
+		</select>
+
+<!-- 근무코드관리 저장 -->
+		<update parameterType="map" id="saveWorkCdMgr">
+
+					MERGE INTO TTIM015 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.WORK_CD
+							     , A.WORK_NM
+							     , A.WORK_S_NM
+							     , A.SUBTRACT_YN
+							     , A.WORK_CD_TYPE
+							     , A.DAY_TYPE
+							     , A.STD_APPLY_HOUR
+							     , A.REQUEST_USE_YN
+							     , A.SEQ
+							     , A.AUTO_GNT_CD
+							     , A.NOTE1
+							     , A.RGB_CD
+							     , A.EXEMPTION_YN
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS WORK_CD
+										 , NULL AS WORK_NM
+										 , NULL AS WORK_S_NM
+										 , NULL AS SUBTRACT_YN
+										 , NULL AS WORK_CD_TYPE
+									     , NULL AS DAY_TYPE
+									     , NULL AS STD_APPLY_HOUR
+									     , NULL AS REQUEST_USE_YN
+									     , NULL AS SEQ
+									     , NULL AS AUTO_GNT_CD
+									     , NULL AS NOTE1
+									     , NULL AS RGB_CD
+									     , NULL AS EXEMPTION_YN
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.workCd})			AS  WORK_CD
+										 , TRIM( #{rm.workNm})			AS  WORK_NM
+										 , TRIM( #{rm.workSNm})		AS  WORK_S_NM
+										 , TRIM( #{rm.subtractYn})		AS  SUBTRACT_YN
+										 , TRIM( #{rm.workCdType})		AS  WORK_CD_TYPE
+										 , TRIM( #{rm.dayType})		AS  DAY_TYPE
+										 , TRIM( #{rm.stdApplyHour})	AS  STD_APPLY_HOUR
+										 , TRIM( #{rm.requestUseYn})	AS  REQUEST_USE_YN
+										 , TRIM( #{rm.seq} )			AS  SEQ
+										 , TRIM( #{rm.autoGntCd})		AS  AUTO_GNT_CD
+										 , TRIM( #{rm.note1})			AS  NOTE1
+										 , TRIM( #{rm.rgbCd})			AS  RGB_CD
+										 , TRIM( #{rm.exemptionYn})	AS  EXEMPTION_YN
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.WORK_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_CD = S.WORK_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.WORK_NM       	= S.WORK_NM
+									, T.WORK_S_NM   	= S.WORK_S_NM
+									, T.SUBTRACT_YN   	= S.SUBTRACT_YN
+									, T.WORK_CD_TYPE    = S.WORK_CD_TYPE
+									, T.DAY_TYPE        = S.DAY_TYPE
+									, T.STD_APPLY_HOUR  = S.STD_APPLY_HOUR
+									, T.REQUEST_USE_YN  = S.REQUEST_USE_YN
+									, T.SEQ             = S.SEQ
+									, T.AUTO_GNT_CD     = S.AUTO_GNT_CD
+									, T.NOTE1     		= S.NOTE1
+									, T.RGB_CD			= S.RGB_CD
+									, T.EXEMPTION_YN	= S.EXEMPTION_YN
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_CD
+							, T.WORK_NM
+							, T.WORK_S_NM
+							, T.SUBTRACT_YN
+							, T.WORK_CD_TYPE
+							, T.DAY_TYPE
+							, T.STD_APPLY_HOUR
+							, T.REQUEST_USE_YN
+							, T.SEQ
+							, T.AUTO_GNT_CD
+							, T.NOTE1
+							, T.RGB_CD
+							, T.EXEMPTION_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.WORK_CD
+							, S.WORK_NM
+							, S.WORK_S_NM
+							, S.SUBTRACT_YN
+							, S.WORK_CD_TYPE
+							, S.DAY_TYPE
+							, S.STD_APPLY_HOUR
+							, S.REQUEST_USE_YN
+							, S.SEQ
+							, S.AUTO_GNT_CD
+							, S.NOTE1
+							, S.RGB_CD
+							, S.EXEMPTION_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 근무코드관리 삭제 -->
+		<delete parameterType="map" id="deleteWorkCdMgr">
+
+					DELETE FROM TTIM015
+					 WHERE ENTER_CD||'_'||WORK_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.workCd != null and !rm.workCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.workCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.retire.retireInterviewLst">
+		<select parameterType="map" resultType="cMap" id="getRetireInterviewLstList">
+
+				<![CDATA[
+					SELECT A.SABUN
+					     , B.NAME
+					     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.REQ_DATE)    AS ORG_NM
+					     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, A.REQ_DATE)   AS JIKCHAK_NM   -- 직책
+					     , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.REQ_DATE)   AS JIKWEE_NM   -- 직위
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, A.REQ_DATE)   AS JIKGUB_NM   -- 직급         
+					     , A.REQ_DATE   -- 신청일
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010', C.APPL_STATUS_CD) AS APPL_STATUS_NM -- 결재상태
+					     , A.RET_SCH_YMD  -- 퇴직희망일 
+                         , A.RET_YMD -- 퇴직일
+                         , A.NOTE --  퇴직사유 
+					     , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO
+                         , Z.CCR_YMD
+                         , Z.ADVISER
+					     , F_COM_GET_NAMES(Z.ENTER_CD, Z.ADVISER, 'ko_KR' , Z.CCR_YMD) AS ADVISER_NAME
+					     , Z.MEMO
+					  FROM THRM551 A
+					     , THRM100 B
+					     , THRI103 C
+					     , THRM151 E
+                         , THRM185 Z
+					 WHERE 1=1 
+					   AND A.ENTER_CD =  #{ssnEnterCd}
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN    = B.SABUN
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.APPL_SEQ = C.APPL_SEQ
+					   AND A.RET_SCH_YMD BETWEEN TRIM( #{sYmd} ) AND TRIM( #{eYmd} )
+					   AND A.ENTER_CD = E.ENTER_CD
+					   AND A.SABUN = E.SABUN
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND E.EDATE
+					   AND C.APPL_STATUS_CD <> '11' --임시저장이 아닌것
+                       AND A.ENTER_CD = Z.ENTER_CD
+                       AND A.SABUN = Z.SABUN
+                       AND A.APPL_SEQ = Z.APPL_SEQ
+                       AND Z.CCR_CD 	= '90'
+                               ]]>
+  				  <if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+				  	AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.REQ_DATE , #{ssnLocaleCd} )  LIKE  '%'|| #{searchOrgNm} ||'%'
+				  </if>
+					<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR  F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+					</if>
+		           <if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+		                AND C.APPL_STATUS_CD = #{searchApplStatusCd}
+				   </if>
+		           ORDER BY A.RET_SCH_YMD DESC	  
+
+
+		</select>
+
+</mapper>

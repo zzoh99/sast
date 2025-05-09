@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perElePayAllMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerElePayAllMgrList">
+				<![CDATA[
+					SELECT  /*+ RULE */
+					                F_COM_GET_ORG_NM(C.ENTER_CD,C.ORG_CD, A.SDATE) AS ORG_NM
+					                , C.ORG_CD
+					                , B.NAME
+					                , A.SABUN
+					                , C.STATUS_NM
+                                    , C.MANAGE_NM
+                                    , C.JIKGUB_NM
+					                , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10010', C.STATUS_CD) AS STATUS_NM
+					                , A.ELEMENT_CD
+					                , E.ELEMENT_NM
+					                , A.SDATE
+					                , A.EDATE
+					                , A.BUSINESS_PLACE_CD
+					                , A.MONTH_MON
+					                , A.NOTE
+					                , A.PAYBAND_CD, A.PAYBAND_YEAR
+					          FROM  TCPN292 A ]]>
+<if test='ssnSearchType eq "O"'>
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = A.ENTER_CD
+  AND AUTH.SABUN = A.SABUN 
+</if> <![CDATA[
+					               ,THRM100 B  
+					               ,(
+					                  SELECT     SUB1.*     
+					                     FROM     THRM151 SUB1,    
+					                        (SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN    
+					                           FROM THRM151     
+					                         WHERE ENTER_CD = #{ssnEnterCd}
+					                           AND (SDATE LIKE REPLACE(#{searchDate},'-','')||'%' OR EDATE LIKE REPLACE(#{searchDate},'-','')||'%' OR (REPLACE(#{searchDate},'-','')||'01') BETWEEN SDATE AND NVL(EDATE,'99991231'))     
+					                         GROUP BY ENTER_CD, SABUN) SUB2    
+					                    WHERE     SUB1.ENTER_CD    = SUB2.ENTER_CD    
+					                      AND SUB1.SABUN = SUB2.SABUN    
+					                     AND SUB1.SDATE = SUB2.SDATE  
+					                ) C    
+					               ,TCPN011 E
+					         WHERE    B.ENTER_CD = A.ENTER_CD
+					           AND    B.SABUN = A.SABUN
+					           AND    B.ENTER_CD = C.ENTER_CD
+					           AND    B.SABUN = C.SABUN
+					           AND    A.ENTER_CD = E.ENTER_CD
+					           AND    A.ELEMENT_CD = E.ELEMENT_CD
+					           AND    E.SDATE = ( SELECT MAX(X.SDATE)
+					                              FROM TCPN011 X   
+					                             WHERE X.ENTER_CD = A.ENTER_CD
+					                               AND X.ELEMENT_CD = A.ELEMENT_CD
+					                               AND X.SDATE <= A.SDATE )
+					           AND    A.ENTER_CD = #{ssnEnterCd} ]]>
+					           <if test="searchElemCd != null and searchElemCd neq ''">
+					           		AND    E.ELEMENT_CD = #{searchElemCd}
+					           </if>
+					           <if test="searchSabunName != null and searchSabunName neq ''">
+					         		  AND    (A.SABUN = #{searchSabunName} OR B.NAME LIKE '%' || #{searchSabunName} || '%')
+					           </if>
+					           <if test="searchStatusCdHidden != null and searchStatusCdHidden neq ''">
+					           		AND    C.STATUS_CD IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					           </if>
+					           <if test="searchManageCdHidden != null and searchManageCdHidden neq ''">
+					           		AND    C.MANAGE_CD IN
+		<foreach collection="searchManageCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					           </if>
+					           <if test="searchOrgNm != null and searchOrgNm neq ''">
+								 	AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) LIKE '%'|| TRIM( #{searchOrgNm} ) ||'%'
+							   </if>
+					           AND (A.SDATE LIKE REPLACE(#{searchDate},'-','')||'%' OR A.EDATE LIKE REPLACE(#{searchDate},'-','')||'%' OR (REPLACE(#{searchDate},'-','')||'01') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231'))     
+					         ORDER BY A.SABUN, A.ELEMENT_CD
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePerElePayAllMgr">
+					MERGE INTO TCPN292 T
+					USING	(
+							SELECT	  SABUN
+									, ELEMENT_CD
+									, SDATE
+									, EDATE
+									, BUSINESS_PLACE_CD
+									, MONTH_MON
+									, NOTE
+							FROM	(
+									SELECT	  NULL		AS SABUN             
+											, NULL		AS ELEMENT_CD        
+											, NULL		AS SDATE             
+											, NULL		AS EDATE             
+											, NULL		AS BUSINESS_PLACE_CD 
+											, NULL		AS MONTH_MON         
+											, NULL		AS NOTE              
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.sabun}) AS SABUN                 
+											, TRIM( #{rm.elementCd}) AS ELEMENT_CD           
+											, TRIM( #{rm.sdate}) AS SDATE                 
+											, TRIM( #{rm.edate}) AS EDATE                 
+											, TRIM( #{rm.businessPlaceCd}) AS BUSINESS_PLACE_CD   
+											, TRIM( #{rm.monthMon}) AS MONTH_MON            
+											, TRIM( #{rm.note}) AS NOTE                  
+											FROM   DUAL
+</foreach>
+									) WHERE SABUN IS NOT NULL
+							) S
+					ON (    T.ENTER_CD    = #{ssnEnterCd}       
+						AND T.SABUN       = S.SABUN     
+						AND T.ELEMENT_CD  = S.ELEMENT_CD
+						AND T.SDATE       = S.SDATE     
+							 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE            	= S.EDATE            
+									, T.BUSINESS_PLACE_CD	= S.BUSINESS_PLACE_CD
+									, T.MONTH_MON        	= S.MONTH_MON        
+									, T.NOTE             	= S.NOTE             
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.ELEMENT_CD
+							, T.SDATE
+							, T.EDATE
+							, T.BUSINESS_PLACE_CD
+							, T.MONTH_MON
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}       
+							, S.SABUN
+							, S.ELEMENT_CD
+							, S.SDATE
+							, S.EDATE
+							, S.BUSINESS_PLACE_CD
+							, S.MONTH_MON
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePerElePayAllMgr">
+					DELETE FROM TCPN292 
+					WHERE 	(ENTER_CD, SABUN, ELEMENT_CD, SDATE) IN 	(  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+											<if test="rm.sabun != null and rm.sabun neq ''">
+												<if test="rm.elementCd != null and rm.elementCd neq ''">
+													<if test="rm.sdate != null and sdate neq ''">
+														(#{ssnEnterCd}, TRIM( #{rm.sabun} ) ,TRIM( #{rm.elementCd} ) ,TRIM( #{rm.sdate} ) )
+													</if>
+												</if>
+											</if>
+										</if>								
+</foreach>
+										)
+		</delete>
+		
+		<!-- 항목별예외처리관리 종료일자 UPDATE -->
+		<update id="prcP_CPN292_EDATE_UPDATE" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_CPN292_EDATE_UPDATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{pSabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+</mapper>

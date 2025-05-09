@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.holidayMgr">
+
+<!-- 휴일관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolidayMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.YY
+					     , A.HOLIDAY_CD
+					     , A.HOLIDAY_NM
+					     , A.MM
+					     , A.DD
+					     , A.GUBUN
+					     , A.FESTIVE_YN
+					     , A.HOLIDAY_YN
+					     , A.PAY_YN
+					     , A.BUSINESS_PLACE_CD
+					     , A.LANGUAGE_CD
+						 , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'TTIM001', LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM
+						 , CASE WHEN RP_YY IS NOT NULL 
+                           THEN RP_YY || '년 ' || RP_MM ||'월 ' || RP_DD || '일' 
+                           ELSE '-' END AS REPLACE_HOLIDAY
+					  FROM TTIM001 A
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+  					   AND A.YY = #{searchYear}
+  					           ]]>
+					<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+                       AND A.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+					</if>
+					 ORDER BY YY, MM, DD, HOLIDAY_NM, A.BUSINESS_PLACE_CD
+
+
+		</select>
+
+<!-- 휴일관리 count -->
+		<select parameterType="map" resultType="cMap" id="getHolidayMgrCnt">
+
+				<![CDATA[
+					SELECT TO_CHAR(COUNT(*)) AS CNT
+					  FROM TTIM001 A
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+  					   AND A.YY       = TRIM( #{fromYear} )
+  					           ]]>
+<if test='fromBizPlaceCd != null and !fromBizPlaceCd.equals("")'>
+                       AND A.BUSINESS_PLACE_CD = #{fromBizPlaceCd}
+</if>
+
+		</select>
+
+<!-- 휴일관리 저장 -->
+		<update parameterType="map" id="saveHolidayMgr">
+
+					MERGE INTO TTIM001 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.YY
+							     , A.HOLIDAY_CD
+							     , A.HOLIDAY_NM
+							     , A.MM
+							     , A.DD
+							     , A.GUBUN
+							     , A.HOLIDAY_YN
+							     , A.FESTIVE_YN
+							     , A.PAY_YN
+							     , A.BUSINESS_PLACE_CD
+							     , A.LANGUAGE_CD
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS YY
+										 , NULL AS HOLIDAY_CD
+										 , NULL AS HOLIDAY_NM
+										 , NULL AS MM
+										 , NULL AS DD
+									     , NULL AS GUBUN
+									     , NULL AS HOLIDAY_YN
+									     , NULL AS FESTIVE_YN
+									     , NULL AS PAY_YN
+									     , NULL AS BUSINESS_PLACE_CD
+									     , NULL AS LANGUAGE_CD
+									FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.yy} )				AS  YY
+										<choose><when test=' rm.holidayCd != null and !rm.holidayCd.equals("")'>
+										 	, TRIM(#{rm.holidayCd}) 		AS HOLIDAY_CD
+										</when><otherwise>
+											, TO_CHAR( (
+														SELECT (NVL(MAX(TO_NUMBER(HOLIDAY_CD)),0) + ${icnt})
+														  FROM (
+																   SELECT HOLIDAY_CD
+																     FROM TTIM001
+																    WHERE ENTER_CD = #{ssnEnterCd}
+																      AND YY = TRIM( #{rm.yy} )
+																      AND NOT REGEXP_LIKE(HOLIDAY_CD, '[^0-9]')
+																)
+													) )	AS HOLIDAY_CD
+											<bind name="icnt" value="icnt + 1" />
+										</otherwise>
+										</choose>
+										 , TRIM( #{rm.holidayNm})		AS  HOLIDAY_NM
+										 , TRIM( #{rm.mm})				AS  MM
+										 , TRIM( #{rm.dd})				AS  DD
+										 , TRIM( #{rm.gubun})			AS  GUBUN
+										 , TRIM( #{rm.holidayYn})		AS  HOLIDAY_YN
+										 , TRIM( #{rm.festiveYn})		AS  FESTIVE_YN
+										 , TRIM( #{rm.payYn})			AS  PAY_YN
+										 , TRIM( #{rm.businessPlaceCd})	AS  BUSINESS_PLACE_CD
+										 , TRIM( #{rm.languageCd})		AS  LANGUAGE_CD
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.YY IS NOT NULL
+										  AND A.HOLIDAY_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.YY = S.YY AND T.HOLIDAY_CD = S.HOLIDAY_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.HOLIDAY_NM		= S.HOLIDAY_NM
+									, T.MM				= S.MM
+									, T.DD				= S.DD
+									, T.GUBUN			= S.GUBUN
+									, T.HOLIDAY_YN		= S.HOLIDAY_YN
+									, T.FESTIVE_YN		= S.FESTIVE_YN
+									, T.PAY_YN			= S.PAY_YN
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+									, T.LANGUAGE_CD		= S.LANGUAGE_CD
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YY
+							, T.HOLIDAY_CD
+							, T.HOLIDAY_NM
+							, T.MM
+							, T.DD
+							, T.GUBUN
+							, T.HOLIDAY_YN
+							, T.FESTIVE_YN
+							, T.PAY_YN
+							, T.BUSINESS_PLACE_CD
+							, T.CHKDATE
+							, T.CHKID
+							, T.LANGUAGE_CD
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YY
+							, S.HOLIDAY_CD
+							, S.HOLIDAY_NM
+							, S.MM
+							, S.DD
+							, S.GUBUN
+							, S.HOLIDAY_YN
+							, S.FESTIVE_YN
+							, S.PAY_YN
+							, S.BUSINESS_PLACE_CD
+							, SYSDATE
+							, #{ssnSabun}
+							, S.LANGUAGE_CD
+						)
+		</update>
+
+<!-- 휴일관리 전년도 복사 -->
+		<insert parameterType="map" id="copyHolidayMgr">
+
+				<![CDATA[
+					INSERT INTO TTIM001
+					(
+						  ENTER_CD
+						, YY
+						, HOLIDAY_CD
+						, HOLIDAY_NM
+						, MM
+						, DD
+						, GUBUN
+						, HOLIDAY_YN
+						, FESTIVE_YN
+						, PAY_YN
+						, BUSINESS_PLACE_CD
+						, CHKDATE
+						, CHKID
+					)
+]]>
+<choose>
+<when test='fromBizPlaceCd != null and toBizPlaceCd != null and !fromBizPlaceCd.equals("") and toBizPlaceCd.equals("")'>
+					-- 원본 사업장 1  전체로 복사할 경우
+					SELECT A.ENTER_CD
+						 , TRIM( #{toYear} )
+						 , A.HOLIDAY_CD
+						 , A.HOLIDAY_NM
+						 , A.MM
+						 , A.DD
+						 , A.GUBUN
+						 , A.HOLIDAY_YN
+						 , A.FESTIVE_YN
+						 , A.PAY_YN
+						 , B.BUSINESS_PLACE_CD
+						 , SYSDATE
+						 , #{ssnSabun}
+					  FROM TTIM001 A
+					     , ( SELECT *
+					           FROM TCPN121
+	 	                      WHERE ENTER_CD = #{ssnEnterCd}
+	 	                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	<choose><when test='toBizPlaceCd != null and !toBizPlaceCd.equals("")'>
+	-- target 사업장
+	 	                        AND BUSINESS_PLACE_CD = #{toBizPlaceCd}
+	</when><otherwise>
+	-- target 사업장이 전체일 경우
+	 	                        AND BUSINESS_PLACE_CD != #{fromBizPlaceCd}
+			<if test='ssnSearchType != null and !ssnSearchType.equals("A")'>
+	 	                        AND BUSINESS_PLACE_CD IN ( SELECT A.SCOPE_VALUE FROM TSYS319 A  -- 그룹별사용자별권한범위항목관리
+	 	                                                    WHERE A.ENTER_CD = #{ssnEnterCd}
+	 	                                                      AND A.SABUN    = #{ssnSabun}
+	 	                                                      AND A.GRP_CD   = #{ssnGrpCd}
+	 	                                                      AND A.AUTH_SCOPE_CD = 'C10')
+			</if>
+	</otherwise>
+	</choose>
+					       ) B
+					 WHERE A.ENTER_CD          = #{ssnEnterCd}
+					   AND A.YY                = TRIM( #{fromYear} )
+                       AND A.BUSINESS_PLACE_CD = #{fromBizPlaceCd}
+</when><otherwise>
+/* 원본 사업장 1 - 전체로 복사할 경우를 제외 */
+
+					SELECT ENTER_CD
+						 , TRIM( #{toYear} )
+						 , HOLIDAY_CD
+						 , HOLIDAY_NM
+						 , MM
+						 , DD
+						 , GUBUN
+						 , HOLIDAY_YN
+						 , FESTIVE_YN
+						 , PAY_YN
+	<choose><when test='fromBizPlaceCd != null and !fromBizPlaceCd.equals("")'>
+						 , TRIM(#{toBizPlaceCd})
+	</when><otherwise>
+						 , BUSINESS_PLACE_CD
+	</otherwise>
+	</choose>
+						 , SYSDATE
+						 , #{ssnSabun}
+					  FROM TTIM001
+					 WHERE ENTER_CD  = #{ssnEnterCd}
+					   AND YY        = TRIM( #{fromYear} )
+	<if test='fromBizPlaceCd != null and !fromBizPlaceCd.equals("")'>
+                       AND BUSINESS_PLACE_CD = #{fromBizPlaceCd}
+	</if>
+
+</otherwise>
+</choose>
+		</insert>
+
+<!-- 휴일관리 삭제 -->
+		<delete parameterType="map" id="deleteHolidayMgrAll">
+
+					DELETE FROM TTIM001
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND YY       = TRIM( #{toYear} )
+
+<if test='fromYear != null and toYear != null and fromYear.equals(toYear)'>
+					   AND BUSINESS_PLACE_CD != #{fromBizPlaceCd}
+			<if test='ssnSearchType != null and !ssnSearchType.equals("A")'>
+	 	               AND BUSINESS_PLACE_CD IN ( SELECT A.SCOPE_VALUE FROM TSYS319 A  -- 그룹별사용자별권한범위항목관리
+	 	                                           WHERE A.ENTER_CD = #{ssnEnterCd}
+	 	                                             AND A.SABUN    = #{ssnSabun}
+	 	                                             AND A.GRP_CD   = #{ssnGrpCd}
+	 	                                             AND A.AUTH_SCOPE_CD = 'C10')
+			</if>
+</if>
+<if test='toBizPlaceCd != null and !toBizPlaceCd.equals("")'>
+                       AND BUSINESS_PLACE_CD = #{toBizPlaceCd}
+</if>
+		</delete>
+
+	<!-- 휴일관리 삭제 -->
+		<delete parameterType="map" id="deleteHolidayMgr">
+
+					DELETE FROM TTIM001
+					 WHERE ENTER_CD||'_'||YY||'_'||HOLIDAY_CD||'_'||BUSINESS_PLACE_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.yy != null and !rm.yy.equals("")
+												and rm.holidayCd != null and !rm.holidayCd.equals("")
+												and rm.businessPlaceCd != null and !rm.businessPlaceCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.yy} )||'_'||TRIM( #{rm.holidayCd} )||'_'||TRIM( #{rm.businessPlaceCd})
+										</if>
+</foreach>
+										)
+		</delete>
+		
+		<update parameterType="map" id="prcReplaceHoliday">
+		<![CDATA[
+			{CALL P_TIM_SET_REPLACE_HOLIDAY(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchYear,mode=IN,jdbcType=VARCHAR},
+				#{searchBizPlaceCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+
+</mapper>

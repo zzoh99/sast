@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.pwrSrch.pwrSrchMgrApp">
+		<select parameterType="map" resultType="cMap" id="getPwrSrchMgrAppList">
+
+				<![CDATA[/* thri211 */
+					SELECT DISTINCT A.SEARCH_SEQ
+							, A.BIZ_CD, A.SEARCH_TYPE
+							, A.SABUN, D.NAME AS OWNER
+							, A.COMMON_USE_YN
+							, A.SEARCH_DESC
+							, A.CONDITION_DESC
+							, A.DISTR_SEARCH_SEQ
+							, TO_CHAR(A.CHKDATE,'YYYYMMDD') AS CHKDATE
+							, A.VIEW_CD
+							, C.VIEW_NM
+							, C.VIEW_DESC
+                  	FROM THRI201 A, THRI205 C, THRM100 D,
+                       	(
+                        	SELECT  *
+                          	FROM THRI207 X, TSYS313 Y
+                         	WHERE X.ENTER_CD 	= Y.ENTER_CD
+                           	AND X.GRP_CD      	= Y.GRP_CD
+                           	AND Y.ENTER_CD 		= #{ssnEnterCd}
+                           	AND Y.SABUN      	= #{ssnSabun}
+                        ) E
+                 	WHERE A.ENTER_CD 	= #{ssnEnterCd}
+                 	]]>
+          		<if test='srchType != null and !srchType.equals("")'>
+                   	AND A.SEARCH_TYPE	LIKE '%'||#{srchType}||'%'
+				</if>
+                   	<![CDATA[ AND A.SEARCH_TYPE 	<> '3' ]]>
+               	<if test='srchBizCd != null and !srchBizCd.equals("")'>
+               	 	AND A.BIZ_CD   		LIKE '%'||#{srchBizCd}||'%'
+				</if>
+                   	AND A.VIEW_CD      	= C.VIEW_CD(+)
+                   	AND C.VIEW_CD      	= E.VIEW_CD(+)
+                   	AND D.ENTER_CD     	= A.ENTER_CD
+                   	AND D.SABUN      	= A.SABUN
+                   	AND (
+                        	A.SABUN        	= #{ssnSabun}
+                        	OR A.COMMON_USE_YN     = 'Y'
+                        )
+               <if test='srchDesc != null and !srchDesc.equals("")'>
+                   	AND A.SEARCH_DESC    LIKE '%'||#{srchDesc}||'%'
+			   </if>
+                	ORDER BY A.SEARCH_SEQ DESC
+
+
+
+		</select>
+
+		<update parameterType="map" id="savePwrSrchMgrApp">
+
+   					MERGE INTO THRI203 TARGETTABLE
+                  	USING (
+               				SELECT    A.SEARCH_ITEM_CD		AS SEARCH_ITEM_CD
+                                	, A.SEARCH_ITEM_NM		AS SEARCH_ITEM_NM
+                                	, A.SEARCH_ITEM_DESC	AS SEARCH_ITEM_DESC
+                                	, A.ITEM_MAP_TYPE		AS ITEM_MAP_TYPE
+                                	, A.PRG_URL				AS PRG_URL
+                                	, A.SQL_SYNTAX			AS SQL_SYNTAX
+                     		FROM   (
+                               		SELECT    NULL			AS SEARCH_ITEM_CD
+                                			, NULL			AS SEARCH_ITEM_NM
+                                			, NULL			AS SEARCH_ITEM_DESC
+                                			, NULL			AS ITEM_MAP_TYPE
+                                			, NULL			AS PRG_URL
+                                			, NULL			AS SQL_SYNTAX
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT
+		                                	<if test='rm.searchItemCd != null and !rm.searchItemCd.equals("")'>
+		                    	 				TRIM(#{rm.searchItemCd}) 	AS SEARCH_ITEM_CD
+											</if>
+											<if test='rm.searchItemCd != null and  rm.searchItemCd.equals("")'>
+		                    	 				TO_CHAR( ( SELECT ( NVL( MAX( TO_NUMBER( SEARCH_ITEM_CD ) ),0) + ${icnt} ) FROM THRI203 ) )  	AS SEARCH_ITEM_CD
+												<bind name="icnt" value="icnt + 1" />
+											</if>
+                                      		, TRIM(#{rm.searchItemNm})  	AS SEARCH_ITEM_NM
+                                       		, TRIM(#{rm.searchItemDesc})	AS SEARCH_ITEM_DESC
+                                       		, TRIM(#{rm.itemMapType})		AS ITEM_MAP_TYPE
+                                       		, TRIM(#{rm.prgUrl})			AS PRG_URL
+                                       		, TRIM(#{rm.sqlSyntax})			AS SQL_SYNTAX
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.SEARCH_ITEM_CD IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               TARGETTABLE.SEARCH_ITEM_CD = SOURCETABLE.SEARCH_ITEM_CD
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.SEARCH_ITEM_NM	= SOURCETABLE.SEARCH_ITEM_NM
+                        			, TARGETTABLE.SEARCH_ITEM_DESC  = SOURCETABLE.SEARCH_ITEM_DESC
+                                  	, TARGETTABLE.ITEM_MAP_TYPE		= SOURCETABLE.ITEM_MAP_TYPE
+                                  	, TARGETTABLE.PRG_URL			= SOURCETABLE.PRG_URL
+                                  	, TARGETTABLE.SQL_SYNTAX		= SOURCETABLE.SQL_SYNTAX
+                                  	, TARGETTABLE.CHKDATE			= SYSDATE
+                                  	, TARGETTABLE.CHKID				= #{sabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SEARCH_ITEM_CD
+               				, TARGETTABLE.SEARCH_ITEM_NM
+                			, TARGETTABLE.SEARCH_ITEM_DESC
+                          	, TARGETTABLE.ITEM_MAP_TYPE
+                          	, TARGETTABLE.PRG_URL
+                          	, TARGETTABLE.SQL_SYNTAX
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{enterCd}
+               				, SOURCETABLE.SEARCH_ITEM_CD
+               				, SOURCETABLE.SEARCH_ITEM_NM
+               				, SOURCETABLE.SEARCH_ITEM_DESC
+               				, SOURCETABLE.ITEM_MAP_TYPE
+               				, SOURCETABLE.PRG_URL
+               				, SOURCETABLE.SQL_SYNTAX
+               				, SYSDATE
+               				, #{sabun}
+               			)
+
+
+
+
+		</update>
+
+		<delete parameterType="map" id="deletePwrSrchMgrApp">
+
+   					DELETE	FROM THRI203
+					WHERE 	(ENTER_CD, SEARCH_ITEM_CD) IN ( (NULL,NULL)
+					<foreach item="rm" collection="deleteRows" >
+						,
+                    	<if test='enterCd != null and !enterCd.equals("")
+                    	and 	rm.searchItemCd != null and !rm.searchItemCd.equals("")'>
+        	 				( TRIM(REPLACE(#{enterCd},CHR(13),'')), TRIM(REPLACE(#{rm.searchItemCd},CHR(13),'')) )
+						</if>
+					</foreach>
+														  )
+
+		</delete>
+
+</mapper>

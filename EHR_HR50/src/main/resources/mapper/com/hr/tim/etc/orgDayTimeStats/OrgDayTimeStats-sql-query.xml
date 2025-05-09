@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.etc.orgDayTimeStats">
+
+
+<!-- 부서원근태현황 조직코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgDayTimeStatsOrgList">
+
+				<![CDATA[
+					SELECT
+						--'DT00000000' AS CODE
+						'A' AS CODE
+						,'전체' AS CODE_NM
+					FROM DUAL
+
+					UNION ALL
+
+					SELECT
+						A.ORG_CD AS CODE,
+						NVL(F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}), B.ORG_NM) AS CODE_NM
+					FROM TORG105 A, TORG101 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.ORG_CD = B.ORG_CD
+					AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					AND A.ENTER_CD = #{ssnEnterCd}
+					AND A.SDATE = (SELECT SDATE FROM TORG103 WHERE ENTER_CD = #{ssnEnterCd} AND SDATE = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = #{ssnEnterCd} AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND EDATE))
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getOrgDayTimeStatsHeaderList">
+
+				<![CDATA[
+					SELECT 'M_CNT'||A.GNT_CD AS SAVE_NAME1
+					     , 'Y_CNT'||A.GNT_CD AS SAVE_NAME2
+					     , 'mCnt'||A.GNT_CD AS SAVE_NAME1_DISP
+					     , 'yCnt'||A.GNT_CD AS SAVE_NAME2_DISP
+					     , NVL(F_COM_GET_LANGUAGE_MAPPING (A.ENTER_CD, 'ttim014', A.LANGUAGE_CD, #{ssnLocaleCd}),A.GNT_NM) AS GNT_NM
+					     , A.GNT_CD AS GNT_CD
+					FROM TTIM014 A , TSYS005 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+					    AND A.GNT_GUBUN_CD = B.CODE
+					    AND B.GRCODE_CD = 'T10003'
+					    AND B.NOTE1 = 'Y'
+					    AND A.ENTER_CD = #{ssnEnterCd}
+					ORDER BY TO_NUMBER(A.SEQ)
+				]]>
+
+
+		</select>
+
+<!-- 부서원근태현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgDayTimeStatsList">
+
+				<![CDATA[
+			SELECT
+				LEVEL AS "_level"
+				,A.*
+			FROM(
+				SELECT
+					  Z.ORG_CD
+					, Z.PRIOR_ORG_CD
+					, Z.ORG_NM
+					, Z.LOCATION_CD
+					, Z.LOCATION_NM
+					, Z.ORG_LEVEl
+					, Z.SEQ
+					, COUNT(X.SABUN) AS EMP_CNT
+					, COUNT(X.IN_HM) AS WORK_EMP_CNT
+					, (CASE WHEN COUNT(X.SABUN) != 0 THEN (SUM(CASE WHEN X.IN_HM IS NULL AND (Y.ABSENCE_FLAG = 0 OR Y.ABSENCE_FLAG IS NULL) THEN 1 ELSE 0 END)) ELSE 0 END) AS ABSENCE_EMP_CNT
+					, (CASE WHEN COUNT(X.LATE_SABUN) = 0 THEN NULL ELSE COUNT(X.LATE_SABUN) END) AS LATE_EMP_CNT
+					]]>
+<foreach item="rtitles" collection="titles" >
+					, SUM(CASE WHEN Y.${rtitles.saveName1}  = 0 THEN NULL ELSE Y.${rtitles.saveName1}  END) AS ${rtitles.saveName1}
+</foreach>
+				FROM
+				(
+					SELECT
+						A.SABUN
+						,A.ENTER_CD
+						,A.ORG_CD
+						,D.IN_HM
+						,D.OUT_HM
+						,E.SABUN AS LATE_SABUN
+					FROM THRM151 A
+					,(
+						SELECT
+							MAX(SDATE) AS SDATE
+							, ENTER_CD
+							, SABUN
+						FROM THRM151
+						WHERE ENTER_CD = #{ssnEnterCd}
+						AND REPLACE(TRIM( #{sYmd} ),'-','') BETWEEN SDATE AND NVL(EDATE, '99991231')
+						GROUP BY ENTER_CD, SABUN
+					) B
+					,THRM100 C
+					,TTIM330 D
+					,TTIM337 E
+					WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.SABUN    = B.SABUN
+					AND A.SDATE    = B.SDATE
+					AND A.ENTER_CD = C.ENTER_CD
+					AND A.SABUN    = C.SABUN
+					AND F_COM_GET_STATUS_CD( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) != 'RAA'
+					AND (C.RET_YMD IS NULL OR C.RET_YMD > REPLACE(TRIM( #{sYmd} ),'-','') )
+					AND A.ENTER_CD = D.ENTER_CD(+)
+					AND A.SABUN = D.SABUN(+)
+					AND REPLACE(TRIM( #{sYmd} ),'-','') = D.YMD(+)
+					AND A.ENTER_CD = E.ENTER_CD(+)
+					AND A.SABUN = E.SABUN(+)
+					AND A.SABUN IN (SELECT SABUN 
+					   				   FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+					   				   )
+					AND REPLACE(TRIM( #{sYmd} ),'-','') = E.YMD(+)
+					AND E.WORK_CD(+) = '0090' /*지각*/
+<if test='multiManageCd != null and !multiManageCd.equals("")'>
+					AND A.WORK_TYPE	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+				) X
+				,(
+					SELECT
+						H.SABUN,
+						0
+<foreach item="rtitles" collection="titles" >
+						+${rtitles.saveName1}
+</foreach>
+						AS ABSENCE_FLAG
+<foreach item="rtitles" collection="titles" >
+						,${rtitles.saveName1}
+</foreach>
+					FROM(
+						SELECT
+							A.SABUN
+<foreach item="rtitles" collection="titles" >
+						, SUM(CASE WHEN A.YMD = REPLACE(TRIM( #{sYmd} ),'-','') AND A.GNT_CD = #{rtitles.gntCd} THEN 1 ELSE 0 END) AS ${rtitles.saveName1}
+</foreach>
+						FROM
+							TTIM405 A
+							,THRI103 B
+						WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.APPL_SEQ = B.APPL_SEQ
+						AND A.ENTER_CD = #{ssnEnterCd}
+						AND A.YMD = REPLACE(TRIM( #{sYmd} ),'-','')
+						AND B.APPL_STATUS_CD = '99'
+						GROUP BY A.SABUN
+					) H
+				) Y
+				,(
+					SELECT
+						A.PRIOR_ORG_CD,
+						A.ORG_CD,
+						NVL(F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM( #{sYmd} ),'-',''), #{ssnLocaleCd}), B.ORG_NM) AS ORG_NM,
+						F_COM_GET_LOCATION_CD(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS LOCATION_CD,
+						F_COM_GET_LOCATION_NM(A.ENTER_CD, F_COM_GET_LOCATION_CD(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'))) AS LOCATION_NM,
+						A.ORDER_SEQ,
+						A.ORG_LEVEL,
+						A.SEQ
+					FROM TORG105 A, TORG101 B
+					WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND A.ENTER_CD = B.ENTER_CD
+					AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					AND A.ORG_CD = B.ORG_CD
+					AND A.SDATE = (SELECT SDATE FROM TORG103 WHERE ENTER_CD = #{ssnEnterCd} AND SDATE = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = #{ssnEnterCd} AND REPLACE(TRIM( #{sYmd} ),'-','') BETWEEN SDATE AND EDATE))
+		<choose>
+			<when test='searchOrgType and searchOrgType eq "Y"'></when>
+		  	<otherwise>
+				<choose>
+					<when test ='orgCd != null and orgCd.equals("")'>
+						AND PRIOR_ORG_CD = '0'
+					</when>
+					<otherwise>
+						AND A.ORG_CD = #{orgCd}
+					</otherwise>
+				</choose>
+			</otherwise>
+		</choose>
+				) Z
+
+				WHERE X.ORG_CD(+) = Z.ORG_CD
+				AND X.SABUN  = Y.SABUN(+)
+
+				GROUP BY
+					  Z.ORG_CD
+					, Z.ORG_NM
+					, Z.LOCATION_CD
+					, Z.LOCATION_NM
+					, Z.ORDER_SEQ
+					, Z.PRIOR_ORG_CD
+					, Z.SEQ
+					, Z.ORG_LEVEL
+			) A
+			WHERE 1=1
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+			AND	A.LOCATION_CD = #{searchLocationCd}
+</if>
+
+
+	<choose>
+		<when test ='orgCd != null and orgCd.equals("")'>
+			START WITH A.PRIOR_ORG_CD = '0'
+		</when>
+		<otherwise>
+			START WITH A.ORG_CD = #{orgCd}
+		</otherwise>
+	</choose>
+			CONNECT BY PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+
+			ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+		</select>
+
+</mapper>

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalPost">
+
+	<!-- 인사기본(발령) 조회 -->
+		<select id="getPsnalPostList" parameterType="map" resultType="cMap">
+					 SELECT *
+					   FROM     
+					      (SELECT X.*
+					        FROM 
+					       (SELECT A.ENTER_CD
+					             , F_COM_GET_ENTER_NM(A.ENTER_CD, DECODE(#{ssnLocaleCd}, 'ko_KR', '1','2')) AS ENTER_NM
+					             , A.ORD_TYPE_CD
+					             , NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tsys011', A.ORD_TYPE_CD, #{ssnLocaleCd}), F_COM_GET_ORD_TYPE_NM(A.ENTER_CD, A.ORD_TYPE_CD)) as ORD_TYPE_NM
+					             , A.ORD_DETAIL_CD
+					             , NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tsys013', A.ORD_DETAIL_CD, #{ssnLocaleCd}), F_COM_GET_ORD_DETAIL_NM(A.ENTER_CD, A.ORD_TYPE_CD, A.ORD_DETAIL_CD)) as ORD_DETAIL_NM
+					             , A.ORD_REASON_CD  --  발령세부사유코드(H40110)
+                                 , A.ORD_REASON_NM  --  발령세부사유명       
+					             , A.SABUN
+					             , A.ORD_YMD
+					             , A.APPLY_SEQ					             
+					             , A.STATUS_CD 				-- 재직상태                STATUS_CD
+                                 , A.STATUS_NM					             
+					             , A.ORG_CD   
+					             , NVL(TRIM(F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD,A.ORD_YMD, #{ssnLocaleCd})),A.ORG_NM) AS ORG_NM
+					             , A.JOB_CD
+					             , F_COM_GET_JOB_NM_201(A.ENTER_CD,A.JOB_CD,A.ORD_YMD, #{ssnLocaleCd}) AS JOB_NM
+					             , A.JIKCHAK_CD
+					             , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					             , A.JIKGUB_CD
+					             , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+					             , A.JIKWEE_CD
+					             , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+					             , A.MANAGE_CD
+					             , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10030',A.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+					             , A.WORK_TYPE  			
+                                 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10050',A.WORK_TYPE, #{ssnLocaleCd}) WORK_TYPE_NM
+                                 , A.PAY_TYPE 					-- 임금형태
+                                 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10110',A.PAY_TYPE, #{ssnLocaleCd}) AS PAY_TYPE_NM
+					             , A.SAL_CLASS		  
+					             , A.CONTRACT_SYMD -- 계약시작일        
+                                 , A.CONTRACT_EYMD  -- 계약종료일  
+							     , A.DISPATCH_ORG_CD
+							     , F_COM_GET_ORG_NM(NVL(A.DISPATCH_ENTER_CD, A.ENTER_CD), A.DISPATCH_ORG_CD, A.ORD_YMD) AS DISPATCH_ORG_NM
+							     , A.DISPATCH_JIKCHAK_CD 
+							     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020', A.DISPATCH_JIKCHAK_CD, #{ssnLocaleCd}) AS DISPATCH_JIKCHAK_NM
+                                 , A.ORD_E_YMD		 -- 발령종료(예정)일 
+                                 , A.PROCESS_NO
+                                 , A.MEMO            -- 비고    
+                                 , A.GEMP_YMD
+                                 , A.EMP_YMD
+                                 
+                                 /* 추가  */   
+                                 , A.ORD_ENTER_CD	-- 전출회사코드				
+							     , F_COM_GET_ENTER_NM2(A.ORD_ENTER_CD, A.ORD_YMD) AS ORD_ENTER_NM	-- 전출회사명	   
+							     , A.RESIGN_REASON_CD	--			퇴직사유코드(H40100)
+								 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H40100',A.RESIGN_REASON_CD, #{ssnLocaleCd}) AS RESIGN_REASON_NM	--			퇴직사유명
+								 , A.RET_PATH_CD		--			이직처코드(H40150)
+								 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H40150',A.RET_PATH_CD, #{ssnLocaleCd}) AS RET_PATH_NM		--			이직처명
+                             
+                                 /* 사용안함 */
+                                 , A.LOCATION_CD 		 -- 근무지          
+                                 , F_COM_GET_MAP_NM(A.ENTER_CD, '600', A.SABUN, A.ORD_YMD, #{ssnLocaleCd}) AS LOCATION_NM
+                                 , NVL(TRIM(F_COM_GET_ORG_NM(A.ENTER_CD,A.WORKORG_CD,A.ORD_YMD, #{ssnLocaleCd})),A.ORG_NM) AS WORKORG_NM
+                                 , JIKGUB_YEAR              
+                                 , MAIN_DEPT_YN                 
+					          FROM THRM191 A
+					         WHERE 1 = 1
+					            AND ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					           AND SABUN    = #{sabun}
+							<if test='searchPreSrchYn != null and searchPreSrchYn eq "N"'>
+					       
+					           <![CDATA[ AND A.ORD_YMD <= LEAST(TO_CHAR(SYSDATE, 'YYYYMMDD'), (SELECT NVL(RET_YMD, '99991231') FROM THRM100 WHERE ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd}) AND SABUN = #{sabun} )) ]]>
+							</if>
+							<if test='mainYn != null and mainYn.equals("Y")'>
+					           AND ( SELECT OT.MAIN_YN FROM TSYS011 OT WHERE OT.ENTER_CD = A.ENTER_CD AND OT.ORD_TYPE_CD = A.ORD_TYPE_CD) = 'Y'
+							</if>
+					          ) X 
+					      ) 
+					ORDER BY ORD_YMD DESC , APPLY_SEQ DESC
+					 
+
+		</select>
+	
+<!-- 인사기본(발령 세부내역) 조회 -->
+		<select id="getPsnalPostPop" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						, A.APPLY_SEQ
+						, A.ORD_TYPE_CD
+						, F_COM_GET_ORD_TYPE_NM(A.ENTER_CD, A.ORD_TYPE_CD) AS ORD_TYPE_NM
+						, A.ORD_DETAIL_CD
+						, F_COM_GET_ORD_DETAIL_NM(A.ENTER_CD, A.ORD_TYPE_CD, A.ORD_DETAIL_CD) AS ORD_DETAIL_NM
+						, A.ORD_YMD
+						, A.ORD_E_YMD
+						, A.SABUN
+						, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+						, A.MANAGE_CD
+						, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10030',A.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+						, A.ORG_CD
+						, F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD,A.ORD_YMD, #{ssnLocaleCd}) AS ORG_NM
+						, A.JOB_CD
+						, F_COM_GET_JOB_NM(A.ENTER_CD,A.JOB_CD,A.ORD_YMD, #{ssnLocaleCd}) AS JOB_NM
+						, A.JIKCHAK_CD
+						, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+						, A.JIKGUB_CD
+						, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+						, A.JIKWEE_CD
+						, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+  		                , A.PAYBAND_CD
+					    , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10120',A.PAYBAND_CD, #{ssnLocaleCd}) AS PAYBAND_NM
+						, A.SAL_CLASS
+						, A.SG_POINT
+						, A.PROCESS_NO
+						, A.ORD_NO
+						, A.EMP_YMD
+						, A.GEMP_YMD
+						, A.RETURN_YMD
+						, NVL(A.MEMO, B.MEMO) AS MEMO
+						, B.MEMO2 AS MEMO2
+					  FROM THRM191 A		-- 발령이력
+					     , THRM221 B		-- 가발령관리
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.SABUN = B.SABUN(+)
+					   AND A.ORD_TYPE_CD = B.ORD_TYPE_CD(+)
+					   AND A.ORD_DETAIL_CD = B.ORD_DETAIL_CD(+)
+					   AND A.ORD_YMD = B.ORD_YMD(+)
+					   AND A.ENTER_CD = NVL( #{enterCd}, #{ssnEnterCd} )
+					   AND A.SABUN = #{sabun}
+					   AND A.ORD_DETAIL_CD = #{ordDetailCd}
+					   AND A.ORD_YMD = #{ordYmd}
+					   AND A.APPLY_SEQ = #{applySeq}
+					   AND B.ORD_YN(+) = '2'
+				]]>
+
+
+		</select>
+	</mapper>

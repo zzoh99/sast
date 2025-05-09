@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.psnalSalaryMasterUser">
+
+    <!-- 개인임금마스터-기본사항-과세정보 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserTaxInfoList">
+        SELECT A.SABUN
+             , A.FOREIGN_YN
+             , A.ABROAD_YN
+             , NVL(A.WOMAN_YN,'N') AS WOMAN_YN
+             , NVL(A.SPOUSE_YN,'N') AS SPOUSE_YN
+             , A.FAMILY_CNT_1
+             , A.FAMILY_CNT_2
+             , A.OLD_CNT_1
+             , A.OLD_CNT_2
+             , A.HANDICAP_CNT
+             , A.CHILD_CNT
+             , A.ADD_CHILD_CNT
+             , NVL(A.SPECIAL_YN,'N') AS SPECIAL_YN
+             , TRIM(TO_CHAR(NVL(A.FAMILY_CNT_1,0) + NVL(A.FAMILY_CNT_2,0) + NVL(A.ADD_CHILD_CNT,0) + DECODE(A.SPOUSE_YN,'Y',1,0) + 1,'999,999,999,990')) AS TOT_CNT
+             , A.SDATE
+             , A.EDATE
+          FROM TCPN101 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+        <if test='isCurrent != null and isCurrent eq "Y"'>
+           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '29991231')
+        </if>
+         ORDER BY A.SDATE DESC
+    </select>
+
+    <!-- 개인임금마스터-기본사항-계좌정보 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserAccountInfoList">
+        SELECT A.SABUN
+             , A.ACCOUNT_TYPE
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'C00180', A.ACCOUNT_TYPE, #{ssnLocaleCd}) AS ACCOUNT_TYPE_NM
+             , A.SDATE
+             , A.EDATE
+             , A.BANK_CD
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H30001', A.BANK_CD, #{ssnLocaleCd}) AS BANK_NM
+             , CRYPTIT.DECRYPT(A.ACCOUNT_NO,#{ssnEnterCd}) AS ACCOUNT_NO
+             , A.ACC_NAME
+             , A.ACC_RES_NO
+             , A.ACC_STATUS_CD
+          FROM TCPN180 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+        <if test='isCurrent != null and isCurrent eq "Y"'>
+           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '29991231')
+        </if>
+        ORDER BY A.ACCOUNT_TYPE, A.SDATE DESC
+    </select>
+
+    <!-- 개인임금마스터-지급/공제내역 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserPayList">
+        SELECT A.SABUN
+             , A.ELEMENT_CD
+             , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}), B.ELEMENT_NM) AS ELEMENT_NM
+             , A.BASIC_MON
+             , A.CURRENCY_CD
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'S10030', A.CURRENCY_CD, #{ssnLocaleCd}) AS CURRENCY_NM
+             , A.MONTH_MON
+             , A.SDATE
+             , A.EDATE
+             , A.NOTE
+          FROM TCPN292 A
+             , TCPN011 B
+         WHERE A.ENTER_CD		= B.ENTER_CD
+           AND A.ELEMENT_CD		= B.ELEMENT_CD
+           AND B.SDATE			= (SELECT MAX(SDATE)
+                                     FROM TCPN011
+                                    WHERE ENTER_CD = A.ENTER_CD
+                                      AND ELEMENT_CD = A.ELEMENT_CD
+                                      AND A.SDATE BETWEEN SDATE AND NVL(EDATE,'99991231') )
+           AND A.ENTER_CD		= #{ssnEnterCd}
+           AND A.SABUN			= #{ssnSabun}
+           AND B.ELEMENT_TYPE	= #{elementType}
+        ORDER BY A.SDATE DESC, B.PRIORITY
+    </select>
+
+    <!-- 개인임금마스터-연봉항목 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserSalaryList">
+        SELECT A.SDATE
+             , A.EDATE
+             , B.ELEMENT_CD
+             , B.ELEMENT_MON
+             , C.ELEMENT_NM
+             , C.PRIORITY
+             , A.BIGO
+          FROM TCPN403 A
+          JOIN TCPN404 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.SABUN = B.SABUN
+           AND A.SDATE = B.SDATE
+          JOIN TCPN011 C
+            ON B.ENTER_CD = C.ENTER_CD
+           AND B.ELEMENT_CD = C.ELEMENT_CD
+          JOIN TCPN402 D
+            ON A.ENTER_CD = D.ENTER_CD
+           AND A.PAY_GROUP_CD = D.PAY_GROUP_CD
+           AND D.ELEMENT_CD = C.ELEMENT_CD
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.SABUN = #{ssnSabun}
+         ORDER BY A.SDATE DESC
+    </select>
+
+    <!-- 개인임금마스터-급여압류-채권현황 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserPayGrnsBondList">
+        SELECT SABUN
+             , ATTATCH_NO
+             , ATTATCH_SYMD
+             , DEBT_CONTENT
+             , BONDER
+             , ATTACH_MON
+             , ATTATCH_STATUS
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'C00020', A.ATTATCH_STATUS, #{ssnLocaleCd}) AS ATTATCH_STATUS_NM
+          FROM TCPN161 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+        ORDER BY A.ATTATCH_NO DESC
+    </select>
+
+    <!-- 개인임금마스터-급여압류-공제현황 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserPayGrnsDedList">
+        SELECT A.SABUN
+             , A.PAY_ACTION_CD
+             , B.PAYMENT_YMD
+             , B.PAY_CD
+             , D.PAY_NM
+             , NVL(C.PAYMENT_MON, 0) AS PAYMENT_MON
+             , NVL(C.ITAX_MON, 0) AS ITAX_MON
+             , NVL(C.RTAX_MON, 0) AS RTAX_MON
+             , NVL(C.NP_EE_MON, 0) AS NP_EE_MON
+             , NVL(C.HI_EE_MON, 0) AS HI_EE_MON
+             , NVL(C.HI_EE_MON2, 0) AS HI_EE_MON2
+             , NVL(C.EI_EE_MON, 0) AS EI_EE_MON
+             , A.MON
+          FROM TCPN162 A
+             , TCPN201 B
+             , TCPN303 C
+             , TCPN051 D
+         WHERE A.ENTER_CD		= B.ENTER_CD
+           AND A.PAY_ACTION_CD	= B.PAY_ACTION_CD
+           AND A.ENTER_CD		= C.ENTER_CD
+           AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+           AND A.SABUN			= C.SABUN
+           AND B.ENTER_CD       = D.ENTER_CD
+           AND B.PAY_CD         = D.PAY_CD
+           AND A.ENTER_CD		= #{ssnEnterCd}
+           AND A.SABUN			= #{ssnSabun}
+         ORDER BY B.PAYMENT_YMD DESC, B.PAY_CD
+    </select>
+
+    <!-- 개인임금마스터-사회보험-현재불입상태 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserInsrStatusList">
+        SELECT '국민연금' AS GUBUN
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+             , TRIM(TO_CHAR(NVL(A.REWARD_TOT_MON,0),'999,999,999,990')) AS REWARD_TOT_MON
+             , F_BEN_INSURENCE_RATE(A.ENTER_CD,'10',A.SDATE) AS RATE
+             , TRIM(TO_CHAR(NVL(F_BEN_NP_SELF_MON(A.ENTER_CD,A.SDATE,A.REWARD_TOT_MON),0),'999,999,999,990')) AS SELF_MON
+          FROM TBEN103 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+           AND A.SDATE		= (SELECT MAX(SDATE)
+                                 FROM TBEN103
+                                WHERE ENTER_CD = A.ENTER_CD
+                                  AND SABUN = A.SABUN)
+        UNION ALL
+        SELECT '건강보험' AS GUBUN
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+             , TRIM(TO_CHAR(NVL(A.REWARD_TOT_MON,0),'999,999,999,990')) AS REWARD_TOT_MON
+             , F_BEN_INSURENCE_RATE(A.ENTER_CD,'15',A.SDATE) AS RATE
+             , TRIM(TO_CHAR(NVL(F_BEN_HI_SELF_MON(A.ENTER_CD,A.SDATE,A.REWARD_TOT_MON),0),'999,999,999,990')) AS SELF_MON
+          FROM TBEN203 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+           AND A.SDATE		= (SELECT MAX(SDATE)
+                                 FROM TBEN203
+                                WHERE ENTER_CD = A.ENTER_CD
+                                  AND SABUN = A.SABUN)
+        UNION ALL
+        SELECT '요양보험료' AS GUBUN
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+             , TRIM(TO_CHAR(NVL(A.REWARD_TOT_MON,0),'999,999,999,990')) AS REWARD_TOT_MON
+             , F_BEN_INSURENCE_RATE(A.ENTER_CD,'15-1',A.SDATE) AS RATE
+             , TRIM(TO_CHAR(NVL(F_BEN_HI_LONGTERMCARE_MON(A.ENTER_CD,A.SDATE,F_BEN_HI_SELF_MON(A.ENTER_CD,A.SDATE,A.REWARD_TOT_MON)),0),'999,999,999,990')) AS SELF_MON
+          FROM TBEN203 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+           AND A.SDATE		= (SELECT MAX(SDATE)
+                                 FROM TBEN203
+                                WHERE ENTER_CD = A.ENTER_CD
+                                  AND SABUN = A.SABUN)
+        UNION ALL
+        SELECT '고용보험료' AS GUBUN
+             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+             , NULL AS REWARD_TOT_MON
+             , NULL AS RATE
+             , NULL AS SELF_MON
+          FROM TBEN303 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+           AND A.SDATE		= (SELECT MAX(SDATE)
+                                 FROM TBEN303
+                                WHERE ENTER_CD = A.ENTER_CD
+                                  AND SABUN = A.SABUN)
+    </select>
+
+    <!-- 개인임금마스터-사회보험-년도별건강/요양보험료정산 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserInsrCalcList">
+        SELECT PAY_YEAR
+             , PAYMENT_YMD
+             , NVL(TOT_EARNING_MON, 0) AS TOT_EARNING_MON
+             , NVL(MON, 0) AS MON
+             , NVL(HI_MON, 0) AS HI_MON
+             , NVL(WORK_CNT, 0) AS WORK_CNT
+             , NVL(MON1 * WORK_CNT, 0) AS MON1
+             , NVL(MON2 * WORK_CNT, 0) AS MON2
+             , NVL(((MON1 * WORK_CNT) + (MON2 * WORK_CNT)), 0) AS MON_TOT
+             , NVL(MON3, 0) AS MON3
+             , NVL(MON4, 0) AS MON4
+             , NVL((MON3 + MON4), 0) AS REAL_TOT
+             , NVL((MON1 * WORK_CNT) - MON3, 0) AS MON5
+             , NVL((MON2 * WORK_CNT) - MON4, 0) AS MON6
+             , NVL((((MON1 * WORK_CNT) - MON3) + ((MON2 * WORK_CNT) - MON4)), 0) AS MON7
+        FROM (
+        SELECT (SUBSTR(A.PAY_YM,1,4) - 1) AS PAY_YEAR
+                                 , A.PAYMENT_YMD
+                                 , NVL((SELECT CURR_TOT_MON
+                                    FROM TCPN841
+                                    WHERE ENTER_CD = B.ENTER_CD
+                                      AND WORK_YY = SUBSTR(A.PAY_YM,1,4)- 1
+                                      AND SABUN = B.SABUN
+                                      AND ADJUST_TYPE = '1'), (SELECT SUM(TOT_EARNING_MON)
+                                                               FROM TCPN303 X , TCPN201 Y
+                                                               WHERE X.ENTER_CD = Y.ENTER_CD
+                                                                 AND X.PAY_ACTION_CD = Y.PAY_ACTION_CD
+                                                                 AND X.ENTER_CD = B.ENTER_CD
+                                                                 AND SUBSTR(Y.PAY_YM,1,4) = SUBSTR(A.PAY_YM,1,4) - 1
+                                                                 AND X.SABUN = B.SABUN
+                                                                 AND Y.PAY_CD = '01'
+                                                               ))
+                                       AS TOT_EARNING_MON
+                                 , (SELECT REWARD_TOT_MON
+                                    FROM TBEN203
+                                    WHERE ENTER_CD = B.ENTER_CD
+                                      AND SABUN = B.SABUN
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+                                   ) AS MON
+                                 , (SELECT NVL(MON4,0) + NVL(MON5,0)
+                                    FROM TBEN203
+                                    WHERE ENTER_CD = B.ENTER_CD
+                                      AND SABUN = B.SABUN
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+                                   ) AS HI_MON
+                                 , F_CPN_SEP_WKP_MTH( CASE WHEN SUBSTR(A.PAY_YM,1,4)- 1||'0101' >= EMP_YMD THEN SUBSTR(A.PAY_YM,1,4)- 1||'0101'
+                                                           ELSE EMP_YMD
+                                                      END,SUBSTR(A.PAY_YM,1,4)- 1||'1231') AS WORK_CNT
+                                 , (SELECT F_BEN_HI_SELF_MON(ENTER_CD,SUBSTR(A.PAY_YM,1,4)- 1||'1231',REWARD_TOT_MON)
+                                    FROM TBEN203
+                                    WHERE ENTER_CD = B.ENTER_CD
+                                      AND SABUN = B.SABUN
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+                                   ) AS MON1
+                                 , (SELECT F_BEN_HI_LONGTERMCARE_MON(ENTER_CD,SUBSTR(A.PAY_YM,1,4)- 1||'1231',F_BEN_HI_SELF_MON(ENTER_CD,SUBSTR(A.PAY_YM,1,4)- 1||'1231',REWARD_TOT_MON))
+                                    FROM TBEN203
+                                    WHERE ENTER_CD = B.ENTER_CD
+                                      AND SABUN = B.SABUN
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+                                   ) AS MON2
+                                 , (SELECT SUM(RESULT_MON)
+                                   FROM TCPN205 X, TCPN201 Y
+                                   WHERE X.ENTER_CD = Y.ENTER_CD
+                                     AND X.PAY_ACTION_CD = Y.PAY_ACTION_CD
+                                     AND X.ENTER_CD = B.ENTER_CD
+                                     AND X.SABUN = B.SABUN
+                                     AND SUBSTR(Y.PAY_YM,1,4) = SUBSTR(A.PAY_YM,1,4) - 1
+                                     AND Y.PAY_CD = '01'
+                                     AND X.ELEMENT_CD = '1020') AS MON3
+                                 , (SELECT SUM(RESULT_MON)
+                                   FROM TCPN205 X, TCPN201 Y
+                                   WHERE X.ENTER_CD = Y.ENTER_CD
+                                     AND X.PAY_ACTION_CD = Y.PAY_ACTION_CD
+                                     AND X.ENTER_CD = B.ENTER_CD
+                                     AND X.SABUN = B.SABUN
+                                     AND SUBSTR(Y.PAY_YM,1,4) = SUBSTR(A.PAY_YM,1,4) - 1
+                                     AND Y.PAY_CD = '01'
+                                     AND X.ELEMENT_CD = '1010') AS MON4
+                              FROM TCPN201 A
+                                 , TCPN303 B
+                             WHERE A.ENTER_CD		= B.ENTER_CD
+                               AND A.PAY_ACTION_CD	= B.PAY_ACTION_CD
+                               AND B.ENTER_CD		= #{ssnEnterCd}
+                               AND B.SABUN			= #{ssnSabun}
+                               AND SUBSTR(A.PAY_YM,5,2) = '04'
+                               AND SUBSTR(A.PAY_YM,1,4) > '2012'  --2012년도 이후부터 보여줌
+                             ORDER BY A.PAYMENT_YMD DESC
+        )
+        ORDER BY PAYMENT_YMD  DESC
+    </select>
+
+    <!-- 개인임금마스터-임금피크-임금피크정보 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPsnalSalaryMasterUserPeakList">
+        SELECT A.SABUN
+             , A.YEAR
+             , A.RATE
+             , A.S_YM
+             , A.E_YM
+             , A.BIGO
+          FROM TCPN126 A
+         WHERE A.ENTER_CD	= #{ssnEnterCd}
+           AND A.SABUN		= #{ssnSabun}
+        ORDER BY A.YEAR
+    </select>
+</mapper>

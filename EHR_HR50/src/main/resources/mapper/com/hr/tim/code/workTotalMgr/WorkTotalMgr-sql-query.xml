@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.workTotalMgr">
+
+<!-- 1 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTotalMgrList">
+
+				<![CDATA[
+			      SELECT WORK_DD_CD , SEARCH_SEQ, FROM_HOUR,  TO_HOUR, SEARCH_DESC
+					FROM (
+					      SELECT ROWNUM AS RNUM, WORK_DD_CD , SEARCH_SEQ , FROM_HOUR,  TO_HOUR, SEARCH_DESC
+					        FROM (
+					            SELECT WORK_DD_CD , A.SEARCH_SEQ , FROM_HOUR,  TO_HOUR, SEARCH_DESC
+					              FROM TTIM019 A, THRI201 B
+					             WHERE A.ENTER_CD			= B.ENTER_CD(+)
+					                    AND A.SEARCH_SEQ	= B.SEARCH_SEQ(+)
+					                AND A.ENTER_CD = #{ssnEnterCd}
+					             ORDER BY WORK_DD_CD, A.SEARCH_SEQ
+					            )
+					   )
+				]]>
+
+
+		</select>
+
+<!-- 2 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTotalMgrUserMgrList">
+
+				<![CDATA[
+				SELECT A.WORK_DD_CD , A.WORK_CD
+				  FROM TTIM020 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				 	AND A.WORK_DD_CD = #{searchWorkDdCd}
+				 ORDER BY WORK_CD
+				]]>
+
+
+		</select>
+
+<!-- 1 저장 -->
+		<update parameterType="map" id="saveWorkTotalMgr">
+
+					MERGE INTO TTIM019 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.WORK_DD_CD
+									, A.FROM_HOUR
+									, A.TO_HOUR
+									, A.SEARCH_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS WORK_DD_CD
+											, NULL		AS FROM_HOUR
+											, NULL		AS TO_HOUR
+											, NULL		AS SEARCH_SEQ
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.workDdCd})	AS WORK_DD_CD
+											, TRIM( #{rm.fromHour})	AS FROM_HOUR
+											, TRIM( #{rm.toHour})		AS TO_HOUR
+											, TRIM( #{rm.searchSeq})	AS SEARCH_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_DD_CD = S.WORK_DD_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.FROM_HOUR	= S.FROM_HOUR
+									, T.TO_HOUR		= S.TO_HOUR
+									, T.SEARCH_SEQ	= S.SEARCH_SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_DD_CD
+							, T.FROM_HOUR
+							, T.TO_HOUR
+							, T.SEARCH_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.WORK_DD_CD
+							, S.FROM_HOUR
+							, S.TO_HOUR
+							, S.SEARCH_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 2 저장 -->
+		<update parameterType="map" id="saveWorkCdUserMgr">
+
+					MERGE INTO TTIM020 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.WORK_DD_CD
+									, A.WORK_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS WORK_DD_CD
+											, NULL		AS WORK_CD
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.workDdCd})	AS WORK_DD_CD
+											, TRIM( #{rm.workCd})		AS WORK_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_DD_CD = S.WORK_DD_CD AND T.WORK_CD = S.WORK_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_DD_CD
+							, T.WORK_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.WORK_DD_CD
+							, S.WORK_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 1 삭제 -->
+		<delete parameterType="map" id="deleteWorkTotalMgr">
+
+					DELETE FROM TTIM019
+					 WHERE (ENTER_CD, WORK_DD_CD) IN ( (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM(#{ssnEnterCd}), TRIM(#{rm.workDdCd}))
+</foreach>
+										)
+		</delete>
+
+<!-- 2 삭제 -->
+		<delete parameterType="map" id="deleteWorkTotalUserMgr">
+
+					DELETE FROM TTIM020
+					 WHERE (ENTER_CD, WORK_DD_CD) IN ( (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM(#{ssnEnterCd}), TRIM( #{rm.workDdCd}))
+</foreach>
+										)
+		</delete>
+
+<!-- 2 삭제 -->
+		<delete parameterType="map" id="deleteWorkCdUserMgr">
+
+					DELETE FROM TTIM020
+					 WHERE (ENTER_CD, WORK_DD_CD, WORK_CD) IN ( (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM(#{ssnEnterCd}), TRIM( #{rm.workDdCd}), TRIM( #{rm.workCd}))
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

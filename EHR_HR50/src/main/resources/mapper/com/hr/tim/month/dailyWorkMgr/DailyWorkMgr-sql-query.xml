@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.month.dailyWorkMgr">
+
+	<!-- 헤더 조회 -->
+		<select parameterType="map" resultType="cMap" id="getDailyWorkMgrHeaderList">
+
+				<![CDATA[
+                SELECT
+                    X.CODE
+                    ,CASE WHEN LENGTH(X.CODE_NM) > 2 THEN SUBSTR(CODE_NM,0,2)||CHR(13)||CHR(10)||SUBSTR(CODE_NM,3) ELSE X.CODE_NM END AS CODE_NM
+                    ,X.SAVE_NAME
+                    ,X.SAVE_NAME_DISP
+                FROM(
+					    SELECT CODE
+							  , (SELECT WORK_NM FROM TTIM015 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_CD = CODE) CODE_NM
+							  , 'WORK_CD_' || ROWNUM SAVE_NAME
+							  , 'workCd'   || ROWNUM SAVE_NAME_DISP
+							FROM (
+							 SELECT DECODE(ROWNUM,1 ,WORK_INPUT_CD1
+												 ,2 ,WORK_INPUT_CD2
+												 ,3 ,WORK_INPUT_CD3
+												 ,4 ,WORK_INPUT_CD4
+												 ,5 ,WORK_INPUT_CD5
+												 ,6 ,WORK_INPUT_CD6
+												 ,7 ,WORK_INPUT_CD7
+												 ,8 ,WORK_INPUT_CD8
+												 ,9 ,WORK_INPUT_CD9
+												 ,10, WORK_INPUT_CD10
+												 ,11, WORK_INPUT_CD11
+												 ,12, WORK_INPUT_CD12
+												 ,13, WORK_INPUT_CD13
+												 ,14, WORK_INPUT_CD14
+												 ,15, WORK_INPUT_CD15
+												 ,16, WORK_INPUT_CD16
+												 ,17, WORK_INPUT_CD17
+												 ,18, WORK_INPUT_CD18
+												 ,19, WORK_INPUT_CD19
+												 ,20, WORK_INPUT_CD20
+												 ) AS CODE
+							   FROM (SELECT WORK_INPUT_CD1
+						                  , WORK_INPUT_CD2
+					                      , WORK_INPUT_CD3
+					                      , WORK_INPUT_CD4
+					                      , WORK_INPUT_CD5
+					                      , WORK_INPUT_CD6
+					                      , WORK_INPUT_CD7
+					                      , WORK_INPUT_CD8
+					                      , WORK_INPUT_CD9
+					                      , WORK_INPUT_CD10
+					                      , WORK_INPUT_CD11
+					                      , WORK_INPUT_CD12
+					                      , WORK_INPUT_CD13
+					                      , WORK_INPUT_CD14
+					                      , WORK_INPUT_CD15
+					                      , WORK_INPUT_CD16
+					                      , WORK_INPUT_CD17
+					                      , WORK_INPUT_CD18
+					                      , WORK_INPUT_CD19
+					                      , WORK_INPUT_CD20
+							           FROM TTIM355
+							          WHERE ENTER_CD = #{ssnEnterCd}
+							            AND WORK_GUBUN_CD   = 'A'
+							           )
+							   CONNECT BY LEVEL <= 20
+						) A, TTIM015 B
+						WHERE A.CODE = B.WORK_CD
+							AND B.ENTER_CD = #{ssnEnterCd}
+							AND A.CODE IS NOT NULL
+                ) X
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getDailyWorkMgrCntMap">
+
+				<![CDATA[
+				SELECT COUNT(1) AS CNT
+				  FROM (
+            	SELECT
+            	     A.YMD
+			         , D.WORK_SHM
+			         , D.WORK_EHM
+			         , B.IN_HM
+			         , CASE WHEN D.WORKDAY_STD = '-1' THEN TO_CHAR(TO_DATE(A.YMD, 'YYYYMMDD')-1, 'YYYYMMDD') ELSE  A.YMD END AS CHK_YMD
+			         , D.WORK_YN
+			         , B.MEMO
+			         , ( SELECT HOLIDAY_NM FROM TTIM001 WHERE ENTER_CD = A.ENTER_CD AND YY || MM || DD = A.YMD AND BUSINESS_PLACE_CD = E.BUSINESS_PLACE_CD) AS HOLIDAY_NM
+				  FROM (SELECT A1.ENTER_CD, A1.SABUN, A1.NAME, A2.SUN_DATE AS YMD, A2.DAY_NM
+				             , B.STATUS_CD, B.JIKGUB_NM, B.JIKWEE_NM,  B.JIKCHAK_NM, B.MANAGE_NM, B.SDATE, B.ORG_CD, B.WORK_TYPE_NM, B.PAY_TYPE_NM
+						  FROM THRM100 A1, TSYS007 A2
+		                      , THRM151 B
+						 WHERE A2.SUN_DATE BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+		                   AND A1.ENTER_CD = TRIM( #{ssnEnterCd} )
+		                   AND A1.ENTER_CD = B.ENTER_CD
+		                   AND A1.SABUN    = B.SABUN
+		                   AND A2.SUN_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+]]>
+						<if test='searchSabun != null and !searchSabun.equals("")'>
+						    AND A1.SABUN || A1.NAME LIKE '%'|| #{searchSabun} ||'%'
+						</if>
+
+						<if test='searchJikweeCd != null and !searchJikweeCd.equals("")'>
+							AND B.JIKWEE_CD = #{searchJikweeCd}
+						</if>
+						<if test='searchManageCd != null and !searchManageCd.equals("")'>
+							AND B.MANAGE_CD = #{searchManageCd}
+						</if>
+						<if test='searchWorkType != null and !searchWorkType.equals("")'>
+							AND B.WORK_TYPE = #{searchWorkType}
+						</if>
+
+						<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+		                   AND B.ORG_CD IN (SELECT #{searchOrgCd}
+                                              FROM DUAL
+
+							<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+                                              <![CDATA[
+                                            UNION
+                                            SELECT ORG_CD
+                                              FROM TORG105
+                                             WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                               AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','') )
+                                             START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+                                                      ]]>
+							</if>
+											)
+						</if>
+						<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+
+		                   AND B.ORG_CD IN (SELECT SCOPE_VALUE
+											  FROM TSYS319
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											 AND GRP_CD  = #{ssnGrpCd}
+											 AND AUTH_SCOPE_CD = 'W10'
+											 AND SABUN = #{ssnSabun}
+
+
+							<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+				  <![CDATA[
+                                            UNION
+                                            SELECT ORG_CD
+                                              FROM TORG105
+                                             WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                               AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','') )
+                                             START WITH PRIOR_ORG_CD   in (SELECT SCOPE_VALUE FROM TSYS319 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+																			 AND GRP_CD  = #{ssnGrpCd}
+																			 AND AUTH_SCOPE_CD = 'W10'
+																			 AND SABUN = #{ssnSabun})
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+				  ]]>
+							</if>
+											)
+						</if>
+
+						 ) A
+					 , TTIM335 B, TTIM120_V C, TTIM017 D
+                     , BP_V E
+					, TORG101 G
+				 WHERE A.ENTER_CD = B.ENTER_CD(+)
+			       AND A.SABUN    = B.SABUN(+)
+			       AND A.YMD      = B.YMD(+)
+			       AND A.ENTER_CD = C.ENTER_CD(+)
+			       AND A.YMD      = C.YMD(+)
+			       AND A.SABUN    = C.SABUN(+)
+			       AND C.ENTER_CD = D.ENTER_CD
+			       AND C.TIME_CD  = D.TIME_CD
+			       AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+		           AND A.ENTER_CD = G.ENTER_CD
+                   AND A.ORG_CD = G.ORG_CD
+                   AND A.YMD BETWEEN G.SDATE AND NVL(G.EDATE, '99992131')
+                   AND A.ENTER_CD = E.ENTER_CD (+)
+                   AND A.SABUN    = E.SABUN    (+)
+                   AND A.YMD BETWEEN E.SDATE(+) AND NVL(E.EDATE(+), '99991231')
+				<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+                   AND E.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+				</if>
+				<if test='searchSabun != null and !searchSabun.equals("")'>
+				    AND A.SABUN || A.NAME LIKE '%'|| #{searchSabun} ||'%'
+				</if>
+				<if test='searchWorkOrgCd != null and !searchWorkOrgCd.equals("")'>
+                   AND C.WORK_ORG_CD = #{searchWorkOrgCd}
+				</if>
+				<if test='searchTimeCheck and searchTimeCheck.equals("Y")'>
+			       AND (CASE WHEN D.WORK_YN = 'N' AND B.IN_HM IS NULL AND B.OUT_HM IS NULL THEN '1' ELSE '0' END) = '1'     /*TimeCard누락자 (체크되어 있으면 1, 없으면 %*/
+				</if>
+				<if test='searchNotWorkerCheck and searchNotWorkerCheck.equals("Y")'>
+				   <![CDATA[
+					AND NOT EXISTS ( SELECT Z.SABUN
+	               					   FROM TTIM309 Z
+									  WHERE Z.ENTER_CD = A.ENTER_CD
+									    AND Z.SABUN    = A.SABUN
+									    AND ( ( NVL(Z.EDATE, '99992131') >= REPLACE(#{searchEymd},'-','') AND Z.SDATE <= REPLACE(#{searchEymd},'-',''))
+									        OR (NVL(Z.EDATE, '99992131') BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-',''))
+				                 		)
+             						)
+             						]]>
+				</if>
+
+			       ) A
+			       WHERE  1=1
+				<if test='searchLateCheck and searchLateCheck.equals("Y")'>
+			       <![CDATA[
+			         AND WORK_SHM IS NOT NULL
+			         AND IN_HM      IS NOT NULL
+			         AND CHK_YMD || WORK_EHM < YMD || IN_HM
+			         AND NVL(D.WORK_YN, 'N') = 'N'
+			           ]]>
+				</if>
+				<if test='searchHolyday and searchHolyday.equals("Y")'>
+				     AND A.HOLIDAY_NM IS NULL
+				     AND TO_CHAR(TO_DATE(A.YMD,'YYYYMMDD'),'D') NOT IN ('1', '7')
+				</if>
+		</select>
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getDailyWorkMgrList">
+
+				<![CDATA[
+		SELECT A.*
+                    , A.TEMP_DAY_NM AS DAY_NM
+                    , A.WORK_YN AS HOL_YN
+                    , NVL((CASE WHEN HOLIDAY_NM IS NULL AND A.WORK_YN = 'Y' THEN '휴일' ELSE HOLIDAY_NM END),'평일') AS DAY_DIV
+                    , (CASE WHEN HOLIDAY_NM IS NOT NULL OR A.WORK_YN = 'Y' THEN '#ef519c' ELSE '' END) AS DAY_NM_FONT_COLOR
+                    , (CASE WHEN HOLIDAY_NM IS NOT NULL OR A.WORK_YN = 'Y' THEN '#ef519c' ELSE '' END) AS DAY_DIV_FONT_COLOR
+                    , (CASE WHEN HOLIDAY_NM IS NOT NULL OR A.WORK_YN = 'Y' THEN '#ef519c' ELSE '' END) AS YMD_FONT_COLOR
+                    , DECODE( A.CLOSE_YN, 'Y', 0, 1 ) AS ROW_EDIT
+                    , '1' AS CLOSE_YN_EDIT  	 
+		 FROM (
+            	SELECT RANK()OVER(ORDER BY  F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.YMD), A.YMD) AS RK 
+            	   ,  A.ENTER_CD 
+		           , F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD, A.YMD, #{ssnLocaleCd}) AS ORG_NM
+		           , A.SABUN
+		           , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,#{ssnLocaleCd}) AS NAME
+		           , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+		           , A.JIKGUB_NM
+		           , A.JIKWEE_NM
+		           , A.JIKCHAK_NM
+		           , A.MANAGE_NM
+                   , A.WORK_TYPE
+		           , A.WORK_TYPE_NM
+		           , A.PAY_TYPE_NM
+		           , A.PAY_TYPE
+		           , A.YMD
+		           , A.LOCATION_CD
+		           , C.TIME_CD
+		           , C.WORK_ORG_CD
+		           , C.WORK_YN
+                   , F_TIM_GET_DAY_GNT_NM(A.ENTER_CD, A.SABUN, A.YMD) AS GNT_CD
+                   , B.APPL_YN
+		           , B.IN_HM
+		           , B.OUT_HM
+				   , (SELECT IN_HM FROM  TTIM330 WHERE ENTER_CD = A.ENTER_CD AND YMD = A.YMD AND SABUN = A.SABUN ) AS TC_IN_HM
+				   , (SELECT OUT_HM FROM TTIM330 WHERE ENTER_CD = A.ENTER_CD AND YMD = A.YMD AND SABUN = A.SABUN ) AS TC_OUT_HM
+				   , (SELECT IN_HM FROM  TTIM730 WHERE ENTER_CD = A.ENTER_CD AND YMD = A.YMD AND SABUN = A.SABUN ) AS EHR_IN_HM
+				   , (SELECT OUT_HM FROM TTIM730 WHERE ENTER_CD = A.ENTER_CD AND YMD = A.YMD AND SABUN = A.SABUN ) AS EHR_OUT_HM
+		           , B.MEMO
+		           , B.MEMO2
+		           , TO_CHAR(B.CHKDATE,'YYYY-MM-DD HH24:MI') AS CHKDATE
+                   , B.CHKID
+                   , F_COM_GET_NAMES(B.ENTER_CD,B.CHKID,#{ssnLocaleCd},TO_CHAR(SYSDATE, 'YYYYMMDD')) CHKNM
+				   , (CASE WHEN B.IN_HM IS NOT NULL AND B.OUT_HM IS NOT NULL THEN F_TIM_GET_WORK_TERM_TIME(A.ENTER_CD,A.SABUN,A.YMD,B.IN_HM,B.OUT_HM) ELSE NULL END) AS WORK_TIME
+                   , F_TIM_WORK_HM_TEXT(A.ENTER_CD,A.SABUN,A.YMD) AS REAL_WORK_TIME
+		           , D.WORKDAY_STD
+		           , D.WORK_SHM
+		           , D.WORK_EHM
+		           , C.BUSINESS_PLACE_CD
+                   , ( SELECT HOLIDAY_NM FROM TTIM001 WHERE ENTER_CD = A.ENTER_CD AND YY || MM || DD = A.YMD AND BUSINESS_PLACE_CD = C.BUSINESS_PLACE_CD) AS HOLIDAY_NM
+                   , A.DAY_NM AS TEMP_DAY_NM
+		           , CASE WHEN D.WORKDAY_STD = '-1' THEN TO_CHAR(TO_DATE(A.YMD, 'YYYYMMDD')-1, 'YYYYMMDD') ELSE  A.YMD END AS CHK_YMD
+		           , (CASE WHEN D.WORK_YN = 'N' AND B.IN_HM IS NULL AND B.OUT_HM IS NULL THEN '1' ELSE '0' END) TIME_CARD_FLAG
+					, B.UPDATE_YN
+					, B.CLOSE_YN
+					      ]]>
+                 <foreach item="rtitles" collection="titles" >
+            	     <![CDATA[
+				    , (SELECT LPAD(NVL(X.WORK_HH,0),2,0)||LPAD(NVL(X.WORK_MM,0),2,0) 
+				         FROM TTIM337 X 
+				        WHERE X.ENTER_CD = B.ENTER_CD 
+				          AND X.YMD      = B.YMD 
+				          AND X.SABUN    = B.SABUN 
+			              AND ( NVL(X.WORK_HH,0)> 0 OR NVL(X.WORK_MM,0)> 0 ) 
+				          AND X.WORK_CD  = #{rtitles.code}) AS "${rtitles.saveName}"
+				          ]]>
+				 </foreach>
+				  FROM (SELECT A1.ENTER_CD
+				  			 , A1.SABUN
+				  			 , A1.NAME
+				  			 , A2.SUN_DATE AS YMD
+				  			 , A2.DAY_NM
+				             , B.STATUS_CD
+				             , B.JIKGUB_NM
+				             , B.JIKWEE_NM
+				             , B.JIKCHAK_NM
+				             , B.MANAGE_NM
+				             , B.SDATE
+				             , B.ORG_CD
+                             , B.WORK_TYPE
+				             , B.WORK_TYPE_NM
+				             , B.PAY_TYPE_NM
+				             , B.PAY_TYPE
+				             , B.LOCATION_CD
+						  FROM THRM100 A1, THRM151 B, TSYS007 A2
+						 WHERE A2.SUN_DATE BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+		                   AND A1.ENTER_CD = TRIM( #{ssnEnterCd} )
+		                   AND A1.ENTER_CD = B.ENTER_CD
+		                   AND A1.SABUN    = B.SABUN
+		                   AND A2.SUN_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+						   AND (A1.SABUN = TRIM( #{searchSabunName} ) OR A1.NAME LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchJikweeCd != null and !searchJikweeCd.equals("")'>
+						   AND B.JIKWEE_CD = #{searchJikweeCd}
+</if>
+<if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+						   AND B.JIKGUB_CD = #{searchJikgubCd}
+</if>
+<if test='searchManageCd != null and !searchManageCd.equals("")'>
+						   AND B.MANAGE_CD = #{searchManageCd}
+</if>
+<if test='searchWorkType != null and !searchWorkType.equals("")'>
+						   AND B.WORK_TYPE = #{searchWorkType}
+</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+						   AND B.LOCATION_CD = #{searchLocationCd}
+</if>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+		                   AND B.ORG_CD IN (SELECT #{searchOrgCd}
+                                              FROM DUAL
+
+		<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+                                              <![CDATA[
+                                            UNION
+                                            SELECT ORG_CD
+                                              FROM TORG105
+                                             WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                               AND SDATE    = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','') )
+                                             START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+                                                 ]]>
+		</if>
+											)
+</if>
+<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+
+		                   AND B.ORG_CD IN (SELECT SCOPE_VALUE
+											  FROM TSYS319
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											 AND GRP_CD  = #{ssnGrpCd}
+											 AND AUTH_SCOPE_CD = 'W10'
+											 AND SABUN = #{ssnSabun}
+	<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+				  <![CDATA[
+                                            UNION
+                                            SELECT ORG_CD
+                                              FROM TORG105
+                                             WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                               AND SDATE    = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','') )
+                                             START WITH PRIOR_ORG_CD   in (SELECT SCOPE_VALUE FROM TSYS319 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+																			 AND GRP_CD  = #{ssnGrpCd}
+																			 AND AUTH_SCOPE_CD = 'W10'
+																			 AND SABUN = #{ssnSabun})
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+				  ]]>
+	</if>
+											)
+</if>
+
+						 ) A
+					 , TTIM017 D
+					 , TTIM335 B
+					 , TTIM120_V C
+				 WHERE 1 = 1
+
+			       AND C.ENTER_CD = TRIM( #{ssnEnterCd} )
+			       AND C.YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+			       AND A.ENTER_CD = C.ENTER_CD
+			       AND A.YMD      = C.YMD
+			       AND A.SABUN    = C.SABUN
+			       
+			       AND C.ENTER_CD = D.ENTER_CD(+)
+			       AND C.TIME_CD  = D.TIME_CD(+)
+			       			       
+				   AND A.ENTER_CD = B.ENTER_CD(+)
+			       AND A.SABUN    = B.SABUN(+)
+			       AND A.YMD      = B.YMD(+)
+
+<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+                   AND C.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+</if>
+<if test='searchWorkOrgCd != null and !searchWorkOrgCd.equals("")'>
+                   AND C.WORK_ORG_CD = #{searchWorkOrgCd}
+</if>
+<if test=' searchWorkGrpCd != null and !searchWorkGrpCd.equals("")'>
+				   AND C.WORK_GRP_CD = #{searchWorkGrpCd}
+</if>
+<if test='searchTimeCheck and searchTimeCheck.equals("Y")'>
+			       AND (CASE WHEN D.WORK_YN = 'N' AND B.IN_HM IS NULL AND B.OUT_HM IS NULL THEN '1' ELSE '0' END) = '1'     /*TimeCard누락자 (체크되어 있으면 1, 없으면 %*/
+</if>
+
+<if test='searchNotWorkerCheck and searchNotWorkerCheck.equals("Y")'>
+				   <![CDATA[
+					AND NOT EXISTS ( SELECT 1
+	               					   FROM TTIM309 Z
+									  WHERE Z.ENTER_CD = A.ENTER_CD
+									    AND Z.SABUN    = A.SABUN
+									    AND C.YMD BETWEEN Z.SDATE AND NVL(Z.EDATE, '99992131')
+             						)
+					            ]]>
+</if>
+
+			       ) A
+			       WHERE  1=1
+<if test='searchLateCheck and searchLateCheck.equals("Y")'>
+			       <![CDATA[
+			         AND WORK_SHM IS NOT NULL
+			         AND IN_HM      IS NOT NULL
+			         AND CHK_YMD || WORK_SHM < YMD || IN_HM
+			         AND NVL(WORK_YN, 'N') = 'N'
+			           ]]>
+</if>
+
+<if test='searchHolyday and searchHolyday.equals("Y")'>
+					/* 휴일제외 */
+				     AND F_TIM_GET_HOLIDAY_CNT( A.ENTER_CD , A.SABUN, TRIM( 'HOLCHK' ), A.YMD, A.YMD ) = 0
+</if>
+<if test='searchNotGntCdCheck and searchNotGntCdCheck.equals("Y")'>
+					/* 근태제외 */
+					 AND TRIM(A.GNT_CD) IS NULL
+</if>
+				   /* ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.YMD), A.YMD */
+
+
+		</select>
+		
+		
+		<select parameterType="map" resultType="cMap" id="getDailyWorkMgrTimeList">
+
+				SELECT ' ' AS SAVE_NAME, ' ' AS COL_VALUE, ' ' AS CODE
+                  FROM DUAL
+<foreach item="rtitles" collection="titles" >
+				UNION
+				SELECT #{rtitles.saveNameDisp}
+                 	, F_TIM_WORK_INFO_TEMP(#{ssnEnterCd}, #{searchSabun}, REPLACE(#{ymd},'-',''), #{shm}, #{ehm}, #{rtitles.code})
+                    , #{rtitles.code} AS CODE
+                  FROM DUAL
+</foreach>
+
+
+
+		</select>
+		
+<!-- 		저장 -->
+<update parameterType="map" id="saveOtWorkAppDet335">
+
+					MERGE INTO TTIM335 T
+					USING	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+							SELECT    #{ssnEnterCd}					AS ENTER_CD
+									, TRIM(#{rm.ymd})				AS YMD
+									, TRIM(#{rm.sabun})				AS SABUN
+									, TRIM(#{rm.gntCd})				AS GNT_CD
+									, TRIM(#{rm.inHm})				AS IN_HM
+									, TRIM(#{rm.outHm})				AS OUT_HM
+									, TRIM(#{rm.memo})				AS MEMO
+									, NVL(TRIM(#{rm.holYn}), (SELECT WORK_YN FROM TTIM120_V WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun}) AND YMD = TRIM(#{rm.ymd}))) AS HOL_YN
+									, TRIM(#{rm.updateYn})          AS UPDATE_YN
+									, TRIM(#{rm.memo2})				AS MEMO2
+									, TRIM(#{rm.closeYn})			AS CLOSE_YN
+									, TRIM(#{rm.timeCd})			AS TIME_CD
+							 FROM   DUAL
+</foreach>
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.YMD          = S.YMD
+					AND  T.SABUN        = S.SABUN
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.IN_HM		= S.IN_HM
+									, T.OUT_HM		= S.OUT_HM
+									, T.MEMO 		= S.MEMO
+									, T.HOL_YN 		= S.HOL_YN
+									, T.UPDATE_YN	= S.UPDATE_YN
+									, T.MEMO2		= S.MEMO2
+									, T.CLOSE_YN	= S.CLOSE_YN
+									, T.TIME_CD		= S.TIME_CD
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YMD
+							, T.SABUN
+							, T.IN_HM
+							, T.OUT_HM
+							, T.MEMO
+							, T.HOL_YN
+							, T.UPDATE_YN
+							, T.MEMO2
+							, T.CLOSE_YN
+							, T.TIME_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YMD
+							, S.SABUN
+							, S.IN_HM
+							, S.OUT_HM
+							, S.MEMO
+							, S.HOL_YN
+							, S.UPDATE_YN
+							, S.MEMO2
+							, S.CLOSE_YN
+							, S.TIME_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+</update>
+
+		<update parameterType="map" id="saveOtWorkAppDet337">
+
+					MERGE INTO TTIM337 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.YMD
+									, A.SABUN
+									, A.WORK_CD
+									, A.WORK_HH
+									, A.WORK_MM
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS YMD
+											, NULL		AS SABUN
+											, NULL		AS WORK_CD
+											, NULL		AS WORK_HH
+											, NULL		AS WORK_MM
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows337" >
+							UNION ALL
+									SELECT    #{ssnEnterCd}					AS ENTER_CD
+											, TRIM(#{rm.ymd})				AS YMD
+											, TRIM(#{rm.sabun})				AS SABUN
+											, TRIM(#{rm.workCd})			AS WORK_CD
+											, TRIM(#{rm.workHh})			AS WORK_HH
+											, TRIM(#{rm.workMm})			AS WORK_MM
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.WORK_CD  IS NOT NULL
+										  AND A.WORK_HH  IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.YMD          = S.YMD
+					AND  T.SABUN        = S.SABUN
+					AND  T.WORK_CD      = S.WORK_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.WORK_HH		= S.WORK_HH
+									, T.WORK_MM		= S.WORK_MM
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YMD
+							, T.SABUN
+							, T.WORK_CD
+							, T.WORK_HH
+							, T.WORK_MM
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YMD
+							, S.SABUN
+							, S.WORK_CD
+							, S.WORK_HH
+							, S.WORK_MM
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<delete parameterType="map" id="deleteOtWorkAppDet335">
+
+				<![CDATA[
+					DELETE FROM TTIM335
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND YMD      = TRIM(#{ymd})
+					   AND SABUN    = TRIM(#{sabun})
+				]]>
+
+
+		</delete>
+		<delete parameterType="map" id="deleteOtWorkAppDet337">
+
+				<![CDATA[
+					DELETE FROM TTIM337
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND YMD      = TRIM(#{ymd})
+					   AND SABUN    = TRIM(#{sabun})
+				]]>
+
+		</delete>
+
+</mapper>

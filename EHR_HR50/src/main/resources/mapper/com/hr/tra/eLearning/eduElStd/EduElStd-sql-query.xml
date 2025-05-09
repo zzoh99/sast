@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.eLearning.eduElStd">
+<!-- 이러닝신청기간 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduElStdList">
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.YM
+					     , A.SDATE
+					     , A.EDATE
+					     , A.APP_CNT
+					     , A.NOTE
+					  FROM TTRA250 A 
+                     WHERE A.ENTER_CD =	#{ssnEnterCd}
+				       AND A.YM LIKE TRIM(#{searchYear}) || '%'
+				     ORDER BY A.YM
+				]]>
+		</select>
+
+
+		<!-- 이러닝 신청건수 예외자 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduElStdEmpList">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+						 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+						 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+						 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS JIKCHAK_NM
+						 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS JIKWEE_NM
+						 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS JIKGUB_NM
+						 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS WORKTYPE_NM
+					     , A.SDATE
+					     , A.EDATE
+					     , A.APP_CNT
+					     , A.NOTE
+					  FROM TTRA251 A 
+                     WHERE A.ENTER_CD =	#{ssnEnterCd}
+				     ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+				]]>
+		</select>
+		
+<!-- 이러닝신청항목 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduElStdItemList">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GRCODE_CD
+					     , A.CODE
+					     , A.CODE_NM
+					     , A.USE_YN
+					     , A.NOTE1
+					     , A.NOTE2
+						 , A.CODE_IDX
+						 , A.S_YMD AS SDATE
+						 , A.E_YMD AS EDATE
+					  FROM TSYS005 A 
+                     WHERE A.ENTER_CD =	#{ssnEnterCd}
+				       AND A.GRCODE_CD = 'L50110'
+				     ORDER BY A.CODE
+				]]>
+		</select>
+		
+<!-- 이러닝신청세부항목 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduElStdItemDtlList">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GRCODE_CD
+					     , A.CODE
+					     , A.CODE_NM
+					     , A.NOTE1
+					     , A.NOTE2
+					     , A.NOTE3
+						 , A.CODE_IDX
+						 , A.S_YMD AS SDATE
+						 , A.E_YMD AS EDATE
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'L50110' , TRIM(A.NOTE1), #{ssnLocaleCd}) AS ITEM_NM
+					  FROM TSYS005 A 
+                     WHERE A.ENTER_CD =	#{ssnEnterCd}
+				       AND A.GRCODE_CD = 'L50120'
+				       AND A.NOTE1 = TRIM(#{searchItemCd})
+				     ORDER BY A.CODE_NM
+				]]>
+		</select>
+		
+<!-- 이러닝신청기간 저장 -->
+		<update parameterType="map" id="saveEduElStdDate">
+				 MERGE INTO TTRA250 T 
+				 USING (  
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				       SELECT TRIM(#{ssnEnterCd}) 	AS ENTER_CD 
+				            , TRIM(#{rm.ym}) 		AS YM
+				            , TRIM(#{rm.sdate}) 	AS SDATE
+				            , TRIM(#{rm.edate}) 	AS EDATE
+				            , TRIM(#{rm.appCnt}) 	AS APP_CNT
+				            , TRIM(#{rm.note}) 	AS NOTE
+				        FROM DUAL
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.YM 			= S.YM 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE		= sysdate 
+				            , T.CHKID	    = #{ssnSabun} 
+				            , T.SDATE 		= S.SDATE 
+				            , T.EDATE 		= S.EDATE 
+				            , T.APP_CNT 	= S.APP_CNT 
+				            , T.NOTE 		= S.NOTE 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.YM
+				            , T.SDATE
+				            , T.EDATE
+				            , T.APP_CNT
+				            , T.NOTE
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.YM
+				            , S.SDATE
+				            , S.EDATE
+				            , S.APP_CNT
+				            , S.NOTE
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+
+<!-- 이러닝 예외자저장 -->
+		<update parameterType="map" id="saveEduElStdEmp">
+				 MERGE INTO TTRA251 T 
+				 USING 
+				( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				       SELECT TRIM(#{ssnEnterCd}) 	AS ENTER_CD 
+				            , TRIM(#{rm.sabun}) 	AS SABUN
+				            , TRIM(#{rm.sdate}) 	AS SDATE
+				            , TRIM(#{rm.edate}) 	AS EDATE
+				            , TRIM(#{rm.appCnt}) 	AS APP_CNT
+				            , TRIM(#{rm.note}) 		AS NOTE
+				        FROM DUAL
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.SABUN 		= S.SABUN 
+				     AND  T.SDATE 		= S.SDATE 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE		= sysdate 
+				            , T.CHKID	    = #{ssnSabun} 
+				            , T.EDATE 		= S.EDATE 
+				            , T.APP_CNT 	= S.APP_CNT 
+				            , T.NOTE 		= S.NOTE 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.SABUN
+				            , T.SDATE
+				            , T.EDATE
+				            , T.APP_CNT
+				            , T.NOTE
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.SABUN
+				            , S.SDATE
+				            , S.EDATE
+				            , S.APP_CNT
+				            , S.NOTE
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+
+<!-- 이러닝 신청항목 저장  -->
+		<update parameterType="map" id="saveEduElStdItem">
+				 MERGE INTO TSYS005 T 
+				 USING 
+				( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				       SELECT TRIM(#{ssnEnterCd}) 	AS ENTER_CD 
+				            , 'L50110' 				AS GRCODE_CD
+				            , TRIM(#{rm.code}) 		AS CODE
+				            , TRIM(#{rm.codeNm}) 	AS CODE_NM
+							, TO_NUMBER(TRIM(#{rm.codeIdx}))  AS CODE_IDX
+				            , TRIM(#{rm.useYn}) 	AS USE_YN
+				            , TRIM(#{rm.note1}) 	AS NOTE1
+				            , TRIM(#{rm.note2}) 	AS NOTE2
+							, TRIM(#{rm.sdate})		AS S_YMD
+							, TRIM(#{rm.edate})		AS E_YMD
+				        FROM DUAL
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.GRCODE_CD 	= S.GRCODE_CD 
+				     AND  T.CODE 		= S.CODE
+					 AND T.CODE_IDX	= S.CODE_IDX
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE		= sysdate 
+				            , T.CHKID	    = #{ssnSabun} 
+				            , T.CODE_NM 	= S.CODE_NM 
+				            , T.NOTE1 		= S.NOTE1 
+				            , T.NOTE2 		= S.NOTE2
+							, T.S_YMD		= S.S_YMD
+							, T.E_YMD		= S.E_YMD
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.GRCODE_CD
+				            , T.CODE
+				            , T.CODE_NM
+							, T.CODE_IDX
+				            , T.USE_YN
+				            , T.NOTE1
+				            , T.NOTE2
+							, T.S_YMD
+							, T.E_YMD
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.GRCODE_CD
+				            , S.CODE
+				            , S.CODE_NM
+							, S.CODE_IDX
+				            , S.USE_YN
+				            , S.NOTE1
+				            , S.NOTE2
+							, S.S_YMD
+							, S.E_YMD
+				            , sysdate
+				            , #{ssnSabun}
+				   )
+	</update>
+
+<!-- 이러닝 신청세부항목 저장  -->
+		<update parameterType="map" id="saveEduElStdItemDtl">
+				 MERGE INTO TSYS005 T 
+				 USING 
+				(
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " index="idx">
+				       SELECT TRIM(#{ssnEnterCd}) 	AS ENTER_CD 
+				            , 'L50120' 				AS GRCODE_CD
+<choose>
+	<when test="rm.code != null and rm.code neq ''">
+							, TRIM(#{rm.code}) 		AS CODE
+	</when>
+	<otherwise>
+							, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(CODE)),0) + (#{idx} + 1 )) FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'L50120' ))  AS CODE
+	</otherwise>
+</choose>
+				            , TRIM(#{rm.codeNm}) 	AS CODE_NM
+							, TO_NUMBER(TRIM(#{rm.codeIdx}))  AS CODE_IDX
+				            , TRIM(#{rm.note1}) 	AS NOTE1
+				            , TRIM(#{rm.note2}) 	AS NOTE2
+				            , TRIM(#{rm.note3}) 	AS NOTE3
+							, TRIM(#{rm.sdate})		AS S_YMD
+							, TRIM(#{rm.edate})		AS E_YMD
+				        FROM DUAL
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.GRCODE_CD 	= S.GRCODE_CD 
+				     AND  T.CODE 		= S.CODE
+				     AND T.CODE_IDX	= S.CODE_IDX
+				) 
+				WHEN MATCHED THEN 	
+				   UPDATE SET T.CHKDATE		= sysdate 
+				            , T.CHKID	    = #{ssnSabun} 
+				            , T.CODE_NM 	= S.CODE_NM 
+				            , T.NOTE1 		= S.NOTE1 
+				            , T.NOTE2 		= S.NOTE2 
+				            , T.NOTE3 		= S.NOTE3
+							, T.S_YMD		= S.S_YMD
+							, T.E_YMD		= S.E_YMD
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.GRCODE_CD
+				            , T.CODE
+				            , T.CODE_NM
+							, T.CODE_IDX
+				            , T.NOTE1
+				            , T.NOTE2
+				            , T.NOTE3
+							, T.S_YMD
+							, T.E_YMD
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.GRCODE_CD
+				            , S.CODE
+							, S.CODE_NM
+							, S.CODE_IDX
+				            , S.NOTE1
+				            , S.NOTE2
+				            , S.NOTE3
+							, S.S_YMD
+							, S.E_YMD
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+		
+<!-- 이러닝신청기간 삭제 -->				
+		<delete parameterType="map" id="deleteEduElStdDate">
+				DELETE FROM TTRA250
+				 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+				   AND ( YM ) IN ( ( NULL) 
+<foreach item="rm" collection="deleteRows"> 
+    <if test="rm.ym != null and rm.ym neq ''">
+				     , ( TRIM( #{rm.ym} ) ) 
+    </if>
+</foreach>
+				       )
+		</delete>
+
+<!-- 이러닝 예외자 삭제 -->				
+		<delete parameterType="map" id="deleteEduElStdEmp">
+				DELETE FROM TTRA251
+				 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+				   AND ( SABUN,SDATE ) IN ( ( NULL,NULL) 
+<foreach item="rm" collection="deleteRows"> 
+    <if test="rm.sabun != null and rm.sabun neq '' and rm.sdate != null and rm.sdate neq ''">
+				     , ( TRIM( #{rm.sabun} ),TRIM( #{rm.sdate} ) ) 
+    </if>
+</foreach>
+				       )
+		</delete>
+
+<!-- 이러닝 신청항목 삭제 -->				
+		<delete parameterType="map" id="deleteEduElStdItem">
+
+			DELETE FROM TSYS005
+			WHERE  (ENTER_CD,GRCODE_CD,CODE, CODE_IDX) IN 	(  (NULL,NULL,NULL,NULL)
+			<foreach item="rm" collection="deleteRows" >
+				<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.code != null and !rm.code.equals("")'>
+					,(TRIM( #{ssnEnterCd} ),TRIM( 'L50110' ),TRIM( #{rm.code} ), TO_NUMBER(TRIM(#{rm.codeIdx})))
+				</if>
+			</foreach>
+			)
+
+		</delete>
+				       
+
+<!-- 이러닝 신청항목 삭제 -->				
+		<delete parameterType="map" id="deleteEduElStdItemDtl">
+			DELETE FROM TSYS005
+			WHERE  (ENTER_CD,GRCODE_CD,CODE, CODE_IDX) IN 	(  (NULL,NULL,NULL,NULL)
+			<foreach item="rm" collection="deleteRows" >
+				<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.code != null and !rm.code.equals("")'>
+					,(TRIM( #{ssnEnterCd} ),TRIM( 'L50120' ),TRIM( #{rm.code} ), TO_NUMBER(TRIM(#{rm.codeIdx})))
+				</if>
+			</foreach>
+			)
+		</delete>
+		
+		
+<!-- 신청기간생성 -->
+		<update id="prcEduElStd" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_TRA_E_LEARN_DATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchYear,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+</mapper>

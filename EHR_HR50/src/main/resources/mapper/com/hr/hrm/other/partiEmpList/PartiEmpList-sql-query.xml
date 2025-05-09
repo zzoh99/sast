@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.partiEmpList">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPartiEmpListList">
+
+				<![CDATA[
+				SELECT F_COM_GET_ORG_NM2(K.ENTER_CD,K.SABUN,REPLACE(#{searchDate},'-','')) AS ORG_NM
+				      ,K.SABUN
+				      ,F_COM_GET_NAMES(K.ENTER_CD,K.SABUN) AS NAME
+				      ,CRYPTIT.DECRYPT (K.RES_NO, K.ENTER_CD) AS RES_NO
+				      ,F_COM_GET_GRCODE_NAME (C.ENTER_CD, 'H00010', K.SEX_TYPE) AS SEX
+				      ,F_COM_GET_NAMES(K.ENTER_CD,K.SABUN,'ALIAS') AS EMP_ALIAS
+				      ,K.EMP_YMD
+				      ,F_COM_GET_CAREER_CNT (K.ENTER_CD, K.SABUN, 'W', 'YYMM', '1') AS EMP_TERM
+				      ,F_COM_GET_CAREER_CNT (K.ENTER_CD, K.SABUN, 'Y', 'YYMM', '1') AS EMP_CARR_TERM
+				      ,F_COM_GET_MAP_NM (K.ENTER_CD, '100', K.SABUN,REPLACE(#{searchDate},'-','')) AS BP_NM
+				      ,F_COM_GET_MAP_NM (K.ENTER_CD, '600', K.SABUN,REPLACE(#{searchDate},'-','')) AS LOCATION_NM
+				      ,F_COM_GET_GRCODE_NAME (C.ENTER_CD, 'H10010', C.STATUS_CD) AS STATUS_NM
+				      ,F_COM_GET_GRCODE_NAME (C.ENTER_CD, 'H10030', C.MANAGE_CD) AS MANAGE_NM
+				      ,F_COM_GET_GRCODE_NAME (C.ENTER_CD, 'H20020', C.JIKCHAK_CD) AS JIKCHAK_NM
+				      ,F_COM_GET_GRCODE_NAME (C.ENTER_CD, 'H20010', C.JIKGUB_CD) AS JIKGUB_NM
+				      ,F_COM_GET_GRCODE_NAME (C.ENTER_CD, 'H20030', C.JIKWEE_CD) AS JIKWEE_NM
+				      ,F_COM_GET_GRCODE_NAME (C.ENTER_CD, 'H10050', C.WORK_TYPE) AS WORK_TYPE_NM
+				      ,F_COM_GET_GRCODE_NAME (K.ENTER_CD, 'F10001', K.STF_TYPE) AS STF_TYPE_NM
+				      ,F_COM_GET_CONT_ADDRESS (K.ENTER_CD, K.SABUN, 'HT') AS HOME_TEL
+				      ,F_COM_GET_CONT_ADDRESS (K.ENTER_CD, K.SABUN, 'HP') AS HAND_PHONE
+				      ,F_COM_GET_CONT_ADDRESS (K.ENTER_CD, K.SABUN, 'IM') AS MAIL_ID
+				      ,X.ACA_SCH_NM
+				      ,X.ACAMAJ_NM
+				      ,X.ACA_YN_NM
+				      ,THRM123.ADDR1 || ' ' || THRM123.ADDR2 AS ADDRESS
+				      ,F_COM_GET_MAP_CD (K.ENTER_CD, '700', K.SABUN,REPLACE(#{searchDate},'-','')) AS BRANCH_CD
+				      ,F_COM_GET_MAP_NM (K.ENTER_CD, '700', K.SABUN,REPLACE(#{searchDate},'-','')) AS BRANCH_NM
+				      ,F_COM_GET_JOB_NM_201(C.ENTER_CD, C.JIKJONG_CD, REPLACE(#{searchDate},'-',''),'') AS JIKJONG_NM
+				       , (  SELECT LISTAGG (MEMO, ', ') WITHIN GROUP (ORDER BY SDATE)
+				              FROM THRM199
+				             WHERE ENTER_CD = K.ENTER_CD
+				               AND SABUN = K.SABUN
+				               AND DIV_CD = '02'
+				               AND REPLACE(#{searchDate},'-','') BETWEEN SDATE AND NVL (EDATE, '99999999')
+				          GROUP BY ENTER_CD, SABUN, DIV_CD) AS BANK_EMP_NO
+				       ,F_COM_GET_JOB_NM_201(C.ENTER_CD, C.JOB_CD, REPLACE(#{searchDate},'-',''),'') AS JOB_NM
+				       ,F_COM_GET_TASK_NM (K.ENTER_CD, K.SABUN) AS TASK_NM
+				       ,THRM117.CMP_NM
+				       ,K.EMP_TYPE_NM
+				FROM THRM100 K
+				    INNER JOIN
+				    (SELECT X.*
+				       FROM THRM151 X
+				           , (  SELECT ENTER_CD ,SABUN ,MAX (SDATE) AS SDATE
+				                  FROM THRM151
+				                 WHERE REPLACE(#{searchDate},'-','') BETWEEN SDATE AND NVL (EDATE, '99999999')
+				                   AND (ENTER_CD
+				                       ,STATUS_CD) NOT IN (    SELECT DISTINCT
+				                                                      ENTER_CD
+				                                                     ,REGEXP_SUBSTR (A.PARAM, '[^,]+', 1, LEVEL)
+				                                                 FROM (SELECT ENTER_CD
+				                                                             ,NVL (F_COM_GET_STD_CD_VALUE (ENTER_CD,'HRM_STATUS_CD_NO'),'RAA') AS PARAM
+				                                                         FROM TORG900) A
+				                                           CONNECT BY LEVEL <= LENGTH (REGEXP_REPLACE (A.PARAM, '[^,]+', '')) + 1)
+				              GROUP BY ENTER_CD, SABUN) Y
+				      WHERE X.ENTER_CD = Y.ENTER_CD
+				        AND X.STATUS_CD NOT LIKE 'RA%'
+				        AND X.SABUN = Y.SABUN
+				        AND X.SDATE = Y.SDATE) C
+				       ON C.ENTER_CD = K.ENTER_CD
+				      AND C.SABUN = K.SABUN
+				      LEFT OUTER JOIN (SELECT ENTER_CD
+				                       ,SABUN
+				                       ,ACA_S_YM
+				                       ,ACA_SCH_NM
+				                       ,ACA_E_YM
+				                       ,ACAMAJ_NM
+				                       ,F_COM_GET_GRCODE_NAME (ENTER_CD, 'F20140', ACA_YN) ACA_YN_NM
+				                   FROM THRM115 A
+				                  WHERE A.ACA_TYPE = 'Y'
+				                    AND A.SEQ = (SELECT MAX (B.SEQ)
+				                                   FROM THRM115 B
+				                                  WHERE B.ENTER_CD = A.ENTER_CD
+				                                    AND B.SABUN = A.SABUN
+				                                    AND B.ACA_TYPE = 'Y')) X
+				       ON X.ENTER_CD = K.ENTER_CD
+				      AND X.SABUN = K.SABUN
+				      LEFT OUTER JOIN THRM123
+				           ON THRM123.ENTER_CD = K.ENTER_CD
+				          AND THRM123.SABUN = K.SABUN
+				          AND THRM123.ADD_TYPE = '3'
+				      LEFT OUTER JOIN (SELECT X.ENTER_CD
+				                       ,X.SABUN
+				                       ,X.CMP_NM
+				                   FROM THRM117 X
+				                  WHERE X.SDATE = (SELECT MAX (Y.SDATE)
+				                                     FROM THRM117 Y
+				                                    WHERE Y.ENTER_CD = X.ENTER_CD
+				                                      AND Y.SABUN = X.SABUN)) THRM117
+				               ON THRM117.ENTER_CD = K.ENTER_CD
+				              AND THRM117.SABUN = K.SABUN
+				 WHERE 1=1
+				 	   AND K.ENTER_CD = #{ssnEnterCd} ]]>
+<if test='searchSabunNameAlias != null and !searchSabunNameAlias.equals("")'>
+					  AND ( K.SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (K.ENTER_CD, K.SABUN) LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (K.ENTER_CD, K.SABUN, 'ALIAS') LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%' )
+</if>
+				ORDER BY F_COM_JIKJE_SORT(K.ENTER_CD, K.SABUN, REPLACE(#{searchDate},'-',''))
+
+
+		</select>
+
+
+</mapper>

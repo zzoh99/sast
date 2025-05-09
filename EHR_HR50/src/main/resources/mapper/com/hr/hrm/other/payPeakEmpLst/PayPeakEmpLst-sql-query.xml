@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.">
+		<select parameterType="map" resultType="cMap" id="getPayPeakEmpLstList">
+
+				<![CDATA[
+			   SELECT A.ENTER_CD			-- 회사코드
+					, A.SABUN				-- 사번
+					, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+					-- , F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN,B.SDATE)	AS ORG_NM
+					, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchYmd}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS ORG_NM
+					, F_SYS_GET_ENDOW_AUTH_YN( A.ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  A.SABUN ) AS AUTH_YN
+					, B.JIKCHAK_CD	-- 직책코드
+					, B.JIKCHAK_NM	-- 직책
+					, B.JIKWEE_CD	-- 직위코드
+					, B.JIKWEE_NM	-- 직위
+					, B.JIKGUB_CD	-- 직급코드
+					, B.JIKGUB_NM	-- 직급
+					, B.SAL_CLASS	-- 호봉
+					, B.STATUS_CD	-- 재직상태코드
+					, B.STATUS_NM	-- 재직상태
+					, B.WORK_TYPE	-- 직군코드
+					, B.WORK_TYPE_NM	-- 직군
+					, B.MANAGE_CD	-- 사원구분코드
+					, B.MANAGE_NM	-- 사원구분
+					, F_COM_GET_JOB_NM2(A.ENTER_CD,A.SABUN, NVL(REPLACE(#{searchYmd}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))	AS JOB_NM
+					, B.PAY_TYPE	-- 급여유형
+					, B.PAY_TYPE_NM	-- 급여유형					
+					, A.GEMP_YMD	-- 그룹입사일
+					, A.EMP_YMD	-- 입사일
+					, A.SEX_TYPE	-- 성별
+					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H00010',A.SEX_TYPE, '') AS SEX_TYPE_NM
+					, ( CASE WHEN SUBSTR(CRYPTIT.decrypt(A.RES_NO, A.ENTER_CD),7,1) IN ('3','4','7','8') THEN
+							'20' || SUBSTR(CRYPTIT.decrypt(A.RES_NO, A.ENTER_CD),1,6)
+						ELSE
+							'19' || SUBSTR(CRYPTIT.decrypt(A.RES_NO, A.ENTER_CD),1,6)
+						END ) AS BIR_YMD	-- 생년월일
+					, F_COM_GET_AGE(A.ENTER_CD, '', A.RES_NO, REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', '') ) AS AGE		-- 나이(만), 조회조건 기준일
+					, F_HRM_GET_ENDWORKDATE(A.ENTER_CD, A.SABUN, REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', ''), NVL(#{searchEndWorkYear} , 60)) AS END_WORK_DATE	-- 정년도래일,  조회조건 기준일, 정년기준
+					, TO_NUMBER(F_COM_GET_AGE(A.ENTER_CD, '', A.RES_NO, REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', '') )) - TO_NUMBER(NVL( #{searchWorkPeakYear} , 55)) + 1 AS PAY_PEAK_YEAR	-- 정년도래일,  조회조건 기준일, 임피기간 FROM
+					, '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO
+				FROM THRM100 A, THRM151 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+				AND A.SABUN = B.SABUN
+				AND REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', '') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')	-- 조회조건 기준일
+				AND A.ENTER_CD = #{ssnEnterCd}
+				AND B.STATUS_CD NOT LIKE 'RA%'
+				AND TO_CHAR(LAST_DAY( TO_DATE(REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', ''), 'YYYYMMDD') )+1, 'YYYYMMDD')
+				         BETWEEN TO_CHAR(TO_DATE(F_HRM_GET_ENDWORKDATE(A.ENTER_CD, A.SABUN, REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', ''), NVL( #{searchWorkPeakYearFrom} , 55)), 'YYYYMMDD')+1, 'YYYYMMDD') AND TO_CHAR(TO_DATE(F_HRM_GET_ENDWORKDATE(A.ENTER_CD, A.SABUN, REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', ''), NVL( #{searchWorkPeakYearTo} , 60)), 'YYYYMMDD')+1, 'YYYYMMDD') 	-- 조회조건 기준일, 임피기간 FROM, TO ]]>
+					<if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+					   AND UPPER(F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchYmd}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))) LIKE '%' || UPPER(#{searchOrgNm}) || '%'
+					</if>
+					<if test='searchSabunName !=null and !searchSabunName.equals("")'>
+					   AND ( UPPER(A.SABUN) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%' OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+					</if>
+					<if test='statusCd != null and !statusCd.equals("")'>
+					   AND B.STATUS_CD IN
+		<foreach collection="statusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					<if test='jikchakCd != null and !jikchakCd.equals("")'>
+					   AND B.JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					<if test='jikweeCd != null and !jikweeCd.equals("")'>
+					   AND B.JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					<if test='jikgubCd != null and !jikgubCd.equals("")'>
+					   AND B.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					<if test='payType != null and !payType.equals("")'>
+					   AND B.PAY_TYPE IN
+		<foreach collection="payType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+
+			<if test='manageCd != null and !manageCd.equals("")'>
+				AND B.MANAGE_CD IN
+				<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+			</if>
+						
+				ORDER BY 
+				 F_HRM_GET_ENDWORKDATE(A.ENTER_CD, A.SABUN, REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', ''), NVL(#{searchEndWorkYear} , 60)) ASC
+				, F_COM_JIKJE_SORT (A.ENTER_CD, A.SABUN, REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', '') )	-- 조회조건 기준일
+		</select>
+
+</mapper>

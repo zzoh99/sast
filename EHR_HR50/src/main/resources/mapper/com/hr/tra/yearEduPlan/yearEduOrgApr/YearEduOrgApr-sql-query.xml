@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.yearEduPlan.yearEduOrgAppDet">
+		<!-- 기준년도 콤보 -->		
+		<select parameterType="map" resultType="cMap" id="getYearEduAprYearCode">
+			
+				<![CDATA[
+					SELECT YEAR AS CODE, YEAR AS CODE_NM
+							, SDATE , EDATE
+					FROM TTRA500
+					WHERE ENTER_CD = #{ssnEnterCd}
+					ORDER BY YEAR DESC, SDATE DESC
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getYearEduOrgAprList">
+			
+				<![CDATA[
+                       SELECT A.ENTER_CD
+							, A.APPL_SEQ
+							, A.SABUN
+							, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+							, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+							, F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS WORKTYPE_NM
+						    , A.YEAR
+						    , A.ORG_CD
+						    , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, B.APPL_YMD, #{ssnLocaleCd}) AS APP_ORG_NM
+						    , A.NOTE
+						    , (SELECT COUNT(DISTINCT Z.SABUN) FROM TTRA503 Z WHERE Z.ORG_CD = A.ORG_CD AND Z.YEAR = A.YEAR ) AS MEM_CNT
+						    , (SELECT COUNT(1) FROM TTRA503 Z WHERE Z.ORG_CD = A.ORG_CD AND Z.YEAR = A.YEAR ) AS EDU_CNT
+						    , (SELECT SUM(Z.TOT_MON)*1000 FROM TTRA503 Z WHERE Z.ORG_CD = A.ORG_CD AND Z.YEAR = A.YEAR ) AS SUM_TOT_MON
+							, B.APPL_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+							, B.APPL_STATUS_CD
+							, '0' AS DETAIL
+                         FROM TTRA501 A, THRI103 B
+                        WHERE A.ENTER_CD   = #{ssnEnterCd}
+                          AND A.ENTER_CD   = B.ENTER_CD
+                          AND A.APPL_SEQ   = B.APPL_SEQ
+					      AND B.APPL_STATUS_CD NOT IN ('11')  ]]>
+<if test="searchFrom != null and searchFrom neq '' and searchTo != null and searchTo neq ''">
+					      AND B.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+</if>
+<if test="searchApplStatusCd != null and searchApplStatusCd neq ''">
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>				      
+<if test="searchSabunName != null and searchSabunName neq ''">
+					      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+</if>			      
+<if test="searchOrgNm != null and searchOrgNm neq ''">
+					      AND UPPER(F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}))  LIKE '%'||UPPER(TRIM( #{searchOrgNm} ))||'%' 
+</if>
+
+<if test="searchYear != null and searchYear neq ''">
+					      AND A.YEAR = #{searchYear}
+</if>
+                        ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+		</select>
+		
+</mapper>

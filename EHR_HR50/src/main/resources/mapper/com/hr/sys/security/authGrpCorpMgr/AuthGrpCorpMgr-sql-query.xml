@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.security.authGrpCorpMgr">
+<!-- 회사코드 리스트 -->
+		<select parameterType="map" resultType="cMap" id="getGrpNmAllList">
+
+				<![CDATA[
+				SELECT	GRP_CD	AS	CODE
+					,	GRP_NM	AS	CODE_NM
+					,   ENTER_CD
+					,	DECODE(ENTER_ALL_YN, 'Y', '예', 'N', '아니오') AS ENTER_ALL_YN
+				FROM	TSYS307
+			]]>
+
+
+		</select>
+<!-- 회사코드 리스트 -->
+		<select parameterType="map" resultType="cMap" id="getEnterAllYnList">
+
+				<![CDATA[
+				SELECT	ENTER_CD
+					,	GRP_CD	AS	CODE
+					,	DECODE(ENTER_ALL_YN, 'Y', '예', 'N', '아니오') AS CODE_NM
+				FROM	TSYS307
+				WHERE	ENTER_CD = #{ssnEnterCd}
+			]]>
+
+
+		</select>
+<!-- 회사코드 리스트 -->
+		<select parameterType="map" resultType="cMap" id="getEnterCdAllListMSsnEnterCd">
+
+				<![CDATA[
+				SELECT	A.ENTER_CD AS CODE
+					,	A.ALIAS AS CODE_NM
+					, (SELECT LISTAGG(GRP_CD, '|') WITHIN GROUP(ORDER BY SEQ) 
+							||',,'|| LISTAGG(GRP_NM, '|') WITHIN GROUP(ORDER BY SEQ) 
+							||',,'|| LISTAGG(DECODE(ENTER_ALL_YN, 'Y', '예', 'N', '아니오'), '|') WITHIN GROUP(ORDER BY SEQ)
+						FROM TSYS307 WHERE ENTER_CD = A.ENTER_CD) AS CODE_GRP_CD 
+				FROM	TORG900 A
+				WHERE 1=1
+				    ]]>
+				<if test='useYn != null and useYn.equals("Y")'>
+					AND A.USE_YN = 'Y' 
+				</if>
+				ORDER	BY
+						A.SEQ
+
+
+
+		</select>
+
+<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAuthGrpCorpMgrList">
+
+				<![CDATA[
+				SELECT X.* FROM (
+						SELECT
+								A.ENTER_CD
+							,	A.GRP_CD
+							,   A.GRP_CD AS GRP_CD1
+							,	B.GRP_NM
+							,	A.AUTH_ENTER_CD
+							,	A.AUTH_ENTER_CD	AS	AUTH_ENTER_NM
+							,	A.SEQ
+							,	A.GRP_CD AS	ENTER_ALL_YN
+							,	A.GRP_CD AS ENTER_ALL_YN1
+							, (SELECT SEQ FROM TORG900 WHERE ENTER_CD = A.ENTER_CD) AS SEQ_ENTER_CD
+							, (SELECT SEQ FROM TORG900 WHERE ENTER_CD = A.AUTH_ENTER_CD) AS SEQ_AUTH_ENTER_CD
+							, B.SEQ AS SEQ_GRP_CD
+						FROM	TSYS318	A
+							,	TSYS307	B
+						WHERE	A.ENTER_CD	=	B.ENTER_CD
+						AND		A.GRP_CD	=	B.GRP_CD
+						AND		A.GRP_CD LIKE '%'|| TRIM(#{searchGrpCd}) ||'%'
+						AND		A.AUTH_ENTER_CD LIKE '%'|| TRIM(#{searchAuthEnterCd}) ||'%'
+						]]>
+						<if test='searchEnterCd != null and !searchEnterCd.equals("")'>
+						AND		A.ENTER_CD	=	#{searchEnterCd}
+						</if>
+					) X
+					
+				ORDER	BY X.SEQ_ENTER_CD, X.SEQ_GRP_CD, X.SEQ_AUTH_ENTER_CD
+
+
+
+		</select>
+
+<!-- 저장 -->
+		<update parameterType="map" id="saveAuthGrpCorpMgr">
+
+					MERGE INTO TSYS318 T
+					USING	(
+							SELECT		ENTER_CD
+									,	GRP_CD
+									,	AUTH_ENTER_CD
+									,	SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS GRP_CD
+											, NULL		AS AUTH_ENTER_CD
+											, NULL		AS SEQ
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT		TRIM(#{rm.enterCd})		AS	ENTER_CD
+											,	TRIM(#{rm.grpCd})		AS	GRP_CD
+											,	TRIM(#{rm.authEnterCd})	AS	AUTH_ENTER_CD
+											,	TRIM(#{rm.seq})			AS	SEQ
+									FROM   DUAL
+
+</foreach>
+									) A WHERE	A.ENTER_CD IS NOT NULL
+										AND		A.GRP_CD IS NOT NULL
+							) S
+					ON (
+							T.ENTER_CD		=	S.ENTER_CD
+						AND	T.GRP_CD		=	S.GRP_CD
+						AND	T.AUTH_ENTER_CD	=	S.AUTH_ENTER_CD
+
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SEQ          = S.SEQ
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.GRP_CD
+							, T.AUTH_ENTER_CD
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.GRP_CD
+							, S.AUTH_ENTER_CD
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAuthGrpCorpMgr">
+
+					DELETE FROM TSYS318
+					 WHERE (ENTER_CD, GRP_CD, AUTH_ENTER_CD) IN ( (NULL, NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+					,
+						<if  test='
+								(rm.enterCd != null and !rm.enterCd.equals(""))
+							and (rm.grpCd != null and !rm.grpCd.equals(""))
+							and (rm.authEnterCd != null and !rm.authEnterCd.equals(""))'>
+
+								( TRIM(#{rm.enterCd}), TRIM(#{rm.grpCd}) , TRIM(#{rm.authEnterCd}) )
+						</if>
+					</foreach>
+					)
+
+
+
+		</delete>
+
+</mapper>

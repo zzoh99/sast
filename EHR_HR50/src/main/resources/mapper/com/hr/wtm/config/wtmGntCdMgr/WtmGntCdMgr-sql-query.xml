@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.config.wtmGntCdMgr">
+
+    <!-- 근태코드관리 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmGntCdMgrList">
+		<![CDATA[
+        SELECT A.ENTER_CD
+             , A.GNT_CD
+             , A.SEQ
+             , A.GNT_GUBUN_CD
+             , A.GNT_NM
+             , A.BASIC_GNT_CD_YN
+             , A.USE_YN
+             , A.MOBILE_USE_YN
+             , A.GNT_SHORT_NM
+			 , '<span class="att-code" style="background-color: '|| COLOR ||'">' || GNT_SHORT_NM || '</span>' AS GNT_SHORT_NM_HTML
+             , A.COLOR
+             , A.MEMO
+             , A.REQUEST_USE_TYPE
+             , A.BASE_CNT
+             , A.MAX_CNT
+             , A.HOL_INCL_YN
+             , A.STD_APPLY_HOUR
+             , A.VACATION_YN
+             , A.MINUS_ALLOW_YN
+             , A.ORG_LEVEL_CD
+             , A.EXCP_SEARCH_SEQ
+             , B.SEARCH_DESC
+             , A.DIV_CNT
+             , A.LANGUAGE_CD
+             , A.NOTE
+             , A.NO_PAY_YN
+          FROM TWTM041 A
+          LEFT JOIN THRI201 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.EXCP_SEARCH_SEQ = B.SEARCH_SEQ
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+		]]>
+         <if test='searchUseYn != null and searchUseYn.equals("Y")'>
+		   AND NVL(A.USE_YN, 'N') = 'Y'
+		 </if>
+		<if test='searchGntNm != null and !searchGntNm.equals("")'>
+			AND GNT_NM LIKE '%'|| #{searchGntNm} ||'%'
+		</if>
+		 ORDER BY A.SEQ, A.GNT_GUBUN_CD
+    </select>
+
+	<!-- 대표코드 설정 중복체크 -->
+	<select parameterType="map" resultType="cMap" id="getWtmGntCdMgrDupCnt">
+		SELECT COUNT(*) AS CNT
+		  FROM TWTM041 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.GNT_GUBUN_CD = #{gntGubunCd}
+		   AND A.GNT_CD != #{gntCd}
+		   AND NVL(A.BASIC_GNT_CD_YN, 'N') = 'Y'
+	</select>
+
+    <!-- 근태코드 저장 -->
+    <update parameterType="map" id="saveWtmGntCdMgr">
+         MERGE INTO TWTM041 T
+		 USING (
+		        SELECT #{ssnEnterCd} AS ENTER_CD
+                     , CASE WHEN TRIM(#{gntCd}) IS NULL OR TRIM(#{gntCd}) = '0' THEN
+                                ( SELECT TO_CHAR(NVL(MAX(TO_NUMBER(GNT_CD)), 0) + 1)
+                                    FROM TWTM041
+                                   WHERE ENTER_CD = #{ssnEnterCd}
+                                     AND REGEXP_REPLACE(GNT_CD, '[0-9]') IS NULL )
+                            ELSE #{gntCd}
+                       END AS GNT_CD
+                     , TRIM(#{seq}) AS SEQ
+                     , TRIM(#{gntGubunCd}) AS GNT_GUBUN_CD
+                     , TRIM(#{gntNm}) AS GNT_NM
+                     , NVL(TRIM(#{basicGntCdYn}), 'N') AS BASIC_GNT_CD_YN
+                     , NVL(TRIM(#{useYn}), 'N') AS USE_YN
+                     , NVL(TRIM(#{mobileUseYn}), 'N') AS MOBILE_USE_YN
+                     , TRIM(#{gntShortNm}) AS GNT_SHORT_NM
+                     , TRIM(#{color}) AS COLOR
+                     , TRIM(#{memo}) AS MEMO
+                     , TRIM(#{requestUseType}) AS REQUEST_USE_TYPE
+                     , TRIM(#{baseCnt}) AS BASE_CNT
+                     , TRIM(#{maxCnt}) AS MAX_CNT
+                     , NVL(TRIM(#{holInclYn}), 'N') AS HOL_INCL_YN
+                     , TRIM(#{stdApplyHour}) AS STD_APPLY_HOUR
+                     , NVL(TRIM(#{vacationYn}), 'N') AS VACATION_YN
+                     , NVL(TRIM(#{minusAllowYn}), 'N') AS MINUS_ALLOW_YN
+                     , TRIM(#{orgLevelCd}) AS ORG_LEVEL_CD
+                     , TRIM(#{excpSearchSeq}) AS EXCP_SEARCH_SEQ
+                     , TRIM(#{divCnt}) AS DIV_CNT
+                     , TRIM(#{languageCd}) AS LANGUAGE_CD
+                     , TRIM(#{note}) AS NOTE
+                     , TRIM(#{noPayYn}) AS NO_PAY_YN
+                  FROM DUAL
+               ) S
+            ON (
+		            T.ENTER_CD = S.ENTER_CD
+		        AND T.GNT_CD = S.GNT_CD
+		       )
+		    WHEN MATCHED THEN
+		  UPDATE SET T.SEQ = S.SEQ
+		           , T.GNT_GUBUN_CD = S.GNT_GUBUN_CD
+		           , T.GNT_NM = S.GNT_NM
+		           , T.BASIC_GNT_CD_YN = S.BASIC_GNT_CD_YN
+		           , T.USE_YN = S.USE_YN
+		           , T.MOBILE_USE_YN = S.MOBILE_USE_YN
+		           , T.GNT_SHORT_NM = S.GNT_SHORT_NM
+		           , T.COLOR = S.COLOR
+		           , T.MEMO = S.MEMO
+		           , T.REQUEST_USE_TYPE = S.REQUEST_USE_TYPE
+		           , T.BASE_CNT = S.BASE_CNT
+		           , T.MAX_CNT = S.MAX_CNT
+		           , T.HOL_INCL_YN = S.HOL_INCL_YN
+		           , T.STD_APPLY_HOUR = S.STD_APPLY_HOUR
+		           , T.VACATION_YN = S.VACATION_YN
+		           , T.MINUS_ALLOW_YN = S.MINUS_ALLOW_YN
+		           , T.ORG_LEVEL_CD = S.ORG_LEVEL_CD
+		           , T.EXCP_SEARCH_SEQ = S.EXCP_SEARCH_SEQ
+		           , T.DIV_CNT = S.DIV_CNT
+		           , T.LANGUAGE_CD = S.LANGUAGE_CD
+		           , T.NOTE = S.NOTE
+		           , T.NO_PAY_YN = S.NO_PAY_YN
+                   , T.CHKDATE = SYSDATE
+                   , T.CHKID = #{ssnSabun}
+		    WHEN NOT MATCHED THEN
+		  INSERT (
+		              T.ENTER_CD
+		            , T.GNT_CD
+		            , T.SEQ
+		            , T.GNT_GUBUN_CD
+		            , T.GNT_NM
+		            , T.BASIC_GNT_CD_YN
+		            , T.USE_YN
+		            , T.MOBILE_USE_YN
+		            , T.GNT_SHORT_NM
+		            , T.COLOR
+		            , T.MEMO
+		            , T.REQUEST_USE_TYPE
+		            , T.BASE_CNT
+		            , T.MAX_CNT
+		            , T.HOL_INCL_YN
+		            , T.STD_APPLY_HOUR
+		            , T.VACATION_YN
+		            , T.MINUS_ALLOW_YN
+		            , T.ORG_LEVEL_CD
+		            , T.EXCP_SEARCH_SEQ
+		            , T.DIV_CNT
+		            , T.LANGUAGE_CD
+		            , T.NOTE
+		            , T.NO_PAY_YN
+		            , T.INSDATE
+		            , T.INSID
+		            , T.CHKDATE
+		            , T.CHKID
+		         )
+		  VALUES (
+		              S.ENTER_CD
+		            , S.GNT_CD
+		            , S.SEQ
+		            , S.GNT_GUBUN_CD
+		            , S.GNT_NM
+		            , S.BASIC_GNT_CD_YN
+		            , S.USE_YN
+		            , S.MOBILE_USE_YN
+		            , S.GNT_SHORT_NM
+		            , S.COLOR
+		            , S.MEMO
+		            , S.REQUEST_USE_TYPE
+		            , S.BASE_CNT
+		            , S.MAX_CNT
+		            , S.HOL_INCL_YN
+		            , S.STD_APPLY_HOUR
+		            , S.VACATION_YN
+		            , S.MINUS_ALLOW_YN
+		            , S.ORG_LEVEL_CD
+		            , S.EXCP_SEARCH_SEQ
+		            , S.DIV_CNT
+		            , S.LANGUAGE_CD
+		            , S.NOTE
+		            , S.NO_PAY_YN
+		            , SYSDATE
+		            , #{ssnSabun}
+                    , SYSDATE
+                    , #{ssnSabun}
+		         )
+    </update>
+
+    <!-- 근태코드 순서 저장 -->
+    <update parameterType="map" id="saveWtmGntCdSeq">
+        MERGE INTO TWTM041 T
+		USING (
+        <foreach item="rm" collection="mergeRows" index="idx" separator=" UNION ALL ">
+		       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+		            , TRIM(#{rm.gntCd}) AS GNT_CD
+		            , TRIM(#{rm.seq}) AS SEQ
+		        FROM DUAL
+        </foreach>
+		      ) S
+		   ON (
+		             T.ENTER_CD = S.ENTER_CD
+		        AND  T.GNT_CD = S.GNT_CD
+		      )
+		   WHEN MATCHED THEN
+		 UPDATE SET T.CHKDATE	= SYSDATE
+		          , T.CHKID	    = #{ssnSabun}
+		          , T.SEQ = S.SEQ
+    </update>
+
+    <!-- 근태코드 삭제 -->
+    <delete parameterType="map" id="deleteWtmGntCdMgr">
+
+        DELETE FROM TWTM041
+         WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+           AND ( GNT_CD ) IN ( ( NULL)
+        <foreach item="rm" collection="deleteRows">
+            <if test="rm.gntCd != null and !rm.gntCd neq '' ">
+                , ( TRIM( #{rm.gntCd} ) )
+            </if>
+        </foreach>
+        )
+    </delete>
+
+	<!-- 근태코드관리 코드화 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmGntCdMgrCodeList">
+		<![CDATA[
+			SELECT A.GNT_CD AS CODE
+				 , A.GNT_NM AS CODE_NM
+			     , A.USE_YN
+			  FROM TWTM041 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+		]]>
+		<if test='searchUseYn != null and searchUseYn.equals("Y")'>
+			   AND NVL(A.USE_YN, 'N') = 'Y'
+		</if>
+		<if test='searchGntNm != null and !searchGntNm.equals("")'>
+			   AND GNT_NM LIKE '%'|| #{searchGntNm} ||'%'
+		</if>
+			 ORDER BY A.SEQ, A.GNT_GUBUN_CD
+	</select>
+
+</mapper>

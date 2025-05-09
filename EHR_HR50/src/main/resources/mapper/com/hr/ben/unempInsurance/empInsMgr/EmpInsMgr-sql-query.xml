@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 고용보험기본사항
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.unempInsurance.empInsMgr">
+		
+	<select id="getEmpInsMgrBasicMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.SABUN
+			 , TO_CHAR(TO_DATE(A.ACQ_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS ACQ_YMD
+			 , TO_CHAR(TO_DATE(A.LOSS_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS LOSS_YMD
+		  FROM TBEN301 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+		   AND A.SABUN		= #{sabun}
+	]]>
+	</select>
+		
+	<select id="getEmpInsMgrChangeList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.SABUN
+			 , A.SEQ
+			 , A.SDATE
+			 , A.EDATE
+			 , A.SOC_CHANGE_CD
+			 , A.SOC_STATE_CD
+			 , A.REWARD_TOT_MON
+			 , A.EMP_MON
+		  FROM TBEN303 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+		   AND A.SABUN		= #{sabun}
+		ORDER BY A.SDATE DESC
+	]]>
+	</select>
+		
+	<select id="getEmpInsMgrPaymentList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		    , B.SABUN
+		    , A.PAY_ACTION_CD
+		    , A.PAYMENT_YMD
+		    , (SELECT PAY_NM FROM TCPN051 WHERE ENTER_CD = A.ENTER_CD AND PAY_CD = A.PAY_CD) AS PAY_NM
+		    , '10' AS SOC_DEDUCT_CD
+		       ,(SELECT SUM(RESULT_MON)
+		        FROM TCPN205
+		        WHERE ENTER_CD = B.ENTER_CD
+		          AND PAY_ACTION_CD = B.PAY_ACTION_CD
+		          AND SABUN = B.SABUN
+		          AND ELEMENT_CD IN (SELECT ELEMENT_CD FROM TCPN072 WHERE ENTER_CD = #{ssnEnterCd} AND ELEMENT_SET_CD = '32')) AS STD_MON
+		    ,(SELECT RESULT_MON
+		      FROM TCPN205
+		      WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = '1030') AS SELF_MON
+		    ,(SELECT RESULT_MON
+		      FROM TCPN205
+		      WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = '1030') AS COMP_MON
+		    ,(SELECT UMEMP_SELF_RATE
+		      FROM TBEN003
+		      WHERE ENTER_CD = A.ENTER_CD
+		        AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')) AS SELF_RATE
+		    ,(SELECT UNEMP_COMP_RATE
+		      FROM TBEN003
+		      WHERE ENTER_CD = A.ENTER_CD
+		        AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')) AS COMP_RATE
+		FROM TCPN201 A, TCPN203 B
+		WHERE A.ENTER_CD = B.ENTER_CD
+		  AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+		  AND A.ENTER_CD = #{ssnEnterCd}
+		  AND B.SABUN = #{sabun}
+		  AND A.PAY_CD = '01' ]]>
+		 <if test="year != null and year neq ''">
+		  AND SUBSTR(A.PAY_YM,1,4) LIKE trim(#{year})||'%'
+		 </if>
+		ORDER BY A.PAYMENT_YMD DESC
+	</select>
+		
+	<select id="getEmpInsMgrF_BEN_NP_SELF_MON" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_BEN_INSURENCE_BASE_MON( #{ssnEnterCd}, '20', #{searchRewardTotMon}, TO_CHAR(SYSDATE, 'YYYYMMDD'), '0', '0' ) AS EMP_MON
+		  FROM DUAL
+	]]>
+	</select>
+		
+	<update id="saveEmpInsMgrBasic" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN301 T
+		USING	(
+				SELECT A.SABUN
+					 , A.ACQ_YMD
+					 , A.LOSS_YMD
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS ACQ_YMD
+							 , NULL	AS LOSS_YMD
+						  FROM DUAL
+						UNION ALL
+						SELECT TRIM(#{sabun})						AS SABUN
+							 , TRIM(REPLACE(#{acqYmd},'-',''))	AS ACQ_YMD
+							 , TRIM(REPLACE(#{lossYmd},'-',''))	AS LOSS_YMD
+						  FROM DUAL
+						) A
+				WHERE A.SABUN IS NOT NULL
+				) S
+		ON	(	T.ENTER_CD	= #{ssnEnterCd}
+			AND	T.SABUN		= S.SABUN
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.ACQ_YMD	= S.ACQ_YMD
+					 , T.LOSS_YMD	= S.LOSS_YMD
+					 , T.CHKDATE	= SYSDATE
+					 , T.CHKID		= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+			  T.ENTER_CD
+			, T.SABUN
+			, T.ACQ_YMD
+			, T.LOSS_YMD
+			, T.CHKDATE
+			, T.CHKID
+			)
+			VALUES
+			(
+			  #{ssnEnterCd}
+			, S.SABUN
+			, S.ACQ_YMD
+			, S.LOSS_YMD
+			, SYSDATE
+			, #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<update id="saveEmpInsMgrChange" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN303 T
+		USING	(
+				SELECT A.SABUN
+					 , A.SEQ
+					 , A.SDATE
+					 , A.EDATE
+					 , A.SOC_CHANGE_CD
+					 , A.SOC_STATE_CD
+					 , A.REWARD_TOT_MON
+					 , A.EMP_MON
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS SEQ
+							 , NULL	AS SDATE
+							 , NULL	AS EDATE
+							 , NULL	AS SOC_CHANGE_CD
+							 , NULL	AS SOC_STATE_CD
+							 , NULL	AS REWARD_TOT_MON
+							 , NULL	AS EMP_MON
+						  FROM DUAL ]]>
+		<foreach item="rm" collection="mergeRows" index="idx">
+						  UNION ALL
+						SELECT TRIM(#{rm.sabun})					AS SABUN
+							 , CASE WHEN TRIM(#{rm.seq}) IS NULL OR TRIM(#{rm.seq}) = '0' THEN
+							 			(SELECT (NVL(MAX(SEQ),0) + (#{idx} + 1)) FROM TBEN303 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun}))
+							 		ELSE TO_NUMBER(#{rm.seq}) END 	SEQ
+							 , TRIM(#{rm.sdate})					AS SDATE
+							 , TRIM(#{rm.edate})					AS EDATE
+							 , TRIM(#{rm.socChangeCd})				AS SOC_CHANGE_CD
+							 , TRIM(#{rm.socStateCd})				AS SOC_STATE_CD
+							 , TRIM(#{rm.rewardTotMon})				AS REWARD_TOT_MON
+							 , TRIM(#{rm.empMon})					AS EMP_MON
+						  FROM DUAL
+		</foreach>
+	<![CDATA[						) A
+				WHERE A.SABUN IS NOT NULL
+				  AND A.SEQ IS NOT NULL
+				  AND A.SDATE IS NOT NULL
+				) S
+		ON	(	T.ENTER_CD	= #{ssnEnterCd}
+			AND	T.SABUN		= S.SABUN
+			AND	T.SEQ		= S.SEQ
+			AND	T.SDATE		= S.SDATE
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.EDATE			= S.EDATE
+					 , T.SOC_CHANGE_CD	= S.SOC_CHANGE_CD
+					 , T.SOC_STATE_CD	= S.SOC_STATE_CD
+					 , T.REWARD_TOT_MON	= S.REWARD_TOT_MON
+					 , T.EMP_MON		= S.EMP_MON
+					 , T.CHKDATE		= SYSDATE
+					 , T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				T.ENTER_CD
+			  , T.SABUN
+			  , T.SEQ
+			  , T.SDATE
+			  , T.EDATE
+			  , T.SOC_CHANGE_CD
+			  , T.SOC_STATE_CD
+			  , T.REWARD_TOT_MON
+			  , T.EMP_MON
+			  , T.CHKDATE
+			  , T.CHKID
+			)
+			VALUES
+			(
+				#{ssnEnterCd}
+			  , S.SABUN
+			  , S.SEQ
+			  , S.SDATE
+			  , S.EDATE
+			  , S.SOC_CHANGE_CD
+			  , S.SOC_STATE_CD
+			  , S.REWARD_TOT_MON
+			  , S.EMP_MON
+			  , SYSDATE
+			  , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<update id="saveEmpInsMgrPayment" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN305 T
+		USING	(
+				SELECT A.SABUN
+					 , A.PAY_ACTION_CD
+					 , A.SOC_DEDUCT_CD
+					 , A.STD_MON
+					 , A.SELF_MON
+					 , A.COMP_MON
+					 , A.SELF_RATE
+					 , A.COMP_RATE
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS PAY_ACTION_CD
+							 , NULL	AS SOC_DEDUCT_CD
+							 , NULL	AS STD_MON
+							 , NULL	AS SELF_MON
+							 , NULL	AS COMP_MON
+							 , NULL	AS SELF_RATE
+							 , NULL	AS COMP_RATE
+						  FROM DUAL ]]>
+				<foreach item="rm" collection="mergeRows">
+						UNION ALL
+						SELECT TRIM(#{rm.sabun})					AS SABUN
+							 , TRIM(#{rm.payActionCd})				AS PAY_ACTION_CD
+							 , TRIM(#{rm.socDeductCd})				AS SOC_DEDUCT_CD
+							 , TO_NUMBER(TRIM(#{rm.stdMon}))		AS STD_MON
+							 , TO_NUMBER(TRIM(#{rm.selfMon}))		AS SELF_MON
+							 , TO_NUMBER(TRIM(#{rm.compMon}))		AS COMP_MON
+							 , TO_NUMBER(TRIM(#{rm.selfRate}))		AS SELF_RATE
+							 , TO_NUMBER(TRIM(#{rm.compRate}))		AS COMP_RATE
+						  FROM DUAL
+				</foreach>
+	<![CDATA[
+						) A
+				WHERE A.SABUN IS NOT NULL
+				  AND A.PAY_ACTION_CD IS NOT NULL
+				) S
+		ON	(	T.ENTER_CD		= #{ssnEnterCd}
+			AND	T.SABUN			= S.SABUN
+			AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.SOC_DEDUCT_CD	= S.SOC_DEDUCT_CD
+					 , T.STD_MON		= S.STD_MON
+					 , T.SELF_MON		= S.SELF_MON
+					 , T.COMP_MON		= S.COMP_MON
+					 , T.SELF_RATE		= S.SELF_RATE
+					 , T.CHKDATE		= SYSDATE
+					 , T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+			  T.ENTER_CD
+			, T.SABUN
+			, T.PAY_ACTION_CD
+			, T.SOC_DEDUCT_CD
+			, T.STD_MON
+			, T.SELF_MON
+			, T.COMP_MON
+			, T.SELF_RATE
+			, T.COMP_RATE
+			, T.CHKDATE
+			, T.CHKID
+			)
+			VALUES
+			(
+			  #{ssnEnterCd}
+			, S.SABUN
+			, S.PAY_ACTION_CD
+			, S.SOC_DEDUCT_CD
+			, S.STD_MON
+			, S.SELF_MON
+			, S.COMP_MON
+			, S.SELF_RATE
+			, S.COMP_RATE
+			, SYSDATE
+			, #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<delete id="deleteEmpInsMgrChange" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN303
+		 WHERE ENTER_CD||'_'||SABUN||'_'||SDATE||'_'||TO_CHAR(SEQ) IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq ''
+					 and rm.sdate != null and rm.sdate neq '' and rm.seq != null and rm.seq neq ''">
+					 TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.sdate})||'_'||TRIM(#{rm.seq})
+			</if>
+		</foreach>
+				)
+	</delete>
+		
+	<delete id="deleteEmpInsMgrPayment" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN305
+		 WHERE ENTER_CD||'_'||SABUN||'_'||PAY_ACTION_CD IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq '' and rm.payActionCd != null and rm.payActionCd neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.payActionCd})
+			</if>
+		</foreach>
+				)
+	</delete>
+</mapper>

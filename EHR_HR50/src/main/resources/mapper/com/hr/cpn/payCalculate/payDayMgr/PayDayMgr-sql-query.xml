@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payDayMgr">
+		<!-- 급여코드 -->
+		<select parameterType="map" resultType="cMap" id="getCpnPayChPopupNotInCdList">
+
+		   <![CDATA[
+	 	       SELECT DISTINCT  PAY_CD AS CODE
+	 	                      , PAY_NM AS CODE_NM
+	 	       FROM TCPN051
+	 	       WHERE ENTER_CD = #{ssnEnterCd}
+                 AND RUN_TYPE NOT IN ('00004','Y0001','RETRO')
+	 	       ORDER BY PAY_CD ASC
+	 	   ]]>
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPayDayChPopupList">
+
+				<![CDATA[
+				SELECT ROWNUM AS RNUM
+				     , ENTER_CD
+				     , PAY_ACTION_CD
+				     , PAY_ACTION_NM
+				     , PAY_YM
+				     , PAY_CD
+				     , RUN_TYPE
+				     , PAYMENT_YMD
+				     , TO_CHAR(TO_DATE(PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+				     , ORD_SYMD
+				     , ORD_EYMD
+				     , TIME_YM
+				     , CAL_TAX_METHOD
+				     , CAL_TAX_SYM
+				     , CAL_TAX_EYM
+				     , ADD_TAX_RATE
+				     , BON_SYMD
+				     , BON_EYMD
+				     , GNT_SYMD
+				     , GNT_EYMD
+				     , BON_CAL_TYPE
+				     , BON_STD_CNT
+				     , BON_APPLY_TYPE
+				     , BON_MON_RATE
+				     , PAYMENT_METHOD
+				     , MAN_CNT
+				     , DECODE(CLOSE_YN,'Y','1','0') AS CLOSE_YN
+				     , PAY_NM
+				     , BIGO
+				     , TAX_PERIORD_CHOICE_YN
+				FROM (
+						SELECT DISTINCT A.ENTER_CD
+		                      , A.PAY_ACTION_CD
+		                      , A.PAY_ACTION_NM
+		                      , A.PAY_YM
+		                      , A.PAY_CD
+		                      , B.RUN_TYPE
+		                      , A.PAYMENT_YMD
+		                      , A.ORD_SYMD
+		                      , A.ORD_EYMD
+		                      , A.TIME_YM
+		                      , A.CAL_TAX_METHOD
+		                      , A.CAL_TAX_SYM
+		                      , A.CAL_TAX_EYM
+		                      , A.ADD_TAX_RATE
+		                      , A.BON_SYMD
+		                      , A.BON_EYMD
+		                      , A.GNT_SYMD
+		                      , A.GNT_EYMD
+		                      , A.BON_CAL_TYPE
+		                      , A.BON_STD_CNT
+		                      , A.BON_APPLY_TYPE
+		                      , A.BON_MON_RATE
+		                      , A.PAYMENT_METHOD
+	                             , (SELECT COUNT(*)
+	                               FROM TCPN203
+	                               WHERE ENTER_CD = A.ENTER_CD
+	                               AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS MAN_CNT
+	                             , C.CLOSE_YN
+	                             , B.PAY_NM
+	                             , A.BIGO
+	                             , A.TAX_PERIORD_CHOICE_YN
+						  FROM TCPN201 A
+				      		 , TCPN051 B
+				             , TCPN981 C
+				             , TCPN203 D
+						 WHERE A.ENTER_CD		= B.ENTER_CD
+						   AND A.PAY_CD			= B.PAY_CD
+						   AND A.ENTER_CD		= D.ENTER_CD(+)
+						   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD(+)
+						   AND A.ENTER_CD		= C.ENTER_CD(+)
+						   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD(+)
+						   AND A.ENTER_CD		= #{ssnEnterCd}
+				           AND B.RUN_TYPE NOT IN ('00004','Y0001','RETRO')
+				           AND A.PAY_ACTION_CD <> #{searchPayActionCd}
+				                   			]]>
+				         <if test='searchPayCd != null and !searchPayCd.equals("")'>
+				         	AND A.PAY_CD	LIKE '%'|| #{searchPayCd} ||'%'
+						 </if>
+				         <if test='searchMonthFrom != null and !searchMonthFrom.equals("") and searchMonthTo != null and !searchMonthTo.equals("")'>
+				         	AND A.PAY_YM	BETWEEN REPLACE(#{searchMonthFrom}, '-', '') AND REPLACE(#{searchMonthTo}, '-', '')
+						 </if>
+						<if test='searchSabun != null and !searchSabun.equals("")'>
+						   AND D.SABUN		= #{searchSabun}
+						</if>
+				         ORDER BY A.PAY_YM DESC, A.PAYMENT_YMD DESC, A.PAY_ACTION_CD DESC
+				    )
+		</select>
+		
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayDayMgrList">
+
+				<![CDATA[
+				SELECT ROWNUM AS RNUM
+				     , ENTER_CD
+				     , PAY_ACTION_CD
+				     , PAY_ACTION_NM
+				     , PAY_YM
+				     , PAY_CD
+				     , RUN_TYPE
+				     , PAYMENT_YMD
+				     , ORD_SYMD
+				     , ORD_EYMD
+				     , TIME_YM
+				     , CAL_TAX_METHOD
+				     , CAL_TAX_SYM
+				     , CAL_TAX_EYM
+				     , ADD_TAX_RATE
+				     , BON_SYMD
+				     , BON_EYMD
+				     , GNT_SYMD
+				     , GNT_EYMD
+				     , BON_CAL_TYPE
+				     , BON_STD_CNT
+				     , BON_APPLY_TYPE
+				     , BON_MON_RATE
+				     , PAYMENT_METHOD
+				     , MAN_CNT
+				     , DECODE(CLOSE_YN, 'Y', '1', 'N', '0') AS CLOSE_YN
+				     , BIGO
+				     , '0' AS DETAIL
+				     , (SELECT COUNT(*) FROM TCPN221 AA WHERE AA.ENTER_CD = A.ENTER_CD AND AA.PAY_ACTION_CD = A.PAY_ACTION_CD ) AS CNT
+				     , TAX_PERIORD_CHOICE_YN
+				     , '0' AS CNT_DETAIL
+				FROM (
+				        SELECT DISTINCT A.ENTER_CD
+				                      , A.PAY_ACTION_CD
+				                      , A.PAY_ACTION_NM
+				                      , A.PAY_YM
+				                      , A.PAY_CD
+				                      , B.RUN_TYPE
+				                      , A.PAYMENT_YMD
+				                      , A.ORD_SYMD
+				                      , A.ORD_EYMD
+				                      , A.TIME_YM
+				                      , A.CAL_TAX_METHOD
+				                      , A.CAL_TAX_SYM
+				                      , A.CAL_TAX_EYM
+				                      , A.ADD_TAX_RATE
+				                      , A.BON_SYMD
+				                      , A.BON_EYMD
+				                      , A.GNT_SYMD
+				                      , A.GNT_EYMD
+				                      , A.BON_CAL_TYPE
+				                      , A.BON_STD_CNT
+				                      , A.BON_APPLY_TYPE
+				                      , A.BON_MON_RATE
+				                      , A.PAYMENT_METHOD
+				                      , A.BIGO
+		                              , (SELECT COUNT(*)
+		                                FROM TCPN203
+		                                WHERE ENTER_CD = A.ENTER_CD
+		                                AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS MAN_CNT
+		                              , C.CLOSE_YN
+		                              , A.TAX_PERIORD_CHOICE_YN
+				          FROM TCPN201 A, TCPN051 B
+				              , TCPN981 C
+				         WHERE A.ENTER_CD      = #{ssnEnterCd}
+				            AND A.PAY_CD IN (SELECT PAY_CD
+											FROM TCPN051
+											WHERE ENTER_CD = #{ssnEnterCd}
+											  AND RUN_TYPE NOT IN ('00004')
+											) ]]>
+				         <if test='searchPayCd != null and !searchPayCd.equals("")'>
+				         	AND A.PAY_CD        = TRIM(#{searchPayCd})
+						</if>
+				         <if test='searchMonthFrom != null and !searchMonthFrom.equals("") and searchMonthTo != null and !searchMonthTo.equals("")'>
+				         	AND A.PAY_YM        BETWEEN REPLACE(#{searchMonthFrom}, '-', '') AND REPLACE(#{searchMonthTo}, '-', '')
+				         </if>
+				         <if test='searchPayCdIn != null and !searchPayCdIn.equals("")'>
+				            AND A.PAY_CD IN
+		<foreach collection="searchPayCdIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				         </if>
+				         AND B.ENTER_CD      = A.ENTER_CD
+				         AND B.PAY_CD        = A.PAY_CD
+				         AND B.RUN_TYPE      NOT IN ('00004')
+				         AND A.ENTER_CD      = C.ENTER_CD      (+)
+				         AND A.PAY_ACTION_CD = C.PAY_ACTION_CD (+)
+				         ORDER BY A.PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+				    ) A
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPayDayMgrMap">
+
+				<![CDATA[
+					SELECT RUN_TYPE, PAYMENT_DD
+                    	, CASE WHEN PAYMENT_MM = 'thatM' OR PAYMENT_MM IS NULL THEN #{selectPayYm}
+                          ELSE TO_CHAR(ADD_MONTHS(TO_DATE(#{selectPayYm},'YYYYMM'),1),'YYYYMM') END AS PAYMENT_YM
+					FROM TCPN051
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND PAY_CD = #{selectPayCd}
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePayDayMgr">
+					MERGE INTO TCPN201 T
+					USING	(
+							SELECT	  PAY_ACTION_CD
+									, PAY_ACTION_NM
+									, PAY_YM
+									, PAY_CD
+									, PAYMENT_YMD
+									, ORD_SYMD
+									, ORD_EYMD
+									, TIME_YM
+									, CAL_TAX_METHOD
+									, CAL_TAX_SYM
+									, CAL_TAX_EYM
+									, ADD_TAX_RATE
+									, BON_SYMD
+									, BON_EYMD
+									, GNT_SYMD
+									, GNT_EYMD
+									, BON_CAL_TYPE
+									, BON_APPLY_TYPE
+									, BON_MON_RATE
+									, PAYMENT_METHOD
+									, BIGO
+									, TAX_PERIORD_CHOICE_YN
+							FROM	(
+									SELECT	  NULL		AS PAY_ACTION_CD
+											, NULL		AS PAY_ACTION_NM
+											, NULL		AS PAY_YM
+											, NULL		AS PAY_CD
+											, NULL		AS PAYMENT_YMD
+											, NULL		AS ORD_SYMD
+											, NULL		AS ORD_EYMD
+											, NULL		AS TIME_YM
+											, NULL		AS CAL_TAX_METHOD
+											, NULL		AS CAL_TAX_SYM
+											, NULL		AS CAL_TAX_EYM
+											, NULL		AS ADD_TAX_RATE
+											, NULL		AS BON_SYMD
+											, NULL		AS BON_EYMD
+											, NULL		AS GNT_SYMD
+											, NULL		AS GNT_EYMD
+											, NULL		AS BON_CAL_TYPE
+											, NULL		AS BON_APPLY_TYPE
+											, NULL		AS BON_MON_RATE
+											, NULL		AS PAYMENT_METHOD
+											, NULL		AS BIGO
+											, NULL		AS TAX_PERIORD_CHOICE_YN
+									FROM	DUAL
+						<bind name="icnt" value="1" />
+						<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+									<choose>
+										<when test='rm.payActionCd != null and !rm.payActionCd.equals("")'>
+											TRIM(#{rm.payActionCd}) 			AS PAY_ACTION_CD
+										</when>
+										<when test='rm.payActionCd != null and rm.payActionCd.equals("")'>
+											TRIM((SELECT TO_CHAR(TO_NUMBER(NVL(MAX(SUBSTR(PAY_ACTION_CD, 7, 3)), '0')) + ${icnt}, '000')
+											FROM TCPN201
+											WHERE SUBSTR (PAY_ACTION_CD, 1, 6) = REPLACE(#{rm.payYm}, '-', '')
+											AND ENTER_CD = #{ssnEnterCd}
+											))	AS PAY_ACTION_CD
+											<!-- icnt 증가 -->
+											<bind name="icnt" value="icnt + 1" />
+										</when>
+									</choose>
+											, TRIM(#{rm.payActionNm}) AS PAY_ACTION_NM
+											, TRIM(#{rm.payYm}) AS PAY_YM
+											, TRIM(#{rm.payCd}) AS PAY_CD
+											, TRIM(#{rm.paymentYmd}) AS PAYMENT_YMD
+											, TRIM(#{rm.ordSymd}) AS ORD_SYMD
+											, TRIM(#{rm.ordEymd}) AS ORD_EYMD
+											, TRIM(#{rm.timeYm}) AS TIME_YM
+											, TRIM(#{rm.calTaxMethod}) AS CAL_TAX_METHOD
+											, TRIM(#{rm.calTaxSym}) AS CAL_TAX_SYM
+											, TRIM(#{rm.calTaxEym}) AS CAL_TAX_EYM
+											, TRIM(#{rm.addTaxRate}) AS ADD_TAX_RATE
+											, TRIM(#{rm.bonSymd}) AS BON_SYMD
+											, TRIM(#{rm.bonEymd}) AS BON_EYMD
+											, TRIM(#{rm.gntSymd}) AS GNT_SYMD
+											, TRIM(#{rm.gntEymd}) AS GNT_EYMD
+											, TRIM(#{rm.bonCalType}) AS BON_CAL_TYPE
+											, TRIM(#{rm.bonApplyType}) AS BON_APPLY_TYPE
+											, TRIM(#{rm.bonMonRate}) AS BON_MON_RATE
+											, TRIM(#{rm.paymentMethod}) AS PAYMENT_METHOD
+											, TRIM(#{rm.bigo}) AS BIGO
+											, TRIM(#{rm.taxPeriordChoiceYn}) AS TAX_PERIORD_CHOICE_YN
+											FROM   DUAL
+						</foreach>
+									)  WHERE PAY_ACTION_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = #{ssnEnterCd} AND  T.PAY_ACTION_CD = S.PAY_ACTION_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAY_ACTION_NM  	= S.PAY_ACTION_NM
+									, T.PAY_YM         	= S.PAY_YM
+									, T.PAY_CD         	= S.PAY_CD
+									, T.PAYMENT_YMD    	= S.PAYMENT_YMD
+									, T.ORD_SYMD       	= S.ORD_SYMD
+									, T.ORD_EYMD       	= S.ORD_EYMD
+									, T.TIME_YM        	= S.TIME_YM
+									, T.CAL_TAX_METHOD 	= S.CAL_TAX_METHOD
+									, T.CAL_TAX_SYM    	= S.CAL_TAX_SYM
+									, T.CAL_TAX_EYM    	= S.CAL_TAX_EYM
+									, T.ADD_TAX_RATE   	= S.ADD_TAX_RATE
+									, T.BON_SYMD       	= S.BON_SYMD
+									, T.BON_EYMD       	= S.BON_EYMD
+									, T.GNT_SYMD       	= S.GNT_SYMD
+									, T.GNT_EYMD       	= S.GNT_EYMD
+									, T.BON_CAL_TYPE   	= S.BON_CAL_TYPE
+									, T.BON_APPLY_TYPE 	= S.BON_APPLY_TYPE
+									, T.BON_MON_RATE   	= S.BON_MON_RATE
+									, T.PAYMENT_METHOD 	= S.PAYMENT_METHOD
+									, T.BIGO 	= S.BIGO
+									, T.TAX_PERIORD_CHOICE_YN 	= S.TAX_PERIORD_CHOICE_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayDayMgr">
+				<![CDATA[
+					DELETE FROM TCPN201
+					WHERE 	ENTER_CD = #{ssnEnterCd}
+					AND 	PAY_ACTION_CD = #{payActionCd}
+				]]>
+		</delete>
+
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertPayDayMgr">
+						INSERT INTO  TCPN201
+						(
+							  ENTER_CD
+							, PAY_ACTION_CD
+							, PAY_ACTION_NM
+							, PAY_YM
+							, PAY_CD
+							, PAYMENT_YMD
+							, ORD_SYMD
+							, ORD_EYMD
+							, TIME_YM
+							, CAL_TAX_METHOD
+							, CAL_TAX_SYM
+							, CAL_TAX_EYM
+							, ADD_TAX_RATE
+							, BON_SYMD
+							, BON_EYMD
+							, GNT_SYMD
+							, GNT_EYMD
+							, BON_CAL_TYPE
+							, BON_APPLY_TYPE
+							, BON_MON_RATE
+							, PAYMENT_METHOD
+							, BIGO
+							, TAX_PERIORD_CHOICE_YN
+							, CHKDATE
+							, CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, #{payYm} || TRIM((SELECT TO_CHAR(TO_NUMBER(NVL(MAX(SUBSTR(PAY_ACTION_CD, 7, 3)), '0')) + 1, '000')
+										     FROM TCPN201
+										     WHERE SUBSTR (PAY_ACTION_CD, 1, 6) = REPLACE(#{payYm}, '-', '')
+										     AND ENTER_CD = #{ssnEnterCd}
+										    ))
+							, #{payActionNm}
+							, #{payYm}
+							, #{payCd}
+							, #{paymentYmd}
+							, #{ordSymd}
+							, #{ordEymd}
+							, #{timeYm}
+							, #{calTaxMethod}
+							, #{calTaxSym}
+							, #{calTaxEym}
+							, #{addTaxRate}
+							, #{bonSymd}
+							, #{bonEymd}
+							, #{gntSymd}
+							, #{gntEymd}
+							, #{bonCalType}
+							, #{bonApplyType}
+							, #{bonMonRate}
+							, #{paymentMethod}
+							, #{bigo}
+							, #{taxPeriordChoiceYn}
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</insert>
+
+		<select parameterType="map" resultType="cMap" id="getPayDayMgrPopList">
+
+				<![CDATA[
+				SELECT	A.ENTER_CD					/*	회사구분(TORG900)		*/
+					,	A.PAY_ACTION_CD				/*	급여계산코드(TCPN201)		*/
+					,	A.TARGET_PAY_ACTION_CD		/*	대상급여계산코드(TCPN201)	*/
+					,	(SELECT PAY_ACTION_NM FROM TCPN201 WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.TARGET_PAY_ACTION_CD) AS TARGET_PAY_ACTION_NM
+					,	(SELECT PAY_YM FROM TCPN201 WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.TARGET_PAY_ACTION_CD) AS PAY_YM
+					,	A.BIGO						/*	비고					*/
+					,	A.CHKDATE					/*	최종수정시간				*/
+					,	A.CHKID						/*	최종수정자				*/
+				FROM	TCPN221	A
+				WHERE	A.ENTER_CD			=	#{ssnEnterCd}
+				AND		A.PAY_ACTION_CD		=	#{searchPayActionCd}
+				]]>
+
+
+		</select>
+
+		<update parameterType="map" id="savePayDayMgrPop">
+						MERGE INTO TCPN221	T
+						USING
+						(
+									SELECT	TRIM(#{ssnEnterCd})	AS	ENTER_CD
+										,	SYSDATE				AS	CHKDATE
+										,	#{ssnSabun}			AS	CHKID
+										,	PAY_ACTION_CD
+										,	TARGET_PAY_ACTION_CD
+										,	BIGO
+							FROM	(
+									SELECT	NULL		AS	PAY_ACTION_CD
+										,	NULL		AS	TARGET_PAY_ACTION_CD
+										,	NULL		AS	BIGO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									SELECT	TRIM(#{rm.payActionCd})			AS	PAY_ACTION_CD
+										,	TRIM(#{rm.targetPayActionCd})	AS	TARGET_PAY_ACTION_CD
+										,	TRIM(#{rm.bigo})				AS	BIGO
+									FROM	DUAL
+</foreach>
+									)	WHERE	PAY_ACTION_CD IS NOT NULL
+										AND		TARGET_PAY_ACTION_CD IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.PAY_ACTION_CD			=		S.PAY_ACTION_CD
+							AND	T.TARGET_PAY_ACTION_CD	=		S.TARGET_PAY_ACTION_CD
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.BIGO			=	S.BIGO
+						,	T.CHKDATE		=	S.CHKDATE
+						,	T.CHKID			=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					(
+							T.ENTER_CD
+						,	T.PAY_ACTION_CD
+						,	T.TARGET_PAY_ACTION_CD
+						,	T.BIGO
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.PAY_ACTION_CD
+						,	S.TARGET_PAY_ACTION_CD
+						,	S.BIGO
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+		</update>
+
+		<delete parameterType="map" id="deletePayDayMgrPop">
+
+
+					DELETE	FROM TCPN221
+					WHERE	(ENTER_CD, PAY_ACTION_CD, TARGET_PAY_ACTION_CD) IN ((NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.payActionCd != null and !rm.payActionCd.equals("")'>
+										<if test='rm.targetPayActionCd != null and !rm.targetPayActionCd.equals("")'>
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.payActionCd} ) , TRIM( #{rm.targetPayActionCd} ) )
+										</if>
+										</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+	</mapper>

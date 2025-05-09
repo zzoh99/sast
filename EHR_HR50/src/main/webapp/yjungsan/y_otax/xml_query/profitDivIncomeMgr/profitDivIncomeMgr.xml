@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천징수영수증
+ -->
+<root>
+
+	<!-- 사업자 조회  -->
+	<query id="selectProfitDivIncomeMgrList">
+		<![CDATA[
+			SELECT A.SABUN
+				 , B.NAME
+				 , CRYPTIT.DECRYPT (B.RES_NO, A.ENTER_CD)	AS RES_NO
+				 , B.SDATE
+				 , B.EDATE
+				 , B.EARNER_CD
+				 , B.BUSINESS_PLACE_CD
+				 , B.EARNER_TYPE
+				 , B.REGINO
+				 , B.EARNER_NM
+				 , B.EARNER_ENG_NM
+				 , DECODE(B.CITIZEN_TYPE, '9', '1', '0')	AS CITIZEN_TYPE
+				 , DECODE(B.RESIDENCY_TYPE, '2', '1', '0')	AS RESIDENCY_TYPE
+				 , B.RESIDENCE_CD
+				 , DECODE(B.BI_NAME_YN, 'Y', '1', '0')		AS BI_NAME_YN
+				 , B.TEL_NO
+				 , B.ADDR
+				 , B.BANK_CD
+				 , CRYPTIT.DECRYPT (B.ACCOUNT_NO, A.ENTER_CD) AS ACCOUNT_NO
+				 , B.MEMO
+				 , '0' AS DETAIL
+				 , A.PAYMENT_YMD
+				 , A.BELONG_YM
+				 , A.SEQ
+				 , A.INCOME_GUBUN
+				 , A.TAX_GUBUN
+				 , A.EARN_MON
+				 , A.TAX_RATE
+				 , A.ITAX_MON
+				 , A.CTAX_MON
+				 , A.RTAX_MON
+				 , A.ATAX_MON
+				 , A.JOSE_TEUKRE
+				 , A.FP_CD
+				 , A.INTEREST_BOND_GUBUN
+				 , A.STOCK_CODE
+			 	 , A.INTEREST_SYMD
+				 , A.INTEREST_EYMD
+				 , A.INTEREST_RATE
+				 , B.LOCATION_CD
+			  FROM TCPN910 A
+				 , TCPN903 B
+			WHERE A.ENTER_CD	= #ssnEnterCd#
+			  AND A.ENTER_CD	= B.ENTER_CD(+)
+			  AND A.SABUN		= B.SABUN(+)
+		   	  AND SUBSTR(A.PAYMENT_YMD,1,6) LIKE TRIM(REPLACE(#paymentYm#,'-',''))||'%'
+			  AND A.BELONG_YM LIKE TRIM(REPLACE(#belongYm#,'-',''))||'%'
+			  AND (NVL(B.NAME,' ') LIKE '%'||trim(#searchSbNm#)||'%'
+			  	   OR NVL(A.SABUN,' ') LIKE '%'||trim(#searchSbNm#)||'%')
+			  AND B.EARNER_CD(+) LIKE '%'||trim(#searchEarnerCd#)||'%'
+			  AND DECODE(#searchBusinessPlaceCd#, NULL, '%', B.BUSINESS_PLACE_CD) = DECODE(#searchBusinessPlaceCd#, NULL, '%', #searchBusinessPlaceCd#)
+			  AND DECODE(#searchLocationCd#, NULL, '%', B.LOCATION_CD) = DECODE(#searchLocationCd#, NULL, '%', #searchLocationCd#)
+			ORDER BY CRYPTIT.DECRYPT (B.RES_NO, A.ENTER_CD), A.SABUN, A.PAYMENT_YMD
+		]]>
+	</query>
+
+	<!-- 사업자 조회  -->
+	<query id="selectProfitDivIncomeMgrCnt">
+		<![CDATA[
+				SELECT COUNT(*) AS CNT
+				FROM TCPN910 A
+				WHERE A.ENTER_CD = #ssnEnterCd#
+				  AND A.BELONG_YM LIKE TRIM(REPLACE(#belong_ym#,'-',''))||'%'
+				  AND A.PAYMENT_YMD = TRIM(REPLACE(#payment_ymd#,'-',''))
+				  AND A.SABUN = #sabun#
+
+			]]>
+	</query>
+
+	<query id="deleteProfitDivIncomeMgr">
+		<![CDATA[
+					DELETE FROM TCPN910
+					 WHERE ENTER_CD = #ssnEnterCd#
+					   AND BELONG_YM = TRIM(REPLACE(#belong_ym#,'-',''))
+					   AND PAYMENT_YMD = TRIM(REPLACE(#payment_ymd#,'-',''))
+					   AND SABUN = #sabun#
+					   AND SEQ   = #seq#
+		]]>
+	</query>
+
+	<query id="mergeProfitDivIncomeMgr">
+		<![CDATA[
+					MERGE INTO TCPN910 T
+					USING	(
+							SELECT A.ENTER_CD
+								, A.SABUN
+								, A.PAYMENT_YMD
+								, A.BELONG_YM
+								, A.SEQ
+								, A.INCOME_GUBUN
+								, A.TAX_GUBUN
+								, A.EARN_MON
+								, A.TAX_RATE
+								, A.ITAX_MON
+								, A.CTAX_MON
+								, A.RTAX_MON
+								, A.ATAX_MON
+								, A.JOSE_TEUKRE
+								, A.FP_CD
+								, A.INTEREST_BOND_GUBUN
+								, A.STOCK_CODE
+								, A.INTEREST_SYMD
+								, A.INTEREST_EYMD
+								, A.INTEREST_RATE
+							  FROM (
+									SELECT   #ssnEnterCd#      		AS ENTER_CD
+											, #sabun#         		AS SABUN
+											, #payment_ymd#         AS PAYMENT_YMD
+											, #belong_ym#           AS BELONG_YM
+											, DECODE(#seq#, ''
+														, (SELECT NVL(MAX(SEQ),0) +1
+											     			FROM TCPN910
+											    			WHERE ENTER_CD    = #ssnEnterCd#
+											      			AND SABUN       = #sabun#
+											      			AND PAYMENT_YMD = #payment_ymd#
+											      			AND BELONG_YM   = #belong_ym#
+											      			)
+											      		, #seq#)	AS SEQ
+											, #income_gubun#        AS INCOME_GUBUN
+											, #tax_gubun#           AS TAX_GUBUN
+											, #earn_mon#            AS EARN_MON
+											, #tax_rate#            AS TAX_RATE
+											, #itax_mon#            AS ITAX_MON
+											, #ctax_mon#            AS CTAX_MON
+											, #rtax_mon#            AS RTAX_MON
+											, #atax_mon#            AS ATAX_MON
+											, #jose_teukre#         AS JOSE_TEUKRE
+											, #fp_cd#            	AS FP_CD
+											, #interest_bond_gubun# AS INTEREST_BOND_GUBUN
+											, #stock_code#          AS STOCK_CODE
+											, #interest_symd#       AS INTEREST_SYMD
+											, #interest_eymd#       AS INTEREST_EYMD
+											, #interest_rate#       AS INTEREST_RATE
+									  FROM DUAL
+									) A
+							 WHERE A.SABUN	IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #ssnEnterCd#
+						AND	T.SABUN			= S.SABUN
+						AND	T.PAYMENT_YMD	= S.PAYMENT_YMD
+						AND	T.BELONG_YM		= S.BELONG_YM
+						AND	T.SEQ			= S.SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET    T.INCOME_GUBUN        = S.INCOME_GUBUN
+									, T.TAX_GUBUN           = S.TAX_GUBUN
+									, T.EARN_MON            = S.EARN_MON
+									, T.TAX_RATE            = S.TAX_RATE
+									, T.ITAX_MON            = S.ITAX_MON
+									, T.CTAX_MON            = S.CTAX_MON
+									, T.RTAX_MON            = S.RTAX_MON
+									, T.ATAX_MON            = S.ATAX_MON
+									, T.JOSE_TEUKRE         = S.JOSE_TEUKRE
+									, T.FP_CD             	= S.FP_CD
+									, T.INTEREST_BOND_GUBUN = S.INTEREST_BOND_GUBUN
+									, T.STOCK_CODE          = S.STOCK_CODE
+									, T.INTEREST_SYMD       = S.INTEREST_SYMD
+									, T.INTEREST_EYMD       = S.INTEREST_EYMD
+									, T.INTEREST_RATE       = S.INTEREST_RATE
+								    , T.CHKDATE		  = SYSDATE
+								    , T.CHKID		  = #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.PAYMENT_YMD
+							, T.BELONG_YM
+							, T.SEQ
+							, T.INCOME_GUBUN
+							, T.TAX_GUBUN
+							, T.EARN_MON
+							, T.TAX_RATE
+							, T.ITAX_MON
+							, T.CTAX_MON
+							, T.RTAX_MON
+							, T.ATAX_MON
+							, T.JOSE_TEUKRE
+							, T.FP_CD
+							, T.INTEREST_BOND_GUBUN
+							, T.STOCK_CODE
+							, T.INTEREST_SYMD
+							, T.INTEREST_EYMD
+							, T.INTEREST_RATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #ssnEnterCd#
+							, S.SABUN
+							, S.PAYMENT_YMD
+							, S.BELONG_YM
+							, S.SEQ
+							, S.INCOME_GUBUN
+							, S.TAX_GUBUN
+							, S.EARN_MON
+							, S.TAX_RATE
+							, S.ITAX_MON
+							, S.CTAX_MON
+							, S.RTAX_MON
+							, S.ATAX_MON
+							, S.JOSE_TEUKRE
+							, S.FP_CD
+							, S.INTEREST_BOND_GUBUN
+							, S.STOCK_CODE
+							, S.INTEREST_SYMD
+							, S.INTEREST_EYMD
+							, S.INTEREST_RATE
+							, SYSDATE
+							, #ssnSabun#
+						)
+		]]>
+	</query>
+</root>

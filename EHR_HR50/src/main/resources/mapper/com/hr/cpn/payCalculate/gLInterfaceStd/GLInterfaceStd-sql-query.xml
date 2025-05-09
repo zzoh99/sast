@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.gLInterfaceStd">
+<!-- 		전표처리기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getGLInterfaceStdList">
+
+
+				SELECT A.ENTER_CD, 
+					   A.PAY_CD, 
+					   A.ACCT_CD,
+					   A.ELEMENT_SET_CD, 
+					   A.C_D_TYPE, 
+					   A.ACCT_L_TYPE,
+				       A.ACCT_M_TYPE, 
+				       A.ACCT_S_TYPE, 
+				       A.ACCT_TYPE1,
+				       A.ACCT_TYPE2, 
+				       A.ACCT_TYPE3, 
+				       A.NOTE, 
+				       A.CHKDATE,
+				       A.CHKID, 
+				       AA.NOTE2 AS GBN_TYPE,
+				       A.SEQ
+				  FROM  TCPN970 A
+					  , TSYS005 AA 
+					  , TSYS001 BB  
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				 <if test='searchPayCd != null and !searchPayCd.equals("")'>
+				   AND  DECODE( #{searchPayCd} , '', '!', A.PAY_CD      ) = DECODE ( #{searchPayCd}, '', '!', #{searchPayCd})
+				 </if>
+				 <if test='searchAccCd != null and !searchAccCd.equals("")'>
+				   AND  DECODE( #{searchAccCd} , '', '!', A.ACCT_CD     ) = DECODE ( #{searchAccCd}, '', '!', #{searchAccCd})
+				 </if>
+				 <if test='searchBoundary != null and !searchBoundary.equals("")'>
+				   AND  DECODE( #{searchBoundary} , '', '!', A.C_D_TYPE    ) = DECODE ( #{searchBoundary}, '', '!', #{searchBoundary})
+				 </if>
+				 <if test='searchAccStype != null and !searchAccStype.equals("")'>
+				   AND  DECODE( #{searchAccStype} , '', '!', A.ACCT_S_TYPE ) = DECODE ( #{searchAccStype}, '', '!', #{searchAccStype})
+				 </if>
+				   
+				   AND AA.GRCODE_CD   = BB.GRCODE_CD
+				   AND AA.ENTER_CD    = A.ENTER_CD
+				   AND AA.GRCODE_CD   = 'C14000' 
+				   AND AA.CODE        = A.ACCT_CD
+				  
+				ORDER BY A.ENTER_CD				     
+						, A.PAY_CD
+						, A.SEQ
+						, A.ACCT_CD
+						, A.ELEMENT_SET_CD
+						, A.C_D_TYPE
+
+
+
+		</select>
+		
+<!-- 		전표처리기준관리 저장 -->	
+		<update parameterType="map" id="saveGLInterfaceStd">
+
+
+					MERGE INTO TCPN970 T
+					USING	(
+							SELECT A.PAY_CD
+								 , A.ACCT_CD
+								 , A.ELEMENT_SET_CD
+								 , A.C_D_TYPE
+								 , A.ACCT_L_TYPE
+								 , A.ACCT_M_TYPE
+								 , A.ACCT_S_TYPE
+								 , A.ACCT_TYPE1
+								 , A.ACCT_TYPE2
+								 , A.ACCT_TYPE3
+								 , A.NOTE
+								 , A.SEQ
+							  FROM (
+									SELECT NULL		AS PAY_CD        
+										 , NULL		AS ACCT_CD       
+										 , NULL		AS ELEMENT_SET_CD
+										 , NULL		AS C_D_TYPE      
+										 , NULL		AS ACCT_L_TYPE   
+										 , NULL		AS ACCT_M_TYPE   
+										 , NULL		AS ACCT_S_TYPE   
+										 , NULL		AS ACCT_TYPE1    
+										 , NULL		AS ACCT_TYPE2    
+										 , NULL		AS ACCT_TYPE3    
+										 , NULL		AS NOTE
+										 , NULL		AS SEQ 
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payCd})			AS PAY_CD
+										 , TRIM(#{rm.acctCd})			AS ACCT_CD        
+										 , TRIM(#{rm.elementSetCd})		AS ELEMENT_SET_CD
+										 , TRIM(#{rm.cDType})			AS C_D_TYPE       
+										 , TRIM(#{rm.acctLType})		AS ACCT_L_TYPE    
+										 , TRIM(#{rm.acctMType})		AS ACCT_M_TYPE    
+										 , TRIM(#{rm.acctSType})		AS ACCT_S_TYPE    
+										 , TRIM(#{rm.acctType1})		AS ACCT_TYPE1     
+										 , TRIM(#{rm.acctType2})		AS ACCT_TYPE2     
+										 , TRIM(#{rm.acctType3})		AS ACCT_TYPE3     
+										 , TRIM(#{rm.note})				AS NOTE
+										 , TRIM(#{rm.seq})				AS SEQ
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_CD IS NOT NULL
+							) S
+					ON (	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.PAY_CD			= S.PAY_CD
+						AND	T.ACCT_CD			= S.ACCT_CD
+						AND	T.ELEMENT_SET_CD	= S.ELEMENT_SET_CD
+						AND	T.C_D_TYPE			= S.C_D_TYPE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.ACCT_L_TYPE	= S.ACCT_L_TYPE
+								 , T.ACCT_M_TYPE	= S.ACCT_M_TYPE
+								 , T.ACCT_S_TYPE	= S.ACCT_S_TYPE
+								 , T.ACCT_TYPE1		= S.ACCT_TYPE1
+								 , T.ACCT_TYPE2		= S.ACCT_TYPE2
+								 , T.ACCT_TYPE3		= S.ACCT_TYPE3
+								 , T.NOTE			= S.NOTE
+								 , T.SEQ			= S.SEQ
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_CD
+							, T.ACCT_CD
+							, T.ELEMENT_SET_CD
+							, T.C_D_TYPE
+							, T.ACCT_L_TYPE
+							, T.ACCT_M_TYPE
+							, T.ACCT_S_TYPE
+							, T.ACCT_TYPE1
+							, T.ACCT_TYPE2
+							, T.ACCT_TYPE3
+							, T.NOTE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_CD          
+							, S.ACCT_CD         
+							, S.ELEMENT_SET_CD  
+							, S.C_D_TYPE        
+							, S.ACCT_L_TYPE     
+							, S.ACCT_M_TYPE     
+							, S.ACCT_S_TYPE     
+							, S.ACCT_TYPE1      
+							, S.ACCT_TYPE2      
+							, S.ACCT_TYPE3      
+							, S.NOTE
+							, S.SEQ            
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+<!-- 		전표처리기준관리 삭제 -->
+		<delete parameterType="map" id="deleteGLInterfaceStd">
+
+
+					DELETE FROM TCPN970
+					 WHERE ENTER_CD||'_'||PAY_CD||'_'||ACCT_CD||'_'||ELEMENT_SET_CD||'_'||C_D_TYPE IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+							,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.payCd})||'_'||TRIM(#{rm.acctCd})||'_'||TRIM(#{rm.elementSetCd})||'_'||TRIM(#{rm.cDType})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+
+	</mapper>

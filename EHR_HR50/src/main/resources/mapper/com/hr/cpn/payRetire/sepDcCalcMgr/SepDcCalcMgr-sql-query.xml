@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 건강보험 퇴직정산
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepDcCalcMgr">
+		<select parameterType="map" resultType="cMap" id="getSepDcCalcMgrList">
+					SELECT A.ENTER_CD
+					       ,A.SABUN
+					     , (SELECT F_COM_GET_NAMES(D.ENTER_CD, D.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME
+					     , (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+					       ,F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS JIKCHAK_NM --직책
+					       ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS JIKWEE_NM --직위
+					       ,F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS JIKGUB_NM --직급
+					       ,F_COM_GET_SAL_CLASS(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS SAL_CLASS --호봉
+					       ,F_COM_GET_JOB_NM2(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JOB_NM --직무
+					       ,F_COM_GET_MANAGE_NM(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS MANAGE_NM --계약유형
+					       ,TO_DATE(B.PAYMENT_YMD, 'YYYYMMDD') - TO_DATE(D.EMP_YMD, 'YYYYMMDD') AS WORK_DAY -- 근무일수 
+					       ,A.IMWON_ADD_RATE --임원가산배수					       
+					       ,D.EMP_YMD --입사일
+					       ,D.GEMP_YMD --그룹입사일
+					       ,A.SEP_SYMD --기산시작일
+					       ,A.SEP_EYMD --기산종료일
+					       ,A.YEAR_1_MON --1년치급여
+					       ,A.YEAR_1_BONUS --1년치상여
+					       ,A.PREV_YEONCHA_MON --전년도연차수당
+					       ,A.THIS_RET_MON --당월퇴직추계
+					       ,A.PREV_RET_MON --전월퇴직추계
+					       ,A.CHA_MON --차액
+					       ,A.OVER_1YEAR_YN --근속1년이상여부
+					       ,A.BIGO --비고
+					       ,A.MAGAM_YN
+					       ,F_COM_DECRYPT(D.RES_NO, D.ENTER_CD) AS RES_NO
+					  FROM TCPN776 A, TCPN201 B, THRM100 D --, TCPN203 C
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD = #{payActionCd}
+					   AND B.ENTER_CD = A.ENTER_CD
+					   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+					  -- AND C.ENTER_CD = A.ENTER_CD
+					  -- AND C.ENTER_CD = A.ENTER_CD
+					  -- AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+					  -- AND C.SABUN = A.SABUN
+					   AND D.ENTER_CD = A.ENTER_CD
+					   AND D.SABUN    = A.SABUN
+					<if test="searchSabunName != null and searchSabunName neq ''">
+					   	AND (UPPER(D.SABUN) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%'
+					   	         OR UPPER((SELECT F_COM_GET_NAMES(D.ENTER_CD, D.SABUN, #{ssnLocaleCd}) FROM DUAL)) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%')
+					</if>
+			<if test="searchOrgNm != null and searchOrgNm neq ''">
+					   AND (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, NVL(A.SEP_EYMD, TO_CHAR(SYSDATE, 'YYYYMMDD'))) FROM DUAL) LIKE '%'||TRIM(#{searchOrgNm})||'%'
+			</if>
+					ORDER BY D.NAME   
+		</select>
+		<update parameterType="map" id="saveSepDcCalcMgr">
+
+
+					MERGE INTO TCPN776 T
+					USING	(
+							SELECT 
+							 A.PAY_ACTION_CD
+							, A.SABUN
+							, A.SEP_SYMD
+							, A.SEP_EYMD
+							, A.IMWON_ADD_RATE
+							, A.YEAR_1_MON
+							, A.YEAR_1_BONUS
+							, A.PREV_YEONCHA_MON
+							, A.THIS_RET_MON
+							, A.PREV_RET_MON
+							, A.CHA_MON
+							, A.OVER_1YEAR_YN
+							, A.BIGO
+							, A.MAGAM_YN 
+							FROM (
+									SELECT  NULL AS PAY_ACTION_CD
+											, NULL AS SABUN
+											, NULL AS SEP_SYMD
+											, NULL AS SEP_EYMD
+											, NULL AS IMWON_ADD_RATE 
+											, NULL AS YEAR_1_MON
+											, NULL AS YEAR_1_BONUS
+											, NULL AS PREV_YEONCHA_MON
+											, NULL AS THIS_RET_MON
+											, NULL AS PREV_RET_MON
+											, NULL AS CHA_MON
+											, NULL AS OVER_1YEAR_YN
+											, NULL AS BIGO
+											, NULL AS MAGAM_YN
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+							SELECT TRIM( #{payActionCd} ) AS PAY_ACTION_CD
+								, TRIM(#{rm.sabun}) AS SABUN
+								, TRIM(#{rm.sepSymd}) AS SEP_SYMD
+								, TRIM(#{rm.sepEymd}) AS SEP_EYMD
+								, TRIM(#{rm.imwonAddRate}) AS IMWON_ADD_RATE 								
+								, TRIM(#{rm.year1Mon}) AS YEAR_1_MON
+								, TRIM(#{rm.year1Bonus}) AS YEAR_1_BONUS
+								, TRIM(#{rm.prevYeonchaMon}) AS PREV_YEONCHA_MON
+								, TRIM(#{rm.thisRetMon}) AS THIS_RET_MON
+								, TRIM(#{rm.prevRetMon}) AS PREV_RET_MON
+								, TRIM(#{rm.chaMon}) AS CHA_MON
+								, TRIM(#{rm.over1yearYn}) AS OVER_1YEAR_YN
+								, TRIM(#{rm.bigo}) AS BIGO
+								, TRIM(#{rm.magamYn}) AS MAGAM_YN
+							FROM DUAL
+</foreach>
+								) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD			= #{ssnEnterCd}
+						AND T.PAY_ACTION_CD		= S.PAY_ACTION_CD
+						AND	T.SABUN				= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.SEP_SYMD		= S.SEP_SYMD
+								 , T.SEP_EYMD		= S.SEP_EYMD
+								 , T.IMWON_ADD_RATE		= S.IMWON_ADD_RATE  
+								 , T.YEAR_1_MON		= S.YEAR_1_MON
+								 , T.YEAR_1_BONUS	= S.YEAR_1_BONUS
+								 , T.PREV_YEONCHA_MON	= S.PREV_YEONCHA_MON
+								 , T.THIS_RET_MON	= S.THIS_RET_MON
+								 , T.PREV_RET_MON	= S.PREV_RET_MON
+								 , T.CHA_MON		= S.CHA_MON
+								 , T.OVER_1YEAR_YN	= S.OVER_1YEAR_YN
+								 , T.MAGAM_YN		= S.MAGAM_YN
+								 , T.BIGO			= S.BIGO
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.PAY_ACTION_CD
+						  , T.SABUN
+						  , T.SEP_SYMD
+						  , T.SEP_EYMD
+						  , T.IMWON_ADD_RATE 
+						  , T.YEAR_1_MON
+						  , T.YEAR_1_BONUS
+						  , T.PREV_YEONCHA_MON
+						  , T.THIS_RET_MON
+						  , T.PREV_RET_MON
+						  , T.CHA_MON
+						  , T.OVER_1YEAR_YN
+						  , T.MAGAM_YN
+						  , T.BIGO
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.PAY_ACTION_CD
+						  , S.SABUN
+						  , S.SEP_SYMD
+						  , S.SEP_EYMD
+						  , S.IMWON_ADD_RATE 
+						  , S.YEAR_1_MON
+						  , S.YEAR_1_BONUS
+						  , S.PREV_YEONCHA_MON
+						  , S.THIS_RET_MON
+						  , S.PREV_RET_MON
+						  , S.CHA_MON
+						  , S.OVER_1YEAR_YN
+						  , S.MAGAM_YN
+						  , S.BIGO
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepDcCalcMgr">
+
+
+					DELETE FROM TCPN776
+					 WHERE ENTER_CD||'_'||PAY_ACTION_CD||'_'||SABUN  IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and payActionCd != null and !payActionCd.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{payActionCd})||'_'||TRIM(#{rm.sabun})
+
+							</if>
+</foreach>
+							)
+							 					
+
+
+
+		</delete>
+		
+		<update  statementType="CALLABLE" parameterType="map" id="callP_CPN_SEP_DC_MON">
+
+			<![CDATA[
+					CALL P_CPN_SEP_DC_MON(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						#{gubun,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+
+
+		</update>
+	</mapper>

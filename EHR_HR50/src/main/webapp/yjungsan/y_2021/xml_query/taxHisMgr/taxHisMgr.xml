@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+<!--
+	원천징수세액조회
+ -->
+<root>
+
+	
+	<!-- 원천징수세액 조회  -->
+    <query id="selectTaxHisMgrList">
+        <![CDATA[
+            SELECT A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN
+                , B.NAME
+                , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+                , A.TAX_RATE
+                , C.BLC_INCOME_TAX_MON
+                , C.BLC_INBIT_TAX_MON
+                , C.BLC_AGRCL_TAX_MON
+                , C.BLC_INCOME_TAX_MON AS TOT_MON_S --소득세
+                , C.BLC_INBIT_TAX_MON AS TOT_MON_J --주민세
+                --C.BLC_AGRCL_TAX_MON 농특세 사용 안함
+                , NVL(A.TAX_INS_YN, 'N') AS TAX_INS_YN
+                , TAX_INS_YN_MONTH
+                , CASE WHEN NVL(A.TAX_INS_YN, 'N') = 'N' --AND ( C.BLC_AGRCL_TAX_MON + C.BLC_INCOME_TAX_MON + C.BLC_INBIT_TAX_MON ) > 0
+                       THEN ( C.BLC_INCOME_TAX_MON ) 
+                       ELSE TAX_INS_MON_1
+                   END TAX_INS_MON_1
+                , TAX_INS_MON_2
+                , TAX_INS_MON_3 
+                , CASE WHEN NVL(A.TAX_INS_YN, 'N') = 'N' --AND ( C.BLC_AGRCL_TAX_MON + C.BLC_INCOME_TAX_MON + C.BLC_INBIT_TAX_MON ) > 0
+                       THEN ( C.BLC_INBIT_TAX_MON ) 
+                       ELSE TAX_INS_MON_11
+                   END TAX_INS_MON_11
+                , TAX_INS_MON_22
+                , TAX_INS_MON_33
+            FROM TCPN811 A, THRM100 B, TCPN841 C
+            WHERE A.ENTER_CD        = B.ENTER_CD
+                AND A.SABUN         = B.SABUN
+                AND A.ENTER_CD      = C.ENTER_CD
+                AND A.SABUN         = C.SABUN
+                AND A.WORK_YY       = C.WORK_YY
+                AND A.ADJUST_TYPE   = C.ADJUST_TYPE
+                AND A.ENTER_CD      = #ssnEnterCd#  
+                AND A.WORK_YY       = #searchYear#
+                $query$
+                AND A.ADJUST_TYPE   LIKE '%'|| #searchAdjustType# ||'%'
+                AND A.ADJUST_TYPE    IN (SELECT CODE
+					                     FROM TSYS005
+					                    WHERE ENTER_CD = #ssnEnterCd#
+					                      AND GRCODE_CD = 'C00303'
+					                      AND USE_YN = 'Y')
+                AND (B.NAME LIKE '%' || #searchSbNm# || '%' OR A.SABUN LIKE '%' || #searchSbNm# || '%') 
+                AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+        ]]> 
+    </query>
+    
+    <!-- 원천징수세액 분할 납부 저장  -->
+    <query id="updateTaxHisMgrList">
+       <![CDATA[
+        UPDATE TCPN811
+           SET TAX_INS_YN       = #tax_ins_yn#
+             , TAX_INS_YN_MONTH = #tax_ins_yn_month#
+             , TAX_INS_MON_1    = #tax_ins_mon_1#
+             , TAX_INS_MON_2    = #tax_ins_mon_2#
+             , TAX_INS_MON_3    = #tax_ins_mon_3#
+             , TAX_INS_MON_11    = #tax_ins_mon_11#
+             , TAX_INS_MON_22    = #tax_ins_mon_22#
+             , TAX_INS_MON_33    = #tax_ins_mon_33#
+             , CHKDATE          = SYSDATE
+             , CHKID            = #ssnSabun#
+         WHERE ENTER_CD    = #ssnEnterCd# 
+           AND WORK_YY     = #searchYear#
+           AND ADJUST_TYPE = #searchAdjustType#
+           AND SABUN       = #sabun#
+       ]]>
+    </query>
+
+</root>

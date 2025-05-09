@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.vacationUpdAppDet">
+
+<!-- 근태취소신청 세부내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationUpdAppDetMap">
+
+				<![CDATA[
+					SELECT A.GNT_CD
+					     , A.GNT_GUBUN_CD
+					     , A.S_YMD
+					     , A.E_YMD
+					     , A.HOL_DAY
+					     , A.CLOSE_DAY
+					     , A.REQ_S_HM
+					     , A.REQ_E_HM
+					     , A.REQUEST_HOUR
+					     , A.OCC_CD ||'_'|| A.FAM_CD AS OCC_FAM_CD
+					     , A.OCC_CD
+					     , A.FAM_CD
+					     , A.OCC_HOLIDAY
+					     , B.B_APPL_SEQ
+					     , B.GNT_REQ_REASON
+					  FROM TTIM301 A, TTIM383 B
+					 WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+					           ]]>
+<choose><when test='searchBApplSeq != null and !searchBApplSeq.equals("")'>
+					   AND A.APPL_SEQ = TRIM( #{searchBApplSeq} )
+					   AND A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.APPL_SEQ = B.B_APPL_SEQ(+)
+					   AND TRIM( #{searchApplSeq} ) = B.APPL_SEQ(+)
+		</when><otherwise>
+			           AND A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.B_APPL_SEQ
+					   AND B.APPL_SEQ = TRIM( #{searchApplSeq} )
+</otherwise>
+</choose>
+
+		</select>
+		
+<!-- 근태취소신청(근태신청 팝업) 조회 (사용안함)-->
+		<select parameterType="map" resultType="cMap" id="getVacationUpdAppDetPopupList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.APPL_YMD		--신청일자
+					     , A.APPL_STATUS_CD --신청상태
+					     , A.APPL_SEQ		--신청서순번
+					     , A.APPL_SABUN
+					     , A.APPL_IN_SABUN
+					     , B.GNT_CD 		--근태종류
+					     , B.SABUN
+					     , B.S_YMD 			--신청시작일
+					     , B.E_YMD 			--신청종료일
+					     , B.HOL_DAY 		--총일수
+					     , B.CLOSE_DAY 		--적용일수
+					     , B.UPDATE_YN 		--수정여부
+					     , B.GNT_REQ_RESON 	--근태신청사유
+					  FROM THRI103 A, TTIM301 B
+					  INNER JOIN TTIM014 C
+					     ON C.ENTER_CD = B.ENTER_CD
+					    AND C.GNT_CD = B.GNT_CD
+					    AND C.REQUEST_USE_TYPE != 'N' -- 근태코드의 신청구분이 '신청안함'이면 조회안되도록
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_STATUS_CD = '99'
+					   AND A.APPL_SEQ NOT IN(SELECT B_APPL_SEQ 
+             								   FROM TTIM383 T1
+                                      			   ,THRI103 T2 
+             								  WHERE T1.ENTER_CD = T2.ENTER_CD
+		                                        AND T1.APPL_SEQ = T2.APPL_SEQ
+		                                        AND T1.ENTER_CD = A.ENTER_CD 
+		                                        AND T1.B_APPL_SEQ = A.APPL_SEQ
+		                                        AND T2.APPL_STATUS_CD = '99')
+					   AND B.SABUN = TRIM( #{sabun} )
+					   AND A.APPL_YMD BETWEEN TRIM( #{sYmd} ) AND TRIM( #{eYmd} )
+					 ]]>
+					 <if test='gntCd != null and !gntCd.equals("") '>
+					   AND B.GNT_CD = TRIM( #{gntCd} )
+					 </if>
+					 ORDER BY A.APPL_YMD DESC, B.S_YMD DESC, A.APPL_CD, A.APPL_STATUS_CD
+
+
+		</select>
+
+<!-- 근태취소신청 세부내역 저장 -->
+		<update parameterType="map" id="saveVacationUpdAppDet">
+
+				<![CDATA[
+					MERGE INTO TTIM383 T
+					USING  (
+							 SELECT   TRIM( #{ssnEnterCd} )		AS ENTER_CD
+							   	 	, TRIM( #{searchApplSeq} )	AS APPL_SEQ
+									, TRIM( #{searchApplSabun} )	AS SABUN
+									, TRIM( #{searchGntCd} )	    AS GNT_CD
+									, TRIM( #{searchApplYmd} )	AS S_YMD
+								    , TRIM( #{searchBApplSeq} )	AS B_APPL_SEQ
+								    , TRIM( #{gntReqReason} )		AS GNT_REQ_REASON
+							  FROM DUAL
+							) S
+					ON (     T.ENTER_CD	= S.ENTER_CD 
+					     AND T.SABUN    = S.SABUN 
+					     AND T.APPL_SEQ = S.APPL_SEQ
+					    )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.GNT_REQ_REASON  = S.GNT_REQ_REASON
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD     
+							, T.GNT_CD       
+							, T.SABUN        
+							, T.S_YMD        
+							, T.APPL_SEQ     
+							, T.B_APPL_SEQ   
+							, T.GNT_REQ_REASON
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD     
+							, S.GNT_CD       
+							, S.SABUN        
+							, S.S_YMD        
+							, S.APPL_SEQ     
+							, S.B_APPL_SEQ   
+							, S.GNT_REQ_REASON
+							, SYSDATE
+							, #{ssnSabun}
+						)
+				]]>
+
+		</update>
+
+
+</mapper>

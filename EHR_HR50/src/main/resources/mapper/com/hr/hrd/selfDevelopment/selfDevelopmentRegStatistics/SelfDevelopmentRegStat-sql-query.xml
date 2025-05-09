@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.selfDevelopment.selfDevelopmentRegStatistics">
+        <select parameterType="map" resultType="cMap" id="getSelfDevelopmentRegStat">
+
+                <![CDATA[
+                    SELECT A.ENTER_CD, A.MAIN_ORG_CD, C.MAIN_ORG_NM, B.ORG_CD, NVL(D.ORG_NM, '파트미발령') AS ORG_NM, A.SABUN, A.NAME
+                         , F_COM_GET_PRIOR_ORG_NM(A.ENTER_CD, B.ORG_CD,  TO_CHAR(SYSDATE, 'YYYYMMDD')) AS PRIOR_ORG_NM
+                         , DECODE(E.SABUN, '', '0', '1') AS APPROVAL_NOTE
+                         , NVL(E.APPROVAL_STATUS,' ') AS APPROVAL_STATUS
+                         , E.APPROVAL_REQ_YMD, E.APPROVAL_EMP_NAME, E.APPROVAL_YMD
+                         , DECODE(( SELECT  SABUN
+                                      FROM TCDPW111
+                                     WHERE ENTER_CD = A.ENTER_CD
+                                       AND SABUN = A.SABUN
+                                       AND ORG_CD = B.ORG_CD
+                                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                  ) ,'',G.SEQ,'0') AS JIGKUB_SEQ
+                         , DECODE((  SELECT  SABUN
+                                       FROM TCDPW111
+                                      WHERE ENTER_CD = A.ENTER_CD
+                                        AND SABUN = A.SABUN
+                                        AND ORG_CD = B.ORG_CD
+                                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                  ) ,'',B.JIKGUB_NM,'팀장') AS JIKGUB_NM
+                      FROM THRM100 A,  THRM151 B,  TCDPW909 C, TORG101 D  -- TCDPW909(본부부점정보)를 관리하지 않아 OUTER JOIN 하도록 변경 (추후 사용하게 될 수도 있으니 쿼리에서 테이블을 걷어내진 않음)
+                         , (SELECT *
+                              FROM TCDPV301 WHERE ENTER_CD = #{ssnEnterCd}  AND ACTIVE_YYYY = #{sYear}
+                                                                                    ]]>
+<if test='searchHalfGubunTypeCd != null and !searchHalfGubunTypeCd.equals("")'>
+                               AND HALF_GUBUN_TYPE = #{searchHalfGubunTypeCd}
+</if>
+                           ) E
+            <![CDATA[
+                         , (SELECT ENTER_CD, CODE, SEQ
+                              FROM TSYS005
+                             WHERE ENTER_CD = #{ssnEnterCd}
+                               AND GRCODE_CD = 'D20010' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+                             ORDER BY SEQ) G
+                     WHERE A.ENTER_CD    = #{ssnEnterCd}
+                       AND A.ENTER_CD    = B.ENTER_CD
+                       AND A.SABUN       = B.SABUN
+                       AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                       AND A.ENTER_CD    = C.ENTER_CD(+)
+                       AND A.MAIN_ORG_CD = C.MAIN_ORG_CD(+)
+                       AND B.ENTER_CD    = D.ENTER_CD(+)
+                       AND B.ORG_CD      = D.ORG_CD(+)
+                       AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE(+) AND NVL(D.EDATE(+), '99991231')
+                       AND A.ENTER_CD    = E.ENTER_CD(+)
+                       AND A.SABUN       = E.SABUN(+)
+                       AND B.STATUS_CD           <> 'RA'
+                       AND C.IT_YN(+)    = 'Y'
+                       AND (A.IT_MOVE_OUT_YMD IS NULL OR A.IT_MOVE_OUT_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+                        AND B.ENTER_CD = G.ENTER_CD(+)
+                        AND B.JIKGUB_CD = G.CODE(+)
+                        AND B.JIKWEE_CD <> 'B02'
+]]>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+                        AND (A.MAIN_ORG_CD LIKE #{searchOrgCd} OR B.ORG_CD LIKE #{searchOrgCd})
+</if>
+
+		           <if test='searchSabunName != null and !searchSabunName.equals("")'>
+                        AND A.SABUN ||A.NAME LIKE '%' || #{searchSabunName} || '%'
+				   </if>
+                <if test='searchChartType != null and !searchChartType.equals("")'>
+		           <if test='searchChartType.equals("APP")'>
+		                AND (E.APPROVAL_STATUS(+) = '3' )
+				   </if>
+		           <if test='searchChartType.equals("REG")'>
+                        AND (E.APPROVAL_STATUS(+) = '1' )
+				   </if>
+
+		           <if test='searchChartType.equals("NONE")'>
+                        AND (E.APPROVAL_STATUS(+)  IS NULL OR E.APPROVAL_STATUS(+) IN ('2','9','4') )
+				   </if>
+				</if>
+                    ORDER BY F_COM_GET_ORG_SEQ(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')), JIGKUB_SEQ, A.NAME
+        </select>
+
+
+</mapper>

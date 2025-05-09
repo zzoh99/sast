@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.orgGrpSta">
+		
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgGrpStaList1">
+			
+				<![CDATA[
+				SELECT  A.SEQ, A.ORG_CD,
+				        F_COM_GET_ORG_NM(#{ssnEnterCd}, A.ORG_CD, REPLACE(#{searchYmd}, '-', '')) AS CODE_NM,
+				        F_ORG_GET_EMP_CNT2(A.ENTER_CD, A.ORG_CD, REPLACE(#{searchYmd}, '-', '')) AS CNT
+				  FROM (
+				        SELECT P.ENTER_CD, P.ORG_LEVEL AS LVL, P.ORG_CD, P.SEQ
+				          FROM (
+				                   SELECT T.ENTER_CD, T.SDATE, T.ORG_CD, T.PRIOR_ORG_CD, T.ORG_LEVEL, T.SEQ
+				                     FROM TORG105 T
+				                    WHERE T.ENTER_CD = #{ssnEnterCd}
+				                      AND T.SDATE = ( SELECT MAX(SDATE)
+				                                        FROM TORG103
+													   WHERE ENTER_CD = #{ssnEnterCd}
+														 AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231') )
+							   ) P
+				         START WITH P.PRIOR_ORG_CD = ( CASE #{searchOrgCd} WHEN '0' THEN ( SELECT X.ORG_CD FROM TORG105 X
+		                                                                        WHERE X.ENTER_CD = #{ssnEnterCd}
+		                                                                          AND X.SDATE  = (SELECT MAX(SDATE) FROM TORG103
+		                                      				                                       WHERE ENTER_CD = #{ssnEnterCd}
+		 					                                                                         AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND EDATE)
+		                                                                          AND X.PRIOR_ORG_CD = '0' )
+                                   			   			ELSE #{searchOrgCd} END )
+				       CONNECT BY PRIOR P.ENTER_CD = P.ENTER_CD
+				           AND PRIOR P.SDATE = P.SDATE
+				           AND PRIOR P.ORG_CD = P.PRIOR_ORG_CD
+				         ORDER SIBLINGS BY P.PRIOR_ORG_CD, P.SEQ
+				       ) A
+				 WHERE  LVL >= (
+				 								SELECT ORG_LEVEL+1
+				   								FROM TORG105 AA 
+				 								 WHERE AA.ENTER_CD = #{ssnEnterCd}
+													 AND AA.ORG_CD = #{searchOrgCd}
+													 AND AA.SDATE = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = #{ssnEnterCd} AND ORG_CD = #{searchOrgCd})
+				                )--해당 선택된 조직 TORG105의 레벨+1
+				]]>
+			
+			
+		</select>
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgGrpStaList2">
+			
+				<![CDATA[
+				SELECT Y.MAP_NM AS CODE_NM, COUNT(X.SABUN) AS CNT
+				      ,ROUND((COUNT(X.SABUN)/SUM(COUNT(X.SABUN)) OVER())*100,1) AS PER_CNT
+				 FROM (
+				        SELECT SUB1.*     
+				          FROM THRM151 SUB1,    
+				               (SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, #{searchYmd}) AS ORG_NM   
+				                  FROM THRM151    
+				                 WHERE ENTER_CD = #{ssnEnterCd}  
+				                   AND REPLACE(#{searchYmd}, '-') BETWEEN SDATE AND NVL(EDATE, '99991231')   ]]>
+				               <if test="jikgubCd != null and jikgubCd neq ''"> 
+	                               AND JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if>
+	                           <if test="workType != null and workType neq ''">
+	                                 AND WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if>
+	                           <if test="manageCd != null and manageCd neq ''">
+	                                 AND MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if> <![CDATA[
+				                 GROUP BY ENTER_CD, SABUN  ,ORG_CD 
+				               ) SUB2    
+				         WHERE SUB1.ENTER_CD = SUB2.ENTER_CD    
+				           AND SUB1.SABUN = SUB2.SABUN   
+				           AND SUB1.SDATE = SUB2.SDATE 
+		                   AND (SUB1.ENTER_CD, SUB1.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+	                                                           FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900) A
+	                                                        CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+			           <if test="searchOrgNm != null and searchOrgNm neq ''">
+			           	   AND SUB2.ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+			           </if>
+				           ) X,
+				        (
+				        SELECT A.ENTER_CD, A.ORG_CD, A.MAP_TYPE_CD, A.MAP_CD, B.MAP_NM, A.SDATE, A.EDATE
+				          FROM (
+				                  SELECT SUB1.*     
+				                    FROM TORG107 SUB1,    
+				                         (SELECT MAX(SDATE) AS SDATE, ENTER_CD, ORG_CD, MAP_TYPE_CD, MAP_CD
+				                            FROM TORG107    
+				                           WHERE ENTER_CD = #{ssnEnterCd} 
+				                             AND REPLACE(#{searchYmd}, '-') BETWEEN SDATE AND NVL(EDATE, '99991231')     
+				                           GROUP BY ENTER_CD, ORG_CD, MAP_TYPE_CD, MAP_CD
+				                         ) SUB2    
+				                   WHERE SUB1.ENTER_CD = SUB2.ENTER_CD                                 
+				                     AND SUB1.ORG_CD = SUB2.ORG_CD   
+				                     AND SUB1.MAP_TYPE_CD = SUB2.MAP_TYPE_CD   
+				                     AND SUB1.MAP_CD = SUB2.MAP_CD   
+				                     AND SUB1.SDATE = SUB2.SDATE               
+				                  ) A
+				                , TORG109 B
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.MAP_TYPE_CD = B.MAP_TYPE_CD
+				           AND A.MAP_CD = B.MAP_CD
+				           AND A.MAP_TYPE_CD = '400'
+					       AND B.SDATE = (SELECT MAX (SDATE) FROM TORG109
+						                   WHERE ENTER_CD = B.ENTER_CD
+						                     AND MAP_TYPE_CD = B.MAP_TYPE_CD
+						                     AND MAP_CD = B.MAP_CD
+						                     AND A.SDATE BETWEEN SDATE AND NVL(EDATE,'99991231'))				           
+				           ) Y
+				WHERE X.ENTER_CD(+) = Y.ENTER_CD
+				   AND X.ORG_CD(+) = Y.ORG_CD
+				GROUP BY Y.MAP_CD, Y.MAP_NM   
+				ORDER BY Y.MAP_CD
+		</select>
+	
+</mapper>

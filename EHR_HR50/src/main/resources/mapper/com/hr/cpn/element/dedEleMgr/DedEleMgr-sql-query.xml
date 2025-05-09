@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.element.dedEleMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getDedEleMgrList">
+
+					SELECT A.ELEMENT_TYPE, A.ELEMENT_CD, A.SDATE, A.EDATE, A.ELEMENT_NM
+					     , A.ELEMENT_ENG, A.REPORT_NM, A.PRIORITY, A.UPDOWN_TYPE, A.UPDOWN_UNIT
+					     , A.CURRENCY_CD, A.ELEMENT_LINK_TYPE, A.DEDUCTION_TYPE, A.ATTRIBUTE_8
+					     , A.SYS_YN
+					     , A.LANGUAGE_CD
+					     , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', A.LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM
+					     , A.LANGUAGE_CD2
+					     , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', A.LANGUAGE_CD2, #{ssnLocaleCd}) AS LANGUAGE_NM2
+					     , A.GRP_SORT
+					     , (SELECT ADJ_ELEMENT_NM
+					          FROM TCPN803
+					         WHERE ENTER_CD       = A.ENTER_CD
+					           AND ADJ_ELEMENT_CD = A.ATTRIBUTE_8
+					           AND WORK_YY = (SELECT MAX(WORK_YY)
+					                            FROM TCPN803
+					                           WHERE ENTER_CD       = A.ENTER_CD
+					                             AND ADJ_ELEMENT_CD = A.ATTRIBUTE_8)) AS ATTRIBUTE_8_NM
+					  FROM TCPN011 A
+					 WHERE A.ENTER_CD      = #{ssnEnterCd}
+					<if test='searchElementNm != null and !searchElementNm.equals("")'>
+					   AND A.ELEMENT_NM    LIKE '%'|| #{searchElementNm} ||'%'
+					</if>
+					   AND A.ELEMENT_TYPE  = 'D'
+					 ORDER BY A.PRIORITY, A.GRP_SORT, A.ELEMENT_CD
+
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveDedEleMgr">
+
+
+					MERGE INTO TCPN011 T
+					USING	(
+							SELECT    A.ELEMENT_TYPE
+                                    , A.ELEMENT_CD
+                                    , A.SDATE
+                                    , A.EDATE
+									, A.ELEMENT_NM
+									, A.ELEMENT_ENG
+									, A.REPORT_NM
+									, A.PRIORITY
+									, A.UPDOWN_TYPE
+									, A.UPDOWN_UNIT
+									, A.CURRENCY_CD
+									, A.ELEMENT_LINK_TYPE
+									, A.DEDUCTION_TYPE
+									, A.ATTRIBUTE_8
+									, A.GRP_SORT
+									, A.LANGUAGE_CD
+									, A.LANGUAGE_CD2
+							FROM	(
+									SELECT	  NULL      AS ELEMENT_TYPE
+                                            , NULL      AS ELEMENT_CD
+                                            , NULL      AS SDATE
+                                            , NULL		AS EDATE
+											, NULL		AS ELEMENT_NM
+											, NULL		AS ELEMENT_ENG
+											, NULL		AS REPORT_NM
+                                            , NULL      AS PRIORITY
+                                            , NULL      AS UPDOWN_TYPE
+                                            , NULL      AS UPDOWN_UNIT
+                                            , NULL      AS CURRENCY_CD
+                                            , NULL      AS ELEMENT_LINK_TYPE
+                                            , NULL      AS DEDUCTION_TYPE
+                                            , NULL      AS ATTRIBUTE_8
+                                            , NULL      AS GRP_SORT
+                                            , NULL      AS LANGUAGE_CD
+                                            , NULL      AS LANGUAGE_CD2
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT   TRIM('D')                    AS ELEMENT_TYPE
+                                            ,TRIM(#{rm.elementCd})         AS ELEMENT_CD
+                                            ,TRIM(#{rm.sdate})             AS SDATE
+                                            ,TRIM(#{rm.edate})            AS EDATE
+											,TRIM(#{rm.elementNm})        AS ELEMENT_NM
+											,TRIM(#{rm.elementEng})       AS ELEMENT_ENG
+											,TRIM(#{rm.reportNm})         AS REPORT_NM
+											,TRIM(#{rm.priority})         AS PRIORITY
+											,TRIM(#{rm.updownType})       AS UPDOWN_TYPE
+											,TRIM(#{rm.updownUnit})       AS UPDOWN_UNIT
+											,TRIM(#{rm.currencyCd})       AS CURRENCY_CD
+											,TRIM(#{rm.elementLinkType})  AS ELEMENT_LINK_TYPE
+											,TRIM(#{rm.deductionType})    AS DEDUCTION_TYPE
+											,TRIM(#{rm.attribute8})       AS ATTRIBUTE_8
+											,TRIM(#{rm.grpSort})          AS GRP_SORT
+											,TRIM(#{rm.languageCd})       AS LANGUAGE_CD
+											,TRIM(#{rm.languageCd2})      AS LANGUAGE_CD2
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ELEMENT_CD IS NOT NULL
+							) S
+					ON (    T.ENTER_CD   = #{ssnEnterCd}
+						AND T.ELEMENT_CD = S.ELEMENT_CD
+						AND T.SDATE      = S.SDATE
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ELEMENT_TYPE       = S.ELEMENT_TYPE
+									, T.EDATE              = S.EDATE
+									, T.ELEMENT_NM         = S.ELEMENT_NM
+									, T.ELEMENT_ENG        = S.ELEMENT_ENG
+									, T.REPORT_NM          = S.REPORT_NM
+                                    , T.PRIORITY           = S.PRIORITY
+                                    , T.UPDOWN_TYPE        = S.UPDOWN_TYPE
+                                    , T.UPDOWN_UNIT        = S.UPDOWN_UNIT
+                                    , T.CURRENCY_CD        = S.CURRENCY_CD
+                                    , T.ELEMENT_LINK_TYPE  = S.ELEMENT_LINK_TYPE
+                                    , T.DEDUCTION_TYPE     = S.DEDUCTION_TYPE
+                                    , T.ATTRIBUTE_8        = S.ATTRIBUTE_8
+                                    , T.GRP_SORT           = S.GRP_SORT
+                                    , T.LANGUAGE_CD   = S.LANGUAGE_CD
+                                    , T.LANGUAGE_CD2  = S.LANGUAGE_CD2
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.ELEMENT_CD
+							, T.SDATE
+							, T.ELEMENT_TYPE
+							, T.EDATE
+							, T.ELEMENT_NM
+							, T.ELEMENT_ENG
+                            , T.REPORT_NM
+                            , T.PRIORITY
+                            , T.UPDOWN_TYPE
+                            , T.UPDOWN_UNIT
+                            , T.CURRENCY_CD
+                            , T.ELEMENT_LINK_TYPE
+                            , T.DEDUCTION_TYPE
+                            , T.ATTRIBUTE_8
+                            , T.GRP_SORT
+                            , T.LANGUAGE_CD
+                            , T.LANGUAGE_CD2
+                            , T.CHKDATE
+                            , T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+                            , S.ELEMENT_CD
+                            , S.SDATE
+                            , S.ELEMENT_TYPE
+                            , S.EDATE
+                            , S.ELEMENT_NM
+                            , S.ELEMENT_ENG
+                            , S.REPORT_NM
+                            , S.PRIORITY
+                            , S.UPDOWN_TYPE
+                            , S.UPDOWN_UNIT
+                            , S.CURRENCY_CD
+                            , S.ELEMENT_LINK_TYPE
+                            , S.DEDUCTION_TYPE
+                            , S.ATTRIBUTE_8
+                            , S.GRP_SORT
+                            , S.LANGUAGE_CD
+                            , S.LANGUAGE_CD2
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteDedEleMgr">
+					DELETE FROM TCPN011
+					WHERE 	(ENTER_CD, ELEMENT_CD, SDATE) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.elementCd != null and !rm.elementCd.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+
+                                        	   (#{ssnEnterCd}, TRIM( #{rm.elementCd} ), TRIM( #{rm.sdate} ) )
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!--     연말정산 코드 항목 조회 팝업-->
+		<select parameterType="map" resultType="cMap" id="getDedEleMgrPopupList">
+					SELECT ADJ_ELEMENT_CD, ADJ_ELEMENT_NM, WORK_YY
+					  FROM TCPN803
+					 WHERE ENTER_CD         = #{ssnEnterCd}
+					<if test='searchWorkYY != null and !searchWorkYY.equals("")'>
+					   AND WORK_YY          = #{searchWorkYY}
+					</if>
+					<if test='sAdjElementNm != null and !sAdjElementNm.equals("")'>
+						AND ADJ_ELEMENT_NM LIKE '%'|| TRIM( #{sAdjElementNm} ) ||'%'
+					</if>
+					   AND INCOME_DATA_YN   = 'Y'
+					 ORDER BY WORK_YY DESC
+					        , ADJ_ELEMENT_CD ASC
+		</select>
+		
+	</mapper>

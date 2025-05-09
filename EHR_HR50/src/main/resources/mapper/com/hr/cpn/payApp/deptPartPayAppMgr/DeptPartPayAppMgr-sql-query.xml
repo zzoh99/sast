@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.deptPartPayAppMgr">
+
+<!-- 기타지급신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getDeptPartPayAppMgrList">
+
+				<![CDATA[
+			SELECT A.ENTER_CD
+			          ,A.APPL_SEQ
+			          ,C.SABUN
+			          ,F_COM_GET_NAMES(A.ENTER_CD, C.SABUN) AS NAME  
+			          ,F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS ORG_NM
+			          ,F_COM_GET_JIKWEE_NM(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS JIKWEE_NM  			          
+			          ,A.BENEFIT_BIZ_CD
+			          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'B10230', A.BENEFIT_BIZ_CD) AS BENEFIT_BIZ_NM
+			          -- ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+			          ,B.APPL_STATUS_CD
+			          ,B.APPL_YMD          
+			          ,A.PAY_YM
+			          ,(SELECT SUM(PAY_MON) FROM TCPN433 WHERE ENTER_CD=A.ENTER_CD AND APPL_SEQ=A.APPL_SEQ) AS TOT_MON
+			          ,A.BIGO
+			          ,A.PAY_ACTION_CD
+			          ,F_COM_GET_PAY_ACTION_NM ( A.ENTER_CD,  A.PAY_ACTION_CD) AS PAY_ACTION_NM
+			          ,A.MAGAM_YN 
+		              , '0' AS DETAIL
+		              ,B.APPL_IN_SABUN
+		              , A.PAY_PAYMENT_YMD
+		              , A.PAY_CD
+			          ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'R') AS RETURN_MEMO --반려사유
+			          ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'L') AS APPL_STEP  --결재라인
+			          ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'P') AS AGREE_NAME  --최종결재자
+			          ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'T') AS AGREE_YMD  --결재일
+			          ,F_HRI_APPROVAL_TASK_INFO(A.ENTER_CD, A.APPL_SEQ, 'F') AS NEXT_AGREE_NAME-- 다음결재자   				                      
+			  FROM TCPN431 A, THRI103 B, THRM100 C
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			    AND B.ENTER_CD = A.ENTER_CD    
+			    AND B.APPL_SEQ = A.APPL_SEQ
+			    AND C.ENTER_CD = A.ENTER_CD
+			    AND B.APPL_SABUN = C.SABUN
+			    AND B.APPL_STATUS_CD <> '11'
+			    AND B.APPL_YMD BETWEEN REPLACE(NVL(TRIM(#{searchApplYmdFrom}),'19000101'), '-', '') AND REPLACE(NVL(TRIM(#{searchApplYmdTo}),'99991231'), '-', '')
+			            ]]>
+			<if test='searchBenefitBizCd != null and !searchBenefitBizCd.equals("")'>
+			    AND A.BENEFIT_BIZ_CD = #{searchBenefitBizCd}
+			</if>
+			<if test='searchPayYm != null and !searchPayYm.equals("")'>
+			    AND A.PAY_YM = REPLACE(#{searchPayYm}, '-', '')
+			</if>
+			<if test='searchMagamYn != null and !searchMagamYn.equals("")'>
+			    AND A.MAGAM_YN= #{searchMagamYn}
+			</if>
+			<if test='searchSabunName != null and !searchSabunName.equals("")'>
+			    AND (B.APPL_SABUN LIKE '%'||#{searchSabunName} ||'%' OR C.NAME LIKE '%'||#{searchSabunName} ||'%')
+			</if>
+			<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+				     AND F_COM_GET_ORG_NM2(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD) LIKE '%'|| #{searchOrgNm} ||'%'
+			</if>
+			<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+			    AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+			</if>
+			<if test='searchPayActionCd != null and !searchPayActionCd.equals("")'>
+			    AND A.PAY_ACTION_CD = #{searchPayActionCd}
+			</if>
+			    AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD
+			                               FROM TCPN980
+			                              WHERE ENTER_CD = A.ENTER_CD
+			                                AND NVL(DEPT_PART_PAY_YN, 'N') = 'Y')
+			   ORDER BY B.APPL_YMD DESC, A.APPL_SEQ DESC      					
+
+
+
+		</select>
+
+<!-- 상세내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getDeptPartPayAppMgrDetailList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						          ,A.APPL_SEQ
+						          ,C.SABUN
+						          ,D.NAME
+						          ,F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS ORG_NM
+						          ,F_COM_GET_JIKGUB_NM(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS JIKGUB_NM
+						          ,F_COM_GET_JIKWEE_NM(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS JIKWEE_NM 
+						          ,A.BENEFIT_BIZ_CD
+						          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'B10230', A.BENEFIT_BIZ_CD) AS BENEFIT_BIZ_NM
+						          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+						          ,B.APPL_YMD          
+						          ,A.PAY_YM
+						          ,C.PAY_MON
+						          ,C.DETAIL_BIGO
+						  FROM TCPN431 A, THRI103 B, TCPN433 C, THRM100 D
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						    AND B.ENTER_CD = A.ENTER_CD    
+						    AND B.APPL_SEQ = A.APPL_SEQ
+						    AND C.ENTER_CD = A.ENTER_CD
+						    AND C.APPL_SEQ = A.APPL_SEQ    
+						    AND A.APPL_SEQ = #{applSeq}
+						    AND D.ENTER_CD = C.ENTER_CD
+						    AND D.SABUN      = C.SABUN
+						            ]]>
+					  	<if test='searchSabunName != null and !searchSabunName.equals("")'>
+						    AND (C.SABUN LIKE '%'||#{searchSabunName} ||'%' OR D.NAME LIKE '%'||#{searchSabunName} ||'%')
+						</if>
+						    AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD
+						                               FROM TCPN980
+						                              WHERE ENTER_CD = A.ENTER_CD
+						                                AND NVL(DEPT_PART_PAY_YN, 'N') = 'Y')      
+						  ORDER BY D.NAME
+
+
+
+		</select>
+		
+		
+		<!-- 결재정보 갱신  -->
+				<update parameterType="map" id="updateDeptPartPayAppMgrThri">
+
+
+						MERGE INTO THRI103	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	APPL_SEQ
+										,	APPL_STATUS_CD
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	APPL_SEQ
+										,	NULL		AS	APPL_STATUS_CD
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="updateRows" >
+													UNION ALL
+														SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+															,	TRIM(#{rm.applSeq})			AS	APPL_SEQ
+															,	TRIM(#{rm.applStatusCd})	AS	APPL_STATUS_CD
+															,	SYSDATE						AS	CHKDATE
+															,	#{ssnSabun}					AS	CHKID
+														FROM	DUAL
+					</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		APPL_SEQ IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.APPL_SEQ				=		S.APPL_SEQ
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.APPL_STATUS_CD	=	S.APPL_STATUS_CD
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+
+
+
+		</update>
+		
+		<!-- Master테이블 마감 갱신  -->
+				<update parameterType="map" id="updateDeptPartPayAppMgr">
+
+
+						MERGE INTO TCPN431	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	APPL_SEQ
+										,	MAGAM_YN
+										, 	PAY_PAYMENT_YMD
+										,	PAY_CD
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	APPL_SEQ
+										,	NULL		AS	MAGAM_YN
+										, 	NULL		AS	PAY_PAYMENT_YMD
+										,	NULL		AS	PAY_CD
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="updateRows" >
+													UNION ALL
+														SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+															,	TRIM(#{rm.applSeq})			AS	APPL_SEQ
+															,	TRIM(#{rm.magamYn})	AS	MAGAM_YN
+															, 	REPLACE(TRIM(#{rm.payPaymentYmd}), '-', '')	AS	PAY_PAYMENT_YMD
+															,	TRIM(#{rm.payCd})			AS	PAY_CD
+															,	SYSDATE						AS	CHKDATE
+															,	#{ssnSabun}					AS	CHKID
+														FROM	DUAL
+					</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		APPL_SEQ IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.APPL_SEQ				=		S.APPL_SEQ
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.MAGAM_YN			=	S.MAGAM_YN
+						,	T.PAY_PAYMENT_YMD 	=	S.PAY_PAYMENT_YMD
+						,	T.PAY_CD			=	S.PAY_CD
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+
+
+
+		</update>
+
+	</mapper>

@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.retire.retireApr">
+
+<!-- 퇴직원신청현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireAprList">
+
+				<![CDATA[
+				SELECT *
+				  FROM (
+					SELECT A.ENTER_CD
+					     ,'3' AS IBS_IMAGE
+					     , A.APPL_YMD           -- 신청일자
+					     , A.APPL_STATUS_CD     -- 신청상태
+					     , A.APPL_SEQ           -- 신청서순번
+					     , A.APPL_SABUN
+					     , A.APPL_IN_SABUN
+					     , B.SABUN
+					     , B.FIN_WORK_YMD
+					     , B.RET_SCH_YMD
+					     , B.RET_YMD
+					     , B.PROCESS_NO
+					     , F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, C.SDATE, #{ssnLocaleCd}) AS ORG_NM
+					     , C.JIKCHAK_CD
+					     , C.JIKCHAK_NM
+					     , C.JIKWEE_CD
+					     , C.JIKWEE_NM
+					     , C.JIKGUB_CD
+					     , C.JIKGUB_NM
+					     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN, #{ssnLocaleCd}) AS NAME -- 성명
+					     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN, 'ALIAS') AS ALIAS     -- 영문ID
+					     ,'3' AS SURVEY_IMAGE
+					     ,'3' AS AGREE_IMAGE
+					     , B.RET_REASON_CD
+			             , F_COM_GET_NAMES(B.ENTER_CD,B.CONV_SABUN1,#{ssnLocaleCd}) AS CONV_NAME1
+			             , B.CONV_SABUN2
+			             , F_COM_GET_NAMES(B.ENTER_CD,B.CONV_SABUN2,#{ssnLocaleCd}) AS CONV_NAME2
+			             , B.TAKEOVER_FILE_SEQ
+               			 , DECODE(B.TAKEOVER_FILE_SEQ,NULL,'N','Y') AS TAKEOVER_FILE_YN
+               			 , (SELECT MAX(D.RET_INTERVIEW_SEQ)
+		                      FROM THRM185 D
+		                     WHERE D.ENTER_CD = B.ENTER_CD
+		                       AND D.SABUN = B.SABUN
+		                       AND D.CCR_CD = '90'
+		               	   )AS RET_INTERVIEW_SEQ
+		               	 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || B.ENTER_CD || chr(38) || 'searchKeyword=' || B.SABUN || chr(38) || 'type=1' AS PHOTO
+					     , DECODE(D.SABUN, NULL, 'N', 'Y') AS PRE_POST_YN
+					     , DECODE(D.SABUN, NULL, 'N', 'Y') AS PRE_POST_YN2
+						 , NVL(D.ORD_YN,'N') AS ORD_YN
+						 , DECODE(NVL(D.ORD_YN, 'N'), 'N', '0', DECODE(D.ORD_YN,'Y','1','0')) AS IBS_IMAGE4
+						 , NVL(B.ORD_TYPE_CD, 'E') AS ORD_TYPE_CD 
+						 , B.ORD_DETAIL_CD
+						 , NVL(B.ORD_YMD, B.RET_SCH_YMD) AS ORD_YMD
+						 , 'RA' AS STATUS_CD
+						 , B.SIGN_FILE_SEQ
+						 , B.SIGN_FILE_SEQ1
+					  FROM THRI103 A, THRM551 B, THRM151 C, THRM221 D
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND B.ENTER_CD = C.ENTER_CD
+					   AND B.SABUN = C.SABUN
+					   AND A.APPL_YMD BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+					   AND B.ENTER_CD = D.ENTER_CD(+)
+					   AND B.SABUN = D.SABUN(+)
+					   AND B.ORD_YMD = D.ORD_YMD(+)
+					   AND B.ORD_TYPE_CD = D.ORD_TYPE_CD(+) 
+					   AND B.ORD_DETAIL_CD = D.ORD_DETAIL_CD(+)
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_YMD BETWEEN TRIM( NVL(#{sYmd}, '00000000') ) AND TRIM( NVL(#{eYmd}, '99991231') )
+					   AND A.APPL_STATUS_CD != '11'
+					   ]]>
+					<if test='applStatusCd != null and !applStatusCd.equals("")'>
+					   AND A.APPL_STATUS_CD = TRIM ( #{applStatusCd} )
+					</if>
+					<if test='jikweeCd != null and !jikweeCd.equals("")'>
+					   AND C.JIKWEE_CD = TRIM( #{jikweeCd} )
+					</if>
+					<if test='orgCd != null and !orgCd.equals("")'>
+					   AND C.ORG_CD = TRIM( #{orgCd} )
+					</if>
+					<if test='orgNm != null and !orgNm.equals("")'>
+							   AND F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, A.APPL_YMD) LIKE '%'|| #{orgNm} ||'%'
+					</if>
+					<if test='name != null and !name.equals("")'>
+					   AND (B.SABUN LIKE '%'||TRIM( #{name} )||'%' OR F_COM_GET_NAMES(C.ENTER_CD, C.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{name} )||'%')
+					</if>
+					 ORDER BY A.APPL_YMD DESC
+					        , A.APPL_STATUS_CD
+					) A
+					WHERE 1 = 1
+					<if test='searchRetInterviewSeq != null and !searchRetInterviewSeq.equals("")'>
+					  AND A.RET_INTERVIEW_SEQ = #{searchRetInterviewSeq}
+					</if>
+
+		</select>
+
+		<update parameterType="map" id="updateRetireApr">
+
+					UPDATE THRM551
+					   SET PROCESS_NO 			= TRIM( #{processNo} )
+					     , RET_YMD    			= TRIM( #{retYmd})
+					     , CONV_SABUN2			= TRIM( #{convSabun2})
+					     , TAKEOVER_FILE_SEQ	= TRIM( #{takeoverFileSeq})
+					     , ORD_YMD				= REPLACE(TRIM( #{ordYmd}),'-','')
+					     , ORD_TYPE_CD 			= TRIM( #{ordTypeCd})
+						 , ORD_DETAIL_CD        = TRIM( #{ordDetailCd})
+					     , CHKDATE    			= SYSDATE
+					     , CHKID      			= #{ssnSabun}
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ = TRIM( #{applSeq} )
+		</update>
+
+		<insert parameterType="map" id="saveRetireAprOrd">
+
+				INSERT INTO THRM221 (
+				            ENTER_CD
+				          , ORD_DETAIL_CD
+				          , SABUN
+				          , ORD_YMD
+				          , APPLY_SEQ
+				          , ORD_TYPE_CD
+				          , PROCESS_NO
+				          , ORD_E_YMD
+				          , STATUS_CD
+				          , MANAGE_CD
+				          , LOCATION_CD
+				          , ORG_CD
+				          , JIKCHAK_CD
+				          , WORK_TYPE
+				          , JOB_CD
+				          , JIKWEE_CD
+				          , JIKGUB_CD
+				          , FIX_OT_CD
+				          , SAL_CLASS
+				          , PAY_TYPE
+				          , TRA_YMD
+				          , GEMP_YMD
+				          , EMP_YMD
+				          , CTITLE_CHG_YMD
+				          , FPROM_YMD
+				          , JIKGUB_CHG_YMD
+				          , CONTRACT_SYMD
+				          , CONTRACT_EYMD
+				          , PAY_GROUP_CD
+				          , WORKORG_CD
+				          , RESIGN_REASON_CD
+				          , RET_PATH_CD
+				          , ORD_YN
+				          , ORD_INS_YN
+				          , TEMP_ORD_YN
+				          , CHKDATE
+				          , CHKID
+				          , DEL_YN
+				)
+				SELECT A.ENTER_CD
+				     , F_COM_GET_STD_CD_VALUE(A.ENTER_CD,'RET_ORD_DETAIL_CD')
+				     , A.SABUN
+				     , A.RET_YMD
+				     , (SELECT DECODE(MAX(APPL_SEQ), NULL, 0, MAX(APPL_SEQ)) + 1
+				          FROM THRM221
+				         WHERE ENTER_CD = B.ENTER_CD
+				           AND SABUN = A.SABUN
+				           AND ORD_YMD = A.RET_YMD)
+				     , F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'RET_ORD_DETAIL_CD')
+				     , A.PROCESS_NO
+				     , A.RET_YMD
+				     , (SELECT STATUS_CD
+				          FROM TSYS013
+				         WHERE ENTER_CD = A.ENTER_CD
+				           AND ORD_TYPE_CD = F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'RET_ORD_DETAIL_CD')
+				           AND ORD_DETAIL_CD = F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'RET_ORD_DETAIL_CD'))   -- 재직상태
+				     , B.MANAGE_CD
+				     , B.LOCATION_CD
+				     , B.ORG_CD
+				     , B.JIKCHAK_CD
+				     , B.WORK_TYPE
+				     , B.JOB_CD
+				     , B.JIKWEE_CD
+				     , B.JIKGUB_CD
+				     , B.FIX_OT_CD
+				     , B.SAL_CLASS
+				     , B.PAY_TYPE
+				     , C.TRA_YMD
+				     , C.GEMP_YMD
+				     , C.EMP_YMD
+				     , B.CTITLE_CHG_YMD
+				     , B.FPROM_YMD
+				     , B.JIKGUB_CHG_YMD
+				     , B.CONTRACT_SYMD
+				     , B.CONTRACT_EYMD
+				     , B.PAY_GROUP_CD
+				     , B.WORKORG_CD
+				     , A.RET_REASON_CD2
+				     , A.RET_PATH_CD
+				     , '0'
+				     , 'Y'
+				     , 'N'
+				     , SYSDATE
+				     , TRIM( #{ssnSabun} )
+				     , 'N'
+				  FROM THRM551 A
+				     , THRM151 B
+				     , THRM100 C
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SABUN = B.SABUN
+				   AND B.ENTER_CD = C.ENTER_CD
+				   AND B.SABUN = C.SABUN
+				   AND A.REQ_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = TRIM( #{sabun} )
+				   AND A.APPL_SEQ = TRIM( #{applSeq} )
+		</insert>
+
+</mapper>

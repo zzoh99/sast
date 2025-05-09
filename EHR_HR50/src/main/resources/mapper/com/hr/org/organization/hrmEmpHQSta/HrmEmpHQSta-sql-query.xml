@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.hrmEmpHQSta">
+		<!-- 본부별 인원현황 항목정의 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHrmEmpHQStaTitleList">
+
+				<![CDATA[
+					SELECT	SDATE  											  AS BASE_YMD
+					,		'CNT_' || ROW_NUMBER() OVER (ORDER BY SDATE DESC) AS ELEMENT_NAME
+			 		FROM (
+	           			SELECT	SDATE AS SDATE			/*조직개편일자*/
+	           			  FROM 	TORG103
+	           			 WHERE 	ENTER_CD = #{ssnEnterCd}  /*회사코드*/
+						 UNION
+	           			SELECT 	#{searchDate} AS SDATE	/*기준일자*/
+	           			  FROM 	DUAL
+			 			)
+				  WHERE SDATE BETWEEN TO_CHAR(ADD_MONTHS(TO_DATE(#{searchDate} /*기준일자*/, 'YYYYMMDD'), -60), 'YYYYMMDD') AND #{searchDate} /*기준일자 */ -- 5년이내의 조직도 이력을 기준으로 가져옴
+			   ORDER BY SDATE DESC
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getHrmEmpHQStaList">
+
+				<![CDATA[
+					/*1. 본부, 공장별 인원현황*/
+					WITH DATA AS (   
+						SELECT	BASE_YMD
+						, 		WORK_TYPE
+						, 		WORK_TYPE_NM
+						, 		WORK_TYPE_SEQ
+						, 		NVL(HQ_ORG_CD, 'BS99999')	AS HQ_ORG_CD
+						, 		NVL(TRIM(HQ_ORG_NM), '기타')	AS HQ_ORG_NM
+						, 		CNT
+					    FROM (
+					        SELECT	BASE_YMD
+/*1.직군코드*/	 				, 		WORK_TYPE  
+/*1.직군명*/   				, 		F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10050', WORK_TYPE) AS WORK_TYPE_NM
+/*1.직군순번*/  				, 		F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H10050', WORK_TYPE)  AS WORK_TYPE_SEQ      
+/*2.본부코드*/  				, 		HQ_ORG_CD  
+/*2.본부명*/   				, 		F_COM_GET_ORG_NM(ENTER_CD, HQ_ORG_CD, BASE_YMD)      AS HQ_ORG_NM
+/*3.인원 */    				, 		CNT
+					        FROM (
+								SELECT 	B.SDATE 					 AS BASE_YMD
+								, 		A.ENTER_CD
+								, 		WORK_TYPE
+								, 		CASE WHEN WORK_TYPE = 'A' THEN F_COM_GET_HQ_ORG_CD_A(A.ENTER_CD, A.ORG_CD, B.SDATE)
+										 	 WHEN WORK_TYPE = 'B' THEN F_COM_GET_HQ_ORG_CD_B(A.ENTER_CD, A.ORG_CD, B.SDATE)
+										END 						 AS HQ_ORG_CD
+								, 		COUNT(*) 					 AS CNT
+					            FROM 	THRM151 A
+					            , 		(
+					            		 SELECT SDATE                  /*조직개편일자*/
+										   FROM TORG103
+										  WHERE ENTER_CD = #{ssnEnterCd} /*회사코드*/
+										  UNION 
+										 SELECT #{searchDate} AS SDATE   /*기준일자*/
+										   FROM DUAL
+										) B
+								WHERE 	A.ENTER_CD = #{ssnEnterCd} 	   /*회사코드*/
+								  AND 	A.STATUS_CD IN ('AA', 'CA') /*재직자, 휴직자 (고정)*/
+								  AND 	A.JIKWEE_CD NOT IN (SELECT CODE FROM TSYS005 WHERE ENTER_CD = A.ENTER_CD AND GRCODE_CD = 'H20030' AND NOTE4 = 'N') /*사외이사, 감사등은 제외(고정)*/
+								  AND 	NVL(B.SDATE, '99991231') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+								  AND 	B.SDATE BETWEEN TO_CHAR(ADD_MONTHS(TO_DATE(#{searchDate} /*기준일자*/, 'YYYYMMDD'), -60), 'YYYYMMDD') AND #{searchDate}   /*기준일자*/
+							 GROUP BY A.ENTER_CD, WORK_TYPE, CASE WHEN WORK_TYPE = 'A' THEN F_COM_GET_HQ_ORG_CD_A(A.ENTER_CD, A.ORG_CD, B.SDATE) 
+					                                              WHEN WORK_TYPE = 'B' THEN F_COM_GET_HQ_ORG_CD_B(A.ENTER_CD, A.ORG_CD, B.SDATE) 
+					                                         END, B.SDATE
+					        )
+					        ORDER BY BASE_YMD DESC, WORK_TYPE_SEQ, HQ_ORG_CD
+					    )
+					)
+
+					SELECT	WORK_TYPE
+					, 		WORK_TYPE_NM
+					, 		HQ_ORG_NM
+					    ]]>
+					/*가번적으로 늘어나야함  Start*/
+					<bind name="tpCnt" value="1" />
+ 					<foreach item="tCnt" collection="titles" index="idx">
+					,		#{tCnt.elementName}
+					<if test=' titles.size > (idx+1) '>
+					<bind name="nextTpCnt" value="tpCnt + 1" />
+					, 		CNT_${tpCnt} - CNT_${nextTpCnt} AS GAP_${tpCnt}
+					</if>
+					<bind name="tpCnt" value="tpCnt + 1" />
+					</foreach>
+					/*가번적으로 늘어나야함  End*/
+					,		'0' AS AVG_YEAR3
+					,		'0' AS SUM_YEAR3
+					,		'0' AS AVG_YEAR5
+					,		'0' AS SUM_YEAR5
+					FROM (
+			            SELECT	WORK_TYPE
+			            , 		WORK_TYPE_NM
+			            , 		HQ_ORG_NM
+						/*가번적으로 늘어나야함  Start*/
+						<foreach item="tCnt" collection="titles" >
+			            , 		NVL((SELECT CNT FROM DATA A WHERE A.WORK_TYPE = AA.WORK_TYPE AND A.HQ_ORG_CD = AA.HQ_ORG_CD AND BASE_YMD = #{tCnt.baseYmd}), 0) AS ${tCnt.elementName}
+						</foreach>
+						/*가번적으로 늘어나야함  End*/
+			            FROM (
+		                    SELECT	DISTINCT 
+/*1.직군코드*/   						WORK_TYPE
+/*1.직군명*/					,		F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10050', WORK_TYPE) 				AS WORK_TYPE_NM
+/*1.직군순번*/					,  		F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H10050', WORK_TYPE)  				AS WORK_TYPE_SEQ
+/*2.본부코드*/					,  		NVL(HQ_ORG_CD, 'BS99999') 							 			 	AS HQ_ORG_CD
+/*2.본부명*/ 					,  		NVL(TRIM(F_COM_GET_ORG_NM(ENTER_CD, HQ_ORG_CD, BASE_YMD)), '기타')	AS HQ_ORG_NM
+		                    FROM (
+								SELECT	B.SDATE  AS BASE_YMD
+								, 		A.ENTER_CD
+								, 		WORK_TYPE
+								, 		CASE WHEN WORK_TYPE = 'A' THEN F_COM_GET_HQ_ORG_CD_A(A.ENTER_CD, A.ORG_CD, B.SDATE) 
+	  										 WHEN WORK_TYPE = 'B' THEN F_COM_GET_HQ_ORG_CD_B(A.ENTER_CD, A.ORG_CD, B.SDATE) 
+   										END 	 AS HQ_ORG_CD
+   								, 		COUNT(*) AS CNT
+                                FROM	THRM151 A
+                                , 		(SELECT	SDATE
+										   FROM (
+										   	SELECT	SDATE 				   /*조직개편일자*/
+											  FROM 	TORG103
+											 WHERE	ENTER_CD = #{ssnEnterCd} /*회사코드*/
+											 UNION
+										    SELECT	#{searchDate} 		   /*기준일자*/ AS SDATE
+											  FROM DUAL
+												)
+										  WHERE	SDATE BETWEEN TO_CHAR(ADD_MONTHS(TO_DATE(#{searchDate} /*기준일자*/, 'YYYYMMDD'), -60), 'YYYYMMDD') AND #{searchDate} /*기준일자 */ -- 5년이내의 조직도 이력을 기준으로 가져옴
+									   ORDER BY SDATE DESC
+                                        ) B
+                                WHERE	A.ENTER_CD = #{ssnEnterCd} /*회사코드*/
+                                  AND	A.STATUS_CD IN ('AA', 'CA') /*재직자, 휴직자 (고정)*/
+                                  AND	A.JIKWEE_CD NOT IN (SELECT CODE FROM TSYS005 WHERE ENTER_CD = A.ENTER_CD AND GRCODE_CD = 'H20030' AND NOTE4 = 'N') /*사외이사, 감사등은 제외(고정)*/
+                                  AND	NVL(B.SDATE, '99991231') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                             GROUP BY	A.ENTER_CD, WORK_TYPE, CASE WHEN WORK_TYPE = 'A' THEN F_COM_GET_HQ_ORG_CD_A(A.ENTER_CD, A.ORG_CD, B.SDATE) 
+																    WHEN WORK_TYPE = 'B' THEN F_COM_GET_HQ_ORG_CD_B(A.ENTER_CD, A.ORG_CD, B.SDATE) 
+															    END, B.SDATE
+		                    ) AA
+		                    ORDER BY WORK_TYPE_SEQ, HQ_ORG_CD
+			            ) AA
+					 )
+
+
+		</select>
+
+</mapper>

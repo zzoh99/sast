@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.intern.internApp1st2nd">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getInternApp1st2ndList">
+
+				<![CDATA[
+					SELECT B.NAME, A.SABUN, A.ORG_NM, A.JIKGUB_NM, A.JIKWEE_NM, B.GEMP_YMD, A.TRA_YMD
+						, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+						, A.APPRAISAL_1ST_YN
+						, A.APPRAISAL_1ST_YN AS STATUS_1ST_YN
+						, A.APPRAISAL_2ND_YN AS STATUS_2ND_YN
+						, '0' AS DETAIL
+					FROM TPAP691 A, THRM100 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.SABUN = B.SABUN
+						AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						]]>
+						<choose><when test='searchAppSeqCd != null and searchAppSeqCd.equals("1")'>
+						AND A.MAN1_SABUN = TRIM(#{searchSabun})
+						</when><otherwise>
+						AND A.MAN2_SABUN = TRIM(#{searchSabun})
+						</otherwise>
+						</choose>
+						
+					ORDER BY A.SABUN, B.GEMP_YMD
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getInternApp1st2ndPopMap">
+
+				<![CDATA[
+					SELECT 
+						  TO_CHAR(TO_DATE(A.APP_AS_YMD), 'YYYY-MM-DD') AS APP_AS_YMD
+						, TO_CHAR(TO_DATE(A.APP_AE_YMD), 'YYYY-MM-DD') AS APP_AE_YMD
+						, TO_CHAR(TO_DATE(B.EMP_YMD), 'YYYY-MM-DD') AS EMP_YMD
+						, F_COM_GET_LOCATION_NM(A.ENTER_CD, A.LOCATION_CD) AS LOCATION_NM
+						, A.ORG_NM
+						, A.JIKGUB_NM
+						, B.NAME
+						, A.APP_1ST_MEMO, A.APP_1ST_POINT
+						]]>
+						<choose><when test='searchAppSeqCd != null and searchAppSeqCd.equals("2")'>
+						, A.APP_2ND_MEMO, A.APP_2ND_POINT
+						, A.FINAL_APP_POINT
+						, (NVL(A.MIDDLE_APP_POINT,0) + A.FINAL_APP_POINT)/2 AS TOTAL_APP_POINT
+						, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P90061', A.TOTAL_APP_CLASS_CD) AS TOTAL_APP_CLASS_NM 
+						</when><otherwise>
+						, NULL AS APP_2ND_MEMO, NULL AS APP_2ND_POINT
+						, NULL AS FINAL_APP_POINT
+						, NULL AS TOTAL_APP_POINT
+						, NULL AS TOTAL_APP_CLASS_NM
+						</otherwise>
+						</choose>
+						
+					FROM TPAP691 A, THRM100 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.SABUN = B.SABUN
+						AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						AND A.SABUN = TRIM(#{searchEvaSabun})
+						AND A.TRA_YMD = TRIM(#{searchTraYmd})
+					ORDER BY A.SABUN, B.GEMP_YMD
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getInternApp1st2ndPopList">
+
+				<![CDATA[
+					SELECT A.SABUN
+					    , A.APP_AS_YMD
+						, A.APP_ITEM_SEQ
+						, A.APP_ITEM_NM
+						, A.APP_ITEM_DETAIL
+						, A.APP_1ST_POINT_CD
+						]]>
+						<choose><when test='searchAppSeqCd != null and searchAppSeqCd.equals("2")'>
+						, A.APP_2ND_POINT_CD
+						</when><otherwise>
+						, NULL AS APP_2ND_POINT_CD
+						</otherwise>
+						</choose>
+						, B.APP_CODE_TYPE
+					FROM TPAP693 A, TPAP692 B
+					WHERE  A.ENTER_CD = B.ENTER_CD
+						AND A.APP_ITEM_SEQ = B. APP_ITEM_SEQ
+						AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						AND A.SABUN = TRIM(#{searchEvaSabun})
+					ORDER BY A.APP_ITEM_SEQ
+		</select>
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveInternApp1st2ndPop">
+
+					MERGE INTO TPAP693 T
+					USING	(
+							SELECT		A.ENTER_CD
+									, A.SABUN
+									, A.APP_AS_YMD
+									, A.APP_ITEM_SEQ
+									, A.APP_1ST_POINT_CD
+									, A.APP_2ND_POINT_CD
+							FROM	(
+									SELECT		NULL	AS ENTER_CD
+											, NULL	AS SABUN
+											, NULL	AS APP_AS_YMD
+											, NULL	AS APP_ITEM_SEQ
+											, NULL	AS APP_1ST_POINT_CD
+											, NULL	AS APP_2ND_POINT_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+												#{ssnEnterCd}	AS ENTER_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.appAsYmd})			AS APP_AS_YMD
+											, TRIM( #{rm.appItemSeq})		AS APP_ITEM_SEQ
+											, TRIM( #{rm.app1stPointCd})	AS APP_1ST_POINT_CD
+											, TRIM( #{rm.app2ndPointCd})	AS APP_2ND_POINT_CD
+											FROM	DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND	T.SABUN			= S.SABUN
+					AND	T.APP_AS_YMD		= S.APP_AS_YMD
+					AND	T.APP_ITEM_SEQ	= S.APP_ITEM_SEQ
+					)
+					WHEN MATCHED THEN
+						UPDATE SET
+							<if test='searchAppSeqCd != null and searchAppSeqCd.equals("1")'>
+								T.APP_1ST_POINT_CD			= S.APP_1ST_POINT_CD
+							</if>
+							
+							<if test='searchAppSeqCd != null and searchAppSeqCd.equals("2")'>
+								T.APP_2ND_POINT_CD			= S.APP_2ND_POINT_CD
+							</if>
+							
+							, T.CHKDATE				= SYSDATE
+							, T.CHKID				= #{ssnSabun}
+
+		</update>
+		
+		<update parameterType="map" id="saveInternApp1st2ndPopMemo">
+
+					UPDATE TPAP691 SET
+						<if test='searchAppSeqCd != null and searchAppSeqCd.equals("1")'>
+							APP_1ST_MEMO = TRIM(#{app1stMemo})
+						</if>
+						
+						<if test='searchAppSeqCd != null and searchAppSeqCd.equals("2")'>
+							APP_2ND_MEMO = TRIM(#{app2ndMemo})
+						</if>
+						
+						, CHKDATE	= SYSDATE
+						, CHKID		= TRIM(#{ssnSabun})
+						
+					WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND SABUN = TRIM(#{searchEvaSabun})
+						AND TRA_YMD = TRIM(#{searchTraYmd})
+
+
+		</update>
+
+		<update parameterType="map" id="saveInternApp1st2ndPopAppYn">
+
+					UPDATE TPAP691 SET
+						 	CHKDATE	= SYSDATE
+						, CHKID		= TRIM(#{ssnSabun})
+						
+						<if test='searchAppSeqCd != null and searchAppSeqCd.equals("1")'>
+						, TPAP691.APPRAISAL_1ST_YN = 'Y'
+						</if>
+						
+						<if test='searchAppSeqCd != null and searchAppSeqCd.equals("2")'>
+						, TPAP691.APPRAISAL_2ND_YN = 'Y'
+						</if>
+						
+					WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND SABUN = TRIM(#{searchEvaSabun})
+						AND TRA_YMD = TRIM(#{searchTraYmd})
+		</update>
+
+<!-- 프로시저 -->
+		<update parameterType="map" id="prcInternApp1st2ndPopTotal" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_TPAP691_UPDATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchTraYmd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+
+</mapper>

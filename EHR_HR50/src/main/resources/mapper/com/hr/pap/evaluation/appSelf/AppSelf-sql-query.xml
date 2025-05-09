@@ -1,0 +1,583 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.evaluation.appSelf">
+
+<!-- 평가자정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfMapAppEmployee">
+
+				<![CDATA[
+					  SELECT A.APP_SABUN
+						    ,B.NAME AS APP_NAME
+						    ,A.APPRAISAL_YN AS STATUS_CD
+						    ,DECODE(A.APPRAISAL_YN,'Y','평가완료','미완료') AS STATUS_NM
+						    ,(SELECT DECODE(COUNT(*),0,'N','Y')
+						        FROM TPAP357
+				 		       WHERE ENTER_CD     = A.ENTER_CD
+					 		     AND APPRAISAL_CD = A.APPRAISAL_CD
+						         AND SABUN        = A.SABUN
+						 	     AND APP_ORG_CD   = A.APP_ORG_CD
+						 	     AND APP_STEP_CD  = A.APP_STEP_CD) AS COMMENT_IMG
+						 	,D.APP_METHOD_CD
+						 	,D.APP_SHEET_TYPE
+						    ,D.APP_YN
+						    ,D.NAME
+						    ,D.JIKWEE_NM
+						    ,D.JIKGUB_NM
+						    ,C.LAST_STATUS_CD
+						    ,F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'P10018' , C.LAST_STATUS_CD) AS LAST_STATUS_NM
+						    ,D.MBO_TARGET_YN
+						    ,D.WORK_TARGET_YN
+						    ,D.COMP_TARGET_YN
+						    , (
+                               SELECT NVL(MAX(T.APP_SEQ_CD), '-1')
+                                 FROM TPAP202 T
+                                WHERE T.ENTER_CD = A.ENTER_CD
+                                  AND T.APPRAISAL_CD = A.APPRAISAL_CD
+                                  AND T.APP_STEP_CD = A.APP_STEP_CD
+                                  AND T.SABUN = A.SABUN
+                                  AND T.APP_ORG_CD = A.APP_ORG_CD
+						      ) AS LAST_APP_SEQ_CD
+					    FROM TPAP202 A, THRM100 B, TPAP350 C, TPAP201 D
+					   WHERE A.ENTER_CD     = B.ENTER_CD
+					 	 AND A.APP_SABUN    = B.SABUN
+
+					 	 AND A.ENTER_CD     = C.ENTER_CD
+				 		 AND A.APPRAISAL_CD = C.APPRAISAL_CD
+				 		 AND A.SABUN        = C.SABUN
+						 AND A.APP_ORG_CD   = C.APP_ORG_CD
+
+						 AND A.ENTER_CD     = D.ENTER_CD
+						 AND A.APPRAISAL_CD = D.APPRAISAL_CD
+						 AND A.APP_ORG_CD   = D.APP_ORG_CD
+						 AND A.APP_STEP_CD  = D.APP_STEP_CD
+						 AND A.SABUN        = D.SABUN
+
+						 AND A.ENTER_CD     = TRIM(#{ssnEnterCd})
+						 AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+						 AND A.SABUN        = TRIM(#{searchEvaSabun})
+						 AND A.APP_ORG_CD   = TRIM(#{searchAppOrgCd})
+						 AND A.APP_STEP_CD  = TRIM(#{searchAppStepCd})
+						         ]]>
+						<choose>
+							<when test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+ 							AND A.APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+							</when>
+							<otherwise>
+ 							AND A.APP_SEQ_CD = '1'
+							</otherwise>
+						</choose>
+
+					 	AND D.APP_YN = 'Y'
+
+		</select>
+
+<!-- 업적평가 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfList1">
+
+				<![CDATA[
+				  SELECT A.APPRAISAL_CD
+						,A.APP_ORG_CD
+						,A.SABUN
+						,A.SEQ
+						,A.MK_GUBUN_CD
+						,A.APP_INDEX_GUBUN_CD
+						,A.REMARK
+
+					    ,'0' AS DETAIL
+						,A.ORDER_SEQ
+						,A.APP_INDEX_GUBUN_NM
+					    ,A.MBO_TARGET
+						,A.KPI_NM
+						,A.FORMULA
+						,A.BASELINE_DATA
+						,A.S_GRADE_BASE
+						,A.A_GRADE_BASE
+						,A.B_GRADE_BASE
+						,A.C_GRADE_BASE
+						,A.D_GRADE_BASE
+						,A.WEIGHT
+						,A.MBO_APP_RESULT
+
+						,A.MBO_SELF_CLASS_CD
+						,DECODE(TRIM(#{searchAppSeqCd}), '0', '', A.MBO_1ST_CLASS_CD) AS MBO_1ST_CLASS_CD
+						,DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', A.MBO_2ND_CLASS_CD) AS MBO_2ND_CLASS_CD
+						,DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', '2', '', A.MBO_3RD_CLASS_CD) AS MBO_3RD_CLASS_CD
+						,A.MBO_APP_SELF_POINT
+						,DECODE(TRIM(#{searchAppSeqCd}), '0', '', A.MBO_APP_1ST_POINT) AS MBO_APP_1ST_POINT
+						,DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', A.MBO_APP_2ND_POINT) AS MBO_APP_2ND_POINT
+						,DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', '2', '', A.MBO_APP_3RD_POINT) AS MBO_APP_3RD_POINT
+						,MBO_MID_APP_RESULT
+						
+						--,A.REMARK /* 실행계획 */
+						,A.MBO_TYPE /* 목표구분코드 */
+						,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10009', A.MBO_TYPE) AS MBO_TYPE_NM /* 목표구분명 */
+						,A.DEADLINE_TYPE /* 추진일정 From */
+						,A.DEADLINE_TYPE_TO /* 추진일정 To */
+						,A.MBO_1ST_MEMO
+						,A.MBO_2ND_MEMO
+						,A.MBO_3RD_MEMO
+				   FROM TPAP352 A
+				  WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					AND A.SABUN        = TRIM(#{searchEvaSabun})
+					AND A.APP_ORG_CD   = TRIM(#{searchAppOrgCd})
+				  ORDER BY A.APP_INDEX_GUBUN_CD, A.ORDER_SEQ
+				]]>
+
+
+		</select>
+
+<!-- 역량평가 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfList2">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL
+					     , A.ENTER_CD
+					     , A.APPRAISAL_CD
+					     , A.SABUN
+					     , A.APP_ORG_CD
+					     , A.COMPETENCY_CD
+					     , A.COMPETENCY_NM
+					     , A.COMP_DEV_PLAN
+					     , A.APP_RATE
+					     , A.COMP_SELF_CLASS_CD
+					     , DECODE(TRIM(#{searchAppSeqCd}), '0', '', A.COMP_1ST_CLASS_CD) AS COMP_1ST_CLASS_CD
+					     , DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', A.COMP_2ND_CLASS_CD) AS COMP_2ND_CLASS_CD
+					     , DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', '2', '', A.COMP_3RD_CLASS_CD) AS COMP_3RD_CLASS_CD
+					     , A.COMP_APP_SELF_POINT
+					     , DECODE(TRIM(#{searchAppSeqCd}), '0', '', A.COMP_APP_1ST_POINT) AS COMP_APP_1ST_POINT
+					     , DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', A.COMP_APP_2ND_POINT) AS COMP_APP_2ND_POINT
+					     , DECODE(TRIM(#{searchAppSeqCd}), '0', '', '1', '', '2', '', A.COMP_APP_3RD_POINT) AS COMP_APP_3RD_POINT
+					     , A.COMP_SELF_OPINION -- 본인의견
+					     , A.COMP_1ST_OPINION  -- 1차평가자의견
+					     , A.COMP_2ND_OPINION  -- 2차평가자의견
+					     , A.COMP_3RD_OPINION  -- 3차평가자의견
+					     , B.MAIN_APP_TYPE     -- 역량구분(P00007)
+					     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'P00007', B.MAIN_APP_TYPE) AS MAIN_APP_TYPE_NM
+					     , A.REQ_SUPPORT_MEMO
+					     , A.FILE_SEQ
+					     , '1' AS FILE_POP
+					     , B.GMEASURE_MEMO
+					     , B.COMPETENCY_TYPE
+					     , B.MEMO
+					     , B.SDATE
+					     , B.EDATE
+					     , B.GMEASURE_CD
+					     , (SELECT GMEASURE_NM FROM TSYS021 WHERE ENTER_CD = B.ENTER_CD AND GMEASURE_CD = B.GMEASURE_CD) AS GMEASURE_NM
+					  FROM TPAP402 A
+					     , TORG051 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.COMPETENCY_CD = B.COMPETENCY_CD
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.SABUN = TRIM(#{searchEvaSabun})
+					   AND A.APP_ORG_CD = TRIM(#{searchAppOrgCd})
+					ORDER BY A.SABUN, B.MAIN_APP_TYPE
+				]]>
+
+
+		</select>
+
+<!-- 본인의견 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfList4">
+
+				<![CDATA[
+					SELECT	A.ENTER_CD				/*	회사구분(TORG900)		*/
+						,	A.APPRAISAL_CD			/*	평가ID코드(TPAP101)		*/
+						,	A.SABUN					/*	사원번호				*/
+						,	A.APP_ORG_CD			/*	조직코드				*/
+						,	A.GOAL_1				/*	목표_1				*/
+						,	A.IMPROVE_YN_1			/*	개선여부(YN)_1			*/
+						,	A.IMPROVE_GRADE_CD_1	/*	개선정도(P90200)_1		*/
+						,	A.IMPROVE_SOLUTION_1	/*	개선방법_1				*/
+						,	A.MAIN_SABUN_1			/*	메인담당자사번_1			*/
+						,	F_COM_GET_NAMES(A.ENTER_CD,A.MAIN_SABUN_1)	AS	MAIN_SABUN_1_NAME
+						,	A.FEEDBACK_YN_1			/*	피드백실시(YN)_1			*/
+						,	A.GOAL_2				/*	목표_2				*/
+						,	A.IMPROVE_YN_2			/*	개선여부(YN)_2			*/
+						,	A.IMPROVE_GRADE_CD_2	/*	개선정도(P90200)_2		*/
+						,	A.IMPROVE_SOLUTION_2	/*	개선방법_2				*/
+						,	A.MAIN_SABUN_2			/*	메인담당자사번_2			*/
+						,	F_COM_GET_NAMES(A.ENTER_CD,A.MAIN_SABUN_2)	AS	MAIN_SABUN_2_NAME
+						,	A.FEEDBACK_YN_2			/*	피드백실시(YN)_2			*/
+						,	A.GOAL_3				/*	목표_3				*/
+						,	A.IMPROVE_YN_3			/*	개선여부(YN)_3			*/
+						,	A.IMPROVE_GRADE_CD_3	/*	개선정도(P90200)_3		*/
+						,	A.IMPROVE_SOLUTION_3	/*	개선방법3				*/
+						,	A.MAIN_SABUN_3			/*	메인담당자사번_3			*/
+						,	F_COM_GET_NAMES(A.ENTER_CD,A.MAIN_SABUN_3)	AS	MAIN_SABUN_3_NAME
+						,	A.FEEDBACK_YN_3			/*	피드백실시(YN)_3			*/
+						,	A.OTHER					/*	기타중점추진사항			*/
+						,	A.CHKDATE				/*	최종수정시간				*/
+						,	A.CHKID					/*	최종수정자				*/
+					FROM	TPAP384	A
+					WHERE	A.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND		A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					AND		A.SABUN = TRIM(#{searchSabun})
+					AND		A.APP_ORG_CD = TRIM(#{searchAppOrgCd})
+				]]>
+
+
+		</select>
+
+<!-- 의견 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfPopCommentView">
+
+				<![CDATA[
+					SELECT A.APPRAISAL_CD,
+						A.REG_SABUN AS SABUN,
+                        (SELECT AA.CODE_NM FROM TSYS005 AA WHERE AA.ENTER_CD = A.ENTER_CD AND AA.GRCODE_CD = 'P00005' AND AA.CODE = A.APP_STEP_CD ) AS STEP_NM,
+						F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10018' , A.APP_STATUS_CD) AS STATUS_NM,
+						(SELECT NAME FROM THRM100 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.REG_SABUN) AS NAME,
+						A.APP_COMMENT,
+						TO_CHAR(A.CHKDATE, 'YYYY-MM-DD HH24:MI') AS REG_TIME
+					FROM TPAP357 A
+					WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+						AND A.SABUN = TRIM(#{searchSabun})
+						AND A.APP_ORG_CD = TRIM(#{searchAppOrgCd})
+						AND A.APP_STEP_CD = TRIM(#{searchAppStepCd})
+					ORDER BY A.SEQ DESC
+				]]>
+
+
+		</select>
+
+<!-- 역량사전 팝업 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfPopCompDicList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					     , MAIN_APP_TYPE
+					     , F_COM_GET_GRCODE_NAME(ENTER_CD, 'P00007', MAIN_APP_TYPE) AS MAIN_APP_TYPE_NM
+					     , COMPETENCY_CD
+					     , COMPETENCY_NM
+					     , MEMO
+					  FROM TORG051
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					           ]]>
+					<if test='searchMainAppType != null and !searchMainAppType.equals("")'>
+					   AND MAIN_APP_TYPE = TRIM(#{searchMainAppType})
+					</if>
+					<if test='searchCompetencyNm != null and !searchCompetencyNm.equals("")'>
+					   AND COMPETENCY_NM LIKE '%'||TRIM(#{searchCompetencyNm})||'%'
+					</if>
+					 ORDER BY MAIN_APP_TYPE, COMPETENCY_CD
+
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppSelfMap1">
+
+				<![CDATA[
+					SELECT NVL(MBO_T_APP_SELF_POINT,'') AS MBO_T_APP_SELF_POINT
+						, NVL(MBO_T_APP_1ST_POINT,'') AS MBO_T_APP_1ST_POINT
+						, NVL(MBO_T_APP_2ND_POINT,'') AS MBO_T_APP_2ND_POINT
+						, NVL(COMP_T_APP_SELF_POINT,'') AS COMP_T_APP_SELF_POINT
+						, NVL(COMP_T_APP_1ST_POINT,'') AS COMP_T_APP_1ST_POINT
+						, NVL(COMP_T_APP_2ND_POINT,'') AS COMP_T_APP_2ND_POINT
+						, NVL(FILE_SEQ, '') AS FILE_SEQ
+					FROM TPAP350 A
+					WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+						AND SABUN = TRIM(#{searchSabun})
+						AND APP_ORG_CD = TRIM(#{searchAppOrgCd})
+				]]>
+
+
+		</select>
+
+<!-- 업적평가 저장 -->
+		<update parameterType="map" id="saveAppSelf1">
+
+					MERGE INTO TPAP352 T
+					USING	(
+							SELECT A.ENTER_CD
+								, A.APPRAISAL_CD
+								, A.SABUN
+								, A.APP_ORG_CD
+								, A.SEQ
+								, A.MK_GUBUN_CD
+								, A.MBO_APP_RESULT
+								, A.REMARK
+								, A.MBO_SELF_CLASS_CD
+								, A.MBO_1ST_CLASS_CD
+								, A.MBO_2ND_CLASS_CD
+								, A.MBO_3RD_CLASS_CD
+								, A.MBO_APP_SELF_POINT
+								, A.MBO_APP_1ST_POINT
+								, A.MBO_APP_2ND_POINT
+								, A.MBO_APP_3RD_POINT
+								, A.MBO_1ST_MEMO
+								, A.MBO_2ND_MEMO
+								, A.MBO_3RD_MEMO
+							FROM	(
+									SELECT	NULL AS ENTER_CD
+										, NULL AS APPRAISAL_CD
+										, NULL AS SABUN
+										, NULL AS APP_ORG_CD
+										, NULL AS SEQ
+										, NULL AS MK_GUBUN_CD
+										, NULL AS MBO_APP_RESULT
+										, NULL AS REMARK
+										, NULL AS MBO_SELF_CLASS_CD
+										, NULL AS MBO_1ST_CLASS_CD
+										, NULL AS MBO_2ND_CLASS_CD
+										, NULL AS MBO_3RD_CLASS_CD
+										, NULL AS MBO_APP_SELF_POINT
+										, NULL AS MBO_APP_1ST_POINT
+										, NULL AS MBO_APP_2ND_POINT
+										, NULL AS MBO_APP_3RD_POINT
+										, NULL AS MBO_1ST_MEMO
+										, NULL AS MBO_2ND_MEMO
+										, NULL AS MBO_3RD_MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT  #{ssnEnterCd}                     AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )		AS APPRAISAL_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.appOrgCd} )		AS APP_ORG_CD
+											, TRIM( #{rm.seq} )				AS SEQ
+											, TRIM( #{rm.mkGubunCd})		AS MK_GUBUN_CD
+											, TRIM( #{rm.mboAppResult})	AS MBO_APP_RESULT
+											, TRIM( #{rm.remark})			AS REMARK
+											, TRIM( #{rm.mboSelfClassCd})	AS MBO_SELF_CLASS_CD
+											, TRIM( #{rm.mbo1stClassCd})	AS MBO_1ST_CLASS_CD
+											, TRIM( #{rm.mbo2ndClassCd})	AS MBO_2ND_CLASS_CD
+											, TRIM( #{rm.mbo3rdClassCd})	AS MBO_3RD_CLASS_CD
+											, TRIM( #{rm.mboAppSelfPoint})	AS MBO_APP_SELF_POINT
+											, TRIM( #{rm.mboApp1stPoint})	AS MBO_APP_1ST_POINT
+											, TRIM( #{rm.mboApp2ndPoint})	AS MBO_APP_2ND_POINT
+											, TRIM( #{rm.mboApp3rdPoint})	AS MBO_APP_3RD_POINT
+											, TRIM( #{rm.mbo1stMemo})		AS MBO_1ST_MEMO
+											, TRIM( #{rm.mbo2ndMemo})		AS MBO_2ND_MEMO
+											, TRIM( #{rm.mbo3rdMemo})		AS MBO_3RD_MEMO
+										FROM   DUAL
+</foreach>
+								) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		 	 = S.ENTER_CD
+						AND  T.APPRAISAL_CD  = S.APPRAISAL_CD
+						AND  T.SABUN         = S.SABUN
+						AND  T.APP_ORG_CD  	 = S.APP_ORG_CD
+						AND  T.SEQ           = S.SEQ
+						AND  T.MK_GUBUN_CD   = S.MK_GUBUN_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MBO_APP_RESULT      = S.MBO_APP_RESULT
+									, T.REMARK              = S.REMARK
+									, T.MBO_SELF_CLASS_CD  	= S.MBO_SELF_CLASS_CD
+									, T.MBO_1ST_CLASS_CD  	= S.MBO_1ST_CLASS_CD
+									, T.MBO_2ND_CLASS_CD  	= S.MBO_2ND_CLASS_CD
+									, T.MBO_3RD_CLASS_CD  	= S.MBO_3RD_CLASS_CD
+									, T.MBO_APP_SELF_POINT  = S.MBO_APP_SELF_POINT
+									, T.MBO_APP_1ST_POINT  	= S.MBO_APP_1ST_POINT
+									, T.MBO_APP_2ND_POINT  	= S.MBO_APP_2ND_POINT
+									, T.MBO_APP_3RD_POINT  	= S.MBO_APP_3RD_POINT
+									, T.MBO_1ST_MEMO        = S.MBO_1ST_MEMO
+									, T.MBO_2ND_MEMO        = S.MBO_2ND_MEMO
+									, T.MBO_3RD_MEMO        = S.MBO_3RD_MEMO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+		</update>
+
+<!-- 역량평가 저장 -->
+		<update parameterType="map" id="saveAppSelf2">
+
+					MERGE INTO TPAP402 T
+					USING	(
+							SELECT A.ENTER_CD
+								, A.APPRAISAL_CD
+								, A.SABUN
+								, A.APP_ORG_CD
+								, A.COMPETENCY_CD
+								, A.COMP_SELF_CLASS_CD
+								, A.COMP_1ST_CLASS_CD
+								, A.COMP_2ND_CLASS_CD
+								, A.COMP_3RD_CLASS_CD
+								, A.COMP_APP_SELF_POINT
+								, A.COMP_APP_1ST_POINT
+								, A.COMP_APP_2ND_POINT
+								, A.COMP_APP_3RD_POINT
+								, A.FILE_SEQ
+								, A.COMP_SELF_OPINION
+								, A.COMP_1ST_OPINION
+								, A.COMP_2ND_OPINION
+								, A.COMP_3RD_OPINION
+							FROM	(
+									SELECT	NULL AS ENTER_CD
+										, NULL AS APPRAISAL_CD
+										, NULL AS SABUN
+										, NULL AS APP_ORG_CD
+										, NULL AS COMPETENCY_CD
+										, NULL AS COMP_SELF_CLASS_CD
+										, NULL AS COMP_1ST_CLASS_CD
+										, NULL AS COMP_2ND_CLASS_CD
+										, NULL AS COMP_3RD_CLASS_CD
+										, NULL AS COMP_APP_SELF_POINT
+										, NULL AS COMP_APP_1ST_POINT
+										, NULL AS COMP_APP_2ND_POINT
+										, NULL AS COMP_APP_3RD_POINT
+										, NULL AS FILE_SEQ
+										, NULL AS COMP_SELF_OPINION
+										, NULL AS COMP_1ST_OPINION
+										, NULL AS COMP_2ND_OPINION
+										, NULL AS COMP_3RD_OPINION
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT  #{ssnEnterCd}                     AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )		AS APPRAISAL_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.appOrgCd} )		AS APP_ORG_CD
+											, TRIM( #{rm.competencyCd} )	AS COMPETENCY_CD
+											, TRIM( #{rm.compSelfClassCd})	AS COMP_SELF_CLASS_CD
+											, TRIM( #{rm.comp1stClassCd})	AS COMP_1ST_CLASS_CD
+											, TRIM( #{rm.comp2ndClassCd})	AS COMP_2ND_CLASS_CD
+											, TRIM( #{rm.comp3rdClassCd})	AS COMP_3RD_CLASS_CD
+											, TRIM( #{rm.compAppSelfPoint}) AS COMP_APP_SELF_POINT
+											, TRIM( #{rm.compApp1stPoint})	 AS COMP_APP_1ST_POINT
+											, TRIM( #{rm.compApp2ndPoint})	 AS COMP_APP_2ND_POINT
+											, TRIM( #{rm.compApp3rdPoint})	 AS COMP_APP_3RD_POINT
+											, TRIM( #{rm.fileSeq})	         AS FILE_SEQ
+											, TRIM( #{rm.compSelfOpinion})	 AS COMP_SELF_OPINION
+											, TRIM( #{rm.comp1stOpinion})	 AS COMP_1ST_OPINION
+											, TRIM( #{rm.comp2ndOpinion})	 AS COMP_2ND_OPINION
+											, TRIM( #{rm.comp3rdOpinion})	 AS COMP_3RD_OPINION
+										FROM   DUAL
+</foreach>
+								) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD				= S.ENTER_CD
+						AND  T.APPRAISAL_CD		= S.APPRAISAL_CD
+						AND  T.SABUN			= S.SABUN
+						AND  T.APP_ORG_CD		= S.APP_ORG_CD
+						AND  T.COMPETENCY_CD	= S.COMPETENCY_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.COMP_SELF_CLASS_CD  = S.COMP_SELF_CLASS_CD
+									, T.COMP_1ST_CLASS_CD	= S.COMP_1ST_CLASS_CD
+									, T.COMP_2ND_CLASS_CD	= S.COMP_2ND_CLASS_CD
+									, T.COMP_3RD_CLASS_CD	= S.COMP_3RD_CLASS_CD
+									, T.COMP_APP_SELF_POINT = S.COMP_APP_SELF_POINT
+									, T.COMP_APP_1ST_POINT	= S.COMP_APP_1ST_POINT
+									, T.COMP_APP_2ND_POINT	= S.COMP_APP_2ND_POINT
+									, T.COMP_APP_3RD_POINT	= S.COMP_APP_3RD_POINT
+									, T.FILE_SEQ	        = S.FILE_SEQ
+									, T.COMP_SELF_OPINION   = S.COMP_SELF_OPINION
+									, T.COMP_1ST_OPINION    = S.COMP_1ST_OPINION
+									, T.COMP_2ND_OPINION    = S.COMP_2ND_OPINION
+									, T.COMP_3RD_OPINION    = S.COMP_3RD_OPINION
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+		</update>
+
+		<!-- 첨부파일 저장 -->
+		<update parameterType="map" id="saveAppAttFile">
+
+				<![CDATA[
+					UPDATE TPAP350
+						SET FILE_SEQ = #{fileSeq}
+							, CHKDATE = SYSDATE
+							, CHKID = #{ssnSabun}
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND APPRAISAL_CD = #{searchAppraisalCd}
+					  AND SABUN = #{searchSabun}
+					  AND APP_ORG_CD = #{searchAppOrgCd}
+				]]>
+
+		</update>
+
+<!-- 프로시저 -->
+		<update parameterType="map" id="prcAppSelf1" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_TPAP350_UPDATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppOrgCd,mode=IN,jdbcType=VARCHAR},
+				#{searchEvaSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSeqCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<update parameterType="map" id="prcAppSelf2" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_REQ(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchEvaSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchAppOrgCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSeqCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+<!-- 반려의견 저장 -->
+		<update parameterType="map" id="saveAppSelfReturnComment">
+
+				<![CDATA[
+					INSERT INTO TPAP357(
+						ENTER_CD
+						, APPRAISAL_CD
+						, SABUN
+						, APP_ORG_CD
+						, APP_STEP_CD
+						, SEQ
+						, APP_STATUS_CD
+						, REG_SABUN
+						, APP_COMMENT
+						, CHKDATE
+						, CHKID
+					)
+					VALUES
+					(
+						  TRIM(#{ssnEnterCd})
+						, TRIM(#{searchAppraisalCd})
+						, TRIM(#{searchEvaSabun})
+						, TRIM(#{searchAppOrgCd})
+						, TRIM(#{searchAppStepCd})
+						, NVL((SELECT MAX(SEQ) FROM TPAP357
+							WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+								AND  APPRAISAL_CD  = TRIM(#{searchAppraisalCd})
+								AND  SABUN         = TRIM(#{searchEvaSabun})
+								AND  APP_ORG_CD    = TRIM(#{searchAppOrgCd})
+								AND  APP_STEP_CD   = TRIM(#{searchAppStepCd})
+							),0) + 1
+						, TRIM(#{searchAppStatusCd})
+						, TRIM(#{searchRegSabun})
+						, TRIM(#{searchAppComment})
+						, SYSDATE
+						, #{ssnSabun}
+					)
+				]]>
+		</update>
+
+<!-- 반려처리 -->
+		<update parameterType="map" id="saveAppSelfReturnStatus" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_REQ_RETURN(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchEvaSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchAppOrgCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSeqCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

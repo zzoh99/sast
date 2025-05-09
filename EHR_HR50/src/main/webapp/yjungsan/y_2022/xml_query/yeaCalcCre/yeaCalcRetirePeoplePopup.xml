@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	퇴직정산 대상자
+ -->
+<root>
+	<!-- 퇴직정산 대상자 조회  -->
+	<query id="selectYeaCalcRetirePopupList">
+		<![CDATA[
+			SELECT A.WORK_YY
+				 , A.ADJUST_TYPE
+				 , D.PAY_ACTION_NM
+                 , DECODE(A.PAY_PEOPLE_STATUS,'P','1','J','2','0') PAY_PEOPLE_STATUS
+                 , A.FINAL_CLOSE_YN
+                 , B.NAME
+				 , A.SABUN
+				 , A.BUSINESS_PLACE_CD
+				 , A.PAY_ACTION_CD
+                 , A.ORG_CD
+                 , A.ORG_NM
+                 , A.TAX_TYPE
+                 , NVL(A.FOREIGN_TAX_TYPE,'3') FOREIGN_TAX_TYPE                 
+                 , A.REDUCE_S_YMD
+                 , A.REDUCE_E_YMD
+                 , A.ZIP
+                 , A.ADDR1
+                 , A.ADDR2
+				 , A.INPUT_CLOSE_YN
+				 , A.APPRV_YN
+                 , A.HOUSE_OWNER_YN
+                 , A.HOUSE_GET_YMD
+                 , A.HOUSE_AREA
+                 , A.OFFICIAL_PRICE
+                 , A.NATIONAL_CD
+                 , A.NATIONAL_NM
+                 , A.RESULT_CONFIRM_YN
+                 , A.HOUSE_CNT
+                 , C.ADJ_S_YMD
+                 , C.ADJ_E_YMD
+                 , C.SABUN AS ADJ_SABUN
+                 , A.EXCEPT_YN
+				 , ( SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0,'Y','N') FINAL_CLOSE_YN
+					 FROM TCPN811
+					 WHERE ENTER_CD    = #ssnEnterCd#
+					   AND WORK_YY     = #searchWorkYy#
+					   AND ADJUST_TYPE = '1'
+					   AND PAY_ACTION_CD= A.PAY_ACTION_CD ) TOT_FINAL_CLOSE_YN
+			FROM TCPN811 A, THRM100 B, TCPN841 C, TCPN201 D
+			WHERE A.ENTER_CD      = #ssnEnterCd#
+			  AND A.WORK_YY       = #searchWorkYy#
+			  AND A.ADJUST_TYPE   = '3'
+			  AND A.ENTER_CD      = B.ENTER_CD
+			  AND A.SABUN         = B.SABUN
+			  AND A.ENTER_CD      = C.ENTER_CD(+)
+			  AND A.SABUN         = C.SABUN(+)
+			  AND A.WORK_YY       = C.WORK_YY(+)
+			  AND A.ADJUST_TYPE   = C.ADJUST_TYPE(+)
+			  AND A.ENTER_CD      = D.ENTER_CD(+)
+			  AND A.PAY_ACTION_CD = D.PAY_ACTION_CD(+)
+			  $query$
+			ORDER BY PAY_PEOPLE_STATUS desc, B.NAME
+		]]>
+	</query>
+
+	<!-- 퇴직정산 대상자 저장  -->
+	<query id="updateYeaCalcRetirePopup">
+		<![CDATA[
+            UPDATE TCPN811
+            SET	EXCEPT_YN     = DECODE(#except_yn#,'Y','Y','N')
+              , CHKDATE	      = SYSDATE
+              , CHKID         = #ssnSabun#
+            WHERE ENTER_CD    = #ssnEnterCd#
+              AND WORK_YY     = #work_yy#
+              AND ADJUST_TYPE = #adjust_type#
+              AND SABUN       = #sabun# 
+		]]>
+	</query>
+
+	<!-- 퇴직정산계산결과 수정 TCPN841 -->
+	<query id="updateYeaCalcRetirePopupAdjYmd">
+		<![CDATA[
+            UPDATE TCPN841
+            SET	  ADJ_S_YMD  = #adj_s_ymd#
+            	, ADJ_E_YMD  = #adj_e_ymd#
+            	, CHKDATE    = SYSDATE
+            	, CHKID      = #ssnSabun#
+            WHERE ENTER_CD = #ssnEnterCd#
+              AND WORK_YY = #work_yy#
+              AND ADJUST_TYPE = #adjust_type#
+              AND SABUN = #sabun# 
+		]]>
+	</query>
+
+	<!-- 기존 등록여부 체크 -->
+	<query id="selectYeaCalcRetirePopupChkSabun">
+		<![CDATA[
+			SELECT B.PAY_ACTION_NM
+			FROM TCPN811 A
+			   , TCPN201 B
+			WHERE A.ENTER_CD = B.ENTER_CD
+			  AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+			  AND A.ENTER_CD = #ssnEnterCd#
+			  AND A.WORK_YY= #work_yy#
+			  AND A.ADJUST_TYPE = #adjust_type#
+			  AND A.SABUN = #sabun#
+		]]>
+	</query>
+
+	<!-- TCPN201없는 TCPN811 데이터 존재여부 확인 -->
+	<query id="selectYeaCalcRetirePopupDataCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TCPN811 A
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.WORK_YY= #work_yy#
+			   AND A.ADJUST_TYPE = #adjust_type#
+			   AND A.SABUN = #sabun#
+			   AND A.PAY_ACTION_CD NOT IN (SELECT B.PAY_ACTION_CD
+											FROM TCPN201 B
+										   WHERE B.ENTER_CD = A.ENTER_CD
+											 AND B.PAY_ACTION_CD = A.PAY_ACTION_CD)
+		]]>
+	</query>
+</root>

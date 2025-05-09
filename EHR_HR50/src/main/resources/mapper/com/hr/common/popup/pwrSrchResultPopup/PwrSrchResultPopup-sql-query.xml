@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.pwrSrchResultPopup">
+		
+	<select id="getPwrSrchResultPopupIBSheetColsList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT SEARCH_SEQ, COLUMN_NM, SEQ, ORDER_BY_SEQ, ASC_DESC, INQ_TYPE, CASE WHEN MERGE_YN = 'Y' THEN '1' ELSE '0' END AS MERGE_YN, SUB_SUM_TYPE
+		     , NVL(ALIGN, 'Center') AS ALIGN
+		     , NVL(WIDTH_RATE, '100') AS WIDTH_RATE	
+				FROM THRI213 
+			WHERE ENTER_CD   = #{ssnEnterCd}
+					AND SEARCH_SEQ = TO_NUMBER(TRIM( #{srchSeq})) 
+		ORDER BY SEQ
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupConditionList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT 	  A.SEARCH_SEQ
+				, A.COLUMN_NM	
+				, A.OPERATOR
+				, A.INPUT_VALUE
+				, A.INPUT_VALUE_DESC
+				, A.AND_OR
+				, A.VALUE_TYPE
+				, A.SEQ
+				, A.COND_TYPE
+    						, B.SEARCH_ITEM_NM
+    						, B.SEARCH_ITEM_CD
+    						, B.ITEM_MAP_TYPE
+    						, B.PRG_URL
+    						, B.SQL_SYNTAX
+				FROM THRI215 A, THRI203 B
+			WHERE A.ENTER_CD     = #{ssnEnterCd}
+					AND A.SEARCH_SEQ     = #{srchSeq}
+					AND A.COND_TYPE      = 'U'
+					AND A.ENTER_CD       = B.ENTER_CD(+)
+					AND A.SEARCH_ITEM_CD = B.SEARCH_ITEM_CD(+)
+		ORDER BY SEQ
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupElemDetailList" parameterType="map" resultType="cMap">
+	<![CDATA[/* thri211 */
+		SELECT 	  A.SEARCH_TYPE
+				, A.CONDITION_DESC
+				, A.SQL_SYNTAX
+  						, A.ADMIN_SQL_SYNTAX
+  						, C.VIEW_NM
+				FROM THRI201 A, THRI205 C
+			WHERE A.ENTER_CD   	= #{ssnEnterCd}
+					AND A.SEARCH_SEQ 	= #{srchSeq}
+					AND A.VIEW_CD		= C.VIEW_CD(+)
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupAuthStmtList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		(	SELECT * 
+			FROM (	SELECT SUB1.* 
+					FROM THRM151 SUB1 
+					WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+					AND #{ssnBaseDate} BETWEEN SDATE AND NVL(EDATE, '99991231') 
+				)
+			WHERE ENTER_CD = #{ssnEnterCd}
+			AND ( 
+					ORG_CD IN (	SELECT SCOPE_VALUE 
+								FROM TSYS319 
+								WHERE ENTER_CD = #{ssnEnterCd}
+								AND SABUN = #{ssnSabun}
+								AND GRP_CD = #{ssnGrpCd}
+								AND AUTH_SCOPE_CD = 'W10' 
+          						   )
+          				OR 
+          				SABUN IN (
+          							SELECT F_ORG_GET_CHIEF_SABUN( ENTER_CD, SCOPE_VALUE , TO_CHAR( SYSDATE,'YYYYMMDD' ) ) 
+                          			FROM TSYS319 
+                          			WHERE ENTER_CD = #{ssnEnterCd} 
+                          			AND SABUN = #{ssnSabun}
+                          			AND GRP_CD = #{ssnGrpCd} 
+                          			AND AUTH_SCOPE_CD = 'W10' 
+          						  )
+				)
+  				AND SABUN = #{ssnSabun}
+  			)
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupTrackStmtList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	SUB1.*                                                                                     
+   		  FROM	THRM151 SUB1                                                                                
+     	 WHERE	SUB1.ENTER_CD    = #{ssnEnterCd}                     
+		   AND	#{ssnBaseDate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupQueryResultList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		${resultQuery}
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupQueryMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_SQL_TMP(#{ssnEnterCd}, TRIM(#{srchSeq}), #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, '') AS query FROM DUAL
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupResultList" parameterType="map" resultType="cMap">
+		SELECT * FROM (
+		<choose>
+			<when test="orderbyStr != null and orderbyStr neq ''">
+				SELECT ROW_NUMBER() OVER (ORDER BY ${orderbyStr}) AS RNUM , A.*
+			</when>
+			<otherwise>
+				SELECT ROWNUM AS RNUM , A.* 
+			</otherwise>
+		</choose>
+			FROM (
+				${selectViewQuery}
+			) A
+		) AA
+		<choose>
+			<when test="ibpage != null and ibpage neq ''">
+				WHERE AA.RNUM BETWEEN (TO_NUMBER(#{ibpage})-1)*TO_NUMBER(#{defaultRow}) + 1 AND ( TO_NUMBER(#{ibpage})*TO_NUMBER(#{defaultRow}) ) 
+			</when>
+			<otherwise>
+				WHERE AA.RNUM BETWEEN 1 AND TO_NUMBER(#{defaultRow})
+			</otherwise>
+		</choose>
+	</select>
+		
+	<select id="getPwrSrchResultPopupResulCntMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT COUNT(*) AS CNT FROM ( ${selectViewQuery} )
+	]]>
+	</select>
+		
+	<select id="getPwrSrchResultPopupResultDown" parameterType="map" resultType="cMap">
+	<![CDATA[
+		${query}
+	]]>
+	</select>
+		
+</mapper>

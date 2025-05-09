@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobSchemeMgr">
+<!-- 		직무분류표 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobSchemeMgrList">
+
+				<![CDATA[
+						SELECT '0' AS DETAIL,
+								0 AS "_level",	
+					     	    '0' AS PRIOR_JOB_CD,
+							    '0' AS JOB_CD,
+						        '' AS SDATE,
+						        '' AS EDATE,
+						        '직무분류표' AS JOB_NM,
+						        '' AS JOB_ENG_NM,
+						        '' AS JOB_TYPE,
+						        '' AS MEMO,
+						        '' AS JOB_DEFINE,
+						        '' AS ACADEMY_REQ,
+						        '' AS MAJOR_REQ,
+						        '' AS JIKGUB_REQ,
+						        '' AS CAREER_REQ,
+						        '' AS OTHER_JOB_REQ,
+						        '' AS NOTE,
+						        0 AS SEQ,
+						        '' AS KEY_POSITION_YN	
+						  FROM DUAL
+						UNION ALL  
+						SELECT * 
+						  FROM (				
+								SELECT '0' AS DETAIL,
+									   LEVEL AS "_level",
+									   B.PRIOR_JOB_CD,
+									   B.JOB_CD,
+								       B.SDATE,
+								       B.EDATE,								       
+								       A.JOB_NM,
+								       A.JOB_ENG_NM,
+								       A.JOB_TYPE,
+								       A.MEMO,
+								       A.JOB_DEFINE,
+								       A.ACADEMY_REQ,
+								       A.MAJOR_REQ,
+								       A.JIKGUB_REQ,
+								       A.CAREER_REQ,
+								       A.OTHER_JOB_REQ,
+								       A.NOTE,
+								       B.SEQ,
+								       A.KEY_POSITION_YN
+								 FROM  TORG201 A, TORG204 B
+								WHERE 1=1
+								  AND A.ENTER_CD = B.ENTER_CD
+								  AND A.JOB_CD = B.JOB_CD
+								  AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+								          ]]>
+<if test='searchSdate != null and !searchSdate.equals("")'>
+								  AND REPLACE(TRIM(#{searchSdate}),'-','') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+</if>
+								 START WITH B.PRIOR_JOB_CD = '0' 
+								 CONNECT BY PRIOR B.ENTER_CD = B.ENTER_CD 
+								    AND PRIOR B.JOB_CD = B.PRIOR_JOB_CD 
+								 ORDER SIBLINGS BY B.PRIOR_JOB_CD, B.SEQ 	
+								 )	 
+
+
+		</select>
+		
+<!-- 		직무분류표 저장 -->	
+		<update parameterType="map" id="saveJobSchemeMgr">
+
+					MERGE INTO TORG204 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.SDATE
+									, A.EDATE
+									, A.PRIOR_JOB_CD
+									, A.SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS PRIOR_JOB_CD
+											, NULL		AS SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.priorJobCd})	AS PRIOR_JOB_CD
+											, TRIM( #{rm.seq} ) AS SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.JOB_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PRIOR_JOB_CD	= S.PRIOR_JOB_CD
+									, T.SEQ = S.SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.SDATE
+							, T.EDATE
+							, T.PRIOR_JOB_CD
+							, T.SEQ			
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.SDATE
+							, S.EDATE
+							, S.PRIOR_JOB_CD
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)				
+		</update>
+<!-- 		직무분류표 삭제 -->
+		<delete parameterType="map" id="deleteJobSchemeMgr">
+
+					DELETE TORG204
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.jobCd != null and !rm.jobCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

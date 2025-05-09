@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	이관업로드 관리
+ -->
+<root>
+
+	<!-- 이관업로드 동적필드 조회  -->
+	<query id="selectHeaderList">
+		<![CDATA[
+			SELECT SUBSTR(EXTRACT(XMLAGG(XMLELEMENT(A, '|', COL_CMT) ORDER BY SEQ),'//text()').GETCLOBVAL(),2) AS HEADER_NM,
+			       LOWER(SUBSTR(EXTRACT(XMLAGG(XMLELEMENT(A, '|', COL_NM) ORDER BY SEQ),'//text()').GETCLOBVAL(),2)) AS HEADER_COL_NM,
+			CASE WHEN #tabNum# = '2' THEN 
+			       'RESIDENCY_TYPE|RESIDENCE_NM|RESIDENCE_CD|CITIZEN_TYPE|FOREIGN_TAX_TYPE|FOREIGN_EMP_TYPE|RELIGION_YN|NATIONAL_NM|NATIONAL_CD|HOUSE_OWNER_YN|ENTER_NM|PRESIDENT|REGINO|PRESIDENT_RES_NO|TAX_GRP_YN|SUB_REGINO|ENTER_ZIP_NO|ENTER_ADDR|ENTER_ADDR_D|NAME|RES_NO|ZIP_NO|ADDR|ADDR_D|'
+			     WHEN #tabNum# = '3' THEN
+			       'ENTER_NM|REGINO|ADJ_S_YMD|ADJ_E_YMD|REDUCE_S_YMD|REDUCE_E_YMD|'
+			     END
+			       ||SUBSTR(EXTRACT(XMLAGG(XMLELEMENT(A, '|', COL_NM) ORDER BY SEQ),'//text()').GETCLOBVAL(),2) AS COLUMN_NM
+			FROM TYEA001
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND WORK_YY 		= #searchWorkYy#
+			  $pTable$
+	   ]]> 
+	</query>
+
+    <!-- 이관업로드 관리 (데이터 조회)  -->
+    <query id="getColDataList">
+       <![CDATA[
+            SELECT $colColumn$
+            FROM $tabTable$
+            WHERE ENTER_CD      = #ssnEnterCd#
+              AND WORK_YY       = #searchWorkYy#
+              AND ADJUST_TYPE   = #searchAdjustType#
+              $WorkCd$ 
+            ORDER BY WORK_YY, ADJUST_TYPE, SABUN ASC
+       ]]>
+    </query>
+
+    <!-- 이관업로드 관리 (기본정보 조회)  -->
+    <query id="selectMigInfoMgrList">
+       <![CDATA[
+       		SELECT A.*
+       		FROM (
+	            SELECT ENTER_CD
+	                 , WORK_YY
+	                 , ADJUST_TYPE
+	                 , SABUN
+	                 , F_COM_GET_NAMES(#ssnEnterCd#,  SABUN) AS F_NAME
+	                 , ENTER_NM
+	                 , PRESIDENT
+	                 , REGINO
+	                 , F_COM_DECRYPT(PRESIDENT_RES_NO, ENTER_CD) AS PRESIDENT_RES_NO
+	                 , RESIDENCY_TYPE
+	                 , RESIDENCE_NM
+	                 , RESIDENCE_CD
+	                 , CITIZEN_TYPE
+	                 , FOREIGN_TAX_TYPE
+	                 , DECODE(FOREIGN_EMP_TYPE,'','N',FOREIGN_EMP_TYPE) AS FOREIGN_EMP_TYPE
+	                 , RELIGION_YN
+	                 , NATIONAL_NM
+	                 , NATIONAL_CD
+	                 , HOUSE_OWNER_YN
+	                 , DECODE(TAX_GRP_YN,'','N',TAX_GRP_YN) AS TAX_GRP_YN
+	                 , SUB_REGINO
+	                 , ENTER_ZIP_NO
+	                 , ENTER_ADDR
+	                 , ENTER_ADDR_D
+	                 , NAME
+	                 , F_COM_DECRYPT(RES_NO, ENTER_CD) AS RES_NO
+	                 , ZIP_NO
+	                 , ADDR
+	                 , ADDR_D
+	                 $InfoColumn1$
+	            FROM TYEA002
+	            WHERE ENTER_CD      = #ssnEnterCd#
+	              AND WORK_YY       = #searchWorkYy#
+	              AND ADJUST_TYPE   = #searchAdjustType#
+	            ORDER BY WORK_YY, ADJUST_TYPE, SABUN ASC
+            ) A WHERE 1=1
+                  AND (F_NAME LIKE '%' || #searchSbNm# || '%' OR SABUN LIKE '%' || #searchSbNm# || '%') 
+       ]]>
+    </query>
+
+	<!-- 이관업로드 관리 (기본정보 저장) -->
+	<query id="insertMigInfo">
+		<![CDATA[
+			INSERT INTO TYEA002
+			(
+				  ENTER_CD
+      			, WORK_YY
+      			, ADJUST_TYPE
+      			, SABUN
+      			, ENTER_NM
+      			, PRESIDENT
+      			, REGINO
+      			, PRESIDENT_RES_NO
+      			, RESIDENCY_TYPE
+      			, RESIDENCE_NM
+      			, RESIDENCE_CD
+      			, CITIZEN_TYPE
+      			, FOREIGN_TAX_TYPE
+      			, FOREIGN_EMP_TYPE
+      			, RELIGION_YN
+      			, NATIONAL_NM
+      			, NATIONAL_CD
+      			, HOUSE_OWNER_YN
+      			, TAX_GRP_YN
+      			, SUB_REGINO
+      			, ENTER_ZIP_NO
+      			, ENTER_ADDR
+      			, ENTER_ADDR_D
+      			, NAME
+      			, RES_NO
+      			, ZIP_NO
+      			, ADDR
+      			, ADDR_D
+      			$colHeader$
+      			, CHKDATE
+      			, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+      			, #enter_nm#
+      			, #president#
+      			, #regino#
+      			, F_COM_ENCRYPT(#president_res_no#,#ssnEnterCd#)
+				, #residency_type#
+				, #residence_nm#
+				, #residence_cd#
+				, #citizen_type#
+				, #foreign_tax_type#
+				, DECODE(#foreign_emp_type#,'','N',#foreign_emp_type#)
+				, #religion_yn#
+				, #national_nm#
+				, #national_cd#
+				, #house_owner_yn#
+				, DECODE(#tax_grp_yn#,'','N',#tax_grp_yn#)
+				, #sub_regino#      			
+      			, #enter_zip_no#
+      			, #enter_addr#
+      			, #enter_addr_d#
+      			, #name#
+      			, F_COM_ENCRYPT(#res_no#,#ssnEnterCd#)
+      			, #zip_no#
+      			, #addr#
+      			, #addr_d#
+				$colData$
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 이관업로드 (기본정보 수정) -->
+	<query id="mergeMigInfo">
+		<![CDATA[
+			MERGE INTO $tabNm$ T
+			USING	(
+						$selectQuery$
+					) S
+			ON ( $onQuery$ )
+			WHEN MATCHED THEN
+				UPDATE SET	 
+					$updateQuery$
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					$insertQuery$
+				)
+				VALUES
+				(
+					$valuesQuery$
+				)
+		]]>
+	</query>
+	
+	<!-- 이관업로드 (기본정보 삭제)  -->
+	<query id="deleteMigInfo">
+		<![CDATA[
+					DELETE FROM $tabNm$
+					WHERE  $deletePrev$ IN 	(  NULL
+					$deleteQuery$
+										)
+	   ]]> 
+	</query>
+
+	<!-- 이관업로드 (기본정보 수정) -->
+	<query id="updateMigInfo">
+		<![CDATA[
+			UPDATE TYEA002
+			SET ENTER_NM			= #enter_nm#
+      			, PRESIDENT			= #president#
+      			, REGINO			= #regino#
+      			, PRESIDENT_RES_NO	= F_COM_ENCRYPT(#president_res_no#,#ssnEnterCd#)
+				, RESIDENCY_TYPE	= #residency_type#
+				, RESIDENCE_NM		= #residence_nm#
+				, RESIDENCE_CD		= #residence_cd#
+				, CITIZEN_TYPE		= #citizen_type#
+				, FOREIGN_TAX_TYPE	= #foreign_tax_type#
+				, FOREIGN_EMP_TYPE	= DECODE(#foreign_emp_type#,'','N',#foreign_emp_type#)
+				, RELIGION_YN		= #religion_yn#
+				, NATIONAL_NM		= #national_nm#
+				, NATIONAL_CD		= #national_cd#
+				, HOUSE_OWNER_YN	= #house_owner_yn#
+				, TAX_GRP_YN		= DECODE(#tax_grp_yn#,'','N',#tax_grp_yn#)
+				, SUB_REGINO 		= #sub_regino#
+				, ENTER_ZIP_NO 		= #enter_zip_no#
+				, ENTER_ADDR 		= #enter_addr#
+				, ENTER_ADDR_D 		= #enter_addr_d#
+				, NAME 				= #name#
+				, RES_NO 			= F_COM_ENCRYPT(#res_no#,#ssnEnterCd#)
+				, ZIP_NO 			= #zip_no#
+				, ADDR 				= #addr#
+				, ADDR_D 			= #addr_d#
+				$upColData$
+				, CHKDATE           = SYSDATE
+				, CHKID             = #ssnSabun#
+			WHERE ENTER_CD      = #ssnEnterCd#
+			  AND WORK_YY       = #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN         = #sabun#
+		]]>
+	</query>
+
+	<!-- 이관업로드 (기본정보 삭제)  -->
+	<query id="deleteMigInfo_bak">
+		<![CDATA[
+			DELETE FROM TYEA002
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND WORK_YY 		= #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN			= #sabun#
+	   ]]> 
+	</query>
+
+    <!-- 이관업로드 관리 (현근무지정보 조회)  -->
+    <query id="selectMigCurWpMgrList">
+       <![CDATA[
+       		SELECT A.*
+       		FROM (
+	            SELECT ENTER_CD
+	                 , WORK_YY
+	                 , ADJUST_TYPE
+	                 , SABUN
+	                 , F_COM_GET_NAMES(#ssnEnterCd#,  SABUN) AS F_NAME
+	                 , WORK_CD
+	                 , ENTER_NM
+	                 , REGINO
+	                 , ADJ_S_YMD
+	                 , ADJ_E_YMD
+	                 , REDUCE_S_YMD
+	                 , REDUCE_E_YMD
+	                 $curWpColumn1$
+	            FROM TYEA003
+	            WHERE ENTER_CD      = #ssnEnterCd#
+	              AND WORK_YY       = #searchWorkYy#
+	              AND ADJUST_TYPE   = #searchAdjustType#
+	              AND WORK_CD		= #searchWorkCd#
+	            ORDER BY WORK_YY, ADJUST_TYPE, SABUN ASC
+            ) A WHERE 1=1
+                  AND (F_NAME LIKE '%' || #searchSbNm# || '%' OR SABUN LIKE '%' || #searchSbNm# || '%')
+       ]]>
+    </query>
+
+	<!-- 이관업로드 관리 (현근무지정보 저장) -->
+	<query id="insertMigCurWp">
+		<![CDATA[
+			INSERT INTO TYEA003
+			(
+      			  ENTER_CD
+      			, WORK_YY
+      			, ADJUST_TYPE
+      			, SABUN
+      			, WORK_CD
+      			, ENTER_NM
+      			, REGINO
+      			, ADJ_S_YMD
+      			, ADJ_E_YMD
+      			, REDUCE_S_YMD
+      			, REDUCE_E_YMD
+      			$colHeader$
+      			, CHKDATE
+      			, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #work_cd#
+				, #enter_nm#
+				, #regino#
+				, #adj_s_ymd#
+				, #adj_e_ymd#
+				, #reduce_s_ymd#
+				, #reduce_e_ymd#
+				$colData$
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 이관업로드 (현근무지정보 수정) -->
+	<query id="updateMigCurWp">
+		<![CDATA[
+			UPDATE TYEA003
+			SET ENTER_NM		= #enter_nm#
+      			, REGINO		= #regino#
+      			, ADJ_S_YMD		= #adj_s_ymd#
+      			, ADJ_E_YMD		= #adj_e_ymd#
+      			, REDUCE_S_YMD	= #reduce_s_ymd#
+      			, REDUCE_E_YMD	= #reduce_e_ymd#
+				$upColData$
+				, CHKDATE       = SYSDATE
+				, CHKID         = #ssnSabun#
+			WHERE ENTER_CD      = #ssnEnterCd#
+			  AND WORK_YY       = #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN         = #sabun#
+			  AND WORK_CD		= #work_cd#
+		]]>
+	</query>
+
+	<!-- 이관업로드 (현근무지정보 삭제)  -->
+	<query id="deleteMigCurWp">
+		<![CDATA[
+			DELETE FROM TYEA003
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND WORK_YY 		= #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN			= #sabun#
+	   ]]> 
+	</query>
+
+	<!-- 이관업로드 관리 (현근무지정보 조회)  -->
+    <query id="selectIncomeDdctList">
+       <![CDATA[
+       		SELECT A.*
+       		FROM (
+	            SELECT ENTER_CD
+	                 , WORK_YY
+	                 , ADJUST_TYPE
+	                 , SABUN
+	                 , F_COM_GET_NAMES(#ssnEnterCd#,  SABUN) AS F_NAME
+	                 $incomeDdctColumn$
+	            FROM TYEA004
+	            WHERE ENTER_CD      = #ssnEnterCd#
+	              AND WORK_YY       = #searchWorkYy#
+	              AND ADJUST_TYPE   = #searchAdjustType#
+	            ORDER BY WORK_YY, ADJUST_TYPE, SABUN ASC
+            ) A WHERE 1=1
+                  AND (F_NAME LIKE '%' || #searchSbNm# || '%' OR SABUN LIKE '%' || #searchSbNm# || '%')
+       ]]>
+    </query>
+
+	<!-- 이관업로드 관리 (소득공제 저장) -->
+	<query id="insertMigIncomeDdct">
+		<![CDATA[
+			INSERT INTO TYEA004
+			(
+      			  ENTER_CD
+      			, WORK_YY
+      			, ADJUST_TYPE
+      			, SABUN
+      			$colHeader$
+      			, CHKDATE
+      			, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				$colData$
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 이관업로드 (소득공제 수정) -->
+	<query id="updateMigIncomeDdct">
+		<![CDATA[
+			UPDATE TYEA004
+			SET CHKDATE       	= SYSDATE
+				, CHKID         = #ssnSabun# 
+				$upColData$
+			WHERE ENTER_CD      = #ssnEnterCd#
+			  AND WORK_YY       = #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN         = #sabun#
+		]]>
+	</query>
+
+	<!-- 이관업로드 (소득공제 삭제)  -->
+	<query id="deleteMigIncomeDdct">
+		<![CDATA[
+			DELETE FROM TYEA004
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND WORK_YY 		= #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN			= #sabun#
+	   ]]> 
+	</query>
+
+	<!-- 이관업로드 관리 (현근무지정보 조회)  -->
+    <query id="selectTaxReductDdctList">
+       <![CDATA[
+       		SELECT A.*
+       		FROM (
+	            SELECT ENTER_CD
+	                 , WORK_YY
+	                 , ADJUST_TYPE
+	                 , SABUN
+	                 , F_COM_GET_NAMES(#ssnEnterCd#,  SABUN) AS F_NAME
+	                 $taxRdtDdctColumn$
+	            FROM TYEA005
+	            WHERE ENTER_CD      = #ssnEnterCd#
+	              AND WORK_YY       = #searchWorkYy#
+	              AND ADJUST_TYPE   = #searchAdjustType#
+	            ORDER BY WORK_YY, ADJUST_TYPE, SABUN ASC
+            ) A WHERE 1=1
+                  AND (F_NAME LIKE '%' || #searchSbNm# || '%' OR SABUN LIKE '%' || #searchSbNm# || '%')
+       ]]>
+    </query>
+
+	<!-- 이관업로드 관리 (소득공제 저장) -->
+	<query id="insertMigTaxReductDdct">
+		<![CDATA[
+			INSERT INTO TYEA005
+			(
+      			  ENTER_CD
+      			, WORK_YY
+      			, ADJUST_TYPE
+      			, SABUN
+      			$colHeader$
+      			, CHKDATE
+      			, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				$colData$
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 이관업로드 (소득공제 수정) -->
+	<query id="updateMigTaxReductDdct">
+		<![CDATA[
+			UPDATE TYEA005
+			SET CHKDATE       	= SYSDATE
+				, CHKID         = #ssnSabun# 
+				$upColData$
+			WHERE ENTER_CD      = #ssnEnterCd#
+			  AND WORK_YY       = #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN         = #sabun#
+		]]>
+	</query>
+
+	<!-- 이관업로드 (소득공제 삭제)  -->
+	<query id="deleteMigTaxReductDdct">
+		<![CDATA[
+			DELETE FROM TYEA005
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND WORK_YY 		= #work_yy#
+			  AND ADJUST_TYPE   = #adjust_type#
+			  AND SABUN			= #sabun#
+	   ]]> 
+	</query>
+</root>

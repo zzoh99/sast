@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천징수부승인
+ -->
+<root>
+
+	<!-- 원천징수부 승인 대상자 조회  -->
+	<query id="selectWithHoldRcptAprList">
+		<![CDATA[
+			SELECT M.* 
+			FROM(
+				SELECT A.ENTER_CD
+				     , C.NAME
+				     , A.SABUN
+				     , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, A.APPL_YMD) AS ORG_NM
+				     , C.RET_YMD
+				     , A.SEQ
+				     , A.WORK_YY
+				     , A.APPL_STATUS
+				     , A.APPR_YMD
+				     , A.APPL_YMD
+				     , A.PRINT_TYPE
+				     , A.ADJUST_TYPE
+				     , A.STAMP_YN
+				     , A.PRINT_YN
+				     , A.MEMO
+				     , (SELECT DISTINCT SABUN
+				          FROM TCPN811 B
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.WORK_YY = B.WORK_YY
+				           AND A.SABUN = B.SABUN
+				           AND A.ADJUST_TYPE = B.ADJUST_TYPE ) AS ADJ_SABUN
+				     , DECODE(D.FILE_TYPE, NULL, 'N', 'Y') AS PDF_YN
+				     , D.FILE_TYPE
+				     , D.FILE_SEQ
+				     , D.FILE_NAME
+				     , D.ATTR1
+	                 , (SELECT DECODE(COUNT(S.SABUN),0,'N','Y') FROM TYEA002 S WHERE A.ENTER_CD = S.ENTER_CD AND A.WORK_YY = S.WORK_YY AND A.ADJUST_TYPE = S.ADJUST_TYPE AND A.SABUN = S.SABUN) AS MIG_YN
+		          FROM TYEA101 A
+		             , THRM100 C
+		             , TYEA105 D
+		         WHERE  A.ENTER_CD  = #ssnEnterCd#
+		           AND  A.ENTER_CD = C.ENTER_CD
+		           AND  A.SABUN = C.SABUN
+		           AND A.ENTER_CD = D.ENTER_CD(+)
+		           AND A.SABUN = D.SABUN(+)
+		           AND A.WORK_YY = D.WORK_YY(+)
+		           AND A.ADJUST_TYPE = D.ADJUST_TYPE(+)
+		           AND A.PRINT_TYPE = D.FILE_TYPE(+)
+		           AND D.FILE_TYPE(+) = '1'
+		           AND DECODE(#searchPdfYn#, NULL, '%', DECODE(D.FILE_TYPE, NULL, 'N' , 'Y')) = DECODE(#searchPdfYn#, NULL, '%', #searchPdfYn#) /* PDF여부 */
+				   AND  A.WORK_YY  LIKE '%'|| #searchWorkYy# ||'%'
+				   AND  A.APPL_YMD BETWEEN NVL(REPLACE(#searchSYmd#,'-',''),'19000101') AND NVL(REPLACE(#searchEYmd#,'-',''),'99991231')
+				   AND  A.APPL_STATUS LIKE '%'|| #searchApplStatus# ||'%'
+				   AND  ( A.SABUN LIKE '%'|| #searchSbNm# ||'%' OR C.NAME LIKE '%'|| #searchSbNm# ||'%' )
+				   AND  A.PRINT_TYPE LIKE '%'|| #searchPrintType# ||'%'
+				 ORDER BY APPL_YMD DESC, SEQ DESC
+			 )M WHERE 1=1
+			    AND DECODE(#searchMigYn#,'','A',MIG_YN) = DECODE(#searchMigYn#,'','A',#searchMigYn#) 
+	   ]]>
+	</query>
+
+	<!-- 원천징수영수증/징수부신청 입력 -->
+	<query id="insertWithHoldRcptApr">
+		<![CDATA[
+			INSERT INTO TYEA101
+			(
+				  ENTER_CD
+				, SABUN
+				, SEQ
+				, ADJUST_TYPE
+				, APPL_YMD
+				, WORK_YY
+				, APPL_STATUS
+				, APPR_YMD
+				, STAMP_YN
+				, PRINT_YN
+				, PRINT_TYPE
+				, MEMO
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #sabun#
+				, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + 1)
+					          FROM TYEA101
+					         WHERE ENTER_CD = #ssnEnterCd#
+					           AND SABUN = TRIM(#sabun#)
+					      ) )
+				, #adjust_type#
+				, TO_CHAR(SYSDATE,'YYYYMMDD')
+				, #work_yy#
+				, #appl_status#
+				, DECODE(#appl_status#,'99',TO_CHAR(SYSDATE,'YYYYMMDD'),'')
+				, #stamp_yn#
+				, #print_yn#
+				, #print_type#
+				, #memo#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 원천징수영수증/징수부신청 수정 -->
+	<query id="updateWithHoldRcptApr">
+		<![CDATA[
+			UPDATE TYEA101
+			   SET APPL_STATUS		= #appl_status#
+			     , APPR_YMD			= DECODE(#appl_status#,'99',TO_CHAR(SYSDATE,'YYYYMMDD'),'')
+			     , PRINT_YN			= #print_yn#
+			     , STAMP_YN			= #stamp_yn#
+			     , MEMO	          	= #memo#
+				 , CHKDATE		 	= SYSDATE
+				 , CHKID			= #ssnSabun#
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND SABUN   			= #sabun#
+			   AND SEQ   			= #seq#
+		]]>
+	</query>
+
+	<!-- 원천징수영수증/징수부신청 삭제 -->
+	<query id="deleteWithHoldRcptApr">
+		<![CDATA[
+			DELETE FROM TYEA101
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND SABUN   				= #sabun#
+			   AND SEQ   				= #seq#
+		]]>
+	</query>
+
+	<!-- 기 등록 대상자 확인 -->
+	<query id="selectYearCalcCrePeopleCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TCPN811 A
+			 WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.SABUN        = #sabun#
+			   AND A.WORK_YY      = #work_yy#
+			   AND A.ADJUST_TYPE  = #adjust_type#
+		  ]]>
+	</query>
+	
+	
+
+	<!-- 급여계산코드확인 -->
+	<query id="selectPayActionCd">
+		<![CDATA[
+				SELECT PAY_ACTION_CD
+				     , PAY_ACTION_NM
+				  FROM TCPN201
+				 WHERE ENTER_CD = #ssnEnterCd#
+				   AND PAY_YM  LIKE #work_yy# || '%'
+				   AND PAY_CD = #searchPayCd#
+				 ORDER BY PAYMENT_YMD DESC
+		  ]]>
+	</query>
+
+	<!-- 급여계산코드 입력 -->
+	<query id="insertPayActionCd">
+		<![CDATA[
+			INSERT INTO TCPN201
+		       (
+		           ENTER_CD
+		         , PAY_ACTION_CD
+		         , PAY_ACTION_NM
+		         , PAY_YM
+		         , PAY_CD
+		         , PAYMENT_YMD
+		         , ORD_SYMD
+		         , ORD_EYMD
+		         , CHKDATE
+		         , CHKID
+		       )
+		       VALUES
+		       (
+		           #ssnEnterCd#
+		         , (
+			         	COALESCE (
+					    	(
+						    	SELECT PAY_YM || TO_CHAR(TO_NUMBER(NVL(MAX(SUBSTR(PAY_ACTION_CD, 7, 3)),0)) + 1, 'FM000') AS SEQ
+							      FROM TCPN201
+							     WHERE ENTER_CD = #ssnEnterCd#
+							       AND PAY_YM = #work_yy# || '12'
+							     GROUP BY PAY_YM
+						    ), #work_yy# || '12' || '001')
+				   )
+		         , #pay_action_nm#
+		         , #work_yy# || '12'
+		         , #searchPayCd#
+		         , #work_yy# || '1231'
+		         , #work_yy# || '0101'
+		         , #work_yy# || '1231'
+		         , SYSDATE
+		         , #ssnSabun#
+		       )
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="deleteWithHoldRcptAprTCPN981">
+		<![CDATA[
+			DELETE FROM TCPN981
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #pay_action_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="insertWithHoldRcptAprTCPN981">
+		<![CDATA[
+			INSERT INTO TCPN981 A
+			(
+				ENTER_CD
+				, PAY_ACTION_CD
+				, CLOSE_YN
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #pay_action_cd#
+				, ( SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0,'Y','N') AS FINAL_CLOSE_YN
+					   FROM TCPN811
+					  WHERE ENTER_CD     = #ssnEnterCd#
+					    AND WORK_YY  	 = #work_yy#
+					    AND ADJUST_TYPE  = #adjust_type#
+					    AND PAY_ACTION_CD = #pay_action_cd#
+			       )
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 원천징수영수증/징수부신청 입력 -->
+	<query id="insertWithHoldRcptApp">
+		<![CDATA[
+			INSERT INTO TYEA101
+			(
+				  ENTER_CD
+				, SABUN
+				, SEQ
+				, ADJUST_TYPE
+				, APPL_YMD
+				, APPL_STATUS
+				, WORK_YY
+			    , PRINT_TYPE
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #sabun#
+				, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + 1)
+					          FROM TYEA101
+					         WHERE ENTER_CD = #ssnEnterCd#
+					           AND SABUN = TRIM(#sabun#)
+					      ) )
+				, #adjust_type#
+				, TO_CHAR(SYSDATE,'YYYYMMDD')
+				, '21'
+				, #work_yy#
+				, #print_type#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 원천징수부 입력시 데이터 삭제  -->
+	<query id="deleteAdjustdata">
+		<![CDATA[
+			DELETE
+		   	  FROM TCPN813 A
+		     WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.SABUN        = #sabun#
+			   AND A.WORK_YY      = #work_yy#
+			   AND A.ADJUST_TYPE  = #adjust_type#
+		  ]]>
+	</query>
+	
+
+
+	<!-- 원천징수부 입력시 데이터 삭제  -->
+	<query id="deleteYearResultData">
+		<![CDATA[
+			DELETE
+		   	  FROM TCPN841 A
+		     WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.SABUN        = #sabun#
+			   AND A.WORK_YY      = #work_yy#
+			   AND A.ADJUST_TYPE  = #adjust_type#
+		  ]]>
+	</query>
+
+	<!-- 정산데이터 존재유무 체크 -->
+	<query id="selectAdjustTypeCnt">
+		<![CDATA[
+			SELECT COUNT(1) CNT
+		   	  FROM TCPN813 A
+		     WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.SABUN        = #sabun#
+			   AND A.WORK_YY      = #work_yy#
+			   AND A.ADJUST_TYPE  = #adjust_type#
+		  ]]>
+	</query>
+
+	<!-- 정산데이터 복사 -->
+	<query id="insertMonpayCopy">
+		<![CDATA[
+			INSERT INTO TCPN813
+			(
+				 ENTER_CD
+				,WORK_YY
+				,ADJUST_TYPE
+				,SABUN
+				,YM
+				,PAY_MON
+				,BONUS_MON
+				,ETC_BONUS_MON
+				,FRGN_TAX_PLUS_MON
+				,INCOME_TAX_MON
+				,INHBT_TAX_MON
+				,RURAL_TAX_MON
+				,FRGN_PAY_YMD
+				,EXMPT_TAX_MON
+				,FRGN_MON
+				,FRGN_NTAX_MON
+				,PEN_MON
+				,HEL_MON
+				,EMP_MON
+				,LABOR_MON
+				,NOTAX_ABROAD_MON
+				,NOTAX_WORK_MON
+				,NOTAX_FOOD_MON
+				,NOTAX_CAR_MON
+				,NOTAX_ETC_MON
+				,NOTAX_FORN_MON
+				,ETC_MON1
+				,ETC_MON2
+				,ETC_MON3
+				,CHKDATE
+				,CHKID
+				,NOTAX_BABY_MON
+				,STOCK_BUY_MON
+				,STOCK_UNION_MON
+				,NOTAX_RESEARCH_MON
+				,NOTAX_NIGHTDUTY_MON
+				,IMWON_RET_OVER_MON
+				,ETC_MON4
+				,NOTAX_REPORTER_MON
+				,MEMO
+			)
+		 SELECT ENTER_CD
+				,WORK_YY
+				,'9'
+				,SABUN
+				,YM
+				,PAY_MON
+				,BONUS_MON
+				,ETC_BONUS_MON
+				,FRGN_TAX_PLUS_MON
+				,INCOME_TAX_MON
+				,INHBT_TAX_MON
+				,RURAL_TAX_MON
+				,FRGN_PAY_YMD
+				,EXMPT_TAX_MON
+				,FRGN_MON
+				,FRGN_NTAX_MON
+				,PEN_MON
+				,HEL_MON
+				,EMP_MON
+				,LABOR_MON
+				,NOTAX_ABROAD_MON
+				,NOTAX_WORK_MON
+				,NOTAX_FOOD_MON
+				,NOTAX_CAR_MON
+				,NOTAX_ETC_MON
+				,NOTAX_FORN_MON
+				,ETC_MON1
+				,ETC_MON2
+				,ETC_MON3
+				,SYSDATE AS CHKDATE
+				,#ssnSabun#
+				,NOTAX_BABY_MON
+				,STOCK_BUY_MON
+				,STOCK_UNION_MON
+				,NOTAX_RESEARCH_MON
+				,NOTAX_NIGHTDUTY_MON
+				,IMWON_RET_OVER_MON
+				,ETC_MON4
+				,NOTAX_REPORTER_MON
+				,MEMO
+			 FROM TCPN813 A
+			WHERE 1=1
+			  AND A.ENTER_CD     = #ssnEnterCd#
+			  AND A.SABUN        = #sabun#
+			  AND A.WORK_YY      = #work_yy#
+			  AND A.ADJUST_TYPE  = #adjust_type#
+		]]>
+	</query>
+
+
+	<!-- 정산데이터 복사 -->
+	<query id="insertYeaResultDataCopy">
+		<![CDATA[
+			INSERT INTO TCPN841
+			(
+				ADJUST_TYPE
+				,WORK_YY
+				,ENTER_CD
+				,SABUN
+				,BUSINESS_PLACE_CD
+				,ENTER_NO
+				,ADJ_S_YMD
+				,ADJ_E_YMD
+				,RESIDENCY_TYPE
+				,CITIZEN_TYPE
+				,FOREIGN_TAX_TYPE
+				,RESIDENCE_CD
+				,RESIDENCE_NM
+				,PRE_PAY_MON
+				,PRE_BONUS_MON
+				,PRE_ETC_BONUS_MON
+				,PRE_TOT_MON
+				,CURR_PAY_MON
+				,CURR_BONUS_MON
+				,CURR_ETC_BONUS_MON
+				,CURR_TOT_MON
+				,PRE_NOTAX_TOT_MON
+				,CURR_NOTAX_ABROAD_MON
+				,CURR_NOTAX_WORK_MON
+				,CURR_NOTAX_ETC_MON
+				,CURR_NOTAX_TOT_MON
+				,NOTAX_TOT_MON
+				,OTHER_PAY_MON
+				,OTHER_NOTAX_MON
+				,TAXABLE_PAY_MON
+				,INCOME_MON
+				,STAND_DEDUCT_MON
+				,BLNCE_INCOME_MON
+				,TAX_BASE_MON
+				,CLCLTE_TAX_MON
+				,TOT_TAX_DEDUCT_MON
+				,FIN_INCOME_TAX
+				,FIN_INBIT_TAX_MON
+				,FIN_AGRCL_TAX_MON
+				,FIN_TOT_TAX_MON
+				,FIN_HEL_MON
+				,PRE_INCOME_TAX_MON
+				,PRE_INBIT_TAX_MON
+				,PRE_AGRCL_TAX_MON
+				,PRE_TOT_TAX_MON
+				,PRE_HEL_MON
+				,CURR_INCOME_TAX_MON
+				,CURR_INBIT_TAX_MON
+				,CURR_AGRCL_TAX_MON
+				,CURR_TOT_TAX_MON
+				,CURR_HEL_MON
+				,BLC_INCOME_TAX_MON
+				,BLC_INBIT_TAX_MON
+				,BLC_AGRCL_TAX_MON
+				,BLC_TOT_TAX_MON
+				,BLC_HEL_MON
+				,CHKDATE
+				,CHKID
+				,CURR_NOTAX_FORN_MON
+				,CURR_NOTAX_BABY_MON
+				,PRE_NOTAX_FORN_MON
+				,PRE_NOTAX_BABY_MON
+				,PRE_NOTAX_ABROAD_MON
+				,PRE_NOTAX_WORK_MON
+				,PRE_NOTAX_ETC_MON
+				,CURR_STOCK_BUY_MON
+				,CURR_STOCK_UNION_MON
+				,PRE_STOCK_BUY_MON
+				,PRE_STOCK_UNION_MON
+				,CURR_NOTAX_RESEARCH_MON
+				,PRE_NOTAX_RESEARCH_MON
+				,CURR_IMWON_RET_OVER_MON
+				,PRE_IMWON_RET_OVER_MON
+				,LIMIT_OVER_MON
+				,SPC_INCOME_TAX_MON
+				,SPC_INBIT_TAX_MON
+				,SPC_AGRCL_TAX_MON
+				,SPC_TOT_TAX_MON
+				,CURR_NOTAX_REPORTER_MON
+				,PRE_NOTAX_REPORTER_MON
+				,CURR_NOTAX_NIGHTDUTY_MON
+				,PRE_NOTAX_NIGHTDUTY_MON
+			)
+		 SELECT '9'
+				,WORK_YY
+				,ENTER_CD
+				,SABUN
+				,BUSINESS_PLACE_CD
+				,ENTER_NO
+				,ADJ_S_YMD
+				,ADJ_E_YMD
+				,RESIDENCY_TYPE
+				,CITIZEN_TYPE
+				,FOREIGN_TAX_TYPE
+				,RESIDENCE_CD
+				,RESIDENCE_NM
+				,PRE_PAY_MON
+				,PRE_BONUS_MON
+				,PRE_ETC_BONUS_MON
+				,PRE_TOT_MON
+				,CURR_PAY_MON
+				,CURR_BONUS_MON
+				,CURR_ETC_BONUS_MON
+				,CURR_TOT_MON
+				,PRE_NOTAX_TOT_MON
+				,CURR_NOTAX_ABROAD_MON
+				,CURR_NOTAX_WORK_MON
+				,CURR_NOTAX_ETC_MON
+				,CURR_NOTAX_TOT_MON
+				,NOTAX_TOT_MON
+				,OTHER_PAY_MON
+				,OTHER_NOTAX_MON
+				,TAXABLE_PAY_MON
+				,INCOME_MON
+				,STAND_DEDUCT_MON
+				,BLNCE_INCOME_MON
+				,TAX_BASE_MON
+				,CLCLTE_TAX_MON
+				,TOT_TAX_DEDUCT_MON
+				,FIN_INCOME_TAX
+				,FIN_INBIT_TAX_MON
+				,FIN_AGRCL_TAX_MON
+				,FIN_TOT_TAX_MON
+				,FIN_HEL_MON
+				,PRE_INCOME_TAX_MON
+				,PRE_INBIT_TAX_MON
+				,PRE_AGRCL_TAX_MON
+				,PRE_TOT_TAX_MON
+				,PRE_HEL_MON
+				,CURR_INCOME_TAX_MON
+				,CURR_INBIT_TAX_MON
+				,CURR_AGRCL_TAX_MON
+				,CURR_TOT_TAX_MON
+				,CURR_HEL_MON
+				,BLC_INCOME_TAX_MON
+				,BLC_INBIT_TAX_MON
+				,BLC_AGRCL_TAX_MON
+				,BLC_TOT_TAX_MON
+				,BLC_HEL_MON
+				,SYSDATE AS CHKDATE
+				,#ssnSabun#
+				,CURR_NOTAX_FORN_MON
+				,CURR_NOTAX_BABY_MON
+				,PRE_NOTAX_FORN_MON
+				,PRE_NOTAX_BABY_MON
+				,PRE_NOTAX_ABROAD_MON
+				,PRE_NOTAX_WORK_MON
+				,PRE_NOTAX_ETC_MON
+				,CURR_STOCK_BUY_MON
+				,CURR_STOCK_UNION_MON
+				,PRE_STOCK_BUY_MON
+				,PRE_STOCK_UNION_MON
+				,CURR_NOTAX_RESEARCH_MON
+				,PRE_NOTAX_RESEARCH_MON
+				,CURR_IMWON_RET_OVER_MON
+				,PRE_IMWON_RET_OVER_MON
+				,LIMIT_OVER_MON
+				,SPC_INCOME_TAX_MON
+				,SPC_INBIT_TAX_MON
+				,SPC_AGRCL_TAX_MON
+				,SPC_TOT_TAX_MON
+				,CURR_NOTAX_REPORTER_MON
+				,PRE_NOTAX_REPORTER_MON
+				,CURR_NOTAX_NIGHTDUTY_MON
+				,PRE_NOTAX_NIGHTDUTY_MON
+			 FROM TCPN841 A
+			WHERE 1=1
+			  AND A.ENTER_CD     = #ssnEnterCd#
+			  AND A.SABUN        = #sabun#
+			  AND A.WORK_YY      = #work_yy#
+			  AND A.ADJUST_TYPE  = #adjust_type#
+		]]>
+	</query>
+
+	<!-- 이관업로드 대상자 카운트 -->
+	<query id="selectMigExistAprCnt">
+	   <![CDATA[
+			SELECT COUNT(*) AS CNT
+			  FROM TYEA002
+			 WHERE ENTER_CD 		= #ssnEnterCd#
+			   AND WORK_YY			= #searchWorkYy#
+		   	   AND ADJUST_TYPE		= #searchAdjustType#
+		   	   AND SABUN			IN ($searchSabuns$)
+	   ]]>
+	</query>
+</root>

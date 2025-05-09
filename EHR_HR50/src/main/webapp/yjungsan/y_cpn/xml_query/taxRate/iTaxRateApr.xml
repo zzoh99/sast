@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천징수세액 조정승인 쿼리
+ -->
+<root>
+
+	<!-- 원천징수세액 조정승인 조회 -->
+	<query id="selectITaxRateApr">
+		<![CDATA[
+			SELECT ENTER_CD
+				 , SABUN
+                 , F_COM_GET_NAMES(ENTER_CD,SABUN) AS NAME
+                 , F_COM_GET_ORG_NM21(ENTER_CD,SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+                 --, F_COM_GET_JIKWEE_NM(ENTER_CD,SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+                 , '' AS JIKWEE_NM
+                 --, F_COM_GET_STATUS_NM(ENTER_CD,SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS STATUS_NM
+                 , '' AS STATUS_NM
+				 , SEQ
+				 , APPL_YMD
+				 , APPL_YM
+				 , RATE
+				 , SDATE
+				 , EDATE
+				 , APPL_STATUS
+				 , APPR_YMD
+				 , MEMO
+			  FROM TCPN114
+			 WHERE ENTER_CD		= #ssnEnterCd#
+			   AND APPL_YMD BETWEEN NVL(REPLACE(#searchSYmd#,'-',''),'19000101') AND NVL(REPLACE(#searchEYmd#,'-',''),'99991231')
+			   AND ( SABUN LIKE '%'|| #searchSbNm# ||'%' OR F_COM_GET_NAMES(ENTER_CD,SABUN) LIKE '%'|| #searchSbNm# ||'%' )
+			   AND APPL_STATUS LIKE '%'|| #searchApplStatus# ||'%'
+			   AND APPL_YM LIKE '%'|| REPLACE(#searchApplYm#,'-','') ||'%'
+			   AND RATE LIKE '%'|| #searchRate# ||'%'
+			 ORDER BY F_COM_GET_NAMES(ENTER_CD,SABUN), APPL_YMD DESC, SEQ
+		]]>
+	</query>
+
+	<!-- 원천징수세액 조정승인 입력 -->
+	<query id="insertITaxRateApr">
+		<![CDATA[
+			INSERT INTO TCPN114
+			(
+				ENTER_CD
+				, SABUN
+				, SEQ
+				, APPL_YMD
+				, APPL_YM
+				, RATE
+				, SDATE
+				, EDATE
+				, APPL_STATUS
+				, APPR_YMD
+				, MEMO
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #sabun#
+				, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + 1)
+					          FROM TCPN114
+					         WHERE ENTER_CD = #ssnEnterCd#
+					           AND SABUN = TRIM(#sabun#)
+					      ) )
+				, TO_CHAR(SYSDATE,'YYYYMMDD')
+				, #appl_ym#
+				, #rate#
+				, #sdate#
+				, #edate#
+				, #appl_status#
+				, DECODE(#appl_status#,'99',TO_CHAR(SYSDATE,'YYYYMMDD'),'')
+				, #memo#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 원천징수세액 조정승인 수정 -->
+	<query id="updateITaxRateApr">
+		<![CDATA[
+			UPDATE TCPN114
+			   SET APPL_YM       	= #appl_ym#
+				 , SDATE          	= #sdate#
+				 , EDATE          	= #edate#
+				 , RATE          	= #rate#
+				 , APPL_STATUS		= #appl_status#
+				 , APPR_YMD			= DECODE(#appl_status#,'99',TO_CHAR(SYSDATE,'YYYYMMDD'),'')
+				 , MEMO	          	= #memo#
+				 , CHKDATE		 	= SYSDATE
+				 , CHKID			= #ssnSabun#
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND SABUN   			= #sabun#
+			   AND SEQ   			= #seq#
+		]]>
+	</query>
+
+	<!-- 원천징수세액 조정승인 삭제 -->
+	<query id="deleteITaxRateApr">
+		<![CDATA[
+			DELETE FROM TCPN114
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND SABUN   				= #sabun#
+			   AND SEQ   				= #seq#
+		]]>
+	</query>
+
+</root>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 퇴직금예외관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepExceMgr">
+		<select parameterType="map" resultType="cMap" id="getSepExceMgrList">
+
+				<![CDATA[
+					SELECT A.PAY_ACTION_CD
+						 , A.ELEMENT_CD
+						 , B.ELEMENT_NM
+						 , A.SABUN
+						 , F_COM_GET_NAMES(C.ENTER_CD,C.SABUN) NAME
+						 , F_COM_GET_NAMES (C.ENTER_CD,C.SABUN, 'ALIAS') AS ALIAS
+					     , F_COM_GET_JIKWEE_NM (C.ENTER_CD,C.SABUN, NVL(C.RET_YMD, TO_CHAR(SYSDATE,'YYYYMMDD'))) AS JIKWEE_NM
+             		     , F_COM_GET_JIKGUB_NM (C.ENTER_CD,C.SABUN, NVL(C.RET_YMD, TO_CHAR(SYSDATE,'YYYYMMDD'))) AS JIKGUB_NM
+						 , A.PAYMENT_MON
+						 , A.NOTE
+					  FROM TCPN749 A
+						 , TCPN741 B
+						 , THRM100 C
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.ELEMENT_CD 	= B.ELEMENT_CD
+					   AND A.ENTER_CD		= C.ENTER_CD
+					   AND A.SABUN			= C.SABUN
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					           		]]>
+					<if test='elementCd != null and !elementCd.equals("")'>
+					   AND A.ELEMENT_CD		= #{elementCd}
+					</if>
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND (UPPER(A.SABUN) LIKE '%' || UPPER(TRIM(#{sabunName})) || '%' OR UPPER(F_COM_GET_NAMES(C.ENTER_CD, C.SABUN, #{ssnLocaleCd})) LIKE '%' || UPPER(TRIM(#{sabunName})) || '%')
+					</if>
+					ORDER BY B.ELEMENT_NM, C.NAME
+
+
+
+		</select>
+		<update parameterType="map" id="saveSepExceMgr">
+
+
+					MERGE INTO TCPN749 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.ELEMENT_CD
+								 , A.SABUN
+								 , A.PAYMENT_MON
+								 , A.NOTE
+							  FROM (
+									SELECT NULL	AS PAY_ACTION_CD
+										 , NULL	AS ELEMENT_CD
+										 , NULL	AS SABUN
+										 , NULL	AS PAYMENT_MON
+										 , NULL	AS NOTE
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})				AS PAY_ACTION_CD
+										 , TRIM(#{rm.elementCd})				AS ELEMENT_CD
+										 , TRIM(#{rm.sabun})					AS SABUN
+										 , TO_NUMBER(TRIM(#{rm.paymentMon}))	AS PAYMENT_MON
+										 , TRIM(#{rm.note})						AS NOTE
+									  FROM DUAL
+
+</foreach>
+									) A
+							WHERE A.PAY_ACTION_CD	IS NOT NULL
+							  AND A.ELEMENT_CD		IS NOT NULL
+							  AND A.SABUN			IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD		= S.PAY_ACTION_CD
+						AND	T.ELEMENT_CD		= S.ELEMENT_CD
+						AND	T.SABUN				= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.PAYMENT_MON	= S.PAYMENT_MON
+								 , T.NOTE			= S.NOTE
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.PAY_ACTION_CD
+						  , T.ELEMENT_CD
+						  , T.SABUN
+						  , T.PAYMENT_MON
+						  , T.NOTE
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.PAY_ACTION_CD
+						  , S.ELEMENT_CD
+						  , S.SABUN
+						  , S.PAYMENT_MON
+						  , S.NOTE
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepExceMgr">
+
+
+					DELETE FROM TCPN749
+					 WHERE ENTER_CD||'_'||PAY_ACTION_CD||'_'||ELEMENT_CD||'_'||SABUN IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.payActionCd != null and !rm.payActionCd.equals("") and rm.elementCd != null and !rm.elementCd.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.payActionCd})||'_'||TRIM(#{rm.elementCd})||'_'||TRIM(#{rm.sabun})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="wtm.stats.wtmWorkTime">
+
+    <!-- 헤더 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmWorkTimeHeaderList">
+
+                <![CDATA[
+        SELECT
+            X.WORK_CD   AS CODE
+             ,CASE WHEN LENGTH(X.CODE_NM) > 2 THEN SUBSTR(CODE_NM,0,2) || '\n' || SUBSTR(CODE_NM,3) ELSE X.CODE_NM END AS CODE_NM
+             ,X.SAVE_NAME
+             ,X.SAVE_NAME_DISP
+        FROM(
+                SELECT A.WORK_CD
+                     , A.WORK_NM AS CODE_NM
+                     , 'WORK_CD_' || ROWNUM SAVE_NAME
+                     , 'workCd'   || ROWNUM SAVE_NAME_DISP
+                FROM TWTM051 A
+                WHERE A.ENTER_CD = #{ssnEnterCd}
+                  AND A.USE_YN = 'Y'
+            )X
+        ]]>
+        </select>
+
+    <!--        조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmWorkTimeList">
+        <![CDATA[
+            SELECT A.*
+                 , NVL((CASE WHEN HOLIDAY_NM IS NOT NULL THEN HOLIDAY_NM WHEN A.WORK_YN = 'N' THEN '휴일' ELSE HOLIDAY_NM END), '평일') AS DAY_DIV
+                 , (CASE WHEN HOLIDAY_NM IS NOT NULL OR A.WORK_YN = 'N' THEN '#ef519c' ELSE '' END) AS DAY_NM_FONT_COLOR
+                 , (CASE WHEN HOLIDAY_NM IS NOT NULL OR A.WORK_YN = 'N' THEN '#ef519c' ELSE '' END) AS DAY_DIV_FONT_COLOR
+                 , (CASE WHEN HOLIDAY_NM IS NOT NULL OR A.WORK_YN = 'N' THEN '#ef519c' ELSE '' END) AS YMD_FONT_COLOR
+                 , (CASE WHEN HOLIDAY_NM IS NULL AND A.WORK_YN = 'Y' THEN 'N' ELSE 'Y' END) AS HOLIDAY_DIV
+                 , (CASE WHEN TO_CHAR(SYSDATE,'YYYYMMDD') > A.YMD
+                         THEN (CASE WHEN A.WORK_YN = 'Y' AND (A.IN_HM IS NULL OR A.OUT_HM IS NULL)
+                                    THEN (CASE WHEN A.GNT_CD = '결근' THEN 'X'
+                                               WHEN A.GNT_CD IS NOT NULL THEN 'O'
+                                               ELSE 'X' END)
+                                    ELSE 'O' END)
+                         ELSE NULL END) AS WORK_FLAG
+              FROM (
+                       SELECT A.ENTER_CD, TO_CHAR(TO_DATE(A.YMD, 'YYYYMMDD'), 'YYYY-MM-DD') || ' (' || A.DAY_NM  || ')' AS V_YMD
+                            , A.YMD
+                            , NVL(B.WORK_CLASS_CD, F_WTM_GET_WORK_CLASS(A.ENTER_CD, A.SABUN, A.YMD)) AS WORK_CLASS_CD
+                            , B.WORK_CLASS_NM
+                            , F_TIM_GET_DAY_GNT_NM(B.ENTER_CD, B.SABUN, B.YMD) AS GNT_CD
+                            , C.WORK_YN
+                            , B.IN_HM
+                            , B.OUT_HM
+                            , (CASE WHEN B.IN_HM IS NOT NULL AND B.OUT_HM IS NOT NULL THEN F_TIM_GET_WORK_TERM_TIME(A.ENTER_CD,A.SABUN,A.YMD,B.IN_HM,B.OUT_HM) ELSE NULL END) AS WORK_TIME
+                            , B.WORK_TIME_F AS WORK_SHM
+                            , B.WORK_TIME_T AS WORK_EHM
+                            , NVL(F_COM_GET_MAP_CD3(A.ENTER_CD, '100', A.SABUN, A.ORG_CD, A.YMD), '1') AS BUSINESS_PLACE_CD
+                            , ( SELECT HOLIDAY_NM
+                                FROM TWTM001_V
+                                WHERE ENTER_CD = A.ENTER_CD
+                                  AND YMD = A.YMD
+                                  AND BUSINESS_PLACE_CD = NVL(F_COM_GET_MAP_CD3(A.ENTER_CD, '100', A.SABUN, A.ORG_CD, A.YMD), '1') ) AS HOLIDAY_NM
+                            , NVL2(B.BASIC_MM + B.OT_MM, F_WTM_GET_MNTS_TO_HHMM(B.BASIC_MM + B.OT_MM), '') AS REAL_WORK_TIME
+                            , DECODE(B.DAY_TYPE, 'W', F_WTM_GET_MNTS_TO_HHMM(B.BASIC_MM), '') AS BASIC_MM_W
+                            , DECODE(B.DAY_TYPE, 'W', F_WTM_GET_MNTS_TO_HHMM(B.OT_MM), '') AS OT_MM_W
+                            , DECODE(B.DAY_TYPE, 'W', F_WTM_GET_MNTS_TO_HHMM(B.LTN_MM), '') AS LTN_MM_W
+                            , DECODE(B.DAY_TYPE, 'H', F_WTM_GET_MNTS_TO_HHMM(B.BASIC_MM), '') AS BASIC_MM_H
+                            , DECODE(B.DAY_TYPE, 'H', F_WTM_GET_MNTS_TO_HHMM(B.OT_MM), '') AS OT_MM_H
+                            , DECODE(B.DAY_TYPE, 'H', F_WTM_GET_MNTS_TO_HHMM(B.LTN_MM), '') AS LTN_MM_H
+                            , DECODE(B.DAY_TYPE, 'NH', F_WTM_GET_MNTS_TO_HHMM(B.BASIC_MM), '') AS BASIC_MM_NH
+                            , DECODE(B.DAY_TYPE, 'NH', F_WTM_GET_MNTS_TO_HHMM(B.OT_MM), '') AS OT_MM_NH
+                            , DECODE(B.DAY_TYPE, 'NH', F_WTM_GET_MNTS_TO_HHMM(B.LTN_MM), '') AS LTN_MM_NH
+                            , B.LATE_YN
+                            , B.LEAVE_EARLY_YN
+                            , B.ABSENCE_YN
+                       FROM (
+                                SELECT A1.ENTER_CD
+                                     , A1.SABUN
+                                     , A1.NAME
+                                     , A2.SUN_DATE AS YMD
+                                     , B.STATUS_CD
+                                     , B.JIKGUB_NM
+                                     , B.JIKWEE_NM
+                                     , B.JIKCHAK_NM
+                                     , B.MANAGE_NM
+                                     , B.SDATE
+                                     , B.ORG_CD
+                                     , B.WORK_TYPE_NM
+                                     , B.PAY_TYPE_NM
+                                     , A2.DAY_NM
+                                  FROM THRM100 A1, THRM151 B, TSYS007 A2
+                                 WHERE A2.SUN_DATE BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+                                   AND A1.ENTER_CD = TRIM( #{ssnEnterCd} )
+                                   AND A1.SABUN    = TRIM( #{searchSabun} )
+                                   AND A1.ENTER_CD = B.ENTER_CD
+                                   AND A1.SABUN    = B.SABUN
+                                   AND A2.SUN_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                            ) A
+                      INNER JOIN TABLE(F_WTM_GET_PSNL_WORK_INFO(A.ENTER_CD, A.SABUN, A.YMD)) C
+                         ON 1 = 1
+                       LEFT OUTER JOIN
+                            (
+                                SELECT B1.ENTER_CD, B1.WORK_CLASS_CD, B2.WORK_CLASS_NM, B1.SABUN, B1.YMD
+                                     , B1.IN_HM, B1.OUT_HM, B2.WORK_TIME_F, B2.WORK_TIME_T
+                                     , B1.BASIC_MM, B1.OT_MM, B1.DAY_TYPE, B1.LTN_MM, B1.LATE_YN, B1.LEAVE_EARLY_YN, B1.ABSENCE_YN
+                                  FROM TWTM101 B1
+                                 INNER JOIN TWTM021 B2
+                                    ON B2.ENTER_CD = B1.ENTER_CD
+                                   AND B2.WORK_CLASS_CD = B1.WORK_CLASS_CD
+                                   AND B1.YMD BETWEEN B2.SDATE AND NVL(B2.EDATE, '99991231')
+                            ) B
+                         ON B.ENTER_CD = A.ENTER_CD
+                        AND B.SABUN = A.SABUN
+                        AND B.YMD = A.YMD
+                   ) A
+             ORDER BY A.YMD
+        ]]>
+    </select>
+
+<!-- 근무요약정보 -->
+        <select parameterType="map" resultType="cMap" id="getWtmWorkTimeList2">
+
+                <![CDATA[
+				WITH TMP AS (
+							SELECT A.ENTER_CD, A.YMD, A.SABUN, A.WORK_GRP_CD, A.WORK_ORG_CD
+							     , NVL(B.WORK_HH_A, 0) AS WORK_HH_A
+							     , NVL(B.WORK_HH_B, 0) AS WORK_HH_B
+							     , NVL(B.WORK_MM_A, 0) AS WORK_MM_A
+							     , NVL(B.WORK_MM_B, 0) AS WORK_MM_B
+							     , ROW_NUMBER() OVER(ORDER BY A.YMD) AS RN
+                                 , D.WEEK_START
+                                 , D.WEEK_END
+                                 , D.WEEK_CNT
+                                 , D.RNUM
+                                 , A.PLAN_WORK_YN
+							FROM TTIM120_V A
+							   , ( SELECT X.ENTER_CD, X.YMD, X.SABUN
+							           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_HH, 0)),0) AS WORK_HH_A
+							           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_HH)),0) AS WORK_HH_B
+							           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_MM, 0)),0) AS WORK_MM_A
+							           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_MM)),0) AS WORK_MM_B
+							         FROM TTIM337 X, TTIM015 Y
+							        WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+							          AND X.SABUN    = TRIM( #{searchSabun} )
+							          AND X.YMD BETWEEN TO_CHAR(TO_DATE(REPLACE(#{searchSymd},'-',''),'YYYYMMDD')-7,'YYYYMMDD') AND TO_CHAR(TO_DATE(REPLACE(#{searchEymd},'-',''),'YYYYMMDD')+7,'YYYYMMDD')
+							          AND X.ENTER_CD = Y.ENTER_CD
+							          AND X.WORK_CD  = Y.WORK_CD
+							          AND Y.DAY_TYPE IN ('101', '105', '201', '205' ) --  정규근무(101),야간근무(103),연장근무(105),휴일근무(201),휴일야간근무(203),휴일연장근무(205)
+							        GROUP BY X.ENTER_CD, X.YMD, X.SABUN
+							     ) B      
+                                , (
+                                      SELECT TO_CHAR(WEEK_START, 'YYYYMMDD') WEEK_START
+                                           , TO_CHAR(WEEK_END, 'YYYYMMDD') WEEK_END
+                                           , ROW_NUMBER()OVER(ORDER BY WEEK_START) AS RNUM
+                                           , SUM( CASE WHEN TO_CHAR(WEEK_START, 'YYYYMMDD') BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+                                                        AND TO_CHAR(WEEK_END, 'YYYYMMDD') BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','') THEN 1 ELSE 0 END) OVER() AS WEEK_CNT
+                                        FROM (
+                                               SELECT TRUNC(START_DT + LEVEL, 'D') + 1 WEEK_START
+                                                    , TRUNC(START_DT + LEVEL, 'D') + 7 WEEK_END
+                                                 FROM ( SELECT TRUNC(TO_DATE(TRIM(REPLACE(#{searchSymd},'-','')), 'YYYYMMDD'),'iw') START_DT
+                                                             , TO_DATE(TRIM(REPLACE(#{searchEymd},'-','')), 'YYYYMMDD') END_DT
+                                                          FROM DUAL  
+                                                       )
+                                               CONNECT BY LEVEL < END_DT - START_DT
+                                              )
+                                       WHERE 1=1
+                                       GROUP BY WEEK_START, WEEK_END
+                                                                                                  
+                                   ) D          
+							WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd})
+							  AND A.SABUN 	  = TRIM( #{searchSabun} )
+							  AND A.YMD BETWEEN D.WEEK_START AND D.WEEK_END
+							  AND A.ENTER_CD    = B.ENTER_CD(+)
+							  AND A.SABUN       = B.SABUN(+) 
+							  AND A.YMD         = B.YMD(+)
+								         
+				)
+				SELECT GUBUN, SDATE, EDATE
+                     , F_TIM_FMT_TIME(TRUNC(WORK_HOUR), TRUNC(( WORK_HOUR - TRUNC(WORK_HOUR)) * 60)) AS  WORK_HOUR
+                     , F_TIM_FMT_TIME(TRUNC(OT_HOUR), TRUNC(( OT_HOUR - TRUNC(OT_HOUR)) * 60)) AS  OT_HOUR
+   					 , '#fdf0f5' AS WORK_HOUR_BACK_COLOR
+   					 , '#fdf0f5' AS OT_HOUR_BACK_COLOR
+				FROM (						
+						SELECT GUBUN, SDATE, EDATE
+						     , CASE WHEN INSTR(GUBUN, '일 평균') > 0 THEN NVL( (WORK_HH_A + (WORK_MM_A/60)) / DECODE(WORK_CNT, 0, NULL, WORK_CNT), 0 )
+                                    WHEN INSTR(GUBUN, '주 평균') > 0 THEN NVL( (WORK_HH_A + (WORK_MM_A/60)) / DECODE(WEEK_CNT, 0, NULL, WEEK_CNT), 0 )
+                                    ELSE (WORK_HH_A + (WORK_MM_A/60)) END AS WORK_HOUR
+                                    
+						     , CASE WHEN INSTR(GUBUN, '일 평균') > 0  THEN NVL( (WORK_HH_B + (WORK_MM_B/60)) / DECODE(WORK_ALL_CNT, 0, NULL, WORK_ALL_CNT), 0 )
+                                    WHEN INSTR(GUBUN, '주 평균') > 0  THEN NVL( (WORK_HH_B + (WORK_MM_B/60)) / DECODE(WEEK_CNT, 0, NULL, WEEK_CNT), 0 )
+                                    ELSE (WORK_HH_B + (WORK_MM_B/60)) END AS OT_HOUR
+						     
+						  FROM (
+								    SELECT ROW_NUMBER() OVER(ORDER BY MIN(YMD)) || '주차' AS GUBUN
+								         , MIN(WEEK_START) AS SDATE
+								         , MAX(WEEK_END) AS EDATE
+								         , SUM(WORK_HH_A) AS WORK_HH_A
+								         , SUM(WORK_HH_B) AS WORK_HH_B
+								         , SUM(WORK_MM_A) AS WORK_MM_A
+								         , SUM(WORK_MM_B) AS WORK_MM_B
+                                         , SUM( DECODE(PLAN_WORK_YN, 'N', 1, 0) ) AS WORK_CNT
+                                         , SUM( 1 ) AS WORK_ALL_CNT
+                                         , MAX(WEEK_CNT) AS WEEK_CNT
+								      FROM TMP
+								     GROUP BY RNUM
+								     UNION ALL
+								    SELECT '단위기간' AS GUBUN
+								         , MIN(WEEK_START) AS SDATE
+								         , MAX(WEEK_END) AS EDATE
+								         , SUM(WORK_HH_A) AS WORK_HH_A
+								         , SUM(WORK_HH_B) AS WORK_HH_B
+								         , SUM(WORK_MM_A) AS WORK_MM_A
+								         , SUM(WORK_MM_B) AS WORK_MM_B
+                                         , SUM( DECODE(PLAN_WORK_YN, 'N', 1, 0) ) AS WORK_CNT
+                                         , SUM( 1 ) AS WORK_ALL_CNT
+                                         , MAX(WEEK_CNT) AS WEEK_CNT
+								     FROM TMP
+							        WHERE YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+                                    UNION ALL 
+								    SELECT '일 평균' AS GUBUN
+								         , MIN(WEEK_START) AS SDATE
+								         , MAX(WEEK_END) AS EDATE
+								         , SUM(WORK_HH_A) AS WORK_HH_A
+								         , SUM(WORK_HH_B) AS WORK_HH_B
+								         , SUM(WORK_MM_A) AS WORK_MM_A
+								         , SUM(WORK_MM_B) AS WORK_MM_B
+                                         , SUM( DECODE(PLAN_WORK_YN, 'N', 1, 0) ) AS WORK_CNT
+                                         , SUM( 1 ) AS WORK_ALL_CNT
+                                         , MAX(WEEK_CNT) AS WEEK_CNT
+								     FROM TMP
+							        WHERE YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+                                    
+                                    UNION ALL 
+								    SELECT '주 평균' AS GUBUN
+								         , MIN(WEEK_START) AS SDATE
+								         , MAX(WEEK_END) AS EDATE
+								         , SUM(WORK_HH_A) AS WORK_HH_A
+								         , SUM(WORK_HH_B) AS WORK_HH_B
+								         , SUM(WORK_MM_A) AS WORK_MM_A
+								         , SUM(WORK_MM_B) AS WORK_MM_B
+                                         , SUM( DECODE(PLAN_WORK_YN, 'N', 1, 0) ) AS WORK_CNT
+                                         , SUM( 1 ) AS WORK_ALL_CNT
+                                         , MAX(WEEK_CNT) AS WEEK_CNT
+								     FROM TMP
+							        WHERE YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+							  )	     
+					  )
+
+                ]]>
+
+
+        </select>
+
+
+</mapper>

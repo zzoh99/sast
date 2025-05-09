@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubAppDet">
+	
+	<!-- 동호회명 콤보 -->		
+	<select id="getClubAppDetClubName" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT TT.* 
+		  FROM ( ]]>
+		<if test='joinType != null and joinType eq "A"'>
+				SELECT CLUB_SEQ AS CODE, CLUB_NM AS CODE_NM
+				   FROM TBEN500
+				  WHERE ENTER_CD = #{ssnEnterCd}
+				    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE
+				  MINUS
+		</if>
+	<![CDATA[
+                     SELECT B.CLUB_SEQ AS CODE, B.CLUB_NM AS CODE_NM
+					FROM TBEN502 A, TBEN500 B
+				   WHERE A.ENTER_CD = #{ssnEnterCd}
+					 AND A.ENTER_CD = B.ENTER_CD 
+					 AND A.CLUB_SEQ = B.CLUB_SEQ 
+					 AND A.SABUN = TRIM( #{sabun} )
+					 AND SYSDATE BETWEEN TO_DATE(A.SDATE) AND TO_DATE(A.EDATE)
+                        ) TT
+	  	 ORDER BY CODE_NM
+	]]>
+	</select>
+		
+	<!-- 신청내용 조회 -->
+	<select id="getClubAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+		     , A.CLUB_SEQ
+		     , A.JOIN_TYPE
+		     , A.SDATE
+		     , A.EDATE
+		     , A.AGREE_YN
+		     , TO_CHAR(A.AGREE_DATE,'YYYY-MM-DD  HH24:MI:SS') AS AGREE_DATE
+		     , A.FILE_SEQ
+		     , A.NOTE
+		     , B.SABUN_A
+		     , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_NAME -- 회장 성명
+		     , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN_A, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_A_NM
+		     , B.SABUN_B
+		     , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_NAME -- 고문 성명
+		     , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN_B, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_B_NM
+		     , B.SABUN_C
+		     , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_NAME -- 총무 성명
+		     , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN_C, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_C_NM
+		     , B.CLUB_FEE
+		     , B.CLUB_NM
+                  FROM TBEN501 A, TBEN500 B
+                 WHERE A.ENTER_CD   = #{ssnEnterCd}
+                   AND A.APPL_SEQ   = #{searchApplSeq}
+                   AND A.ENTER_CD   = B.ENTER_CD
+                   AND A.CLUB_SEQ   = B.CLUB_SEQ
+	]]>
+	</select>
+		
+	<!-- 동호회 정보 조회 -->
+	<select id="getClubAppDetClubMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.CLUB_SEQ
+		     , A.CLUB_NM
+		     , A.SDATE
+		     , A.EDATE
+		     , A.CLUB_FEE
+		     , A.SABUN_A
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_NAME -- 회장 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_A, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_A_NM
+		     , A.SABUN_B
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_NAME -- 고문 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_B, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_B_NM
+		     , A.SABUN_C
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_NAME -- 총무 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_C, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_C_NM
+		     , ( SELECT MAX( NVL(Z.SDATE,'') ) FROM TBEN501 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.CLUB_SEQ = A.CLUB_SEQ AND Z.JOIN_TYPE = 'A' AND Z.SABUN = #{searchApplSabun} ) AS SDATE_D
+          FROM TBEN500 A
+         WHERE A.ENTER_CD   = #{ssnEnterCd}
+           AND A.CLUB_SEQ   = #{clubSeq}
+	]]>
+	</select>
+		
+	<!-- 신청 내용 저장 -->
+	<update id="saveClubAppDet" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN501 T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				SELECT	  TRIM( #{ssnEnterCd} ) 						AS ENTER_CD
+						, TRIM( #{rm.searchApplSeq} ) 				AS APPL_SEQ
+						, TRIM( #{rm.searchApplSabun} )				AS SABUN
+						, TRIM( #{rm.clubSeq} )  					AS CLUB_SEQ
+           				, TRIM( #{rm.joinType} )  					AS JOIN_TYPE
+						, REPLACE(TRIM( #{rm.sdate} ), '-', '') 	AS SDATE
+						, REPLACE(TRIM( #{rm.edate} ), '-', '') 	AS EDATE
+			            , TRIM( #{rm.agreeYn} )  					AS AGREE_YN
+			    <choose>
+			    	<when test='rm.agreeYn != null  and !rm.agreeYn.equals("")'>
+			    		, SYSDATE									AS  AGREE_DATE
+			    	</when>
+			    	<otherwise>
+			    		, null										AS  AGREE_DATE
+			    	</otherwise>
+			    </choose>
+			            , TRIM( #{rm.fileSeq} )  					AS FILE_SEQ
+			            , TRIM( #{rm.note} )  						AS NOTE
+				 FROM   DUAL
+		</foreach>	
+	<![CDATA[				
+				) S
+		ON ( 		 T.ENTER_CD	= S.ENTER_CD
+				AND  T.APPL_SEQ	= S.APPL_SEQ
+		 )
+		WHEN MATCHED THEN
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun} 
+		            , T.CLUB_SEQ = S.CLUB_SEQ 
+		            , T.JOIN_TYPE = S.JOIN_TYPE 
+		            , T.SDATE = S.SDATE 
+		            , T.EDATE = S.EDATE 
+		            , T.AGREE_YN = S.AGREE_YN 
+		            , T.AGREE_DATE = S.AGREE_DATE 
+		            , T.FILE_SEQ = S.FILE_SEQ 
+		            , T.NOTE = S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.APPL_SEQ
+		            , T.SABUN
+		            , T.CLUB_SEQ
+		            , T.JOIN_TYPE
+		            , T.SDATE
+		            , T.EDATE
+		            , T.AGREE_YN
+		            , T.AGREE_DATE
+		            , T.FILE_SEQ
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.APPL_SEQ
+		            , S.SABUN
+		            , S.CLUB_SEQ
+		            , S.JOIN_TYPE
+		            , S.SDATE
+		            , S.EDATE
+		            , S.AGREE_YN
+		            , S.AGREE_DATE
+		            , S.FILE_SEQ
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<!-- 중복신청 조회 -->
+	<select id="getClubAppDetDupChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT COUNT(1) AS CNT
+		     FROM TBEN501 A
+		    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+		      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+		      AND A.SABUN   	= TRIM( #{searchApplSabun} )           
+              AND A.CLUB_SEQ    = TRIM( #{clubSeq} )
+              AND A.JOIN_TYPE   = TRIM( #{joinType} ) ]]>
+		<choose>
+			<when test="joinType != null and joinType eq 'A'">
+			  AND A.SDATE		= REPLACE(TRIM( #{sdate} ),'-','')
+			</when>
+			<otherwise>
+			  AND A.EDATE		= REPLACE(TRIM( #{edate} ),'-','')
+			</otherwise>
+		</choose>
+              AND EXISTS ( SELECT 1
+                             FROM THRI103 X
+                            WHERE X.ENTER_CD = A.ENTER_Cd
+                              AND X.APPL_SEQ = A.APPL_SEQ
+                              AND X.APPL_STATUS_CD IN ( '21', '31', '99' ))                                             
+	</select>
+</mapper>

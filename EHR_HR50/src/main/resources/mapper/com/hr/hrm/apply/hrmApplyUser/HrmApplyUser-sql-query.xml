@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.apply.hrmApplyUser">
+
+	<!-- 인사신청 인사기본신청_리스트 조회 -->
+	<select parameterType="map" resultType="cMap" id="getHrmApplyTypeUserPsnalBasicAppList">
+		<![CDATA[
+			SELECT APPL_CD, APPL_NM, TRANS_TYPE, SEQ, ICON
+			  FROM (
+			           -- 개인 이미지 / 서명 변경 신청은 THRM100 변경 신청을 사용할 경우 오픈
+			           SELECT B.APPL_CD, B.APPL_NM, 'U' AS TRANS_TYPE, B.SEQ, B.ICON
+			             FROM THRM800 A
+			            INNER JOIN THRI131 B
+			               ON B.ENTER_CD = A.ENTER_CD
+			              AND B.MAIN_MENU_CD = #{mainMenuCd}
+			              AND B.APPL_CD IN ('PICTURE', 'SIGN') -- 개인 이미지 / 서명
+			              AND B.GRP_CD = #{ssnGrpCd}
+			            WHERE A.ENTER_CD = #{ssnEnterCd}
+			              AND A.EMP_TABLE = 'THRM100'
+			              AND A.USE_YN = 'Y' -- 변경신청여부Y
+
+			           UNION ALL
+
+			           SELECT A.EMP_TABLE AS APPL_CD, NVL(B.APPL_NM, A.EMP_TABLE_NM) AS APPL_NM, A.TRANS_TYPE, B.SEQ, B.ICON
+			             FROM THRM800 A
+			            INNER JOIN THRI131 B
+			               ON B.ENTER_CD = A.ENTER_CD
+			              AND B.MAIN_MENU_CD = #{mainMenuCd}
+			              AND B.APPL_CD = A.EMP_TABLE
+			              AND B.GRP_CD = #{ssnGrpCd}
+			            WHERE A.ENTER_CD = #{ssnEnterCd}
+			              AND A.USE_YN = 'Y' -- 변경신청여부Y
+			       )
+			 ORDER BY SEQ
+		]]>
+	</select>
+
+	<!-- 인사신청 그 외 인사신청 리스트 조회 -->
+	<select parameterType="map" resultType="cMap" id="getHrmApplyTypeUserAppList">
+		<![CDATA[
+			SELECT A.APPL_CD, NVL(A.APPL_NM, B.APPL_NM) AS APPL_NM, A.ICON
+			  FROM THRI131 A
+			 INNER JOIN THRI101 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.APPL_CD = A.APPL_CD
+			   AND NVL(B.USE_YN, 'N') = 'Y'
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.MAIN_MENU_CD = #{mainMenuCd}
+			   AND A.GRP_CD = #{ssnGrpCd}
+			   AND NVL(A.USE_YN, 'N') = 'Y'
+			   AND NOT EXISTS
+			       (
+			           SELECT 1
+			             FROM THRM800
+			            WHERE ENTER_CD = A.ENTER_CD
+			              AND EMP_TABLE = A.APPL_CD
+				   )
+			   -- 신청/결재 프로그램ID 의 .do 앞의 부분이 대상자의 권한에 추가되어 있는지
+			   AND EXISTS(
+					 SELECT 1
+					 FROM TSYS311
+					 WHERE ENTER_CD = A.ENTER_CD
+					   AND GRP_CD = #{ssnGrpCd}
+					   AND PRG_CD LIKE '%' || SUBSTR(DETAIL_PRG_CD,
+													 INSTR(DETAIL_PRG_CD, '/', -1) + 1,
+													 INSTR(DETAIL_PRG_CD, '.do') - INSTR(DETAIL_PRG_CD, '/', -1) - 1
+						 ) || '%'
+				 )
+			ORDER BY A.SEQ, B.SEQ
+		]]>
+	</select>
+</mapper>

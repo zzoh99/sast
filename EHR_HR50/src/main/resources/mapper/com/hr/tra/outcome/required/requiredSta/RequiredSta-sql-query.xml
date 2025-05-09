@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.required.requiredSta">
+<!-- 월별  -->
+		<select parameterType="map" resultType="cMap" id="getRequiredStaTitleList">
+			
+				<![CDATA[
+					SELECT CASE WHEN LEVEL < 10 THEN '0' ELSE '' END || LEVEL AS MON
+					     , 'MON' || CASE WHEN LEVEL < 10 THEN '0' ELSE '' END || LEVEL AS SAVE_NAME
+					     , 'MON' || CASE WHEN LEVEL < 10 THEN '0' ELSE '' END || LEVEL || '_FONT_COLOR' AS SAVE_NAME_FC
+					FROM DUAL
+					CONNECT BY LEVEL <= 12 
+				]]>
+			
+			
+		</select>
+		
+				
+<!-- 필수교육이수현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRequiredStaList">
+			
+				<![CDATA[
+				SELECT A.*
+				     , DECODE(EDU_CONF_CNT, 0, '미이수', '수료' ) AS EDU_CONF_YN  
+				     , DECODE(EDU_CONF_CNT, 0, '#FF0000', '#0000FF' ) AS EDU_CONF_YN_FONT_COLOR  
+				  FROM (
+						SELECT A.ENTER_CD
+		                     , A.YEAR
+						     , A.SABUN
+						     , A.EDU_SEQ
+						     , A.GUBUN_CD
+						     , A.EDU_LEVEL
+						     , A.EDU_COURSE_NM
+						     
+							 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+						     , F_COM_GET_PRIOR_ORG_TYPE_NM(A.ENTER_CD, F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), 'B0400', TO_CHAR(SYSDATE, 'YYYYMMDD') ) AS P_ORG_NM
+							 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+							 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+							 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+							 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+							 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+							 , F_COM_GET_STATUS_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_NM
+							 , F_COM_GET_JIKGUB_YEUNCHA( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))  AS JIKGUB_YEAR
+							 , F_COM_GET_JOB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JOB_NM ]]>
+<foreach item="rtitles" collection="titles">
+							 , DECODE( ${rtitles.saveName} ,'1', '수료', '0', '미이수', '') AS  ${rtitles.saveName} 
+							 , DECODE( ${rtitles.saveName} ,'1', '#0000FF', '0', '#FF0000', '') AS  ${rtitles.saveNameFc} 
+</foreach>
+						     , ( 	
+<foreach item="rtitles" collection="titles" separator=" + ">
+								   TO_NUMBER(NVL(${rtitles.saveName}, '0'))
+</foreach>			     	
+		                       ) AS EDU_CONF_CNT
+						  FROM (
+							SELECT A.ENTER_CD
+		                         , A.YEAR
+							     , A.SABUN
+							     , A.EDU_SEQ
+							     , A.GUBUN_CD
+							     , A.EDU_LEVEL
+							     
+							     , B.EDU_COURSE_NM
+<foreach item="rtitles" collection="titles">
+		                         , ( SELECT MAX(EDU_CONFIRM_TYPE)
+		                               FROM TTRA301 X, TTRA161 Y
+		                              WHERE X.ENTER_CD      = Y.ENTER_CD 
+		                                AND X.EDU_SEQ       = Y.EDU_SEQ
+		                                AND X.EDU_EVENT_SEQ = Y.EDU_EVENT_SEQ
+		                                AND X.SABUN         = Y.SABUN
+		                                AND X.ENTER_CD      = A.ENTER_CD
+		                                AND X.SABUN         = A.SABUN
+		                                AND X.EDU_SEQ       = A.EDU_SEQ
+		                                AND Y.EDU_YM        = TRIM(#{searchYear}) || #{rtitles.mon}
+		                            ) AS ${rtitles.saveName}
+</foreach>
+							  FROM (    SELECT A.ENTER_CD
+		                                     , A.YEAR
+		                                     , A.SABUN
+		                                     , A.EDU_SEQ
+		                                     , A.GUBUN_CD
+		                                     , A.EDU_LEVEL
+		                                 FROM TTRA161 A
+		                                WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		                                  AND A.YEAR     = TRIM(#{searchYear})
+<if test="searchGubunCd != null and searchGubunCd neq ''">
+			 			                  AND A.GUBUN_CD = TRIM( #{searchGubunCd} ) 
+</if>
+		                                GROUP BY A.ENTER_CD, A.YEAR, A.SABUN, A.EDU_SEQ, A.GUBUN_CD, A.EDU_LEVEL
+		                           ) A, TTRA101 B
+							 WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+							   AND A.YEAR          = TRIM(#{searchYear})
+							   AND A.ENTER_CD      = B.ENTER_CD
+							   AND A.EDU_SEQ       = B.EDU_SEQ
+<if test="searchJikgubCd != null and searchJikgubCd neq ''">
+						       AND F_COM_GET_JIKGUB_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) = TRIM( #{searchJikgubCd} ) 
+</if>
+<if test="searchEduCourseNm != null and searchEduCourseNm neq ''">
+						       AND B.EDU_COURSE_NM LIKE '%' || TRIM( #{searchEduCourseNm} ) || '%' 
+</if>
+<if test="searchSabunName != null and searchSabunName neq ''">
+							   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+						) A
+						WHERE 1=1
+<if test="searchEduAppYn != null and searchEduAppYn neq ''">
+						  AND A.EDU_APP_YN = TRIM( #{searchEduAppYn} ) 
+</if>
+				) A
+				WHERE 1=1
+<if test="searchEduConfYn != null and searchEduConfYn eq 1">
+				AND A.EDU_CONF_CNT > 0
+</if>
+<if test="searchEduConfYn != null and searchEduConfYn eq 0">
+				  AND A.EDU_CONF_CNT = 0 
+</if>
+
+			    ORDER BY F_COM_GET_GRCODE_SEQ( A.ENTER_CD, 'L16010', A.GUBUN_CD)
+		            , F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+		</select>
+		
+</mapper>

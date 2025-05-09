@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.element.eleLinkCalcMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEleLinkCalcMgrFirstList">
+
+				<![CDATA[
+					SELECT A.ELEMENT_CD
+					     --, B.ELEMENT_NM
+					     , ELEMENT_NM2 AS ELEMENT_NM
+					     , A.C_RULE
+					     , A.SEARCH_SEQ
+					     , C.SEARCH_DESC
+					     , A.WORK_APPLY_YN
+					     , A.WORK_DD_CD
+					     , A.SDATE
+					     , A.EDATE
+					  FROM TCPN025 A,
+					       (SELECT SUB1.*
+					             , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM) AS ELEMENT_NM2
+					          FROM TCPN011 SUB1
+					             , (SELECT MAX(SDATE) AS SDATE
+					                     , ELEMENT_CD
+					                  FROM TCPN011
+					                 WHERE ENTER_CD = #{ssnEnterCd}
+					                   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                 GROUP BY ELEMENT_CD ) SUB2
+					         WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+					           AND SUB1.ELEMENT_CD = SUB2.ELEMENT_CD
+					           AND SUB1.SDATE = SUB2.SDATE) B
+					     , THRI201 C /* TCPN025 A, TCPN011 B, THRI201 C */
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND B.ENTER_CD   = A.ENTER_CD
+					   AND B.ELEMENT_CD = A.ELEMENT_CD
+					           ]]>
+					<if test='searchElementNm != null and !searchElementNm.equals("")'>
+					   AND B.ELEMENT_NM LIKE  '%' || #{searchElementNm} || '%'
+                    </if>
+					   AND C.ENTER_CD   = A.ENTER_CD
+					   AND C.SEARCH_SEQ = A.SEARCH_SEQ
+					 ORDER BY B.ELEMENT_TYPE, B.PRIORITY, A.SDATE DESC
+
+
+
+		</select>
+
+        <!--        저장 -->
+        <update parameterType="map" id="saveEleLinkCalcMgrFirst">
+
+
+                    MERGE INTO TCPN025 T
+                    USING   (
+                            SELECT    A.ELEMENT_CD
+                                    , A.SEARCH_SEQ
+                                    , A.SDATE
+                                    , A.EDATE
+                                    , A.C_RULE
+                                    , A.WORK_APPLY_YN
+                                    , A.WORK_DD_CD
+                            FROM    (
+                                    SELECT    NULL      AS ELEMENT_CD
+                                            , NULL      AS SEARCH_SEQ
+                                            , NULL      AS SDATE
+                                            , NULL      AS EDATE
+                                            , NULL      AS C_RULE
+                                            , NULL      AS WORK_APPLY_YN
+                                            , NULL      AS WORK_DD_CD
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT
+                                              TRIM( #{rm.elementCd} )   AS ELEMENT_CD
+                                            , TRIM( #{rm.searchSeq} )   AS SEARCH_SEQ
+                                            , TRIM( #{rm.sdate} )   AS SDATE
+                                            , TRIM( #{rm.edate} )   AS EDATE
+                                            , TRIM( #{rm.cRule} )   AS C_RULE
+                                            , TRIM( #{rm.workApplyYn} ) AS WORK_APPLY_YN
+                                            , TRIM( #{rm.workDdCd} )    AS WORK_DD_CD
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.SDATE IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD       = #{ssnEnterCd}
+                    AND  T.ELEMENT_CD     = S.ELEMENT_CD
+                    AND  T.SEARCH_SEQ     = S.SEARCH_SEQ
+                    AND  T.SDATE          = S.SDATE
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.EDATE           = S.EDATE
+                                    , T.C_RULE          = S.C_RULE
+                                    , T.WORK_APPLY_YN   = S.WORK_APPLY_YN
+                                    , T.WORK_DD_CD      = S.WORK_DD_CD
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.ELEMENT_CD
+                            , T.SEARCH_SEQ
+                            , T.SDATE
+                            , T.EDATE
+                            , T.C_RULE
+                            , T.WORK_APPLY_YN
+                            , T.WORK_DD_CD
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              #{ssnEnterCd}
+                            , S.ELEMENT_CD
+                            , S.SEARCH_SEQ
+                            , S.SDATE
+                            , S.EDATE
+                            , S.C_RULE
+                            , S.WORK_APPLY_YN
+                            , S.WORK_DD_CD
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+<!--        삭제 -->
+        <delete parameterType="map" id="deleteEleLinkCalcMgrFirst">
+
+
+                    DELETE FROM TCPN025
+                    WHERE   (ENTER_CD, ELEMENT_CD, SEARCH_SEQ, SDATE) IN    (  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+                                             <if test='rm.searchSeq != null and !rm.searchSeq.equals("")'>
+                                               <if test='rm.sdate != null and !rm.sdate.equals("")'>
+                                                 (#{ssnEnterCd}, TRIM( #{rm.elementCd} ), TRIM( #{rm.searchSeq} ),  TRIM( #{rm.sdate} ))
+                                               </if>
+                                             </if>
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+
+
+
+        </delete>
+
+<!--      조회 -->
+		<select parameterType="map" resultType="cMap" id="getEleLinkCalcMgrSecondList">
+
+				<![CDATA[
+					SELECT A.ELEMENT_CD
+					     , A.SEARCH_SEQ
+					     , A.SDATE
+					     , A.SEQ
+					     , A.ELE_CAL_TYPE
+					     , A.C_RULE_TYPE
+					     , A.CAL_VALUE
+					     /* 항목계산식구분(C00040)에 따른 Value명 가져오기
+					     E  : 항목코드
+					     ES : 항목그룹코드
+					     F  : 사용자함수
+					     A  : 괄호
+					     B  : 사칙연산
+					     C  : 상수
+					     */
+					     , (CASE WHEN A.ELE_CAL_TYPE = 'E' THEN (SELECT NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', X.LANGUAGE_CD, #{ssnLocaleCd}),X.ELEMENT_NM) AS ELEMENT_NM
+					                                               FROM TCPN011 X
+					                                              WHERE X.ENTER_CD = A.ENTER_CD
+					                                                AND X.ELEMENT_CD = A.CAL_VALUE
+					                                                AND X.SDATE = (SELECT MAX(Y.SDATE)
+					                                                                 FROM TCPN011 Y
+					                                                                WHERE Y.ENTER_CD = X.ENTER_CD
+					                                                                  AND Y.ELEMENT_CD = X.ELEMENT_CD
+					                                                                  AND A.SDATE BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231')))
+					             WHEN A.ELE_CAL_TYPE = 'ES' THEN (SELECT X.ELEMENT_SET_NM
+					                                                FROM TCPN071 X
+					                                               WHERE X.ENTER_CD = A.ENTER_CD
+					                                                 AND X.ELEMENT_SET_CD = A.CAL_VALUE)
+					             WHEN A.ELE_CAL_TYPE = 'F' THEN (SELECT X.UDF_NAME
+					                                               FROM TSYS801 X
+					                                              WHERE X.ENTER_CD = A.ENTER_CD
+					                                                AND X.UDF_CD   = A.CAL_VALUE)
+					             ELSE A.CAL_VALUE END) AS CAL_VALUE_NM
+					     , A.CAL_SEQ
+					     , A.UPDOWN_TYPE
+					     , A.UPDOWN_UNIT
+					  FROM TCPN027 A /* TCPN027 A */
+					 WHERE A.ENTER_CD   = #{ssnEnterCd}
+					   AND A.ELEMENT_CD = #{searchElementCd}
+					   AND A.SEARCH_SEQ = #{searchSearchSeq}
+					   AND A.SDATE      = #{searchSdate}
+					 ORDER BY A.CAL_SEQ
+				]]>
+
+
+		</select>
+
+<!--        저장 -->
+        <update parameterType="map" id="saveEleLinkCalcMgrSecond">
+
+
+                    MERGE INTO TCPN027 T
+                    USING   (
+                            SELECT    A.SEQ
+                                    , A.ELEMENT_CD
+                                    , A.SEARCH_SEQ
+                                    , A.SDATE
+                                    , A.ELE_CAL_TYPE
+                                    , A.C_RULE_TYPE
+                                    , A.CAL_VALUE
+                                    , A.CAL_SEQ
+                                    , A.UPDOWN_TYPE
+                                    , A.UPDOWN_UNIT
+                            FROM    (
+                                    SELECT    NULL  AS SEQ
+                                            , NULL  AS ELEMENT_CD
+                                            , NULL  AS SEARCH_SEQ
+                                            , NULL  AS SDATE
+                                            , NULL  AS ELE_CAL_TYPE
+                                            , NULL  AS C_RULE_TYPE
+                                            , NULL  AS CAL_VALUE
+                                            , NULL  AS CAL_SEQ
+                                            , NULL  AS UPDOWN_TYPE
+                                            , NULL  AS UPDOWN_UNIT
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT
+                                             --증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+                                        <if test='rm.seq != null'>
+
+
+                                        <choose>
+                                            <when test='!rm.seq.equals("")'>
+                                                TRIM(#{rm.seq}) AS SEQ
+                                            </when>
+                                            <otherwise>
+                                                TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+                                                FROM TCPN027
+                                                WHERE ENTER_CD = #{ssnEnterCd}
+                                                AND ELEMENT_CD = #{rm.elementCd}
+                                                AND SEARCH_SEQ = #{rm.searchSeq}
+                                                AND SDATE = #{rm.sdate}
+                                                ) )   AS SEQ
+                                                --icnt 증가
+                                                <bind name="icnt" value="icnt + 1" />
+                                            </otherwise>
+                                        </choose>
+                                        </if>
+
+                                            , TRIM( #{rm.elementCd} )  AS ELEMENT_CD
+                                            , TRIM( #{rm.searchSeq} )  AS SEARCH_SEQ
+                                            , TRIM( #{rm.sdate} )      AS SDATE
+                                            , TRIM( #{rm.eleCalType} ) AS ELE_CAL_TYPE
+                                            , TRIM( #{rm.cRuleType} )  AS C_RULE_TYPE
+                                            , TRIM( #{rm.calValue} )   AS CAL_VALUE
+                                            , TRIM( #{rm.calSeq} )     AS CAL_SEQ
+                                            , TRIM( #{rm.updownType} ) AS UPDOWN_TYPE
+                                            , TRIM( #{rm.updownUnit} ) AS UPDOWN_UNIT
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.SEQ IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD       = #{ssnEnterCd}
+                    AND  T.ELEMENT_CD     = S.ELEMENT_CD
+                    AND  T.SEARCH_SEQ     = S.SEARCH_SEQ
+                    AND  T.SDATE          = S.SDATE
+                    AND  T.SEQ            = S.SEQ
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.ELE_CAL_TYPE = S.ELE_CAL_TYPE
+                                    , T.C_RULE_TYPE  = S.C_RULE_TYPE
+                                    , T.CAL_VALUE    = S.CAL_VALUE
+                                    , T.CAL_SEQ      = S.CAL_SEQ
+                                    , T.UPDOWN_TYPE  = S.UPDOWN_TYPE
+                                    , T.UPDOWN_UNIT  = S.UPDOWN_UNIT
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.ELEMENT_CD
+                            , T.SEARCH_SEQ
+                            , T.SDATE
+                            , T.SEQ
+                            , T.ELE_CAL_TYPE
+                            , T.C_RULE_TYPE
+                            , T.CAL_VALUE
+                            , T.CAL_SEQ
+                            , T.UPDOWN_TYPE
+                            , T.UPDOWN_UNIT
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              #{ssnEnterCd}
+                            , S.ELEMENT_CD
+                            , S.SEARCH_SEQ
+                            , S.SDATE
+                            , S.SEQ
+                            , S.ELE_CAL_TYPE
+                            , S.C_RULE_TYPE
+                            , S.CAL_VALUE
+                            , S.CAL_SEQ
+                            , S.UPDOWN_TYPE
+                            , S.UPDOWN_UNIT
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+<!--        삭제 -->
+        <delete parameterType="map" id="deleteEleLinkCalcMgrSecond">
+
+
+                    DELETE FROM TCPN027
+                    WHERE   (ENTER_CD, ELEMENT_CD, SEARCH_SEQ, SDATE, SEQ) IN    (  (NULL, NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+                                             <if test='rm.searchSeq != null and !rm.searchSeq.equals("")'>
+                                               <if test='rm.sdate != null and !rm.sdate.equals("")'>
+                                                  <if test='rm.seq != null and !rm.seq.equals("")'>
+                                                    (#{ssnEnterCd}, TRIM( #{rm.elementCd} ), TRIM( #{rm.searchSeq} ),  TRIM( #{rm.sdate} ), TRIM( #{rm.seq} ))
+                                                  </if>
+                                               </if>
+                                             </if>
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+
+
+
+        </delete>
+
+        <!-- 근무사항 삭제 -->
+        <delete parameterType="map" id="deleteEleLinkCalcMgrThird">
+            DELETE FROM TTIM009
+             WHERE (ENTER_CD, ELEMENT_CD) IN
+            <foreach item="rm" collection="deleteRows" separator=" UNION ALL " open="(" close=")">
+                <if test='ssnEnterCd != null and ssnEnterCd neq "" and rm.elementCd != null and rm.elementCd neq ""'>
+                   SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+                        , TRIM( #{rm.elementCd} ) AS ELEMENT_CD
+                     FROM DUAL
+                </if>
+            </foreach>
+        </delete>
+	</mapper>

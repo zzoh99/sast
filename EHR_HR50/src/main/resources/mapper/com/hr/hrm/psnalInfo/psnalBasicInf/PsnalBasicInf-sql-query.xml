@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalBasicInf">
+
+	<!--인사기본 부서 조회 -->
+	<select id="getPsnalBasicLeftOrgList" parameterType="map" resultType="cMap">
+			<![CDATA[
+						  SELECT LEVEL AS "_level"
+							   , A.ORG_CD
+					    	   , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM
+                               , ( CASE WHEN LEVEL < 3 THEN '1' ELSE '0' END ) AS "_expand"
+						    FROM (
+						             SELECT T.ENTER_CD, T.ORG_CD, T.SDATE, T.PRIOR_ORG_CD, T.SEQ, T.ORG_LEVEL
+						               FROM TORG105 T
+						              WHERE T.ENTER_CD = TRIM(#{ssnEnterCd})
+						                AND T.SDATE =
+						                    (
+						                        SELECT MAX(SDATE)
+						                          FROM TORG103
+						                         WHERE ENTER_CD = T.ENTER_CD
+						                           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+											)
+						         ) A
+					       START WITH A.PRIOR_ORG_CD = '0'
+					     CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					         AND    PRIOR A.SDATE    = A.SDATE
+					         AND    PRIOR A.ORG_CD   = A.PRIOR_ORG_CD
+					       ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+				]]>
+	</select>
+
+	<!-- 	인사기본 부서원 조회 -->
+	<select id="getPsnalBasicLeftEmpList" parameterType="map" resultType="cMap">
+
+					   SELECT A.ENTER_CD
+							, A.SABUN
+							, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+						    , A.JIKGUB_CD
+							, A.JIKGUB_NM
+							, A.JIKWEE_NM
+							, A.JIKCHAK_NM
+							, A.WORK_TYPE_NM
+					     FROM THRM151 A, THRM100 B
+					     WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND A.STATUS_CD NOT LIKE 'RA%'
+						   AND A.ENTER_CD = B.ENTER_CD
+						   AND A.SABUN    = B.SABUN
+						<if test='searchOrgCd != null and !searchOrgCd.equals("") '>
+						   AND A.ORG_CD   = TRIM(#{searchOrgCd})
+						</if>
+						<if test='searchSabunName != null and !searchSabunName.equals("") '>
+						 -- 다국어검색
+						 AND EXISTS (
+							SELECT 'X' FROM DUAL WHERE A.SABUN LIKE '%' || #{searchSabunName} || '%'
+							UNION ALL
+							SELECT 'X' FROM THRM100 WHERE ENTER_CD = A.ENTER_CD
+							AND SABUN = A.SABUN
+							AND NAME LIKE '%' || #{searchSabunName} || '%'
+					 	 )
+						</if>
+
+						   AND A.SDATE    =  ( SELECT MAX(X.SDATE)
+						                         FROM THRM151 X
+								                WHERE X.ENTER_CD = A.ENTER_CD
+								                  AND X.SABUN    = A.SABUN
+								                  AND TO_CHAR(sysdate, 'yyyymmdd') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231') )
+						 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(sysdate, 'yyyymmdd')  )
+
+	</select>
+
+</mapper>

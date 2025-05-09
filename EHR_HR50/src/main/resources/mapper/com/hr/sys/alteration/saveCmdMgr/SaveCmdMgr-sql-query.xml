@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.alteration.saveCmdMgr">
+<!-- 		조회 -->
+		<select id="getSaveCmdMgrList" parameterType="map" resultType="cMap">
+
+					SELECT CMD AS CMD_DATA
+			             , TABLE_NAME
+			             , DUP_CHECK
+			             , NOTE
+	                  FROM TSYS302 
+	                 WHERE 1 =1 
+<if test='searchCmd != null and !searchCmd.equals("")'>
+					   AND CMD LIKE '%'||TRIM(#{searchCmd})||'%'
+</if>
+<if test='searchTableName != null and !searchTableName.equals("")'>
+					   AND TABLE_NAME LIKE '%'||UPPER(TRIM(#{searchTableName}))||'%'
+</if>
+					 ORDER BY CMD
+
+
+		</select>
+<!-- 		저장 -->	
+		<update id="saveSaveCmdMgr" parameterType="map">
+
+					 MERGE INTO TSYS302 T 
+					 USING 
+					( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{rm.cmdData})  		AS  CMD
+					            , TRIM(#{rm.tableName})  	AS  TABLE_NAME
+					            , TRIM(#{rm.dupCheck})  	AS  DUP_CHECK
+					            , TRIM(#{rm.note})  		AS  NOTE
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.CMD 	= S.CMD 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+					            , T.TABLE_NAME 		= S.TABLE_NAME 
+					            , T.DUP_CHECK 		= S.DUP_CHECK 
+					            , T.NOTE 			= S.NOTE 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.CMD
+					            , T.TABLE_NAME
+					            , T.DUP_CHECK
+					            , T.NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.CMD
+					            , S.TABLE_NAME
+					            , S.DUP_CHECK
+					            , S.NOTE
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+		</update>
+
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteSaveCmdMgr">
+
+					DELETE FROM TSYS302 
+					WHERE 	CMD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.cmdData != null and !rm.cmdData.equals("")'>
+											TRIM( #{rm.cmdData} )
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+
+
+</mapper>

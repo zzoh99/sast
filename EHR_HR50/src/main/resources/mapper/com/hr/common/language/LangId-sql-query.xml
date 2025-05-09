@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.language">
+	<select id="getLoinMessageMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT B.KEY_ID AS KEY_ID, B.KEY_TEXT
+		   	  FROM TLAN150 A, TLAN151 B
+		 	 WHERE A.KEY_LEVEL  = B.KEY_LEVEL
+                  AND A.KEY_ID = B.KEY_ID
+                  AND A.KEY_LEVEL = #{keyLevel}
+                  AND B.LANG_CD || '_' || B.COUNTRY_CD = #{localeCd}
+			]]>
+	</select>
+	
+	<select id="getLocaleList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT  A.LANG_CD,
+					B.COUNTRY_CD,
+					A.LANG_CD || '_' || B.COUNTRY_CD AS LOCALE_CD,
+					F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD ,'L00100',A.LANG_CD, 1) AS LANG_NM,
+					F_COM_GET_SQL_MAP(C.ENTER_CD,NULL,NULL,NULL,'BASE_LANG')  AS DF_LANG
+			FROM TLAN101 A, TLAN100 B, TORG900 C
+			WHERE 1 = 1
+			AND A.LANG_CD   = B.LANG_CD
+			AND A.ENTER_CD  = C.ENTER_CD
+			AND A.ENTER_CD  = #{ssnEnterCd}
+			AND C.LANG_USE_YN = '1'
+			AND A.USE_YN = '1'
+			AND C.USE_YN = 'Y'
+			ORDER BY NVL(A.DEFAULT_YN, 'N') DESC, A.SEQ
+		]]>
+	</select>
+	
+	<select id="getLocaleCdStr" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT ''''||REPLACE(REPLACE(LOCALE_CD1,' AS',''' AS')  ,',',',''')   AS LOCALE_CD1, LOCALE_CD2
+			FROM (
+				SELECT SUBSTR(XMLAGG(XMLELEMENT( X, ',' , A.LANG_CD || '_'  || B.COUNTRY_CD ||' AS '|| UPPER( A.LANG_CD || '_'  || B.COUNTRY_CD) ) ORDER BY A.SEQ).EXTRACT('//text()'),2)  AS LOCALE_CD1
+					 , SUBSTR(XMLAGG(XMLELEMENT( X, ',' , A.LANG_CD || '_'  || B.COUNTRY_CD  ) ORDER BY A.SEQ).EXTRACT('//text()'),2)  AS LOCALE_CD2
+				FROM TLAN101 A, TLAN100 B
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+				AND A.LANG_CD = B.LANG_CD
+				AND A.USE_YN = '1'
+			)
+		]]>
+	</select>
+	
+	<select id="getLocaleCdMgrStr" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT ''''||REPLACE(REPLACE(LOCALE_CD1,' AS',''' AS')  ,',',',''')   AS LOCALE_CD1, LOCALE_CD2
+			,DECODE(NVL(F_SYS_LOAD('multiLang'), 0),'0', 'N', '1','Y')  BASE_LAN
+			,(SELECT DECODE(LANG_USE_YN,'0', 'N', '1','Y') FROM TORG900 WHERE ENTER_CD = #{ssnEnterCd} AND ROWNUM= 1 ) AS ORG_LAN
+			FROM (
+				SELECT SUBSTR(XMLAGG(XMLELEMENT( X, ',' , A.LANG_CD || '_'  || B.COUNTRY_CD ||' AS '|| UPPER( A.LANG_CD || '_'  || B.COUNTRY_CD) ) ORDER BY A.SEQ).EXTRACT('//text()'),2)  AS LOCALE_CD1
+					, SUBSTR(XMLAGG(XMLELEMENT( X, ',' , A.LANG_CD || '_'  || B.COUNTRY_CD  ) ORDER BY A.SEQ).EXTRACT('//text()'),2)  AS LOCALE_CD2
+				FROM TLAN101 A, TLAN100 B
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+				AND A.LANG_CD = B.LANG_CD
+				)
+		]]>
+	</select>
+	
+	<select id="getLocaleMessageMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT KEY_LEVEL || '.' || KEY_ID AS KEY_ID
+			     , CASE WHEN #{convReturn} = 'Y' THEN REPLACE(REPLACE(KEY_TEXT, '\r\n', CHR(10)),'\n',CHR(10))
+			            ELSE KEY_TEXT END AS KEY_TEXT
+			  FROM TLAN_VIEW
+			 WHERE KEY_READ = 0
+			   AND KEY_LEVEL = CASE WHEN #{keyLevel} IS NULL THEN 'msg'
+			                        ELSE #{keyLevel} END
+			   AND LANG_CD || '_' || COUNTRY_CD  = #{ssnLocaleCd}
+			   AND ENTER_CD = #{ssnEnterCd}
+		]]>
+	</select>
+	
+	<select id="getNullLocaleMessageMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT KEY_LEVEL || '.' || KEY_ID AS KEY_ID, KEY_TEXT
+			FROM TLAN150
+			WHERE KEY_READ = 0
+			AND KEY_LEVEL = DECODE(#{keyLevel}, null, 'msg', #{keyLevel})
+		]]>
+	</select>
+	
+	<select id="getDefaultUseLangId" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT ENTER_CD,
+					LANG_CD,
+					SEQ,
+					USE_YN,
+					DEFAULT_YN,
+					NOTE,
+					CHKDATE,
+					CHKID
+			FROM TLAN101
+			WHERE ENTER_CD = #{ssnEnterCd}
+			AND USE_YN = '1'
+			AND DEFAULT_YN  = '1'
+			AND ROWNUM = 1
+		]]>
+	</select>
+	
+	<select id="getLangIdCodeList" resultType="cMap">
+		<![CDATA[
+			SELECT  LANG_CD,
+					COUNTRY_CD,
+					SEQ,
+					USE_YN,
+					NOTE,
+					CHKDATE,
+					CHKID
+			FROM TLAN100
+			ORDER BY SEQ
+		]]>
+	</select>
+	
+	<select id="getchangeLocaleSub" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT  F_COM_GET_NAMES(#{ssnEnterCd}, #{ssnSabun}, #{ssnLocaleCd}) AS SSN_NAME
+				  , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd},'tsys307',#{ssnGrpCd},#{ssnLocaleCd}), (SELECT GRP_NM FROM TSYS307 WHERE ENTER_CD = #{ssnEnterCd} AND GRP_CD = #{ssnGrpCd} AND ROWNUM = 1)) AS SSN_GRP_NM
+				  , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd},'torg900',(SELECT DOMAIN FROM TORG900 WHERE ENTER_CD = #{ssnEnterCd} AND ROWNUM = 1),#{ssnLocaleCd}), (SELECT DOMAIN FROM TORG900 WHERE ENTER_CD = #{ssnEnterCd} AND ROWNUM = 1)) AS SSN_ENTER_NM
+			FROM DUAL
+		]]>
+	</select>
+	
+	<select id="langCdSequence" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_SEQ('LANG') AS SEQ FROM DUAL
+		]]>
+	</select>
+	
+	<select id="getLangCdTword" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT
+			F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, #{keyLevel}, #{languageCd}, #{ssnLocaleCd}) AS TLANGWORD FROM DUAL
+		]]>
+	</select>
+	
+</mapper>

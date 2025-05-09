@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appAdjStatusMng">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppAdjStausMngList1">
+
+			<![CDATA[
+				SELECT A.ENTER_CD,
+						A.APPRAISAL_CD,
+						A.APP_STEP_CD,
+						A.APP_SEQ_CD,
+						B.NAME AS APP_NAME,
+						A.APP_SABUN,
+						F_COM_GET_NAMES (A.ENTER_CD, A.APP_SABUN, 'ALIAS') AS ALIAS,
+						F_COM_GET_ORG_NM(A.ENTER_CD, D.ORG_CD, TRIM(#{baseYmd})) AS ORG_NM,
+						D.JIKGUB_NM,
+						D.JIKWEE_NM,
+						D.JIKCHAK_NM,
+						F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00003', A.APP_SEQ_CD ) AS APP_SEQ_NM,
+						A.CNT,
+						A.APPRAISAL_YN,
+						A.APP_GROUP_CD,
+						C.APP_GROUP_NM
+				FROM(
+					SELECT A.ENTER_CD,
+							A.APPRAISAL_CD,
+							A.APP_STEP_CD,
+							A.APP_SABUN,
+							A.APP_SEQ_CD,
+							A.APP_GROUP_CD,
+							COUNT(A.SABUN) AS CNT,
+						DECODE((
+						       SELECT COUNT(*)
+						         FROM
+    							(SELECT X.*
+    							   FROM TPAP202 X, TPAP201 Y
+    							  WHERE X.ENTER_CD = Y.ENTER_CD
+    							    AND X.APPRAISAL_CD = Y.APPRAISAL_CD
+    							    AND X.SABUN = Y.SABUN
+    							    AND X.APP_ORG_CD = Y.APP_ORG_CD
+    							    AND X.APP_STEP_CD = Y.APP_STEP_CD
+    							    AND Y.APP_YN ='Y') K
+							WHERE K.ENTER_CD = A.ENTER_CD
+								AND K.APPRAISAL_CD = A.APPRAISAL_CD
+								AND K.APP_SABUN = A.APP_SABUN
+								AND K.APP_SEQ_CD = A.APP_SEQ_CD
+								AND K.APP_STEP_CD = A.APP_STEP_CD
+								        ]]>
+								<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("0")'>
+									AND APP_GROUP_CD = A.APP_GROUP_CD
+								</if>
+								AND NVL(K.APPRAISAL_YN, 'N') ='Y' ), COUNT(*) , 'Y', 'N') AS APPRAISAL_YN
+					FROM TPAP202 A, TPAP201 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.APPRAISAL_CD = B.APPRAISAL_CD
+						AND A.SABUN = B.SABUN
+						AND A.APP_ORG_CD = B.APP_ORG_CD
+						AND A.APP_STEP_CD = B.APP_STEP_CD
+						AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+						AND A.APP_STEP_CD = '5'
+						AND B.APP_YN = 'Y'
+					GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_STEP_CD, A.APP_SABUN, A.APP_SEQ_CD, A.APP_GROUP_CD ) A,
+					THRM100 B, TPAP133 C, THRM151 D
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.APP_SABUN = B.SABUN
+					AND A.ENTER_CD = C.ENTER_CD(+)
+					AND A.APPRAISAL_CD = C.APPRAISAL_CD(+)
+					AND A.APP_GROUP_CD = C.APP_GROUP_CD(+)
+					AND A.ENTER_CD = D.ENTER_CD
+					AND A.APP_SABUN = D.SABUN
+					AND TRIM(#{baseYmd}) BETWEEN SDATE AND EDATE
+
+					<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+						AND A.APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+					</if>
+
+					<if test='searchAppraisalYn != null and !searchAppraisalYn.equals("")'>
+						AND A.APPRAISAL_YN = TRIM(#{searchAppraisalYn})
+					</if>
+
+					<if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+						AND (B.NAME LIKE '%'|| TRIM(#{searchNameSabun}) ||'%' OR A.APP_SABUN LIKE '%'|| TRIM(#{searchNameSabun}) ||'%')
+					</if>
+
+				ORDER BY A.APP_SABUN
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppAdjStausMngList2">
+
+			<![CDATA[
+				SELECT A.ENTER_CD,
+					A.APPRAISAL_CD,
+					A.APP_STEP_CD,
+					A.SABUN,
+					A.APP_ORG_CD,
+					A.APP_SEQ_CD,
+					A.APP_SABUN,
+					B.NAME,
+					F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS,
+					B.APP_ORG_NM,
+					B.JIKWEE_NM,
+					B.JIKGUB_NM,
+					B.JIKCHAK_NM,
+					A.APPRAISAL_YN
+				FROM TPAP202 A, TPAP201 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					AND A.APP_STEP_CD = B.APP_STEP_CD
+					AND A.SABUN = B.SABUN
+					AND A.APP_ORG_CD = B.APP_ORG_CD
+					AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					AND A.APP_STEP_CD = '5'
+					AND A.APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+					AND A.APP_SABUN = TRIM(#{searchAppSabun})
+]]>
+					<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("0")'>
+						AND A.APP_GROUP_CD = TRIM(#{searchAppGroupCd})
+					</if>
+
+					AND B.APP_YN = 'Y'
+
+
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getAppAdjStausMngList3">
+
+			<![CDATA[
+				SELECT  A.SABUN
+				       ,A.NAME
+				       ,A.APP_ORG_NM
+				       ,A.JIKGUB_NM
+				       ,A.JIKWEE_NM
+				       ,A.JIKCHAK_NM
+				       ,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10018', A.LAST_STATUS_CD) AS STATUS_NM
+				       ,A.APPRAISAL_CD
+				       ,A.APP_ORG_CD
+				       ,A.APP_GROUP_CD1
+				       ,A.APP_GROUP_NM1
+				       ,A.APP_GROUP_CD2
+				       ,A.APP_GROUP_NM2
+				       ,A.APP_GROUP_CD3
+				       ,A.APP_GROUP_NM3
+				  FROM (
+				            SELECT  A.ENTER_CD
+				                   ,A.SABUN
+				                   ,A.NAME
+				                   ,A.APP_ORG_NM
+				                   ,A.JIKGUB_NM
+				                   ,A.JIKWEE_NM
+				                   ,A.JIKCHAK_NM
+				                   ,B.LAST_STATUS_CD
+				                   ,A.APPRAISAL_CD
+				                   ,A.APP_ORG_CD
+				                   ,MAX(DECODE(C.APP_SEQ_CD, 1, C.APP_GROUP_CD, '')) AS APP_GROUP_CD1
+				                   ,MAX(DECODE(C.APP_SEQ_CD, 1, F_PAP_GET_APP_GROUP_NM(C.ENTER_CD,C.APPRAISAL_CD, C.APP_GROUP_CD), '')) AS APP_GROUP_NM1
+				                   ,MAX(DECODE(C.APP_SEQ_CD, 2, C.APP_GROUP_CD, '')) AS APP_GROUP_CD2
+				                   ,MAX(DECODE(C.APP_SEQ_CD, 2, F_PAP_GET_APP_GROUP_NM(C.ENTER_CD,C.APPRAISAL_CD, C.APP_GROUP_CD), '')) AS APP_GROUP_NM2
+				                   ,MAX(DECODE(C.APP_SEQ_CD, 6, C.APP_GROUP_CD, '')) AS APP_GROUP_CD3
+				                   ,MAX(DECODE(C.APP_SEQ_CD, 6, F_PAP_GET_APP_GROUP_NM(C.ENTER_CD,C.APPRAISAL_CD, C.APP_GROUP_CD), '')) AS APP_GROUP_NM3
+				              FROM TPAP201 A,
+				                   TPAP350 B,
+				                   TPAP202 C
+				             WHERE A.ENTER_CD      = B.ENTER_CD
+				               AND A.APPRAISAL_CD  = B.APPRAISAL_CD
+				               AND A.APP_ORG_CD    = B.APP_ORG_CD
+				               AND A.SABUN         = B.SABUN
+				               AND A.ENTER_CD      = C.ENTER_CD(+)
+				               AND A.APPRAISAL_CD  = C.APPRAISAL_CD(+)
+				               AND A.APP_STEP_CD   = C.APP_STEP_CD(+)
+				               AND A.SABUN         = C.SABUN(+)
+				               AND A.APP_ORG_CD    = C.APP_ORG_CD(+)
+				               AND A.ENTER_CD      = TRIM(#{ssnEnterCd})
+				               AND A.APPRAISAL_CD  = TRIM(#{searchAppraisalCd})
+				               AND A.APP_STEP_CD   = TRIM('5')
+]]>
+<if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+				               AND (A.NAME LIKE '%'|| TRIM(#{searchNameSabun}) ||'%' OR A.SABUN LIKE '%'|| TRIM(#{searchNameSabun}) ||'%')
+</if>
+<if test='searchAppStatusCd != null and !searchAppStatusCd.equals("")'>
+				               AND B.LAST_STATUS_CD = TRIM(#{searchAppStatusCd})
+</if>
+<if test='searchAppNameSabun != null and !searchAppNameSabun.equals("")'>
+				               AND A.SABUN IN (
+				                       SELECT C1.SABUN
+				                         FROM TPAP202 C1
+				                        WHERE C1.ENTER_CD = A.ENTER_CD
+				                          AND C1.APPRAISAL_CD = A.APPRAISAL_CD
+				                          AND C1.APP_STEP_CD = A.APP_STEP_CD
+				                          AND (F_COM_GET_NAMES(C1.ENTER_CD, C1.APP_SABUN) LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%' OR C1.APP_SABUN LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%')
+				                   )
+</if>
+<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+				               AND C.APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+</if>
+				             GROUP BY A.ENTER_CD,A.SABUN,A.NAME,A.APP_ORG_NM,A.JIKGUB_NM,A.JIKWEE_NM,A.JIKCHAK_NM,B.LAST_STATUS_CD,A.APPRAISAL_CD,A.APP_ORG_CD
+ 				       ) A
+				 WHERE 1=1
+
+<if test='searchAppGroupNm1 != null and !searchAppGroupNm1.equals("")'>
+				   AND A.APP_GROUP_NM1 LIKE '%'|| TRIM(#{searchAppGroupNm1}) ||'%'
+</if>
+<if test='searchAppGroupNm2 != null and !searchAppGroupNm2.equals("")'>
+				   AND A.APP_GROUP_NM2 LIKE '%'|| TRIM(#{searchAppGroupNm2}) ||'%'
+</if>
+<if test='searchAppGroupNm3 != null and !searchAppGroupNm3.equals("")'>
+				   AND A.APP_GROUP_NM3 LIKE '%'|| TRIM(#{searchAppGroupNm3}) ||'%'
+</if>
+				 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+		</select>
+
+
+
+		<select parameterType="map" resultType="cMap" id="getAppAdjStausMngList3D">
+
+			<![CDATA[
+                SELECT  A.SABUN
+                       ,A.NAME
+                       ,A.APP_ORG_NM
+                       ,A.JIKGUB_NM
+                       ,A.JIKWEE_NM
+                       ,A.JIKCHAK_NM
+                       ,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10018', A.LAST_STATUS_CD) AS STATUS_NM
+                       ,A.APPRAISAL_CD
+                       ,A.APP_ORG_CD
+                  FROM (
+                            SELECT  A.ENTER_CD
+                                   ,A.SABUN
+                                   ,A.NAME
+                                   ,A.APP_ORG_NM
+                                   ,A.JIKGUB_NM
+                                   ,A.JIKWEE_NM
+                                   ,A.JIKCHAK_NM
+                                   ,DECODE(F_PAPN_LAST_STATUS_YN(A.ENTER_CD , A.APPRAISAL_CD, A.SABUN, A.APP_ORG_CD), 'Y', '99','11') AS LAST_STATUS_CD
+                                   ,A.APPRAISAL_CD
+                                   ,A.APP_ORG_CD
+                              FROM TPAP201 A,
+                                   TPAP350 B,
+                                   TPAP202 C
+                             WHERE A.ENTER_CD      = B.ENTER_CD
+                               AND A.APPRAISAL_CD  = B.APPRAISAL_CD
+                               AND A.APP_ORG_CD    = B.APP_ORG_CD
+                               AND A.SABUN         = B.SABUN
+					           AND A.ENTER_CD      = TRIM(#{ssnEnterCd})
+                               AND A.APPRAISAL_CD  = TRIM(#{searchAppraisalCd})
+                               AND A.APP_STEP_CD   = TRIM('5')
+
+                               AND A.ENTER_CD      = C.ENTER_CD(+)
+                               AND A.APPRAISAL_CD  = C.APPRAISAL_CD(+)
+                               AND A.APP_STEP_CD   = C.APP_STEP_CD(+)
+                               AND A.SABUN         = C.SABUN(+)
+                               AND A.APP_ORG_CD    = C.APP_ORG_CD(+)
+                                       ]]>
+					      <if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+						       AND (A.NAME LIKE '%'|| TRIM(#{searchNameSabun}) ||'%' OR A.SABUN LIKE '%'|| TRIM(#{searchNameSabun}) ||'%')
+						  </if>
+
+					      <if test='searchAppNameSabun != null and !searchAppNameSabun.equals("")'>
+						       AND (F_COM_GET_NAMES(C.ENTER_CD, C.APP_SABUN) LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%' OR C.APP_SABUN LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%')
+						  </if>
+					      <if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+						       AND C.APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+						  </if>
+                             GROUP BY A.ENTER_CD,A.SABUN,A.NAME,A.APP_ORG_NM,A.JIKGUB_NM,A.JIKWEE_NM,A.JIKCHAK_NM,B.LAST_STATUS_CD,A.APPRAISAL_CD,A.APP_ORG_CD
+ 						) A
+                 WHERE 1=1
+
+		      <if test='searchAppStatusCd != null and !searchAppStatusCd.equals("")'>
+			       AND A.LAST_STATUS_CD = TRIM(#{searchAppStatusCd})
+			  </if>
+                 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppAdjStausMngList4">
+
+			<![CDATA[
+
+                      SELECT A.APP_SABUN
+                            ,F_COM_GET_NAMES(A.ENTER_CD, A.APP_SABUN) AS APP_NAME
+                            ,A.APP_SEQ_CD
+                            ,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00003', A.APP_SEQ_CD) AS APP_SEQ_NM
+                            ,A.ORG_NM AS APP_ORG_NM
+                            ,A.JIKWEE_NM
+                            ,A.JIKCHAK_NM
+                            ,A.JIKGUB_NM
+                            ,NVL(A.APPRAISAL_YN, 'N') AS APPRAISAL_YN
+                            ,A.APP_GROUP_CD
+                            ,F_PAP_GET_APP_GROUP_NM(A.ENTER_CD,A.APPRAISAL_CD, A.APP_GROUP_CD) AS APP_GROUP_NM
+                            ,A.APP_ORG_CD
+                            ,A.SABUN
+                            ,A.APPRAISAL_CD
+                            ,A.APP_STEP_CD
+                        FROM TPAP202 A
+                       WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+                         AND A.APPRAISAL_CD  = TRIM(#{searchAppraisalCd2})
+                         AND A.APP_STEP_CD   = TRIM('5')
+                         AND A.SABUN         = TRIM(#{searchSabun})
+                         AND A.APP_ORG_CD    = TRIM(#{searchAppOrgCd})
+                       ORDER BY A.APP_SEQ_CD
+
+			]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppAdjStausMng2">
+
+				<![CDATA[
+					UPDATE TPAP202 T SET
+						T.APPRAISAL_YN  = #{appraisalYn}
+						, T.CHKDATE  = SYSDATE
+						, T.CHKID   = #{ssnSabun}
+					WHERE T.ENTER_CD  = #{ssnEnterCd}
+						AND  T.APPRAISAL_CD = #{appraisalCd}
+						AND  T.APP_STEP_CD = #{appStepCd}
+						AND  T.SABUN = #{sabun}
+						AND  T.APP_ORG_CD = #{appOrgCd}
+						AND  T.APP_SEQ_CD = #{appSeqCd}
+						AND  T.APP_SABUN = #{appSabun}
+				]]>
+
+
+		</update>
+
+
+<!-- 		저장 -->
+        <update parameterType="map" id="saveAppAdjStausMng3">
+
+                    MERGE INTO TPAP202 T
+                    USING   (
+                            SELECT    A.ENTER_CD
+                                    , A.APPRAISAL_CD
+                                    , A.APP_STEP_CD
+                                    , A.SABUN
+                                    , A.APP_ORG_CD
+                                    , A.APP_SEQ_CD
+                                    , A.APP_SABUN
+                                    , A.APPRAISAL_YN
+                            FROM    (
+                                    SELECT    NULL      AS ENTER_CD
+                                            , NULL      AS APPRAISAL_CD
+                                            , NULL      AS APP_STEP_CD
+                                            , NULL      AS SABUN
+                                            , NULL      AS APP_ORG_CD
+                                            , NULL      AS APP_SEQ_CD
+                                            , NULL      AS APP_SABUN
+                                            , NULL      AS APPRAISAL_YN
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT    #{ssnEnterCd}                AS ENTER_CD
+                                            , TRIM( #{searchAppraisalCd2} )AS APPRAISAL_CD
+                                            , TRIM( '5' )                AS APP_STEP_CD
+                                            , TRIM( #{rm.sabun} )        AS SABUN
+                                            , TRIM( #{rm.appOrgCd} )     AS APP_ORG_CD
+                                            , TRIM( #{rm.appSeqCd} )     AS APP_SEQ_CD
+                                            , TRIM( #{rm.appSabun} )     AS APP_SABUN
+                                            , TRIM( #{rm.appraisalYn} )  AS APPRAISAL_YN
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.ENTER_CD IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD         = S.ENTER_CD
+                    AND  T.APPRAISAL_CD     = S.APPRAISAL_CD
+                    AND  T.APP_STEP_CD      = S.APP_STEP_CD
+                    AND  T.SABUN            = S.SABUN
+                    AND  T.APP_ORG_CD       = S.APP_ORG_CD
+                    AND  T.APP_SEQ_CD       = S.APP_SEQ_CD
+                    AND  T.APP_SABUN        = S.APP_SABUN
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.APPRAISAL_YN    = S.APPRAISAL_YN
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+		</update>
+
+
+
+<!-- 		저장 -->
+        <update parameterType="map" id="saveAppAdjStausMng4">
+
+                <![CDATA[
+				       UPDATE TPAP350
+				          SET LAST_STATUS_CD   = CASE WHEN #{appTypeCd} = 'D' THEN DECODE(F_PAPN_LAST_STATUS_YN(ENTER_CD, APPRAISAL_CD, SABUN, APP_ORG_CD), 'Y', '99', '11')
+				                                      WHEN #{saveAppYnCnt} = '0' THEN '11'
+				                                      WHEN #{saveAppYnCnt} = '1' THEN '21'
+				                                      WHEN #{saveAppYnCnt} = '2' THEN '25'
+				                                      WHEN #{saveAppYnCnt} = '3' THEN '35'
+				                                      WHEN #{saveAppYnCnt} = '4' THEN '99' END
+				            , CHKDATE          = SYSDATE
+				            , CHKID            = #{ssnSabun}
+				        WHERE ENTER_CD     = #{ssnEnterCd}
+				          AND APPRAISAL_CD = #{searchAppraisalCd2}
+				          AND SABUN        = #{searchSabun}
+				          AND APP_ORG_CD   = #{searchAppOrgCd}
+                ]]>
+
+		</update>
+
+
+		<select parameterType="map" resultType="cMap" id="getBaseYmd">
+
+				<![CDATA[
+						SELECT B.D_BASE_YMD AS BASE_YMD, A.APP_TYPE_CD
+						FROM TPAP101 A, TPAP105 B, TSYS005 C
+						WHERE B.ENTER_CD     = TRIM(#{ssnEnterCd})
+							AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+							AND A.ENTER_CD = B.ENTER_CD
+							AND A.APPRAISAL_CD = B.APPRAISAL_CD
+							AND B.ENTER_CD = C.ENTER_CD
+							AND C.GRCODE_CD='P00005'
+							AND C.CODE = B.APP_STEP_CD
+                            AND B.APP_STEP_CD = '5'
+				]]>
+
+
+		</select>
+		
+<!-- 평가진행상태관리3 > 평가그룹 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppAdjStausMng3AppGroupList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPRAISAL_CD
+					     , A.APP_GROUP_CD
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00003', A.APP_SEQ_CD) AS APP_SEQ_NM
+					     , A.APP_GROUP_NM
+					     , A.APP_SEQ_CD
+					     --, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00002', A.ORG_GRADE_CD) AS ORG_GRADE_NM
+					     , (SELECT COUNT(SABUN) 
+					          FROM TPAP202 
+					         WHERE ENTER_CD = A.ENTER_CD
+					           AND APPRAISAL_CD = A.APPRAISAL_CD
+					           AND SABUN||APP_ORG_CD IN (SELECT SABUN||APP_ORG_CD
+					                                       FROM TPAP201 
+					                                      WHERE ENTER_CD     = #{ssnEnterCd}
+					                                        AND APPRAISAL_CD = #{searchAppraisalCd}
+					                                        AND APP_YN       = 'Y'
+					                                        AND APP_STEP_CD  = '5')  --최종평가일 경우에만
+					           AND APP_GROUP_CD   = A.APP_GROUP_CD
+					           AND APP_SEQ_CD   = A.APP_SEQ_CD
+					           AND APP_STEP_CD  = '5'
+					         ) AS INWON_CNT
+					     , (SELECT MAX(APP_SABUN)
+					          FROM TPAP202 
+					         WHERE ENTER_CD     = A.ENTER_CD
+					           AND APPRAISAL_CD = A.APPRAISAL_CD
+					           AND SABUN||APP_ORG_CD IN (SELECT SABUN||APP_ORG_CD
+					                                       FROM TPAP201 
+					                                      WHERE ENTER_CD     = #{ssnEnterCd}
+					                                        AND APPRAISAL_CD = #{searchAppraisalCd}
+					                                        AND APP_YN       = 'Y'
+					                                        AND APP_STEP_CD  = '5')  --최종평가일 경우에만
+					           AND APP_GROUP_CD   = A.APP_GROUP_CD
+					           AND APP_SEQ_CD   = A.APP_SEQ_CD
+					           AND APP_STEP_CD  = '5'
+					         ) AS APP_SABUN
+					  FROM TPAP133 A
+					     , TPAP201 B
+					 WHERE B.ENTER_CD     = A.ENTER_CD
+					   AND B.APPRAISAL_CD = A.APPRAISAL_CD
+					   AND A.ENTER_CD     = #{ssnEnterCd}
+					   AND A.APPRAISAL_CD = #{searchAppraisalCd}
+					   AND A.APP_SEQ_CD   = #{searchAppSeqCd}  -- 변수 : 1차, 2차, 3차(조회조건, 1이면 1차, 2이면 2차, 6이면 3차)
+					   AND B.APP_YN       = 'Y'
+					   AND B.APP_STEP_CD  = '5'  --최종평가일 경우에만
+					   ]]>
+<if test='searchAppGroupNm != null and !searchAppGroupNm.equals("")'>
+					   AND A.APP_GROUP_NM LIKE '%' || #{searchAppGroupNm} || '%'  -- 변수, (조회조건, TEXT)
+</if>
+<if test='searchAppNameSabun != null and !searchAppNameSabun.equals("")'>
+					   AND A.APP_GROUP_CD IN (SELECT APP_GROUP_CD
+					                            FROM TPAP202
+					                           WHERE ENTER_CD     = A.ENTER_CD
+					                             AND APPRAISAL_CD = A.APPRAISAL_CD
+					                             AND APP_STEP_CD  = '5'
+					                             AND APP_SEQ_CD   = #{searchAppSeqCd}
+					                             AND (F_COM_GET_NAMES(ENTER_CD, APP_SABUN) LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%' OR APP_SABUN LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%')
+					                           GROUP BY APP_GROUP_CD
+					                         )
+</if>
+<if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+					   AND A.APP_GROUP_CD IN (SELECT APP_GROUP_CD
+					                            FROM TPAP202
+					                           WHERE ENTER_CD     = A.ENTER_CD
+					                             AND APPRAISAL_CD = A.APPRAISAL_CD
+					                             AND APP_STEP_CD  = '5'
+					                             AND APP_SEQ_CD   = #{searchAppSeqCd}
+					                             AND (F_COM_GET_NAMES(ENTER_CD, SABUN) LIKE '%'|| TRIM(#{searchNameSabun}) ||'%' OR SABUN LIKE '%'|| TRIM(#{searchNameSabun}) ||'%')
+					                           GROUP BY APP_GROUP_CD
+					                         )
+</if>
+<if test='searchAppStatusCd != null and !searchAppStatusCd.equals("")'>
+					   AND A.APP_GROUP_CD IN (SELECT X.APP_GROUP_CD
+					                            FROM TPAP202 X
+					                               , TPAP350 Y
+					                           WHERE X.ENTER_CD     = A.ENTER_CD
+					                             AND X.APPRAISAL_CD = A.APPRAISAL_CD
+					                             AND X.APP_STEP_CD  = '5'
+					                             AND X.APP_SEQ_CD   = #{searchAppSeqCd}
+					                             AND X.ENTER_CD     = Y.ENTER_CD
+					                             AND X.APPRAISAL_CD = Y.APPRAISAL_CD
+					                             AND X.SABUN        = Y.SABUN
+					                             AND X.APP_ORG_CD   = Y.APP_ORG_CD
+					                             AND Y.LAST_STATUS_CD = #{searchAppStatusCd}
+					                           GROUP BY X.APP_GROUP_CD
+					                         )
+</if>
+					 GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_GROUP_CD, A.APP_GROUP_NM, /*A.ORG_GRADE_CD,*/ A.APP_SEQ_CD 
+					 ORDER BY A.APP_SEQ_CD ASC, A.APP_GROUP_NM ASC
+
+
+		</select>
+		
+<!-- 평가진행상태관리3 > 평가그룹 소속 피평가자 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppAdjStausMng3EmpList">
+
+				<![CDATA[
+					SELECT B.APPRAISAL_CD
+					     , B.APP_ORG_CD
+					     , B.APP_ORG_NM
+					     , B.SABUN
+					     , B.NAME
+					     , B.JIKWEE_NM
+					     , B.JIKCHAK_NM
+					     , C.APP_SEQ_CD
+					     , C.APP_SABUN
+					     , F_COM_GET_NAMES(C.ENTER_CD, C.APP_SABUN) AS APP_NAME
+					     , F_COM_GET_JIKCHAK_NM(C.ENTER_CD, C.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231')) AS APP_JIKCHAK_NM
+					     , NVL(C.APPRAISAL_YN, 'N') AS APPRAISAL_YN
+					     , E.LAST_STATUS_CD
+					  FROM TPAP133 A
+					     , TPAP201 B
+					     , TPAP202 C
+					     , TPAP101 D
+					     , TPAP350 E
+					 WHERE A.ENTER_CD     = #{ssnEnterCd}
+					   AND A.APPRAISAL_CD = #{searchAppraisalCd}
+					   AND B.ENTER_CD     = A.ENTER_CD
+					   AND B.APPRAISAL_CD = A.APPRAISAL_CD
+					   AND B.APP_YN       = 'Y'
+					   AND B.APP_STEP_CD  = '5'  --최종평가일 경우에만 
+					   AND C.ENTER_CD     = A.ENTER_CD
+					   AND C.APPRAISAL_CD = A.APPRAISAL_CD
+					   AND C.SABUN        = B.SABUN
+					   AND C.APP_GROUP_CD = A.APP_GROUP_CD
+					   AND C.APP_ORG_CD   = B.APP_ORG_CD
+					   AND C.APP_STEP_CD  = B.APP_STEP_CD
+					   AND A.APP_GROUP_CD = #{searchAppGroupCd}  -- 변수, (평가그룹 적용인원으로 받는 변수)
+					   AND D.ENTER_CD     = A.ENTER_CD
+					   AND D.APPRAISAL_CD = A.APPRAISAL_CD
+					   AND B.ENTER_CD     = E.ENTER_CD
+					   AND B.APPRAISAL_CD = E.APPRAISAL_CD
+					   AND B.SABUN        = E.SABUN
+					   AND B.APP_ORG_CD   = E.APP_ORG_CD
+					           ]]>
+<if test='searchAppNameSabun != null and !searchAppNameSabun.equals("")'>
+					   AND (F_COM_GET_NAMES(C.ENTER_CD, C.APP_SABUN) LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%' OR C.APP_SABUN LIKE '%'|| TRIM(#{searchAppNameSabun}) ||'%')
+</if>
+<if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+					   AND (F_COM_GET_NAMES(E.ENTER_CD, E.SABUN) LIKE '%'|| TRIM(#{searchNameSabun}) ||'%' OR E.SABUN LIKE '%'|| TRIM(#{searchNameSabun}) ||'%')
+</if>
+<if test='searchAppStatusCd != null and !searchAppStatusCd.equals("")'>
+					   AND E.LAST_STATUS_CD = #{searchAppStatusCd}
+</if>
+					 ORDER BY B.APP_ORG_CD, F_COM_JIKJE_SORT(B.ENTER_CD, C.SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231'))
+
+
+		</select>
+
+<!-- 평가진행상태관리3 > 평가완료여부 저장 -->
+		<update parameterType="map" id="saveAppAdjStausMng3AppraisalYn">
+
+				<![CDATA[
+					UPDATE TPAP202 T SET
+					       T.APPRAISAL_YN = #{appraisalYn}
+					     , T.CHKDATE      = SYSDATE
+					     , T.CHKID        = #{ssnSabun}
+					 WHERE T.ENTER_CD     = #{ssnEnterCd}
+					   AND T.APPRAISAL_CD = #{appraisalCd}
+					   AND T.APP_STEP_CD  = '5'
+					   AND T.SABUN        = #{sabun}
+					   AND T.APP_ORG_CD   = #{appOrgCd}
+					   AND T.APP_SEQ_CD   = #{appSeqCd}
+					   AND T.APP_SABUN    = #{appSabun}
+				]]>
+
+		</update>
+
+<!-- 평가진행상태관리3 > 평가진행상태 저장 -->
+		<update parameterType="map" id="saveAppAdjStausMng3StatusCd">
+
+				<![CDATA[
+					UPDATE TPAP350 SET
+					       LAST_STATUS_CD  = #{lastStatusCd}
+				            , CHKDATE      = SYSDATE
+				            , CHKID        = #{ssnSabun}
+				        WHERE ENTER_CD     = #{ssnEnterCd}
+				          AND APPRAISAL_CD = #{appraisalCd}
+				          AND SABUN        = #{sabun}
+				          AND APP_ORG_CD   = #{appOrgCd}
+				]]>
+
+		</update>
+</mapper>

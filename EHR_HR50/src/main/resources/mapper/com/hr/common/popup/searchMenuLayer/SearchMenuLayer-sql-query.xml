@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.searchMenuLayer">
+	
+	<!-- 조회 -->
+	<select id="getSearchMenuLayerList" parameterType="map" resultType="cMap">
+	<![CDATA[
+           SELECT REPLACE(A.PRG_CD,'&','||') AS PRG_CD
+                , A.MENU_NM
+                , A.MAIN_MENU_CD ]]>
+           <choose>
+           	<when test="searchText != null and searchText neq ''">
+           	<![CDATA[
+           		, SUBSTR(MENU_PATH,0, INSTR(MENU_PATH, TRIM( #{searchText} ),-1)-1) || '<strong class=page-title>' || TRIM( #{searchText} ) || '</strong>'
+	           || SUBSTR(MENU_PATH,INSTR(MENU_PATH, TRIM( #{searchText} ),-1)+LENGTH(TRIM( #{searchText} ))) AS SEARCH_PATH
+	        ]]>
+           	</when>
+           	<otherwise>
+           		, MENU_PATH AS SEARCH_PATH
+           	</otherwise>
+           </choose>
+            , MENU_PATH
+			, ISU_BLOCK_ENCRYPT('{"subGrpCd"="'|| A.GRP_CD ||'","mainMenuCd"="'|| A.MAIN_MENU_CD ||'"}', #{ssnEncodedKey}) AS MURL
+			, REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+				"mainMenuCd":"'||MAIN_MENU_CD||'"
+				,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+				,"menuCd":"'||MENU_CD||'"
+				,"url":"'||PRG_CD||'"
+				,"prgCd":"'||PRG_CD||'"
+				,"menuSeq":"'||MENU_SEQ||'"
+			}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'') AS SURL
+			, MENU_SEQ
+			, MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+	<![CDATA[
+             FROM (
+                   SELECT A.*, SUBSTR(SYS_CONNECT_BY_PATH (MENU_NM, ' > '), 4) AS MENU_PATH, rownum AS RNUM
+                     FROM (
+                         SELECT ENTER_CD,MAIN_MENU_CD,'0'  AS PRIOR_MENU_CD,'T' || MAIN_MENU_CD AS MENU_CD,0 AS MENU_SEQ,MAIN_MENU_NM AS MENU_NM,'' AS PRG_CD,'' AS TYPE,0 AS SEQ
+                              , 1 AS AUTH_YN
+                        	  , '' AS GRP_CD
+                           FROM TSYS309
+                          WHERE ENTER_CD = #{ssnEnterCd}
+                            AND USE_YN = '1'
+                        UNION ALL
+                         SELECT B.ENTER_CD, B.MAIN_MENU_CD, DECODE(B.PRIOR_MENU_CD, '0', 'T' || B.MAIN_MENU_CD, B.PRIOR_MENU_CD) AS PRIOR_MENU_CD
+                              , B.MENU_CD, B.MENU_SEQ, B.MENU_NM, B.PRG_CD, B.TYPE, B.SEQ
+                              , 1 AS AUTH_YN
+                        	  , GRP_CD
+                           FROM TSYS311 A, TSYS303 B
+                          WHERE A.ENTER_CD = #{ssnEnterCd}
+                            AND A.GRP_CD   = #{ssnGrpCd}
+                            AND A.USE_YN   = '1'
+                                     AND A.ENTER_CD      = B.ENTER_CD
+                                     AND A.MAIN_MENU_CD  = B.MAIN_MENU_CD
+                                     AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+                                     AND A.MENU_CD       = B.MENU_CD
+                                     AND A.MENU_SEQ      = B.MENU_SEQ
+                      ) A
+                   START WITH A.PRIOR_MENU_CD    = '0'
+                 CONNECT BY PRIOR A.ENTER_CD     = A.ENTER_CD
+                     AND    PRIOR A.MAIN_MENU_CD = A.MAIN_MENU_CD
+                     AND    PRIOR A.MENU_CD      = A.PRIOR_MENU_CD
+                  ORDER SIBLINGS BY A.SEQ        
+                 ) A
+           WHERE TYPE =  'P'
+             AND AUTH_YN > 0  ]]>
+	<if test="searchText != null and searchText neq ''">
+			 AND MENU_NM LIKE '%' || TRIM( #{searchText} ) ||'%'
+	</if>    
+		ORDER BY RNUM
+	</select>
+</mapper>

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.outcome.eduInTypePeopleMgr">
+<!-- 	 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduInTypePeopleMgrList">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+						 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+						 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+						 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+						 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+						 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+						 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+						
+						 , A.APPL_SEQ
+					     , A.EDU_SEQ
+					     , A.EDU_EVENT_SEQ
+					     
+					     , B.APPL_STATUS_CD
+					     
+					     , C.EDU_COURSE_NM
+			     		 , C.IN_OUT_TYPE
+						 , C.EDU_BRANCH_CD
+						 , C.EDU_M_BRANCH_CD
+						 , C.EDU_METHOD_CD
+						 , C.EDU_ORG_CD 
+					     , (SELECT X.EDU_ORG_NM
+					          FROM TTRA001 X
+					         WHERE X.ENTER_CD   = C.ENTER_CD
+					           AND X.EDU_ORG_CD = C.EDU_ORG_CD ) AS EDU_ORG_NM
+					            
+						 , D.EDU_S_YMD
+						 , D.EDU_E_YMD
+					     , D.REAL_EXPENSE_MON
+					     , D.LABOR_APPLY_YN
+					     
+					     , '1' AS CHK_RESULT
+					     
+					     , DECODE( E.APPL_SEQ, NULL, '1', '0') AS ROW_EDIT
+					     , E.APPL_STATUS_CD AS APPL_STATUS_CD2       
+					  FROM TTRA201 A
+					     , THRI103 B
+						 , TTRA101 C
+					  	 , TTRA121 D
+					  	 , ( SELECT X.AP_APPL_SEQ, Y.*
+					           FROM TTRA203 X , THRI103  Y
+					          WHERE X.ENTER_CD    = Y.ENTER_CD
+					            AND X.APPL_SEQ    = Y.APPL_SEQ
+					            AND Y.APPL_STATUS_CD IN ('21' , '31', '99' )
+					       ) E
+					 WHERE A.ENTER_CD        = #{ssnEnterCd}
+					   AND A.EDU_SEQ         = TRIM(#{searchEduSeq})
+					   AND A.EDU_EVENT_SEQ   = TRIM(#{searchEduEventSeq})
+					   AND A.EDU_EVENT_SEQ   = D.EDU_EVENT_SEQ
+					   AND A.ENTER_CD        = B.ENTER_CD
+					   AND A.APPL_SEQ        = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD != '11'
+					   AND A.ENTER_CD        = C.ENTER_CD
+					   AND A.EDU_SEQ         = C.EDU_SEQ
+					   AND A.ENTER_CD        = D.ENTER_CD
+					   AND A.EDU_SEQ         = D.EDU_SEQ
+					   AND A.EDU_EVENT_SEQ   = D.EDU_EVENT_SEQ
+			           AND A.ENTER_CD        = E.ENTER_CD(+)
+			           AND A.APPL_SEQ        = E.AP_APPL_SEQ(+)
+					ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), B.APPL_YMD
+				]]>
+			
+			
+		</select>
+
+
+<!-- 기신청조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduInTypePeopleMgrEduApp">
+			
+				<![CDATA[
+					SELECT COUNT(1) AS CNT
+					  FROM TTRA201 A
+					 WHERE A.ENTER_CD       = TRIM(#{ssnEnterCd})
+					   AND A.SABUN          = TRIM(#{sabun})
+					   AND A.EDU_SEQ        = TRIM(#{eduSeq})
+					   AND A.EDU_EVENT_SEQ  = TRIM(#{eduEventSeq})
+                       AND EXISTS ( SELECT 1
+                                      FROM THRI103 X
+                                     WHERE X.ENTER_CD = A.ENTER_Cd
+                                       AND X.APPL_SEQ = A.APPL_SEQ
+                                       AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+                                   )                                             
+				]]>
+			
+			
+		</select>
+		
+
+<!-- 삭제  : 교육신청-->		
+		<delete parameterType="map" id="deleteEduInTypePeopleMgr201">
+			
+				<![CDATA[
+				DELETE FROM TTRA201
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND APPL_SEQ  = TRIM(#{applSeq}) 
+
+				]]>
+			
+			
+		</delete>
+<!-- 삭제  : 교육이력-->		
+		<delete parameterType="map" id="deleteEduInTypePeopleMgr301">
+			
+				<![CDATA[
+				DELETE FROM TTRA301
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND APPL_SEQ  = TRIM(#{applSeq}) 
+
+				]]>
+			
+			
+		</delete>
+		
+<!-- 삭제  : 신청서마스터-->		
+		<delete parameterType="map" id="deleteEduInTypePeopleMgr103">
+			
+				<![CDATA[
+				DELETE FROM THRI103
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND APPL_SEQ  = TRIM(#{applSeq}) 
+
+				]]>
+			
+			
+		</delete>
+		
+<!-- 삭제  : 신청서결재라인-->		
+		<delete parameterType="map" id="deleteEduInTypePeopleMgr107">
+			
+				<![CDATA[
+				DELETE FROM THRI107
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND APPL_SEQ  = TRIM(#{applSeq}) 
+
+				]]>
+			
+			
+		</delete>
+		
+</mapper>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubrefApp">
+
+	<!-- 동호회 (재)등록신청 내역 조회 -->	
+	<select id="getClubrefAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT A.ENTER_CD
+			     , A.APPL_SEQ
+			     , A.SABUN
+			     , A.YEAR
+			     , A.GUBUN_CD
+			     , A.CLUB_SEQ
+			     , A.CLUB_NM
+			     , A.CLUB_FEE
+			     , A.SABUN_A
+			     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_NAME -- 성명
+			     , A.SABUN_B
+			     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_NAME -- 성명
+			     , A.SABUN_C
+			     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_NAME -- 성명
+			     , A.MEMER_CNT
+			     , A.YEAR_IN_CNT
+			     , A.YEAR_OUT_CNT
+			     , A.PURPOSE
+			     , A.ACT_PLAN
+			     , A.BUD_PLAN
+			     , A.ETC_NOTE
+			     , A.NOTE
+			     , B.APPL_CD
+				 , B.APPL_SEQ
+				 , B.APPL_YMD
+				 , B.APPL_SABUN
+				 , B.APPL_IN_SABUN
+				 , B.APPL_STATUS_CD
+				 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+				 , '0' AS DETAIL
+			  FROM THRI103 B, TBEN505 A, TBEN500 C
+			 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+               AND A.ENTER_CD   = B.ENTER_CD
+               AND A.APPL_SEQ   = B.APPL_SEQ
+               AND A.ENTER_CD   = C.ENTER_CD(+)
+               AND A.CLUB_SEQ   = C.CLUB_SEQ(+)
+               AND A.SABUN      = TRIM( #{searchSabun} )
+             ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+	]]>
+	</select>
+		
+	<!-- 동호회 재등록신청기간 조회 -->	
+	<select id="getClubrefAppDateChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT
+		  	( 
+			 SELECT CASE WHEN(SYSDATE BETWEEN 
+								 TO_DATE((SELECT TO_CHAR(SYSDATE,'YYYY')||Z.NOTE1
+										    FROM TSYS005 Z
+										   WHERE Z.ENTER_CD  = TRIM(#{ssnEnterCd})
+										     AND Z.GRCODE_CD = 'B50000'
+										     AND Z.CODE      = 'B' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Z.S_YMD AND Z.E_YMD))
+						 AND 
+								 TO_DATE((SELECT TO_CHAR(SYSDATE,'YYYY')||Z.NOTE2
+										    FROM TSYS005 Z
+										   WHERE Z.ENTER_CD  = TRIM(#{ssnEnterCd})
+										     AND Z.GRCODE_CD = 'B50000'
+										     AND Z.CODE      = 'B' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Z.S_YMD AND Z.E_YMD))
+				) THEN 'Y' ELSE 'N' END FROM DUAL 
+			) AS APP_DATE_YN FROM DUAL
+	]]>
+	</select>
+		
+	<delete id="deleteClubrefApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN505
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( APPL_SEQ ) IN ( ( NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.applSeq != null and rm.applSeq neq ''">
+				, ( TRIM( #{rm.applSeq} ) )
+			</if>
+		</foreach>
+		       )
+	</delete>
+</mapper>

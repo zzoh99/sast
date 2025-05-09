@@ -1,0 +1,1097 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급여기본사항
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayMasterMgr">
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrAnnualIncomeMap">
+			
+				<![CDATA[
+				SELECT F_COM_GET_MANAGE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS MANAGE_NM
+				     , TO_CHAR(TO_DATE(A.SDATE,'YYYYMMDD'),'YYYY-MM-DD') AS YEAR_SDATE
+				     , TO_CHAR(TO_DATE(A.EDATE,'YYYYMMDD'),'YYYY-MM-DD') AS YEAR_EDATE
+				     , F_COM_GET_ORG_NM2 ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				     , F_COM_GET_JIKGUB_NM( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+				     , F_COM_GET_JIKCHAK_NM( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+				     , F_COM_GET_JIKWEE_NM ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+				     , F_COM_GET_PAY_TYPE_NM ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS PAY_TYPE_NM
+				     , B.*
+				     , (SELECT SUM(X.ELEMENT_MON)
+				          FROM TCPN404 X
+				         INNER JOIN TCPN403 X1
+				                         ON X1.ENTER_CD = X.ENTER_CD
+				                        AND X1.SABUN    = X.SABUN
+				                        AND X1.SDATE    = X.SDATE
+				         INNER JOIN TCPN071 Z
+				                         ON Z.ENTER_CD = X.ENTER_CD
+				         INNER JOIN TCPN072 Z1
+				                         ON Z1.ENTER_CD       = Z.ENTER_CD
+				                        AND Z1.ELEMENT_SET_CD = Z.ELEMENT_SET_CD
+				                        AND Z1.ELEMENT_CD     = X.ELEMENT_CD
+				         INNER JOIN TCPN011 Y
+				                         ON Y.ENTER_CD   = X.ENTER_CD
+				                        AND Y.ELEMENT_CD = X.ELEMENT_CD
+				                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+				         WHERE X.ENTER_CD       = A.ENTER_CD
+				           AND Z.ELEMENT_SET_CD = F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD, 'ELE_SET_YEAR_MON', TO_CHAR(SYSDATE, 'YYYYMMDD'))
+				           AND X.SABUN          = A.SABUN
+				           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X1.SDATE AND NVL(X1.EDATE, '99991231')
+				       ) AS ELETOT_YEAR_MON
+				     , (SELECT SUM(X.ELEMENT_MON)
+				          FROM TCPN404 X
+				         INNER JOIN TCPN403 X1
+				                         ON X1.ENTER_CD = X.ENTER_CD
+				                        AND X1.SABUN    = X.SABUN
+				                        AND X1.SDATE    = X.SDATE
+				         INNER JOIN TCPN071 Z
+				                         ON Z.ENTER_CD = X.ENTER_CD
+				         INNER JOIN TCPN072 Z1
+				                         ON Z1.ENTER_CD       = Z.ENTER_CD
+				                        AND Z1.ELEMENT_SET_CD = Z.ELEMENT_SET_CD
+				                        AND Z1.ELEMENT_CD     = X.ELEMENT_CD
+				         INNER JOIN TCPN011 Y
+				                         ON Y.ENTER_CD   = X.ENTER_CD
+				                        AND Y.ELEMENT_CD = X.ELEMENT_CD
+				                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+				         WHERE X.ENTER_CD     = A.ENTER_CD
+				         AND Z.ELEMENT_SET_CD = F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD,'ELE_SET_MONTH_MON',TO_CHAR(SYSDATE,'YYYYMMDD'))
+				         AND X.SABUN          = A.SABUN
+				         AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X1.SDATE AND NVL(X1.EDATE, '99991231')
+				     ) AS ELETOT_MONTH_MON
+				  FROM TCPN403 A
+				     , (SELECT *
+				          FROM (SELECT ENTER_CD, SABUN, SDATE, ELEMENT_CD, ELEMENT_MON
+				                  FROM TCPN404
+				                 WHERE ENTER_CD = #{ssnEnterCd})
+				         PIVOT ( SUM(ELEMENT_MON) FOR ELEMENT_CD IN ]]>
+			<foreach collection="elementCd" item="item" index="index" open="(" close=")" separator=",">
+				'${item}' AS ${elementAlias[index]}
+			</foreach>
+			<![CDATA[               )
+				        ) B
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SABUN    = B.SABUN
+				   AND A.SDATE    = B.SDATE
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') <= NVL(A.EDATE, '99991231')
+				   AND NVL(TO_CHAR(SYSDATE, 'YYYYMMDD'), '99991231') >= NVL(A.SDATE, '99991231')
+				   AND B.SABUN = #{sabun}
+				   AND ROWNUM = 1
+				]]>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrTaxInfoMap">
+				<![CDATA[
+					SELECT A.SABUN
+						 , B.NATIONAL_NM
+						 , A.FOREIGN_YN
+						 , A.ABROAD_YN
+						 , NVL(A.WOMAN_YN,'N') AS WOMAN_YN
+						 , NVL(A.SPOUSE_YN,'N') AS SPOUSE_YN
+						 , A.FAMILY_CNT_1
+						 , A.FAMILY_CNT_2
+						 , A.OLD_CNT_1
+						 , A.OLD_CNT_2
+						 , A.HANDICAP_CNT
+						 , A.CHILD_CNT
+						 , A.ADD_CHILD_CNT
+						 , NVL(A.SPECIAL_YN,'N') AS SPECIAL_YN
+						 , TRIM(TO_CHAR(NVL(A.FAMILY_CNT_1,0) + NVL(A.FAMILY_CNT_2,0) + NVL(A.ADD_CHILD_CNT,0) + DECODE(A.SPOUSE_YN,'Y',1,0) + 1,'999,999,999,990')) AS TOT_CNT
+						 , SPECIAL_SYMD
+						 , SPECIAL_EYMD
+					  FROM TCPN101 A
+						 , THRM100 B
+					 WHERE A.ENTER_CD	= B.ENTER_CD
+					   AND A.SABUN		= B.SABUN
+					   AND A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrTaxInfoList">
+				<![CDATA[
+					SELECT A.SABUN
+						 , A.FOREIGN_YN
+						 , A.ABROAD_YN
+						 , NVL(A.WOMAN_YN,'N') AS WOMAN_YN
+						 , NVL(A.SPOUSE_YN,'N') AS SPOUSE_YN
+						 , A.FAMILY_CNT_1
+						 , A.FAMILY_CNT_2
+						 , A.OLD_CNT_1
+						 , A.OLD_CNT_2
+						 , A.HANDICAP_CNT
+						 , A.CHILD_CNT
+						 , A.ADD_CHILD_CNT
+						 , NVL(A.SPECIAL_YN,'N') AS SPECIAL_YN
+						 , TRIM(TO_CHAR(NVL(A.FAMILY_CNT_1,0) + NVL(A.FAMILY_CNT_2,0) + NVL(A.ADD_CHILD_CNT,0) + DECODE(A.SPOUSE_YN,'Y',1,0) + 1,'999,999,999,990')) AS TOT_CNT
+						 , A.SDATE
+						 , A.EDATE
+					  FROM TCPN101 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					 ORDER BY A.SDATE DESC
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrfixAllowanceList">
+			
+				<![CDATA[
+					-- (항목그룹관리에 고정수당 추가, 항목링크(기준금액))
+					SELECT ELEMENT_NM, MON
+					FROM (
+					      SELECT A.ENTER_CD
+					            ,A.ELEMENT_CD
+					            ,NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}), B.ELEMENT_NM) AS ELEMENT_NM
+					            ,B.ELEMENT_LINK_TYPE
+					            ,B.PRIORITY
+					            ,F_CPN_GET_ELE_MON_FIX(A.ENTER_CD,TO_CHAR(SYSDATE,'YYYYMMDD'),#{sabun},A.ELEMENT_CD) AS MON
+					      FROM TCPN072 A, TCPN011 B
+					      WHERE A.ENTER_CD = B.ENTER_CD
+					        AND A.ELEMENT_CD = B.ELEMENT_CD
+					        AND A.ENTER_CD = #{ssnEnterCd}
+					        AND A.ELEMENT_SET_CD = '50'
+					        AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+					        AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+					)
+					WHERE MON <> 0
+					ORDER BY PRIORITY
+				]]>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrAccountInfoList">
+			
+				<![CDATA[
+					SELECT A.SABUN
+						 , A.ACCOUNT_TYPE
+						 , A.SDATE
+						 , A.EDATE
+						 , A.BANK_CD
+						 , CRYPTIT.DECRYPT(A.ACCOUNT_NO,#{ssnEnterCd}) AS ACCOUNT_NO
+						 , A.ACC_NAME
+						 , A.ACC_RES_NO
+						 , A.ACC_STATUS_CD
+					  FROM TCPN180 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					ORDER BY A.ACCOUNT_TYPE, A.SDATE DESC
+				]]>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrPayList">
+				<![CDATA[
+					SELECT A.SABUN
+						 , A.ELEMENT_CD
+						 , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}), B.ELEMENT_NM) AS ELEMENT_NM
+						 , A.BASIC_MON
+						 , A.CURRENCY_CD
+						 , A.MONTH_MON
+						 , A.SDATE
+						 , A.EDATE
+						 , A.NOTE
+					  FROM TCPN292 A
+						 , TCPN011 B
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.ELEMENT_CD		= B.ELEMENT_CD
+					   AND B.SDATE			= (SELECT MAX(SDATE)
+					   							 FROM TCPN011
+					   							WHERE ENTER_CD = A.ENTER_CD
+					   							  AND ELEMENT_CD = A.ELEMENT_CD
+					   							  AND A.SDATE BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.SABUN			= #{sabun}
+					   AND B.ELEMENT_TYPE	= 'A'
+					ORDER BY A.SDATE DESC, B.PRIORITY
+				]]>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrDeductionList">
+				<![CDATA[
+					SELECT A.SABUN
+						 , A.ELEMENT_CD
+						 , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}), B.ELEMENT_NM) AS ELEMENT_NM
+						 , A.BASIC_MON
+						 , A.CURRENCY_CD
+						 , A.MONTH_MON
+						 , A.SDATE
+						 , A.EDATE
+						 , A.NOTE
+					  FROM TCPN292 A
+						 , TCPN011 B
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.ELEMENT_CD		= B.ELEMENT_CD
+					   AND B.SDATE			= (SELECT MAX(SDATE)
+					   							 FROM TCPN011
+					   							WHERE ENTER_CD = A.ENTER_CD
+					   							  AND ELEMENT_CD = A.ELEMENT_CD
+					   							  AND A.SDATE BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.SABUN			= #{sabun}
+					   AND B.ELEMENT_TYPE	= 'D'
+					ORDER BY A.SDATE DESC, B.PRIORITY
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrAnnualIncomeList">
+				<![CDATA[
+					SELECT	A.SDATE
+					,    	A.EDATE
+					,    	B.*
+					,   	(SELECT SUM(X.ELEMENT_MON)
+							   FROM TCPN404 X
+					    	  INNER JOIN TCPN403 X1 ON X1.ENTER_CD = X.ENTER_CD AND X1.SABUN = X.SABUN AND X1.SDATE = X.SDATE
+							  INNER JOIN TCPN071 Z  ON Z.ENTER_CD  = X.ENTER_CD
+							  INNER JOIN TCPN072 Z1 ON Z1.ENTER_CD = Z.ENTER_CD AND Z1.ELEMENT_SET_CD = Z.ELEMENT_SET_CD AND Z1.ELEMENT_CD = X.ELEMENT_CD
+					    	  INNER JOIN TCPN011 Y  ON Y.ENTER_CD  = X.ENTER_CD AND Y.ELEMENT_CD 	  = X.ELEMENT_CD     AND X.SDATE BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231')
+					    	       WHERE X.ENTER_CD 			   = A.ENTER_CD
+					    	         AND Z.ELEMENT_SET_CD 	       = F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD, 'ELE_SET_YEAR_MON', A.SDATE)
+					    	         AND X.SABUN 			       = A.SABUN
+								     AND A.SDATE BETWEEN X1.SDATE AND NVL(X1.EDATE, '99991231'))	AS ELETOT_YEAR_MON
+					,   	(SELECT SUM(X.ELEMENT_MON)
+					    	   FROM TCPN404 X
+					    	  INNER JOIN TCPN403 X1 ON X1.ENTER_CD = X.ENTER_CD AND X1.SABUN = X.SABUN AND X1.SDATE = X.SDATE
+							  INNER JOIN TCPN071 Z  ON Z.ENTER_CD  = X.ENTER_CD
+							  INNER JOIN TCPN072 Z1 ON Z1.ENTER_CD = Z.ENTER_CD AND Z1.ELEMENT_SET_CD = Z.ELEMENT_SET_CD AND Z1.ELEMENT_CD = X.ELEMENT_CD
+					    	  INNER JOIN TCPN011 Y  ON Y.ENTER_CD  = X.ENTER_CD AND Y.ELEMENT_CD 	  = X.ELEMENT_CD     AND X.SDATE BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231')
+					    	       WHERE X.ENTER_CD 	  = A.ENTER_CD
+					    	         AND Z.ELEMENT_SET_CD = F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD, 'ELE_SET_MONTH_MON', A.SDATE)
+					    	         AND X.SABUN 		  = A.SABUN
+					    	         AND A.SDATE BETWEEN X1.SDATE AND NVL(X1.EDATE,'99991231'))	 	AS ELETOT_MONTH_MON
+					, 		A.BIGO
+					FROM	TCPN403 A
+					,		(
+								SELECT	*
+								  FROM	(
+											SELECT ENTER_CD, SABUN, SDATE, ELEMENT_CD, ELEMENT_MON
+											  FROM TCPN404
+										     WHERE ENTER_CD = #{ssnEnterCd}
+										)
+								PIVOT	(
+											SUM(ELEMENT_MON) FOR ELEMENT_CD IN
+																					]]>
+										
+							<foreach collection="elementCd" item="item" index="index" open="(" close=")" separator=",">
+									'${item}' AS ${elementAlias[index]}
+							</foreach>
+												<![CDATA[
+										)
+							)	B
+					WHERE	A.ENTER_CD	=	B.ENTER_CD
+					AND		A.SABUN		=	B.SABUN
+					AND		A.SDATE		=	B.SDATE
+					AND		A.ENTER_CD	=	#{ssnEnterCd}
+					AND		A.SABUN		=   #{sabun}
+			   ORDER BY		A.SDATE DESC
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrExceptionTermList">
+			
+				<![CDATA[
+					SELECT ENTER_CD
+						 , SABUN
+						 , EX_WKP_SYMD
+						 , EX_WKP_EYMD
+						 , EX_WKP_DAY
+						 , EX_WKP_MTH
+						 , NOTE
+						 , BIGO
+					  FROM TCPN723
+					 WHERE ENTER_CD	= #{ssnEnterCd}
+					   AND SABUN	= #{sabun}
+					ORDER BY EX_WKP_SYMD DESC
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrInterimPayList">
+			
+				<![CDATA[
+					SELECT A.SABUN
+					    , TO_CHAR(TO_DATE(A.SEP_SYMD,'YYYYMMDD'),'YYYY-MM-DD')
+					       ||' ~ '||TO_CHAR(TO_DATE(A.SEP_EYMD,'YYYYMMDD'),'YYYY-MM-DD') SEP_YMD_TERM
+					    , TO_DATE(A.SEP_EYMD,'YYYYMMDD') - TO_DATE(A.SEP_SYMD,'YYYYMMDD')+1 AS WORK_MM
+					    , (SELECT SUM(TO_DATE(EX_WKP_EYMD,'YYYYMMDD') - TO_DATE(EX_WKP_SYMD,'YYYYMMDD'))
+					       FROM TCPN763
+					       WHERE ENTER_CD = A.ENTER_CD
+					         AND PAY_ACTION_CD = A.PAY_ACTION_CD
+					         AND SABUN = A.SABUN) AS EX_WORK_MM
+					    , NVL(A.TWKP_D_CNT,TO_DATE(A.SEP_EYMD,'YYYYMMDD') - TO_DATE(A.SEP_SYMD,'YYYYMMDD')+1) AS REAL_WORK_MM
+						 , A.AVG_MON
+						 , A.TOT_EARNING_MON
+						 , A.R_ITAX_MON
+						 , A.R_RTAX_MON
+						 , A.ATTATCH_MON
+						 , A.TOT_EARNING_MON - NVL(A.R_ITAX_MON,0) - NVL(A.R_RTAX_MON,0) - NVL(A.ATTATCH_MON,0) AS PAYMENT_MON
+						 , B.BIGO
+					  FROM TCPN771 A
+						 , TCPN763 B
+						 , TCPN981 C
+					 WHERE A.ENTER_CD		= B.ENTER_CD(+)
+					   AND A.SABUN			= B.SABUN(+)
+					   AND A.PAY_ACTION_CD	= B.PAY_ACTION_CD(+)
+					   AND A.ENTER_CD		= C.ENTER_CD
+					   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.SABUN			= #{sabun}
+					   AND NVL(C.CLOSE_YN,'N') = 'Y'
+					   AND A.PAY_CD IN ('S2')
+					ORDER BY A.SEP_SYMD DESC, A.SEP_EYMD
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrBondStateList">
+			
+				<![CDATA[
+					SELECT SABUN
+						 , ATTATCH_NO
+						 , ATTATCH_SYMD
+						 , DEBT_CONTENT
+						 , BONDER
+						 , ATTACH_MON
+						 , ATTATCH_STATUS
+					  FROM TCPN161 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					ORDER BY A.ATTATCH_NO DESC
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrDeductionStateList">
+			
+				<![CDATA[
+					SELECT A.SABUN
+						 , A.PAY_ACTION_CD
+						 , B.PAYMENT_YMD
+						 , B.PAY_CD
+						 , C.PAYMENT_MON
+						 , C.ITAX_MON
+						 , C.RTAX_MON
+						 , C.NP_EE_MON
+						 , C.HI_EE_MON
+						 , C.HI_EE_MON2
+						 , C.EI_EE_MON
+						 , A.MON
+					  FROM TCPN162 A
+						 , TCPN201 B
+						 , TCPN303 C
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.PAY_ACTION_CD	= B.PAY_ACTION_CD
+					   AND A.ENTER_CD		= C.ENTER_CD
+					   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+					   AND A.SABUN			= C.SABUN
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.SABUN			= #{sabun}
+					ORDER BY B.PAYMENT_YMD DESC, B.PAY_CD
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrPayStatusList">
+			
+				<![CDATA[
+					SELECT '국민연금' AS GUBUN
+						 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+						 , TRIM(TO_CHAR(NVL(A.REWARD_TOT_MON,0),'999,999,999,990')) AS REWARD_TOT_MON
+						 , F_BEN_INSURENCE_RATE(A.ENTER_CD,'10',A.SDATE) AS RATE
+						 , TRIM(TO_CHAR(NVL(F_BEN_NP_SELF_MON(A.ENTER_CD,A.SDATE,A.REWARD_TOT_MON),0),'999,999,999,990')) AS SELF_MON
+					  FROM TBEN103 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					   AND A.SDATE		= (SELECT MAX(SDATE)
+											 FROM TBEN103
+											WHERE ENTER_CD = A.ENTER_CD
+											  AND SABUN = A.SABUN)
+					UNION ALL
+					SELECT '건강보험' AS GUBUN
+						 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+						 , TRIM(TO_CHAR(NVL(A.REWARD_TOT_MON,0),'999,999,999,990')) AS REWARD_TOT_MON
+						 , F_BEN_INSURENCE_RATE(A.ENTER_CD,'15',A.SDATE) AS RATE
+						 , TRIM(TO_CHAR(NVL(F_BEN_HI_SELF_MON(A.ENTER_CD,A.SDATE,A.REWARD_TOT_MON),0),'999,999,999,990')) AS SELF_MON
+					  FROM TBEN203 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					   AND A.SDATE		= (SELECT MAX(SDATE)
+											 FROM TBEN203
+											WHERE ENTER_CD = A.ENTER_CD
+											  AND SABUN = A.SABUN)
+					UNION ALL
+					SELECT '요양보험료' AS GUBUN
+						 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+						 , TRIM(TO_CHAR(NVL(A.REWARD_TOT_MON,0),'999,999,999,990')) AS REWARD_TOT_MON
+						 , F_BEN_INSURENCE_RATE(A.ENTER_CD,'15-1',A.SDATE) AS RATE
+						 , TRIM(TO_CHAR(NVL(F_BEN_HI_LONGTERMCARE_MON(A.ENTER_CD,A.SDATE,F_BEN_HI_SELF_MON(A.ENTER_CD,A.SDATE,A.REWARD_TOT_MON)),0),'999,999,999,990')) AS SELF_MON
+					  FROM TBEN203 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					   AND A.SDATE		= (SELECT MAX(SDATE)
+											 FROM TBEN203
+											WHERE ENTER_CD = A.ENTER_CD
+											  AND SABUN = A.SABUN)
+					UNION ALL
+					SELECT '고용보험료' AS GUBUN
+						 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B10150',A.SOC_STATE_CD, #{ssnLocaleCd}) SOC_STATE_NM
+						 , NULL AS REWARD_TOT_MON
+						 , NULL AS RATE
+						 , NULL AS SELF_MON
+					  FROM TBEN303 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					   AND A.SDATE		= (SELECT MAX(SDATE)
+											 FROM TBEN303
+											WHERE ENTER_CD = A.ENTER_CD
+											  AND SABUN = A.SABUN)
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrPremiumCalcList">
+			
+				<![CDATA[
+					SELECT PAY_YEAR
+					      ,PAYMENT_YMD
+					      ,TOT_EARNING_MON
+					      ,MON
+					      ,HI_MON
+					      ,WORK_CNT
+					      ,MON1 * WORK_CNT AS MON1
+					      ,MON2 * WORK_CNT AS MON2
+					      ,((MON1 * WORK_CNT) + (MON2 * WORK_CNT)) AS MON_TOT
+					      ,MON3 AS MON3
+					      ,MON4 AS MON4
+					      ,(MON3 + MON4) AS REAL_TOT
+					      ,(MON1 * WORK_CNT) - MON3 AS MON5
+					      ,(MON2 * WORK_CNT) - MON4 AS MON6
+					      ,(((MON1 * WORK_CNT) - MON3) + ((MON2 * WORK_CNT) - MON4)) AS MON7
+					FROM (
+					SELECT (SUBSTR(A.PAY_YM,1,4) - 1) AS PAY_YEAR
+											 , A.PAYMENT_YMD
+											 , NVL((SELECT CURR_TOT_MON
+					                            FROM TCPN841
+					                            WHERE ENTER_CD = B.ENTER_CD
+					                              AND WORK_YY = SUBSTR(A.PAY_YM,1,4)- 1
+					                              AND SABUN = B.SABUN
+					                              AND ADJUST_TYPE = '1'), (SELECT SUM(TOT_EARNING_MON)
+					                              						   FROM TCPN303 X , TCPN201 Y
+					                              						   WHERE X.ENTER_CD = Y.ENTER_CD
+					                              						     AND X.PAY_ACTION_CD = Y.PAY_ACTION_CD
+					                              						     AND X.ENTER_CD = B.ENTER_CD
+					                              						     AND SUBSTR(Y.PAY_YM,1,4) = SUBSTR(A.PAY_YM,1,4) - 1
+					                              						     AND X.SABUN = B.SABUN
+					                              						     AND Y.PAY_CD = '01'
+					                              						   ))
+					                               AS TOT_EARNING_MON
+					                         , (SELECT REWARD_TOT_MON
+					                            FROM TBEN203
+					                            WHERE ENTER_CD = B.ENTER_CD
+					                              AND SABUN = B.SABUN
+					                              AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+					                           ) AS MON
+											 , (SELECT NVL(MON4,0) + NVL(MON5,0)
+					                            FROM TBEN203
+					                            WHERE ENTER_CD = B.ENTER_CD
+					                              AND SABUN = B.SABUN
+					                              AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+					                           ) AS HI_MON
+											 , F_CPN_SEP_WKP_MTH( CASE WHEN SUBSTR(A.PAY_YM,1,4)- 1||'0101' >= EMP_YMD THEN SUBSTR(A.PAY_YM,1,4)- 1||'0101'
+					                                                   ELSE EMP_YMD
+					                                              END,SUBSTR(A.PAY_YM,1,4)- 1||'1231') AS WORK_CNT
+					                         , (SELECT F_BEN_HI_SELF_MON(ENTER_CD,SUBSTR(A.PAY_YM,1,4)- 1||'1231',REWARD_TOT_MON)
+					                            FROM TBEN203
+					                            WHERE ENTER_CD = B.ENTER_CD
+					                              AND SABUN = B.SABUN
+					                              AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+					                           ) AS MON1
+											 , (SELECT F_BEN_HI_LONGTERMCARE_MON(ENTER_CD,SUBSTR(A.PAY_YM,1,4)- 1||'1231',F_BEN_HI_SELF_MON(ENTER_CD,SUBSTR(A.PAY_YM,1,4)- 1||'1231',REWARD_TOT_MON))
+					                            FROM TBEN203
+					                            WHERE ENTER_CD = B.ENTER_CD
+					                              AND SABUN = B.SABUN
+					                              AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231')
+					                           ) AS MON2
+											 , (SELECT SUM(RESULT_MON)
+					                           FROM TCPN205 X, TCPN201 Y
+					                           WHERE X.ENTER_CD = Y.ENTER_CD
+					                             AND X.PAY_ACTION_CD = Y.PAY_ACTION_CD
+					                             AND X.ENTER_CD = B.ENTER_CD
+					                             AND X.SABUN = B.SABUN
+					                             AND SUBSTR(Y.PAY_YM,1,4) = SUBSTR(A.PAY_YM,1,4) - 1
+					                             AND Y.PAY_CD = '01'
+					                             AND X.ELEMENT_CD = '1020') AS MON3
+											 , (SELECT SUM(RESULT_MON)
+					                           FROM TCPN205 X, TCPN201 Y
+					                           WHERE X.ENTER_CD = Y.ENTER_CD
+					                             AND X.PAY_ACTION_CD = Y.PAY_ACTION_CD
+					                             AND X.ENTER_CD = B.ENTER_CD
+					                             AND X.SABUN = B.SABUN
+					                             AND SUBSTR(Y.PAY_YM,1,4) = SUBSTR(A.PAY_YM,1,4) - 1
+					                             AND Y.PAY_CD = '01'
+					                             AND X.ELEMENT_CD = '1010') AS MON4
+										  FROM TCPN201 A
+											 , TCPN303 B
+										 WHERE A.ENTER_CD		= B.ENTER_CD
+										   AND A.PAY_ACTION_CD	= B.PAY_ACTION_CD
+										   AND B.ENTER_CD		= #{ssnEnterCd}
+										   AND B.SABUN			= #{sabun}
+					                       AND SUBSTR(A.PAY_YM,5,2) = '04'
+					                       AND SUBSTR(A.PAY_YM,1,4) > '2012'  --2012년도 이후부터 보여줌
+										 ORDER BY A.PAYMENT_YMD DESC
+					)
+					ORDER BY PAYMENT_YMD  DESC
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrLoanStateList">
+			
+				<![CDATA[
+					SELECT A.APPL_SEQ
+						 , B.APPL_YMD
+						 , A.LOAN_YMD
+						 , A.LOAN_CD
+						 , (SELECT LOAN_NM
+					        FROM TBEN621
+					        WHERE ENTER_CD = A.ENTER_CD
+					          AND LOAN_CD = A.LOAN_CD
+					          AND A.LOAN_YMD BETWEEN SDATE AND NVL(EDATE,'99991231') ) AS LOAN_NM
+						 , A.LOAN_MON
+						 , A.LOAN_REMAIN
+						 , 0 AS CNT
+						 , A.MTH_MON
+						 , A.EXPYN
+						 , A.EXPCODE
+					  FROM TBEN623 A, THRI103 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN = #{sabun}
+					ORDER BY A.LOAN_YMD DESC
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrRepayList">
+			
+				<![CDATA[
+					SELECT C.REPAY_YMD
+						 , C.REPAY_REP_CNT
+						 , C.REPAY_MTH_MON
+						 , ((SELECT LOAN_MON
+                            FROM TBEN623
+                            WHERE ENTER_CD = C.ENTER_CD
+                              AND SABUN = C.SABUN
+                              AND APPL_SEQ = C.APPL_SEQ) -
+                            NVL((SELECT SUM(REPAY_MTH_MON)
+                             FROM TBEN625
+                             WHERE ENTER_CD = C.ENTER_CD
+                               AND SABUN = C.SABUN
+                               AND APPL_SEQ = C.APPL_SEQ
+                               AND REPAY_YMD <= C.REPAY_YMD),0)) AS REPAY_LOAN_REMAIN
+						 , C.REPAY_PER_RATE
+						 , C.REPAY_PER_MON
+						 , C.REPAY_STD_RATE
+						 , C.REPAY_STD_MON
+						 , C.REPAY_GUBUN
+					  FROM TBEN625 C
+					 WHERE C.ENTER_CD	= #{ssnEnterCd}
+					   AND C.SABUN		= #{sabun}
+					   AND C.APPL_SEQ	=TO_NUMBER(#{applSeq})
+					ORDER BY C.REPAY_YMD DESC, C.REPAY_SEQ DESC
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrSalaryPeak">
+			
+				<![CDATA[
+					SELECT A.SABUN
+							 , A.YEAR 
+							 , A.RATE 
+							 , A.S_YM 
+							 , A.E_YM 
+							 , A.BIGO 
+					  FROM TCPN126 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.SABUN		= #{sabun}
+					ORDER BY A.YEAR
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayMasterMgrSalaryPeakCalc">
+			
+				<![CDATA[
+					SELECT * FROM 
+						(SELECT B.YEAR
+					          ,B.RATE
+					          ,TO_CHAR(ADD_MONTHS(TO_DATE(A.S_YM, 'YYYYMM'), (B.YEAR-A.YEAR)*12), 'YYYYMM') AS S_YM
+					          ,TO_CHAR(ADD_MONTHS(TO_DATE(A.S_YM, 'YYYYMM'), ((B.YEAR-A.YEAR)*12)+11), 'YYYYMM') AS E_YM          
+					          ,'자동생성' AS BIGO
+						  FROM TCPN126 A, TCPN006 B
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						    AND A.SABUN = #{sabun}
+						    AND A.YEAR = #{searchYear}
+						    AND B.ENTER_CD = A.ENTER_CD
+						    AND A.YEAR < B.YEAR
+						UNION ALL
+						SELECT   A.YEAR 
+								 , A.RATE 
+								 , A.S_YM 
+								 , A.E_YM 
+								 , A.BIGO 
+						  FROM TCPN126 A
+						 WHERE A.ENTER_CD	= #{ssnEnterCd}
+						   AND A.SABUN		= #{sabun}
+						   AND A.YEAR 		<= #{searchYear})
+					ORDER BY YEAR DESC
+				]]>
+			
+		</select>
+		
+		<update parameterType="map" id="savePerPayMasterMgrTaxInfo">
+					MERGE INTO TCPN101 T
+					USING	(
+							SELECT A.SABUN
+								 , A.SDATE
+								 , A.EDATE
+								 , A.FOREIGN_YN
+								 , A.ABROAD_YN
+								 , A.SPOUSE_YN
+								 , A.FAMILY_CNT_1
+								 , A.FAMILY_CNT_2
+								 , A.ADD_CHILD_CNT
+							  FROM (
+									SELECT NULL	AS SABUN
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+										 , NULL	AS FOREIGN_YN
+										 , NULL	AS ABROAD_YN
+										 , NULL	AS SPOUSE_YN
+										 , NULL	AS FAMILY_CNT_1
+										 , NULL	AS FAMILY_CNT_2
+										 , NULL	AS ADD_CHILD_CNT
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows">
+
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})					AS SABUN
+										 , TRIM(#{rm.sdate})					AS SDATE
+										 , TRIM(#{rm.edate})					AS EDATE
+										 , TRIM(#{rm.foreignYn})				AS FOREIGN_YN
+										 , TRIM(#{rm.abroadYn})					AS ABROAD_YN
+										 , TRIM(#{rm.spouseYn})					AS SPOUSE_YN
+										 , TO_NUMBER(TRIM(#{rm.familyCnt1}))	AS FAMILY_CNT_1
+										 , TO_NUMBER(TRIM(#{rm.familyCnt2}))	AS FAMILY_CNT_2
+										 , TO_NUMBER(TRIM(#{rm.addChildCnt}))	AS ADD_CHILD_CNT
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.SABUN IS NOT NULL
+							  AND A.SDATE IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD	= #{ssnEnterCd}
+						AND	T.SABUN		= S.SABUN
+						AND	T.SDATE		= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE			= S.EDATE
+								 , T.FOREIGN_YN		= S.FOREIGN_YN
+								 , T.ABROAD_YN		= S.ABROAD_YN
+								 , T.SPOUSE_YN		= S.SPOUSE_YN
+								 , T.FAMILY_CNT_1	= S.FAMILY_CNT_1
+								 , T.FAMILY_CNT_2	= S.FAMILY_CNT_2
+								 , T.ADD_CHILD_CNT	= S.ADD_CHILD_CNT
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.SABUN
+						  , T.SDATE
+						  , T.EDATE
+						  , T.FOREIGN_YN
+						  , T.ABROAD_YN
+						  , T.SPOUSE_YN
+						  , T.FAMILY_CNT_1
+						  , T.FAMILY_CNT_2
+						  , T.ADD_CHILD_CNT
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.SABUN
+						  , S.SDATE
+						  , S.EDATE
+						  , S.FOREIGN_YN
+						  , S.ABROAD_YN
+						  , S.SPOUSE_YN
+						  , S.FAMILY_CNT_1
+						  , S.FAMILY_CNT_2
+						  , S.ADD_CHILD_CNT
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+		</update>
+		
+		<update parameterType="map" id="savePerPayMasterMgrAccountInfo">
+					MERGE INTO TCPN180 T
+					USING	(
+							SELECT A.SABUN
+								 , A.ACCOUNT_TYPE
+								 , A.SDATE
+								 , A.EDATE
+								 , A.BANK_CD
+								 , A.ACCOUNT_NO
+								 , A.ACC_NAME
+								 , A.ACC_RES_NO
+								 , A.ACC_STATUS_CD
+							  FROM (
+									SELECT NULL	AS SABUN
+										 , NULL	AS ACCOUNT_TYPE
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+										 , NULL	AS BANK_CD
+										 , NULL	AS ACCOUNT_NO
+										 , NULL	AS ACC_NAME
+										 , NULL	AS ACC_RES_NO
+										 , NULL	AS ACC_STATUS_CD
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows">
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})			AS SABUN
+										 , TRIM(#{rm.accountType})		AS ACCOUNT_TYPE
+										 , TRIM(#{rm.sdate})			AS SDATE
+										 , TRIM(#{rm.edate})			AS EDATE
+										 , TRIM(#{rm.bankCd})			AS BANK_CD
+										 , CRYPTIT.ENCRYPT(TRIM(#{rm.accountNo}), #{ssnEnterCd}) AS ACCOUNT_NO
+										 , CASE WHEN TRIM(#{rm.accName}) IS NULL OR TRIM(#{rm.accName}) = '' THEN
+													 (SELECT F_COM_GET_NAMES(ENTER_CD,SABUN) NAME FROM THRM100 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun}))
+												ELSE TRIM(#{rm.accName}) END ACC_NAME
+										 , TRIM(#{rm.accResNo})			AS ACC_RES_NO
+										 , TRIM(#{rm.accStatusCd})		AS ACC_STATUS_CD
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.SABUN			IS NOT NULL
+							  AND A.ACCOUNT_TYPE	IS NOT NULL
+							  AND A.SDATE			IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.SABUN			= S.SABUN
+						AND	T.ACCOUNT_TYPE	= S.ACCOUNT_TYPE
+						AND	T.SDATE			= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE			= S.EDATE
+								 , T.BANK_CD		= S.BANK_CD
+								 , T.ACCOUNT_NO		= S.ACCOUNT_NO
+								 , T.ACC_NAME		= S.ACC_NAME
+								 , T.ACC_RES_NO		= S.ACC_RES_NO
+								 , T.ACC_STATUS_CD	= S.ACC_STATUS_CD
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.SABUN
+						  , T.ACCOUNT_TYPE
+						  , T.SDATE
+						  , T.EDATE
+						  , T.BANK_CD
+						  , T.ACCOUNT_NO
+						  , T.ACC_NAME
+						  , T.ACC_RES_NO
+						  , T.ACC_STATUS_CD
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.SABUN
+						  , S.ACCOUNT_TYPE
+						  , S.SDATE
+						  , S.EDATE
+						  , S.BANK_CD
+						  , S.ACCOUNT_NO
+						  , S.ACC_NAME
+						  , S.ACC_RES_NO
+						  , S.ACC_STATUS_CD
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+		</update>
+		
+		<update parameterType="map" id="savePerPayMasterMgrPayDeduction">
+					MERGE INTO TCPN292 T
+					USING	(
+							SELECT A.SABUN
+								 , A.ELEMENT_CD
+								 , A.SDATE
+								 , A.EDATE
+								 , A.BUSINESS_PLACE_CD
+								 , A.TIME_UNIT
+								 , A.BASIC_MON
+								 , A.CURRENCY_CD
+								 , A.MONTH_MON
+								 , A.NOTE
+								 , A.PAYBAND_CD
+								 , A.PAYBAND_YEAR
+							  FROM (
+									SELECT NULL	AS SABUN
+										 , NULL	AS ELEMENT_CD
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+										 , NULL	AS BUSINESS_PLACE_CD
+										 , NULL	AS TIME_UNIT
+										 , NULL	AS BASIC_MON
+										 , NULL	AS CURRENCY_CD
+										 , NULL	AS MONTH_MON
+										 , NULL	AS NOTE
+										 , NULL	AS PAYBAND_CD
+										 , NULL	AS PAYBAND_YEAR
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows">
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})			AS SABUN
+										 , TRIM(#{rm.elementCd})		AS ELEMENT_CD
+										 , TRIM(#{rm.sdate})			AS SDATE
+										 , TRIM(#{rm.edate})			AS EDATE
+										 , TRIM(#{rm.businessPlaceCd})	AS BUSINESS_PLACE_CD
+										 , 'M'			                AS TIME_UNIT
+										 , TRIM(#{rm.basicMon})			AS BASIC_MON
+										 , TRIM(#{rm.currencyCd})		AS CURRENCY_CD
+										 , TRIM(#{rm.monthMon})			AS MONTH_MON
+										 , TRIM(#{rm.note})				AS NOTE
+										 , TRIM(#{rm.paybandCd})		AS PAYBAND_CD
+										 , TRIM(#{rm.paybandYear})		AS PAYBAND_YEAR
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.SABUN		IS NOT NULL
+							  AND A.ELEMENT_CD	IS NOT NULL
+							  AND A.SDATE		IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.SABUN			= S.SABUN
+						AND	T.ELEMENT_CD	= S.ELEMENT_CD
+						AND	T.SDATE			= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE				= S.EDATE
+								 , T.BUSINESS_PLACE_CD	= S.BUSINESS_PLACE_CD
+								 , T.TIME_UNIT			= S.TIME_UNIT
+								 , T.BASIC_MON			= S.BASIC_MON
+								 , T.CURRENCY_CD		= S.CURRENCY_CD
+								 , T.MONTH_MON			= S.MONTH_MON
+								 , T.NOTE				= S.NOTE
+								 , T.PAYBAND_CD			= S.PAYBAND_CD
+								 , T.PAYBAND_YEAR		= S.PAYBAND_YEAR
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.SABUN
+						  , T.ELEMENT_CD
+						  , T.SDATE
+						  , T.EDATE
+						  , T.BUSINESS_PLACE_CD
+						  , T.TIME_UNIT
+						  , T.BASIC_MON
+						  , T.CURRENCY_CD
+						  , T.MONTH_MON
+						  , T.NOTE
+						  , T.PAYBAND_CD
+						  , T.PAYBAND_YEAR
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.SABUN
+						  , S.ELEMENT_CD
+						  , S.SDATE
+						  , S.EDATE
+						  , S.BUSINESS_PLACE_CD
+						  , S.TIME_UNIT
+						  , S.BASIC_MON
+						  , S.CURRENCY_CD
+						  , S.MONTH_MON
+						  , S.NOTE
+						  , S.PAYBAND_CD
+						  , S.PAYBAND_YEAR
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+		</update>
+		
+		<update parameterType="map" id="savePerPayMasterMgrSalaryPeak">
+					MERGE INTO TCPN126 T
+					USING	(
+							SELECT A.SABUN
+								 , A.YEAR 
+								 , A.RATE 
+								 , A.S_YM 
+								 , A.E_YM 
+								 , A.BIGO 
+							  FROM (
+									SELECT NULL	AS SABUN
+										 , NULL	AS YEAR
+										 , NULL	AS RATE
+										 , NULL	AS S_YM
+										 , NULL	AS E_YM
+										 , NULL	AS BIGO
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows">
+									UNION ALL
+									SELECT TRIM(#{sabun})	AS SABUN
+										 , TRIM(#{rm.year})		AS YEAR
+										 , TRIM(#{rm.rate})		AS RATE
+										 , TRIM(#{rm.sYm})		AS S_YM
+										 , TRIM(#{rm.eYm})		AS E_YM
+										 , TRIM(#{rm.bigo})		AS BIGO
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.SABUN		IS NOT NULL
+							  AND A.YEAR		IS NOT NULL
+							  AND A.S_YM		IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.SABUN			= S.SABUN
+						AND	T.YEAR			= S.YEAR
+						AND	T.S_YM			= S.S_YM
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.E_YM				= S.E_YM
+								 , T.RATE				= S.RATE
+								 , T.BIGO				= S.BIGO
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.SABUN
+						  , T.YEAR
+						  , T.RATE
+						  , T.S_YM
+						  , T.E_YM
+						  , T.BIGO
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.SABUN
+						  , S.YEAR
+						  , S.RATE
+						  , S.S_YM
+						  , S.E_YM
+						  , S.BIGO
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+		</update>
+		
+		<delete parameterType="map" id="deletePerPayMasterMgrTaxInfo">
+					DELETE FROM TCPN101
+					 WHERE (ENTER_CD, SABUN, SDATE) IN ( (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						, ( TRIM(#{ssnEnterCd}), TRIM(#{rm.sabun}), TRIM(#{rm.sdate}) )
+</foreach>
+							)
+			
+			
+		</delete>
+
+		<update parameterType="map" id="updatePerPayMasterMgrTaxInfoEdate">
+					UPDATE TCPN101 A
+					   SET EDATE = (SELECT TO_CHAR(TO_DATE(MIN(SDATE), 'YYYYMMDD')-1, 'YYYYMMDD')
+					                  FROM TCPN101
+					                 WHERE ENTER_CD = A.ENTER_CD
+					                   AND SABUN = A.SABUN
+					                   AND SDATE > A.SDATE
+					               )
+					  WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND A.SABUN = (SELECT DISTINCT A.SABUN
+					                     FROM (
+					                           SELECT NULL AS SABUN
+					                             FROM DUAL
+<foreach item="rm" collection="insertRows">
+					                           UNION ALL
+					                           SELECT TRIM(#{rm.sabun}) AS SABUN
+					                             FROM DUAL
+</foreach>
+<foreach item="rm" collection="deleteRows">
+					                           UNION ALL
+					                           SELECT TRIM(#{rm.sabun}) AS SABUN
+					                             FROM DUAL
+</foreach>
+					                          ) A
+					                    WHERE A.SABUN IS NOT NULL
+					                  )
+		</update>
+
+		<delete parameterType="map" id="deletePerPayMasterMgrAccountInfo">
+					DELETE FROM TCPN180
+					 WHERE ENTER_CD||'_'||SABUN||'_'||ACCOUNT_TYPE||'_'||BANK_CD||'_'||ACCOUNT_NO IN ( NULL
+<foreach item="rm" collection="deleteRows">
+						,
+							<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq ''
+								 and rm.accountType != null and rm.accountType neq '' and rm.bankCd != null and rm.bankCd neq ''
+								 and rm.accountNo != null and rm.accountNo neq ''">
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.accountType})||'_'||TRIM(#{rm.bankCd})||'_'||CRYPTIT.ENCRYPT(TRIM(#{rm.accountNo}), #{ssnEnterCd})
+							</if>
+</foreach>
+							)
+
+		</delete>
+		
+		<delete parameterType="map" id="deletePerPayMasterMgrPayDeduction">
+					DELETE FROM TCPN292
+					 WHERE ENTER_CD||'_'||SABUN||'_'||ELEMENT_CD||'_'||SDATE IN ( NULL
+<foreach item="rm" collection="deleteRows">
+						,
+							<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq ''
+								and rm.elementCd != null and rm.elementCd neq '' and rm.sdate != null and rm.sdate neq ''">
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.elementCd})||'_'||TRIM(#{rm.sdate})
+							</if>
+</foreach>
+							)
+		</delete>
+		
+		<delete parameterType="map" id="deletePerPayMasterMgrSalaryPeak">
+					DELETE FROM TCPN126	
+					 WHERE ENTER_CD||'_'||SABUN||'_'||YEAR||'_'||S_YM IN ( NULL
+<foreach item="rm" collection="deleteRows">
+						,
+							<if test="ssnEnterCd != null and ssnEnterCd neq '' and sabun != null and sabun neq ''
+									and rm.year != null and rm.year neq '' and rm.sYm != null and rm.sYm neq ''">
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{sabun})||'_'||TRIM(#{rm.year})||'_'||TRIM(#{rm.sYm})
+							</if>
+</foreach>
+							)
+		</delete>
+		
+		<select parameterType="map" resultType="cMap" id="getYearCombo">
+			
+				<![CDATA[
+					SELECT YEAR CODE_NM, RATE CODE
+					  FROM TCPN006 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					ORDER BY YEAR
+				]]>
+		</select>
+</mapper>

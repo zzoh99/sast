@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 압류관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.personalBasis.attachMgr">
+		<select parameterType="map" resultType="cMap" id="getAttachMgrList">
+
+
+					SELECT '0' AS DETAIL
+						 , B.ORG_NM
+						 , B.WORK_TYPE
+						 , B.JIKGUB_CD
+						 , B.JIKCHAK_CD
+						 , B.JIKWEE_CD
+						 , B.SABUN
+						 , B.NAME
+						 , B.MANAGE_CD
+						 , B.STATUS_CD
+						 , B.EMP_YMD
+						 , B.RES_NO
+						 , A.SABUN
+						 , A.ATTATCH_NO
+						 , A.ELEMENT_CD
+						 , F_CPN_GET_ELEMENT_NM(A.ENTER_CD, A.ELEMENT_CD, A. ATTATCH_SYMD ) AS ELEMENT_NM
+						 , A.ATTATCH_TYPE
+						 , A.BONDER
+						 , A.BOND_CONTENT
+						 , A.DEBT_CONTENT
+						 , A.RATE
+						 , A.ATTACH_MON
+						 , A.ATT_TOT_MON
+						 , NVL((SELECT SUM(NVL(RECEIPT_MON,0)) FROM TCPN163 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND ATTATCH_NO = A.ATTATCH_NO),0) AS RECEIPT_MON
+						 --, (NVL(A.ATTACH_MON,0) - NVL((SELECT SUM(NVL(MON,0)) FROM TCPN165 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND ATTATCH_NO = A.ATTATCH_NO),0)) AS REMAIN_AMT
+						 , NVL(A.ATTACH_MON,0) - NVL(A.ATT_TOT_MON, 0) AS REMAIN_AMT
+						 , A.ATTATCH_SYMD
+						 , A.INVALID_YMD
+						 , A.COURT_YMD
+						 , A.ATTATCH_STATUS
+						 , A.RELATION_EVENT
+						 , A.BOND_CHARGER
+						 , A.BOND_TEL_NO
+						 , A.BOND_HAND_NO
+						 , A.ATT_BANK_NM
+						 , CRYPTIT.DECRYPT(A.ATT_ACCOUNT_NO,#{ssnEnterCd}) AS ATT_ACCOUNT_NO
+						 , A.ATT_DEPOSITOR
+						 , A.DISCHARGE_MON
+						 , A.LIST
+						 , A.NOTE
+						 , NVL(A.LAW_APPLY_TYPE,'N') AS LAW_APPLY_TYPE
+					  FROM TCPN161 A
+						 , (
+							SELECT X.ENTER_CD
+								 , Y.ORG_CD
+								 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+								 , Y.WORK_TYPE
+								 , Y.JIKGUB_CD
+								 , Y.JIKCHAK_CD
+								 , Y.JIKWEE_CD
+								 , Y.MANAGE_CD
+								 , Y.STATUS_CD
+								 , X.SABUN
+								 , TRIM(X.NAME) AS NAME
+								 , X.EMP_YMD
+								 , X.GEMP_YMD
+								 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+								 , X.RET_YMD
+							  FROM THRM100 X
+								 , THRM151 Y
+							 WHERE X.ENTER_CD	= Y.ENTER_CD
+							   AND X.SABUN		= Y.SABUN
+							   AND X.ENTER_CD	= #{ssnEnterCd}
+							<if test='orgCd != null and !orgCd.equals("")'>
+							   AND Y.ORG_CD		= #{orgCd}
+							</if>
+							<if test='multiStatusCd != null and !multiStatusCd.equals("")'>
+							   AND Y.STATUS_CD	IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+							</if>
+							<if test='sabunName != null and !sabunName.equals("")'>
+							   AND X.SABUN||X.NAME LIKE '%'||trim(#{sabunName})||'%'
+							</if>
+							   AND Y.SDATE		= (	SELECT MAX(SDATE)
+													  FROM THRM151
+													 WHERE ENTER_CD	= Y.ENTER_CD
+													   AND SABUN	= Y.SABUN
+													   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+							) B
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.SABUN			= B.SABUN
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					<if test='fromAttatchSymd != null and !fromAttatchSymd.equals("")'>
+						<![CDATA[
+					   AND A.ATTATCH_SYMD	>= REPLACE(#{fromAttatchSymd},'-','')
+					   ]]>
+					</if>
+					<if test='toAttatchSymd != null and !toAttatchSymd.equals("")'>
+						<![CDATA[
+					   AND A.ATTATCH_SYMD	<= REPLACE(#{toAttatchSymd},'-','')
+					   ]]>
+					</if>
+					<if test='multiAttatchStatus != null and !multiAttatchStatus.equals("")'>
+					   AND A.ATTATCH_STATUS	IN
+		<foreach collection="multiAttatchStatus" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					<if test='orgNm != null and !orgNm.equals("")'>
+					   AND B.ORG_NM LIKE '%' || #{orgNm} || '%'
+					</if>
+					ORDER BY A.ATTATCH_SYMD,B.ORG_NM,B.WORK_TYPE,B.JIKGUB_CD,B.JIKCHAK_CD,B.JIKWEE_CD,B.NAME
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAttachMgrDepositInfoList">
+
+				<![CDATA[
+					SELECT SABUN
+						 , ATTATCH_NO
+						 , SEQ
+						 , DEPOSIT_AMT
+						 , DEPOSIT_YMD
+						 , DEPOSIT_ORG_NM
+						 , FEE
+					  FROM TCPN167
+					 WHERE ENTER_CD		= #{ssnEnterCd}
+					   AND SABUN		= #{sabun}
+					   AND ATTATCH_NO	= #{attatchNo}
+					ORDER BY SEQ DESC
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveAttachMgrDtl">
+
+
+					MERGE INTO TCPN161 T
+					USING	(
+							SELECT A.SABUN
+								 , A.ATTATCH_NO
+								 , A.ELEMENT_CD
+								 , A.ATTATCH_TYPE
+								 , A.BONDER
+								 , A.BOND_CONTENT
+								 , A.DEBT_CONTENT
+								 , A.ATTACH_MON
+								 , A.ATT_TOT_MON
+								 , A.ATTATCH_SYMD
+								 , A.INVALID_YMD
+								 , A.COURT_YMD
+								 , A.ATTATCH_STATUS
+								 , A.RELATION_EVENT
+								 , A.BOND_CHARGER
+								 , A.BOND_TEL_NO
+								 , A.BOND_HAND_NO
+								 , A.ATT_BANK_NM
+								 , A.ATT_ACCOUNT_NO
+								 , A.ATT_DEPOSITOR
+								 , A.NOTE
+							  FROM (
+									SELECT TRIM(#{sabun})									AS SABUN
+										 , TRIM(#{attatchNo})								AS ATTATCH_NO
+										 , TRIM(#{elementCd})								AS ELEMENT_CD
+										 , TRIM(#{attatchType})							AS ATTATCH_TYPE
+										 , TRIM(#{bonder})								AS BONDER
+										 , TRIM(#{bondContent})							AS BOND_CONTENT
+										 , TRIM(#{debtContent})							AS DEBT_CONTENT
+										 , TO_NUMBER(TRIM(REPLACE(#{attachMon},',','')))	AS ATTACH_MON
+										 , TO_NUMBER(TRIM(REPLACE(#{attTotMon},',','')))	AS ATT_TOT_MON
+										 , TRIM(REPLACE(#{attatchSymd},'-',''))			AS ATTATCH_SYMD
+										 , TRIM(REPLACE(#{invalidYmd},'-',''))			AS INVALID_YMD
+										 , TRIM(REPLACE(#{courtYmd},'-',''))				AS COURT_YMD
+										 , TRIM(#{attatchStatus})							AS ATTATCH_STATUS
+										 , TRIM(#{relationEvent})							AS RELATION_EVENT
+										 , TRIM(#{bondCharger})							AS BOND_CHARGER
+										 , TRIM(#{bondTelNo})								AS BOND_TEL_NO
+										 , TRIM(#{bondHandNo})							AS BOND_HAND_NO
+										 , TRIM(#{attBankNm})								AS ATT_BANK_NM
+										 , CRYPTIT.ENCRYPT(TRIM(#{attAccountNo}), #{ssnEnterCd})	AS ATT_ACCOUNT_NO
+										 , TRIM(#{attDepositor})							AS ATT_DEPOSITOR
+										 , TRIM(#{note})									AS NOTE
+									  FROM DUAL
+									) A
+							 WHERE A.SABUN		IS NOT NULL
+							   AND A.ATTATCH_NO	IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.SABUN			= S.SABUN
+						AND	T.ATTATCH_NO	= S.ATTATCH_NO
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.ELEMENT_CD			= S.ELEMENT_CD
+								 , T.ATTATCH_TYPE		= S.ATTATCH_TYPE
+								 , T.BONDER				= S.BONDER
+								 , T.BOND_CONTENT		= S.BOND_CONTENT
+								 , T.DEBT_CONTENT		= S.DEBT_CONTENT
+								 , T.ATTACH_MON			= S.ATTACH_MON
+								 , T.ATT_TOT_MON		= S.ATT_TOT_MON
+								 , T.ATTATCH_SYMD		= S.ATTATCH_SYMD
+								 , T.INVALID_YMD		= S.INVALID_YMD
+								 , T.COURT_YMD			= S.COURT_YMD
+								 , T.ATTATCH_STATUS		= S.ATTATCH_STATUS
+								 , T.RELATION_EVENT		= S.RELATION_EVENT
+								 , T.BOND_CHARGER		= S.BOND_CHARGER
+								 , T.BOND_TEL_NO		= S.BOND_TEL_NO
+								 , T.BOND_HAND_NO		= S.BOND_HAND_NO
+								 , T.ATT_BANK_NM		= S.ATT_BANK_NM
+								 , T.ATT_ACCOUNT_NO		= S.ATT_ACCOUNT_NO
+								 , T.ATT_DEPOSITOR		= S.ATT_DEPOSITOR
+								 , T.NOTE				= S.NOTE
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.ATTATCH_NO
+							, T.ELEMENT_CD
+							, T.ATTATCH_TYPE
+							, T.BONDER
+							, T.BOND_CONTENT
+							, T.DEBT_CONTENT
+							, T.ATTACH_MON
+							, T.ATT_TOT_MON
+							, T.ATTATCH_SYMD
+							, T.INVALID_YMD
+							, T.COURT_YMD
+							, T.ATTATCH_STATUS
+							, T.RELATION_EVENT
+							, T.BOND_CHARGER
+							, T.BOND_TEL_NO
+							, T.BOND_HAND_NO
+							, T.ATT_BANK_NM
+							, T.ATT_ACCOUNT_NO
+							, T.ATT_DEPOSITOR
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.SABUN
+							, S.ATTATCH_NO
+							, F_CPN_GET_GLOVAL_VALUE(#{ssnEnterCd},'ATTATCH_ELE_CD',TO_CHAR(SYSDATE,'YYYYMMDD'))
+							, S.ATTATCH_TYPE
+							, S.BONDER
+							, S.BOND_CONTENT
+							, S.DEBT_CONTENT
+							, S.ATTACH_MON
+							, S.ATT_TOT_MON
+							, S.ATTATCH_SYMD
+							, S.INVALID_YMD
+							, S.COURT_YMD
+							, S.ATTATCH_STATUS
+							, S.RELATION_EVENT
+							, S.BOND_CHARGER
+							, S.BOND_TEL_NO
+							, S.BOND_HAND_NO
+							, S.ATT_BANK_NM
+							, S.ATT_ACCOUNT_NO
+							, S.ATT_DEPOSITOR
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" id="saveAttachMgrDepositInfo">
+
+
+					MERGE INTO TCPN167 T
+					USING	(
+							SELECT A.SABUN
+								 , A.ATTATCH_NO
+								 , A.SEQ
+								 , A.DEPOSIT_AMT
+								 , A.DEPOSIT_YMD
+								 , A.DEPOSIT_ORG_NM
+								 , A.FEE
+							  FROM (
+									SELECT NULL		AS SABUN
+										 , NULL		AS ATTATCH_NO
+										 , NULL		AS SEQ
+										 , NULL		AS DEPOSIT_AMT
+										 , NULL		AS DEPOSIT_YMD
+										 , NULL		AS DEPOSIT_ORG_NM
+										 , NULL		AS FEE
+									  FROM DUAL
+<bind name="cnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})					AS SABUN
+										 , TRIM(#{rm.attatchNo})				AS ATTATCH_NO
+										 , CASE WHEN TRIM(#{rm.seq}) IS NULL OR TRIM(#{rm.seq}) = '0' THEN
+													(SELECT (NVL(MAX(SEQ),0) + #{cnt}) FROM TCPN167 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun}) AND ATTATCH_NO = TRIM(#{rm.attatchNo}))
+												ELSE TO_NUMBER(#{rm.seq}) END SEQ
+										 , TO_NUMBER(TRIM(#{rm.depositAmt}))	AS DEPOSIT_AMT
+										 , TRIM(#{rm.depositYmd})				AS DEPOSIT_YMD
+										 , TRIM(#{rm.depositOrgNm})				AS DEPOSIT_ORG_NM
+										 , TO_NUMBER(TRIM(#{rm.fee}))			AS FEE
+									  FROM DUAL
+<bind name="cnt" value="cnt+1" />
+</foreach>
+									) A
+							 WHERE A.SABUN IS NOT NULL
+							   AND A.ATTATCH_NO IS NOT NULL
+							   AND A.SEQ IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.SABUN			= S.SABUN
+						AND	T.ATTATCH_NO	= S.ATTATCH_NO
+						AND	T.SEQ			= S.SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.DEPOSIT_AMT	= S.DEPOSIT_AMT
+								 , T.DEPOSIT_YMD	= S.DEPOSIT_YMD
+								 , T.DEPOSIT_ORG_NM	= S.DEPOSIT_ORG_NM
+								 , T.FEE			= S.FEE
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.ATTATCH_NO
+							, T.SEQ
+							, T.DEPOSIT_AMT
+							, T.DEPOSIT_YMD
+							, T.DEPOSIT_ORG_NM
+							, T.FEE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.SABUN
+							, S.ATTATCH_NO
+							, S.SEQ
+							, S.DEPOSIT_AMT
+							, S.DEPOSIT_YMD
+							, S.DEPOSIT_ORG_NM
+							, S.FEE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteAttachMgr">
+
+
+					DELETE FROM TCPN161
+					 WHERE ENTER_CD||'_'||SABUN||'_'||ATTATCH_NO IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+							,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.attatchNo != null and !rm.attatchNo.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.attatchNo})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteAttachMgrDtl">
+
+
+					DELETE FROM TCPN161
+					 WHERE ENTER_CD||'_'||SABUN||'_'||ATTATCH_NO IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+							,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.attatchNo != null and !rm.attatchNo.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.attatchNo})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteAttachMgrDepositInfo">
+
+
+					DELETE FROM TCPN167
+					 WHERE ENTER_CD||'_'||SABUN||'_'||ATTATCH_NO||'_'||TRIM(TO_CHAR(SEQ)) IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+							,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.attatchNo != null and !rm.attatchNo.equals("") and rm.seq != null and !rm.seq.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.attatchNo})||'_'||TRIM(#{rm.seq})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+
+		<delete parameterType="map" id="deleteAllAttachMgrDepositInfo">
+			DELETE FROM TCPN167
+			WHERE ENTER_CD||'_'||SABUN||'_'||ATTATCH_NO IN ( NULL
+			<foreach item="rm" collection="deleteRows" >
+				,
+				<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.attatchNo != null and !rm.attatchNo.equals("")'>
+					TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.attatchNo})
+				</if>
+			</foreach>
+			)
+		</delete>
+	</mapper>

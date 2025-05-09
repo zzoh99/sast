@@ -1,0 +1,842 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.selfReport.selfReportRegist.selfReportRegist">
+		<select parameterType="map" resultType="cMap" id="getMoveHopeCdList">
+
+				<![CDATA[
+					SELECT MOVE_HOPE_CD AS CODE
+					     , MOVE_HOPE_NM AS CODE_NM
+					  FROM TCDPV210
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					 ORDER BY SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getSurveyPointList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.SURVEY_ITEM_CD
+						 , A.SURVEY_ITEM_NM
+						 , A.SURVEY_ITEM_DESC
+						 , #{searchActiveYyyy} AS ACTIVE_YYYY
+						 , #{searchHalfGubunType} AS HALF_GUBUN_TYPE
+						 , #{searchSabun} AS SABUN
+						 , NVL(B.POINT,0) AS POINT
+						 , (SELECT ROUND(NVL(AVG(POINT),0),0)
+							  FROM TCDPV202
+							 WHERE ENTER_CD = #{ssnEnterCd}
+							   AND ACTIVE_YYYY = #{searchActiveYyyy}
+							   AND HALF_GUBUN_TYPE = #{searchHalfGubunType}
+							   AND SURVEY_ITEM_CD = A.SURVEY_ITEM_CD
+							   AND SABUN NOT IN (#{searchSabun}) ) AS AVG_POINT
+						 , NVL(B.POINT,0) - (   SELECT ROUND(NVL(AVG(POINT),0),0)
+												  FROM TCDPV202
+												 WHERE ENTER_CD = #{ssnEnterCd}
+												   AND ACTIVE_YYYY = #{searchActiveYyyy}
+												   AND HALF_GUBUN_TYPE = #{searchHalfGubunType}
+												   AND SURVEY_ITEM_CD = A.SURVEY_ITEM_CD
+												   AND SABUN NOT IN (#{searchSabun}) ) AS GAP_POINT
+						 , CASE WHEN B.POINT = 1 THEN 'Y' ELSE 'N' END AS POINT1
+						 , CASE WHEN B.POINT = 2 THEN 'Y' ELSE 'N' END AS POINT2
+						 , CASE WHEN B.POINT = 3 THEN 'Y' ELSE 'N' END AS POINT3
+						 , CASE WHEN B.POINT = 4 THEN 'Y' ELSE 'N' END AS POINT4
+						 , CASE WHEN B.POINT = 5 THEN 'Y' ELSE 'N' END AS POINT5
+					  FROM TCDPV100 A LEFT OUTER JOIN (SELECT * FROM TCDPV202 WHERE ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType} AND SABUN = #{searchSabun}) B
+						ON A.ENTER_CD     = B.ENTER_CD
+					   AND A.SURVEY_ITEM_CD = B.SURVEY_ITEM_CD
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.START_YMD <= (SELECT ACTIVE_START_YMD FROM TCDPV000 WHERE ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+					   AND A.END_YMD   >= (SELECT ACTIVE_START_YMD FROM TCDPV000 WHERE ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+					 ORDER BY A.SEQ
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveSurveyPoint">
+
+					MERGE INTO TCDPV202 T
+					USING (
+						 SELECT  A.ENTER_CD
+							   , A.ACTIVE_YYYY
+							   , A.HALF_GUBUN_TYPE
+							   , A.SABUN
+							   , A.SURVEY_ITEM_CD
+							   , A.POINT
+						FROM (
+							 SELECT  NULL AS ENTER_CD
+								   , NULL AS ACTIVE_YYYY
+								   , NULL AS HALF_GUBUN_TYPE
+								   , NULL AS SABUN
+								   , NULL AS SURVEY_ITEM_CD
+								   , NULL AS POINT
+							FROM DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+							 SELECT  TRIM(#{rm.enterCd}) AS ENTER_CD
+								   , TRIM(#{rm.activeYyyy}) AS ACTIVE_YYYY
+								   , TRIM(#{rm.halfGubunType}) AS HALF_GUBUN_TYPE
+								   , TRIM(#{rm.sabun}) AS SABUN
+								   , TRIM(#{rm.surveyItemCd}) AS SURVEY_ITEM_CD
+								   , TRIM(#{rm.point}) AS POINT
+							FROM DUAL
+					</foreach>
+						) A WHERE A.ENTER_CD IS NOT NULL
+					 		  AND A.ACTIVE_YYYY IS NOT NULL
+					 		  AND A.HALF_GUBUN_TYPE IS NOT NULL
+					 		  AND A.SABUN IS NOT NULL
+					 		  AND A.SURVEY_ITEM_CD IS NOT NULL
+					) S
+					ON (  T.ENTER_CD        = S.ENTER_CD
+					  AND T.ACTIVE_YYYY     = S.ACTIVE_YYYY
+					  AND T.HALF_GUBUN_TYPE = S.HALF_GUBUN_TYPE
+					  AND T.SABUN           = S.SABUN
+					  AND T.SURVEY_ITEM_CD  = S.SURVEY_ITEM_CD   )
+					WHEN MATCHED THEN
+						UPDATE SET  T.POINT   = S.POINT
+								  , T.CHKDATE = SYSDATE
+								  , T.CHKID   = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT (
+							  T.ENTER_CD
+							, T.ACTIVE_YYYY
+							, T.HALF_GUBUN_TYPE
+							, T.SABUN
+							, T.SURVEY_ITEM_CD
+							, T.POINT
+							, T.CHKDATE
+							, T.CHKID
+						) VALUES (
+							  S.ENTER_CD
+							, S.ACTIVE_YYYY
+							, S.HALF_GUBUN_TYPE
+							, S.SABUN
+							, S.SURVEY_ITEM_CD
+							, S.POINT
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		<select parameterType="map" resultType="cMap" id="getSelfReportRegistPopupList">
+
+				<![CDATA[
+						SELECT A.ACTIVE_YYYY
+							 , A.HALF_GUBUN_TYPE
+							 , B.SABUN
+							 , B.CAREER_TARGET_CD
+							 , B.WORK_ASSIGN_CD_1
+							 , B.WORK_ASSIGN_CD_2
+							 , B.WORK_ASSIGN_CD_3
+							 , B.MOVE_HOPE_TIME
+							 , B.MOVE_HOPE_CD
+							 , B.MOVE_HOPE_DESC
+							 , B.MAIN_ORG_CD_1
+							 , B.MAIN_ORG_CD_2
+							 , B.MAIN_ORG_CD_3
+							 --, ( SELECT MAIN_ORG_NM FROM INST1.TSHRMW909 WHERE MAIN_ORG_CD = B.MAIN_ORG_CD_1 ) AS MAIN_ORG_NM_1
+							 --, ( SELECT MAIN_ORG_NM FROM INST1.TSHRMW909 WHERE MAIN_ORG_CD = B.MAIN_ORG_CD_2 ) AS MAIN_ORG_NM_2
+							 --, ( SELECT MAIN_ORG_NM FROM INST1.TSHRMW909 WHERE MAIN_ORG_CD = B.MAIN_ORG_CD_2 ) AS MAIN_ORG_NM_3
+							 , B.MAIN_ORG_CD_1 AS MAIN_ORG_NM_1
+							 , B.MAIN_ORG_CD_2 AS MAIN_ORG_NM_2
+							 , B.MAIN_ORG_CD_3 AS MAIN_ORG_NM_3
+							 , B.MAIN_ORG_CD_MOVE_HOPE_TIME
+							 , B.MAIN_ORG_CD_MOVE_HOPE_CD
+							 , B.MAIN_ORG_CD_MOVE_HOPE_DESC
+							 , B.TRANSFER_EMP_NO
+							 , B.TRANSFER_DESC
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.TRANSFER_EMP_NO, #{ssnLocaleCd}) AS TRANSFER_EMP_NM
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.TRANSFER_EMP_NO, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) TRANSFER_ORG_NM
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.TRANSFER_EMP_NO, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS TRANSFER_JIKGUB_NM
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.TRANSFER_EMP_NO, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS TRANSFER_JIKWEE_NM
+							 , B.SUCCESSOR_EMP_NO_1
+							 , B.SUCCESSOR_DESC_1
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, #{ssnLocaleCd}) AS SUCCESSOR_EMP_NM_1
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) SUCCESSOR_ORG_NM_1
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKGUB_NM_1
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKWEE_NM_1
+							 , B.SUCCESSOR_EMP_NO_2
+							 , B.SUCCESSOR_DESC_2
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, #{ssnLocaleCd}) AS SUCCESSOR_EMP_NM_2
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) SUCCESSOR_ORG_NM_2
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKGUB_NM_2
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKWEE_NM_2
+							 , B.SUCCESSOR_EMP_NO_3
+							 , B.SUCCESSOR_DESC_3
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, #{ssnLocaleCd}) AS SUCCESSOR_EMP_NM_3
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) SUCCESSOR_ORG_NM_3
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKGUB_NM_3
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKWEE_NM_3
+							 , B.APPROVAL_REQ_YMD
+							 , B.APPROVAL_STATUS
+							 , B.APPROVAL_MAIN_ORG_CD
+						/*     , B.MAIN_ORG_NM AS APPROVAL_MAIN_ORG_NM */
+							 , B.APPROVAL_ORG_CD
+						/*     , C.ORG_NM AS APPROVAL_ORG_NM */
+							 , B.APPROVAL_EMP_NO
+							 , B.APPROVAL_EMP_NAME
+							 , B.APPROVAL_YMD
+							 , C.CAREER_TARGET_NM
+							 , C.CAREER_TARGET_TYPE
+							 , C.CAREER_TARGET_DESC
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'G'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_1
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_LARGE_1
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'M'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_1
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_MIDDLE_1
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_1
+							   ) AS WORK_ASSIGN_NM_1
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'G'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_2
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_LARGE_2
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'M'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_2
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_MIDDLE_2
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_2
+							   ) AS WORK_ASSIGN_NM_2
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'G'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_3
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_LARGE_3
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'M'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_3
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_MIDDLE_3
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_3
+							   ) AS WORK_ASSIGN_NM_3
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND WORK_ASSIGN_CD_1    = B.WORK_ASSIGN_CD_1
+							   ) AS WORK_ASSIGN_APP_CNT_1
+							 , ( SELECT COUNT(*)
+								   FROM TCDPU161
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_1
+									AND EXE_YN              = 'Y'
+									AND ( APPROVAL_STATUS   = '5' OR APPROVAL_STATUS IS NULL )
+							   ) AS WORK_ASSIGN_CUR_CNT_1
+							 , (	SELECT DECODE(SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1),'','', SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1)||'년') ||
+										   DECODE(SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM)),'','', SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM))||'개월') AS WORK_ASSIGN_WRK_EXP_1
+									FROM (
+											SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD ,
+												   ROUND(ROUND(SUM(MONTHS_BETWEEN(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD') , TO_DATE(ST_YMD,'YYYYMMDD')))) / 12 , 1)   AS TERM
+											FROM (
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD > '20070630'
+												AND APPROVAL_TYPE <> '3'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												UNION ALL
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD <= '20070630'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+											)
+											GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD
+										)
+									WHERE  ENTER_CD = A.ENTER_CD
+										AND SABUN = B.SABUN
+										AND WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_1
+								) AS WORK_ASSIGN_WRK_EXP_1
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND WORK_ASSIGN_CD_2    = B.WORK_ASSIGN_CD_2
+							   ) AS WORK_ASSIGN_APP_CNT_2
+							 , ( SELECT COUNT(*)
+								   FROM TCDPU161
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_2
+									AND EXE_YN              = 'Y'
+									AND ( APPROVAL_STATUS   = '5' OR APPROVAL_STATUS IS NULL )
+							   ) AS WORK_ASSIGN_CUR_CNT_2
+							 , ( SELECT DECODE(SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1),'','', SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1)||'년') ||
+										   DECODE(SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM)),'','', SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM))||'개월') AS WORK_ASSIGN_WRK_EXP_1
+									FROM (
+											SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD ,
+												   ROUND(ROUND(SUM(MONTHS_BETWEEN(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD') , TO_DATE(ST_YMD,'YYYYMMDD')))) / 12 , 1)   AS TERM
+											FROM (
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD > '20070630'
+												AND APPROVAL_TYPE <> '3'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												UNION ALL
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD <= '20070630'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+											)
+											GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD
+										)
+									WHERE  ENTER_CD = A.ENTER_CD
+										AND SABUN = B.SABUN
+										AND WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_2
+							   ) AS WORK_ASSIGN_WRK_EXP_2
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND WORK_ASSIGN_CD_3    = B.WORK_ASSIGN_CD_3
+							   ) AS WORK_ASSIGN_APP_CNT_3
+							 , ( SELECT COUNT(*)
+								   FROM TCDPU161
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_3
+									AND EXE_YN              = 'Y'
+									AND ( APPROVAL_STATUS   = '5' OR APPROVAL_STATUS IS NULL )
+							   ) AS WORK_ASSIGN_CUR_CNT_3
+							 , ( SELECT DECODE(SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1),'','', SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1)||'년') ||
+										   DECODE(SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM)),'','', SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM))||'개월') AS WORK_ASSIGN_WRK_EXP_1
+									FROM (
+											SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD ,
+												   ROUND(ROUND(SUM(MONTHS_BETWEEN(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD') , TO_DATE(ST_YMD,'YYYYMMDD')))) / 12 , 1)   AS TERM
+											FROM (
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD > '20070630'
+												AND APPROVAL_TYPE <> '3'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												UNION ALL
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD <= '20070630'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+											)
+											GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD
+										)
+									WHERE  ENTER_CD = A.ENTER_CD
+										AND SABUN = B.SABUN
+										AND WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_3
+							   ) AS WORK_ASSIGN_WRK_EXP_3
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND MAIN_ORG_CD_1       = B.MAIN_ORG_CD_1
+							   ) AS MAIN_ORG_APP_CNT_1
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND MAIN_ORG_CD_2       = B.MAIN_ORG_CD_2
+							   ) AS MAIN_ORG_APP_CNT_2
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND MAIN_ORG_CD_3       = B.MAIN_ORG_CD_3
+							   ) AS MAIN_ORG_APP_CNT_3
+						  FROM TCDPV000 A INNER JOIN (SELECT *
+						  							    FROM TCDPV201
+						  							   WHERE ENTER_CD = #{ssnEnterCd}
+						  							     AND ACTIVE_YYYY=#{searchActiveYyyy}
+						  							     AND HALF_GUBUN_TYPE=#{searchHalfGubunType}
+						  							     AND SABUN = #{searchSabun}) B
+							ON A.ENTER_CD = B.ENTER_CD
+						   AND A.ACTIVE_YYYY = B.ACTIVE_YYYY
+						  LEFT OUTER JOIN TCDPV200 C
+							ON B.ENTER_CD         = C.ENTER_CD
+						   AND B.CAREER_TARGET_CD = C.CAREER_TARGET_CD
+						 WHERE A.ENTER_CD  = #{ssnEnterCd}
+						   AND A.ACTIVE_YYYY = #{searchActiveYyyy}
+						   AND A.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+						 ORDER BY A.ACTIVE_YYYY DESC, A.HALF_GUBUN_TYPE
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getSelfReportRegistList">
+
+				<![CDATA[
+						SELECT A.ACTIVE_YYYY
+							 , A.HALF_GUBUN_TYPE
+							 , A.ACTIVE_START_YMD
+						     , A.ACTIVE_END_YMD
+							 , B.SABUN
+							 , DECODE(B.SABUN, NULL, 'N', 'Y') AS REG_YN
+							 , B.CAREER_TARGET_CD
+							 , B.WORK_ASSIGN_CD_1
+							 , B.WORK_ASSIGN_CD_2
+							 , B.WORK_ASSIGN_CD_3
+							 , B.MOVE_HOPE_TIME
+							 , B.MOVE_HOPE_CD
+							 , B.MOVE_HOPE_DESC
+							 , B.MAIN_ORG_CD_1
+							 , B.MAIN_ORG_CD_2
+							 , B.MAIN_ORG_CD_3
+							 --, ( SELECT MAIN_ORG_NM FROM INST1.TSHRMW909 WHERE MAIN_ORG_CD = B.MAIN_ORG_CD_1 ) AS MAIN_ORG_NM_1
+							 --, ( SELECT MAIN_ORG_NM FROM INST1.TSHRMW909 WHERE MAIN_ORG_CD = B.MAIN_ORG_CD_2 ) AS MAIN_ORG_NM_2
+							 --, ( SELECT MAIN_ORG_NM FROM INST1.TSHRMW909 WHERE MAIN_ORG_CD = B.MAIN_ORG_CD_2 ) AS MAIN_ORG_NM_3
+							 , B.MAIN_ORG_CD_1 AS MAIN_ORG_NM_1
+							 , B.MAIN_ORG_CD_2 AS MAIN_ORG_NM_2
+							 , B.MAIN_ORG_CD_3 AS MAIN_ORG_NM_3
+							 , B.MAIN_ORG_CD_MOVE_HOPE_TIME
+							 , B.MAIN_ORG_CD_MOVE_HOPE_CD
+							 , B.MAIN_ORG_CD_MOVE_HOPE_DESC
+							 , B.TRANSFER_EMP_NO
+							 , B.TRANSFER_DESC
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.TRANSFER_EMP_NO, #{ssnLocaleCd}) AS TRANSFER_EMP_NM
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.TRANSFER_EMP_NO, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) TRANSFER_ORG_NM
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.TRANSFER_EMP_NO, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS TRANSFER_JIKGUB_NM
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.TRANSFER_EMP_NO, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS TRANSFER_JIKWEE_NM
+							 , B.SUCCESSOR_EMP_NO_1
+							 , B.SUCCESSOR_DESC_1
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, #{ssnLocaleCd}) AS SUCCESSOR_EMP_NM_1
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) SUCCESSOR_ORG_NM_1
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKGUB_NM_1
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_1, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKWEE_NM_1
+							 , B.SUCCESSOR_EMP_NO_2
+							 , B.SUCCESSOR_DESC_2
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, #{ssnLocaleCd}) AS SUCCESSOR_EMP_NM_2
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) SUCCESSOR_ORG_NM_2
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKGUB_NM_2
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_2, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKWEE_NM_2
+							 , B.SUCCESSOR_EMP_NO_3
+							 , B.SUCCESSOR_DESC_3
+                             , F_COM_GET_NAMES(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, #{ssnLocaleCd}) AS SUCCESSOR_EMP_NM_3
+                             , F_COM_GET_ORG_NM(B.ENTER_CD, F_COM_GET_ORG_CD(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, A.ACTIVE_YYYY || '1231'), A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) SUCCESSOR_ORG_NM_3
+                             , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKGUB_NM_3
+                             , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SUCCESSOR_EMP_NO_3, A.ACTIVE_YYYY || '1231', #{ssnLocaleCd}) AS SUCCESSOR_JIKWEE_NM_3
+							 , B.APPROVAL_REQ_YMD
+							 , B.APPROVAL_STATUS
+							 , B.APPROVAL_MAIN_ORG_CD
+						/*     , B.MAIN_ORG_NM AS APPROVAL_MAIN_ORG_NM */
+							 , B.APPROVAL_ORG_CD
+						/*     , C.ORG_NM AS APPROVAL_ORG_NM */
+							 , B.APPROVAL_EMP_NO
+							 , B.APPROVAL_EMP_NAME
+							 , B.APPROVAL_YMD
+							 , C.CAREER_TARGET_NM
+							 , C.CAREER_TARGET_TYPE
+							 , (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = C.ENTER_CD AND GRCODE_CD = 'D00001' AND CODE = C.CAREER_TARGET_TYPE AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD) AS CAREER_TARGET_TYPE_NM
+							 , C.CAREER_TARGET_DESC
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'G'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_1
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_LARGE_1
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'M'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_1
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_MIDDLE_1
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_1
+							   ) AS WORK_ASSIGN_NM_1
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'G'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_2
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_LARGE_2
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'M'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_2
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_MIDDLE_2
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_2
+							   ) AS WORK_ASSIGN_NM_2
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'G'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_3
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_LARGE_3
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_TYPE    = 'M'
+									AND ROWNUM = '1'
+								  START WITH WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_3
+								CONNECT BY WORK_ASSIGN_CD   = PRIOR PRIOR_WORK_ASSIGN_CD
+							   ) AS WORK_ASSIGN_NM_MIDDLE_3
+							 , ( SELECT WORK_ASSIGN_NM
+								   FROM TCDPW501
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_3
+							   ) AS WORK_ASSIGN_NM_3
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND WORK_ASSIGN_CD_1    = B.WORK_ASSIGN_CD_1
+							   ) AS WORK_ASSIGN_APP_CNT_1
+							 , ( SELECT COUNT(*)
+								   FROM TCDPU161
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_1
+									AND EXE_YN              = 'Y'
+									AND ( APPROVAL_STATUS   = '5' OR APPROVAL_STATUS IS NULL )
+							   ) AS WORK_ASSIGN_CUR_CNT_1
+							 , (	SELECT DECODE(SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1),'','', SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1)||'년') ||
+										   DECODE(SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM)),'','', SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM))||'개월') AS WORK_ASSIGN_WRK_EXP_1
+									FROM (
+											SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD ,
+												   ROUND(ROUND(SUM(MONTHS_BETWEEN(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD') , TO_DATE(ST_YMD,'YYYYMMDD')))) / 12 , 1)   AS TERM
+											FROM (
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD > '20070630'
+												AND APPROVAL_TYPE <> '3'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												UNION ALL
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD <= '20070630'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+											)
+											GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD
+										)
+									WHERE  ENTER_CD = A.ENTER_CD
+										AND SABUN = B.SABUN
+										AND WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_1
+								) AS WORK_ASSIGN_WRK_EXP_1
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND WORK_ASSIGN_CD_2    = B.WORK_ASSIGN_CD_2
+							   ) AS WORK_ASSIGN_APP_CNT_2
+							 , ( SELECT COUNT(*)
+								   FROM TCDPU161
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_2
+									AND EXE_YN              = 'Y'
+									AND ( APPROVAL_STATUS   = '5' OR APPROVAL_STATUS IS NULL )
+							   ) AS WORK_ASSIGN_CUR_CNT_2
+							 , ( SELECT DECODE(SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1),'','', SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1)||'년') ||
+										   DECODE(SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM)),'','', SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM))||'개월') AS WORK_ASSIGN_WRK_EXP_1
+									FROM (
+											SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD ,
+												   ROUND(ROUND(SUM(MONTHS_BETWEEN(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD') , TO_DATE(ST_YMD,'YYYYMMDD')))) / 12 , 1)   AS TERM
+											FROM (
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD > '20070630'
+												AND APPROVAL_TYPE <> '3'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												UNION ALL
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD <= '20070630'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+											)
+											GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD
+										)
+									WHERE  ENTER_CD = A.ENTER_CD
+										AND SABUN = B.SABUN
+										AND WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_2
+							   ) AS WORK_ASSIGN_WRK_EXP_2
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND WORK_ASSIGN_CD_3    = B.WORK_ASSIGN_CD_3
+							   ) AS WORK_ASSIGN_APP_CNT_3
+							 , ( SELECT COUNT(*)
+								   FROM TCDPU161
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND WORK_ASSIGN_CD      = B.WORK_ASSIGN_CD_3
+									AND EXE_YN              = 'Y'
+									AND ( APPROVAL_STATUS   = '5' OR APPROVAL_STATUS IS NULL )
+							   ) AS WORK_ASSIGN_CUR_CNT_3
+							 , ( SELECT DECODE(SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1),'','', SUBSTR(TERM, 0,INSTR(NVL(TERM,0),'.')-1)||'년') ||
+										   DECODE(SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM)),'','', SUBSTR(TERM, INSTR(NVL(TERM,0),'.')+1, LENGTH(TERM))||'개월') AS WORK_ASSIGN_WRK_EXP_1
+									FROM (
+											SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD ,
+												   ROUND(ROUND(SUM(MONTHS_BETWEEN(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD') , TO_DATE(ST_YMD,'YYYYMMDD')))) / 12 , 1)   AS TERM
+											FROM (
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD > '20070630'
+												AND APPROVAL_TYPE <> '3'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												UNION ALL
+												SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+												FROM TCDPU161
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND ED_YMD <= '20070630'
+												AND APPROVAL_STATUS = '5'
+												GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+											)
+											GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD
+										)
+									WHERE  ENTER_CD = A.ENTER_CD
+										AND SABUN = B.SABUN
+										AND WORK_ASSIGN_CD = B.WORK_ASSIGN_CD_3
+							   ) AS WORK_ASSIGN_WRK_EXP_3
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND MAIN_ORG_CD_1       = B.MAIN_ORG_CD_1
+							   ) AS MAIN_ORG_APP_CNT_1
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND MAIN_ORG_CD_2       = B.MAIN_ORG_CD_2
+							   ) AS MAIN_ORG_APP_CNT_2
+							 , ( SELECT COUNT(*)
+								   FROM TCDPV201
+								  WHERE ENTER_CD            = B.ENTER_CD
+									AND ACTIVE_YYYY         = B.ACTIVE_YYYY
+									AND HALF_GUBUN_TYPE     = B.HALF_GUBUN_TYPE
+									AND MAIN_ORG_CD_3       = B.MAIN_ORG_CD_3
+							   ) AS MAIN_ORG_APP_CNT_3
+						  FROM TCDPV000 A LEFT OUTER JOIN (SELECT * FROM TCDPV201 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = #{searchSabun}) B
+							ON A.ENTER_CD = B.ENTER_CD
+						   AND A.ACTIVE_YYYY = B.ACTIVE_YYYY 
+						  LEFT OUTER JOIN TCDPV200 C
+							ON B.ENTER_CD         = C.ENTER_CD
+						   AND B.CAREER_TARGET_CD = C.CAREER_TARGET_CD
+						 WHERE A.ENTER_CD  = #{ssnEnterCd}
+						 ORDER BY A.ACTIVE_YYYY DESC, A.HALF_GUBUN_TYPE DESC
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveSelfReportRegist">
+
+					MERGE INTO TCDPV201 T
+					USING (
+						 SELECT  A.ENTER_CD
+							   , A.ACTIVE_YYYY
+							   , A.HALF_GUBUN_TYPE
+							   , A.SABUN
+							   , A.CAREER_TARGET_CD
+							   , A.WORK_ASSIGN_CD_1
+							   , A.WORK_ASSIGN_CD_2
+							   , A.WORK_ASSIGN_CD_3
+							   , A.MOVE_HOPE_TIME
+							   , A.MOVE_HOPE_CD
+							   , A.MOVE_HOPE_DESC
+							   , A.TRANSFER_EMP_NO
+							   , A.TRANSFER_DESC
+							   , A.SUCCESSOR_EMP_NO_1
+							   , A.SUCCESSOR_DESC_1
+							   , A.SUCCESSOR_EMP_NO_2
+							   , A.SUCCESSOR_DESC_2
+							   , A.SUCCESSOR_EMP_NO_3
+							   , A.SUCCESSOR_DESC_3
+							   , A.APPROVAL_REQ_YMD
+							   , A.APPROVAL_STATUS
+							   , A.APPROVAL_EMP_NO
+							   , A.APPROVAL_YMD
+							   , A.REG_YMD
+						FROM (
+							 SELECT  TRIM(#{ssnEnterCd}     )    AS ENTER_CD
+								   , TRIM(#{activeYyyy}     )    AS ACTIVE_YYYY
+								   , TRIM(#{halfGubunType}  )    AS HALF_GUBUN_TYPE
+								   , TRIM(#{sabun}          )    AS SABUN
+								   , TRIM(#{careerTargetCd} )    AS CAREER_TARGET_CD
+								   , TRIM(#{workAssignCd1}  )    AS WORK_ASSIGN_CD_1
+								   , TRIM(#{workAssignCd2} )    AS WORK_ASSIGN_CD_2
+								   , TRIM(#{workAssignCd3}  )    AS WORK_ASSIGN_CD_3
+								   , TRIM(#{moveHopeTime}   )    AS MOVE_HOPE_TIME
+								   , TRIM(#{moveHopeCd}     )    AS MOVE_HOPE_CD
+								   , TRIM(#{moveHopeDesc}   )    AS MOVE_HOPE_DESC
+								   , TRIM(#{transferEmpNo}  )    AS TRANSFER_EMP_NO
+								   , TRIM(#{transferDesc}   )    AS TRANSFER_DESC
+								   , TRIM(#{successorEmpNo1})    AS SUCCESSOR_EMP_NO_1
+								   , TRIM(#{successorDesc1} )    AS SUCCESSOR_DESC_1
+								   , TRIM(#{successorEmpNo2})    AS SUCCESSOR_EMP_NO_2
+								   , TRIM(#{successorDesc2} )    AS SUCCESSOR_DESC_2
+								   , TRIM(#{successorEmpNo3})    AS SUCCESSOR_EMP_NO_3
+								   , TRIM(#{successorDesc3} )    AS SUCCESSOR_DESC_3
+								   , TRIM(#{approvalReqYmd} )    AS APPROVAL_REQ_YMD
+								   , NVL(#{approvalStatus}, '9') AS APPROVAL_STATUS
+								   , TRIM(#{approvalEmpNo}   ) AS APPROVAL_EMP_NO
+								   , TRIM(#{approvalYmd}     ) AS APPROVAL_YMD
+								   , TO_CHAR(SYSDATE,'YYYYMMDD') AS REG_YMD
+							FROM DUAL
+							) A
+					) S
+					ON (T.ENTER_CD=S.ENTER_CD AND T.ACTIVE_YYYY=S.ACTIVE_YYYY AND T.HALF_GUBUN_TYPE=S.HALF_GUBUN_TYPE AND T.SABUN=S.SABUN)
+					WHEN MATCHED THEN
+						UPDATE SET  T.CAREER_TARGET_CD     = S.CAREER_TARGET_CD
+								  , T.WORK_ASSIGN_CD_1     = S.WORK_ASSIGN_CD_1
+								  , T.WORK_ASSIGN_CD_2     = S.WORK_ASSIGN_CD_2
+								  , T.WORK_ASSIGN_CD_3     = S.WORK_ASSIGN_CD_3
+								  , T.MOVE_HOPE_TIME       = S.MOVE_HOPE_TIME
+								  , T.MOVE_HOPE_CD         = S.MOVE_HOPE_CD
+								  , T.MOVE_HOPE_DESC       = S.MOVE_HOPE_DESC
+								  , T.TRANSFER_EMP_NO      = S.TRANSFER_EMP_NO
+								  , T.TRANSFER_DESC        = S.TRANSFER_DESC
+								  , T.SUCCESSOR_EMP_NO_1   = S.SUCCESSOR_EMP_NO_1
+								  , T.SUCCESSOR_DESC_1     = S.SUCCESSOR_DESC_1
+								  , T.SUCCESSOR_EMP_NO_2   = S.SUCCESSOR_EMP_NO_2
+								  , T.SUCCESSOR_DESC_2     = S.SUCCESSOR_DESC_2
+								  , T.SUCCESSOR_EMP_NO_3   = S.SUCCESSOR_EMP_NO_3
+								  , T.SUCCESSOR_DESC_3     = S.SUCCESSOR_DESC_3
+								  , T.APPROVAL_REQ_YMD     = S.APPROVAL_REQ_YMD
+								  , T.APPROVAL_STATUS      = S.APPROVAL_STATUS
+								  , T.APPROVAL_EMP_NO      = S.APPROVAL_EMP_NO
+								  , T.APPROVAL_YMD         = S.APPROVAL_YMD
+								  , T.REG_YMD         	   = S.REG_YMD
+								  , T.CHKDATE              = SYSDATE
+								  , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT (
+							  T.ENTER_CD
+							, T.ACTIVE_YYYY
+							, T.HALF_GUBUN_TYPE
+							, T.SABUN
+							, T.CAREER_TARGET_CD
+							, T.WORK_ASSIGN_CD_1
+							, T.WORK_ASSIGN_CD_2
+							, T.WORK_ASSIGN_CD_3
+							, T.MOVE_HOPE_TIME
+							, T.MOVE_HOPE_CD
+							, T.MOVE_HOPE_DESC
+							, T.TRANSFER_EMP_NO
+							, T.TRANSFER_DESC
+							, T.SUCCESSOR_EMP_NO_1
+							, T.SUCCESSOR_DESC_1
+							, T.SUCCESSOR_EMP_NO_2
+							, T.SUCCESSOR_DESC_2
+							, T.SUCCESSOR_EMP_NO_3
+							, T.SUCCESSOR_DESC_3
+							, T.APPROVAL_REQ_YMD
+							, T.APPROVAL_STATUS
+							, T.APPROVAL_EMP_NO
+							, T.APPROVAL_YMD
+							, T.REG_YMD
+							, T.CHKDATE
+							, T.CHKID
+						) VALUES (
+							  S.ENTER_CD
+							, S.ACTIVE_YYYY
+							, S.HALF_GUBUN_TYPE
+							, S.SABUN
+							, S.CAREER_TARGET_CD
+							, S.WORK_ASSIGN_CD_1
+							, S.WORK_ASSIGN_CD_2
+							, S.WORK_ASSIGN_CD_3
+							, S.MOVE_HOPE_TIME
+							, S.MOVE_HOPE_CD
+							, S.MOVE_HOPE_DESC
+							, S.TRANSFER_EMP_NO
+							, S.TRANSFER_DESC
+							, S.SUCCESSOR_EMP_NO_1
+							, S.SUCCESSOR_DESC_1
+							, S.SUCCESSOR_EMP_NO_2
+							, S.SUCCESSOR_DESC_2
+							, S.SUCCESSOR_EMP_NO_3
+							, S.SUCCESSOR_DESC_3
+							, S.APPROVAL_REQ_YMD
+							, S.APPROVAL_STATUS
+							, S.APPROVAL_EMP_NO
+							, S.APPROVAL_YMD
+							, S.REG_YMD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		<delete parameterType="map" id="deleteSelfReportRegist">
+
+
+				<![CDATA[
+
+				]]>
+
+
+		</delete>
+
+</mapper>

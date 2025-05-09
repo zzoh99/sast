@@ -1,0 +1,556 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmt.orgAppmtMgr.tab2">
+	
+<!-- 발령구분(부서전배, 조직개편) 발령상세코드(ORD_DETAIL_CD 콤보로 사용할때) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgAppmtMgrTabOrdCodeList">
+
+				<![CDATA[
+					SELECT B.ORD_DETAIL_CD AS CODE		-- 발령종류(TSYS013)
+					     , B.ORD_DETAIL_NM AS CODE_NM	-- 발령종류명
+					  FROM TSYS011 A, TSYS013 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.ORD_TYPE_CD = B.ORD_TYPE_CD
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.ORD_TYPE_CD = #{chgOrdTypeCd}
+					 ORDER BY A.SEQ
+				]]>
+
+
+		</select>
+		
+<!-- 발령구분(부서전배, 조직개편) 발령종류코드(ORD_TYPE_CD 콤보로 사용할때) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgAppmtMgrTabOrdTypeCodeList">
+
+				<![CDATA[
+                SELECT ORD_TYPE_CD AS CODE        -- 발령종류(TSYS013)
+                      ,ORD_TYPE_NM AS CODE_NM    -- 발령종류명
+                      FROM TSYS011
+                     WHERE  ENTER_CD = #{ssnEnterCd}
+                       AND  ORD_TYPE IN ('70', '80')
+                       ORDER BY SEQ
+				]]>
+
+
+		</select>
+		
+
+<!-- 발령조직 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgAppmtMgrTab2OrgList">
+
+				<![CDATA[
+					SELECT LEVEL AS "_level"
+					     , A.ORG_CHART_NM
+					     , A.SDATE
+					     , A.PRIOR_ORG_CD
+					     , A.ORG_CD
+					     , C.ORG_NM
+					  FROM ( SELECT A1.ENTER_CD, A1.SDATE, A1.ORG_CD, A1.PRIOR_ORG_CD, A1.SEQ
+					              , A2.ORG_CHART_NM
+					           FROM TORG105 A1
+					              , TORG103 A2
+					          WHERE A1.ENTER_CD = #{ssnEnterCd}
+					            AND A1.ENTER_CD = A2.ENTER_CD
+					            AND A1.SDATE = A2.SDATE
+					            AND A2.SDATE = ( SELECT MAX(SDATE)
+					                               FROM TORG103
+					                              WHERE ENTER_CD = A2.ENTER_CD
+					                                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231') ) ) A
+					     , TORG101 C
+					 WHERE A.ENTER_CD = C.ENTER_CD
+			           AND A.ORG_CD = C.ORG_CD
+			           AND A.SDATE BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+					 START WITH A.PRIOR_ORG_CD = '0' 
+					 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD 
+					    AND PRIOR A.SDATE = A.SDATE 
+					    AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD 
+					 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+				]]>
+
+
+		</select>
+
+        <!-- 발령사원 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgAppmtMgrTab2UserList">
+            SELECT A.SABUN
+            , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS ORG_NM
+            , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD) AS JIKWEE_NM
+            , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD) AS JIKCHAK_NM
+            , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD) AS JIKGUB_NM
+            , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10050',A.WORK_TYPE) AS WORK_TYPE_NM
+            , B.NAME
+            , A.JIKWEE_CD
+            , A.JIKGUB_CD
+            , A.JIKCHAK_CD
+            , A.WORK_TYPE
+            , A.JOB_CD
+            , C.JOB_NM AS JOB_NM
+            FROM (
+            SELECT SUB1.*
+            FROM THRM151 SUB1
+            WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+            <choose>
+                <when test="chgOrdYmd != null and chgOrdYmd neq ''">
+                    AND REPLACE(#{chgOrdYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                </when>
+                <otherwise>
+                    AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                </otherwise>
+            </choose>
+            ) A
+            , THRM100 B
+            , TORG201 C
+            , TSYS005 D
+            , TSYS005 E
+            , TSYS005 F
+            WHERE A.ENTER_CD = #{ssnEnterCd}
+            AND A.ORG_CD = #{orgCd}
+            AND A.STATUS_CD NOT IN ('RA', 'EA', 'FB')
+            AND A.ENTER_CD = B.ENTER_CD
+            AND A.SABUN = B.SABUN
+            AND A.ENTER_CD = C.ENTER_CD(+)
+            AND A.JOB_CD = C.JOB_CD(+)
+            AND A.ENTER_CD = D.ENTER_CD(+)
+            AND A.JIKWEE_CD = D.CODE(+)
+            AND D.GRCODE_CD(+)='H20030'
+            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.S_YMD AND D.E_YMD
+            AND A.ENTER_CD = E.ENTER_CD(+)
+            AND A.JIKCHAK_CD = E.CODE(+)
+            AND E.GRCODE_CD(+)='H20020'
+            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.S_YMD AND E.E_YMD
+            AND A.ENTER_CD = F.ENTER_CD(+)
+            AND A.JIKGUB_CD = F.CODE(+)
+            AND F.GRCODE_CD(+)='H20010'
+            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN F.S_YMD AND F.E_YMD
+            ORDER BY D.SEQ, E.SEQ, F.SEQ
+		</select>
+
+<!-- 발령담당자 저장 -->
+		<insert parameterType="map" id="insertOrgAppmtMgrTab2User">
+
+				<![CDATA[
+					INSERT INTO THRM221
+					(
+						  ENTER_CD
+						, ORD_DETAIL_CD
+						, SABUN
+						, ORD_YMD
+						, APPLY_SEQ
+						, ORD_TYPE_CD
+						, ORD_REASON_CD --추가
+						, PROCESS_NO
+						, NAME   -- 추가
+						, CHKDATE
+						, CHKID
+					)
+					SELECT	  S.ENTER_CD
+							, S.ORD_DETAIL_CD
+							, S.SABUN
+							, S.ORD_YMD
+							, S.APPLY_SEQ
+							, S.ORD_TYPE_CD
+							, S.ORD_REASON_CD    -- 추가
+							, S.PROCESS_NO
+							, S.NAME
+							, sysdate
+							, #{ssnSabun}
+					FROM (
+							SELECT    NULL 	AS ENTER_CD     
+									, NULL 	AS ORD_DETAIL_CD
+									, NULL 	AS SABUN        
+									, NULL 	AS ORD_YMD      
+									, NULL 	AS APPLY_SEQ    
+									, NULL 	AS ORD_TYPE_CD  
+									, NULL  AS ORD_REASON_CD
+									, NULL 	AS PROCESS_NO   
+									, NULL 	AS NAME         
+							FROM   DUAL
+							]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="updateRows" >
+				UNION ALL
+							SELECT	  TRIM(#{ssnEnterCd})                AS ENTER_CD
+							        , TRIM(#{chgOrdDetailCd})            AS ORD_DETAIL_CD
+							        , TRIM(#{rm.sabun})                  AS SABUN
+							        , TRIM(REPLACE(#{chgOrdYmd},'-','')) AS ORD_YMD
+							        , TO_CHAR( (
+												SELECT TO_CHAR(NVL(MAX(TO_NUMBER( APPLY_SEQ )),0) + ${icnt})
+												  FROM THRM221
+												 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+												   AND SABUN =	  TRIM(#{rm.sabun})
+												   AND ORD_YMD =  TRIM(REPLACE(#{chgOrdYmd},'-',''))
+
+											  ) )	AS APPLY_SEQ
+									  <bind name="icnt" value="icnt + 1" />
+									, TRIM(#{chgOrdTypeCd})	AS ORD_TYPE_CD
+									, TRIM(#{rm.ordReasonCd})   AS ORD_REASON_CD
+									, TRIM(#{rm.processNo})	    AS PROCESS_NO
+									, TRIM(#{rm.name})     AS NAME
+							FROM   THRM151 A
+			              			,THRM100 B
+			              WHERE A.ENTER_CD = B.ENTER_CD
+			                AND A.SABUN = B.SABUN
+			              	AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+			                AND A.SABUN = TRIM(#{rm.sabun})
+			                AND TRIM(REPLACE(#{chgOrdYmd},'-','')) BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+</foreach>
+						) S
+					WHERE S.ENTER_CD IS NOT NULL
+					  AND S.ORD_TYPE_CD IS NOT NULL
+					  AND S.SABUN IS NOT NULL
+					  AND S.ORD_YMD IS NOT NULL
+					  AND S.APPLY_SEQ IS NOT NULL				
+		</insert>
+		
+		
+		<update parameterType="map" id="updateOrgAppmtMgrTab2User">
+
+                <![CDATA[
+
+                    UPDATE THRM221 T
+                    SET T.ORD_REASON_CD         = #{ordReasonCd}
+                        , T.VISUAL_YN           = #{visualYn}
+                        , T.MEMO                = #{memo}
+                        , T.CHKDATE             = SYSDATE
+                        , T.CHKID               = #{ssnSabun}
+                    
+                    WHERE T.ENTER_CD = #{ssnEnterCd}
+                      AND T.ORD_TYPE_CD = TRIM( #{ordTypeCd} )
+                      AND T.ORD_DETAIL_CD = TRIM( #{ordDetailCd} )
+                      AND T.SABUN = TRIM( #{sabun} )
+                      AND T.ORD_YMD = TRIM( #{ordYmd} )
+                      AND T.APPLY_SEQ = TRIM( #{applySeq} )
+                ]]>
+
+
+		</update>
+        
+        
+        <update parameterType="map" id="updateOrgAppmtMgrTab2User2">
+
+                    MERGE INTO THRM223 T
+                    USING (SELECT * FROM (
+                                        SELECT NULL AS ENTER_CD
+                                             ,NULL AS ORD_TYPE_CD
+                                             ,NULL AS ORD_DETAIL_CD
+                                             ,NULL AS SABUN
+                                             ,NULL AS ORD_YMD
+                                             ,NULL AS APPLY_SEQ
+                                             ,NULL AS POST_ITEM
+                                             ,NULL AS POST_ITEM_VALUE
+                                         FROM DUAL
+<foreach item="rm" collection="postItemList" >
+                                         
+                                       UNION ALL
+                                       SELECT #{ssnEnterCd} AS ENTER_CD
+                                       		 ,TRIM( #{ordTypeCd} ) AS ORD_TYPE_CD
+                                             ,TRIM( #{ordDetailCd} ) AS ORD_DETAIL_CD
+                                             ,TRIM( #{sabun} ) AS SABUN
+                                             ,TRIM( #{ordYmd} ) AS ORD_YMD
+                                             ,TRIM( #{applySeq} ) AS APPLY_SEQ
+                                             ,#{rm.postItem} AS POST_ITEM
+                                             ,#{rm.value} AS POST_ITEM_VALUE
+                                         FROM DUAL
+    
+    <if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+                                       UNION ALL
+                                       SELECT #{ssnEnterCd} AS ENTER_CD
+                                             ,TRIM( #{ordTypeCd} ) AS ORD_TYPE_CD
+                                             ,TRIM( #{ordDetailCd} ) AS ORD_DETAIL_CD
+                                             ,TRIM( #{sabun} ) AS SABUN
+                                             ,TRIM( #{ordYmd} ) AS ORD_YMD
+                                             ,TRIM( #{applySeq} ) AS APPLY_SEQ
+                                             ,#{rm.postItem}||'_NM' AS POST_ITEM
+                                             ,
+                                             <choose><when test='rm.popupType != null and rm.popupType.equals("ORG")'>
+                                                F_COM_GET_ORG_NM( #{ssnEnterCd} , #{rm.value} , #{ordYmd})
+                                            </when><when test='rm.popupType != null and rm.popupType.equals("JOB")'>
+                                                F_COM_GET_JOB_NM_201( #{ssnEnterCd} , #{rm.value} , #{ordYmd})
+                                            </when><when test='rm.popupType != null and rm.popupType.equals("LOCATION")'>
+                                                F_COM_GET_LOCATION_NM( #{ssnEnterCd} , #{rm.value}    )
+											 </when><otherwise>
+                                                F_COM_GET_GRCODE_NAME( #{ssnEnterCd} , #{rm.popupType}, #{rm.value})
+											 </otherwise>
+											 </choose>
+                                         FROM DUAL
+	</if>
+</foreach>
+                             )WHERE ENTER_CD IS NOT NULL
+                             ) S
+                    ON (T.ENTER_CD = S.ENTER_CD
+                        AND T.ORD_TYPE_CD = S.ORD_TYPE_CD
+                        AND T.ORD_DETAIL_CD = S.ORD_DETAIL_CD
+                        AND T.SABUN = S.SABUN
+                        AND T.ORD_YMD = S.ORD_YMD
+                        AND T.APPLY_SEQ = S.APPLY_SEQ
+                        AND T.POST_ITEM = S.POST_ITEM
+                        )
+                    WHEN MATCHED THEN
+                      UPDATE
+                         SET T.POST_ITEM_VALUE = S.POST_ITEM_VALUE
+                            ,T.CHKDATE         = SYSDATE
+                            ,T.CHKID           = #{ssnSabun}
+
+		</update>
+        
+        
+        <select parameterType="map" resultType="cMap" id="getOrgAppmtMgrTab2MaxApplySeq">
+
+                <![CDATA[
+                
+                    SELECT A.*
+                          ,B.ORD_YMD AS MAX_ORD_YMD_211
+                          ,B.APPLY_SEQ AS MAX_APPLY_SEQ_211
+                          ,C.ORD_YMD AS MAX_ORD_YMD_191
+                          ,C.APPLY_SEQ AS MAX_APPLY_SEQ_191
+                          ,(SELECT NVL(MAX(APPLY_SEQ), 0) + 1
+                              FROM THRM221
+                             WHERE ENTER_CD = A.ENTER_CD
+                               AND SABUN = A.SABUN
+                               AND ORD_YMD = A.ORD_YMD) AS NEW_APPLY_SEQ                    
+                          ,DECODE(D.SABUN,NULL,0,1) AS DUP_CNT
+                          ,D.PROCESS_NO AS DUP_PROCESS_NO
+                          ,(SELECT PROCESS_TITLE FROM THRM220 WHERE ENTER_CD = D.ENTER_CD AND PROCESS_NO = D.PROCESS_NO) AS DUP_PROCESS_TITLE
+                          ]]>
+<foreach item="rm" collection="postItemList" >
+    <if test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+                                      ,C.${rm.columnCd}
+        <if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+                                      ,C.${rm.nmColumnCd}
+        </if>
+    </if>
+</foreach>
+                      FROM (SELECT #{ssnEnterCd} AS ENTER_CD
+                                  ,#{ordDetailCd} AS ORD_DETAIL_CD
+                                  ,#{sabun} AS SABUN
+                                  ,#{name} AS NAME
+                                  ,#{ordYmd} AS ORD_YMD
+                                  ,#{ordTypeCd} AS ORD_TYPE_CD
+                                  ,#{ordReasonCd} AS ORD_REASON_CD
+                                  ,#{processNo} AS PROCESS_NO
+                                  ,'N' AS ORD_YN
+                                  ,#{visualYn} AS VISUAL_YN
+                                  ,#{ssnSabun} AS SSN_SABUN
+                                  ,#{sNo} AS S_NO
+                                
+                              FROM DUAL) A
+                          ,(SELECT ENTER_CD
+                                  ,SABUN
+                                  ,ORD_YMD
+                                  ,MAX(APPLY_SEQ) AS APPLY_SEQ
+                              FROM THRM221
+                             WHERE (ENTER_CD, SABUN, ORD_YMD) IN
+                                   (SELECT ENTER_CD
+                                          ,SABUN
+                                          ,MAX(ORD_YMD) AS ORD_YMD
+                                      FROM THRM221
+                                     WHERE ENTER_CD = #{ssnEnterCd}
+                                       AND SABUN IN (#{sabun})
+                                     GROUP BY ENTER_CD
+                                             ,SABUN)
+                             GROUP BY ENTER_CD
+                                     ,SABUN
+                                     ,ORD_YMD) B
+                          ,(SELECT ENTER_CD, SABUN, ORD_YMD, APPLY_SEQ
+<foreach item="rm" collection="postItemList" >
+    <if test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+                                      ,${rm.columnCd}
+        <if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+                                      ,${rm.nmColumnCd}
+        </if>
+    </if>
+</foreach>
+                              FROM THRM191 WHERE (ENTER_CD, SABUN, ORD_YMD, APPLY_SEQ) IN 
+                                   (SELECT ENTER_CD
+                                          ,SABUN
+                                          ,ORD_YMD
+                                          ,MAX(APPLY_SEQ) AS APPLY_SEQ
+                                      FROM THRM191
+                                     WHERE (ENTER_CD, SABUN, ORD_YMD) IN
+                                           (SELECT ENTER_CD
+                                                  ,SABUN
+                                                  ,MAX(ORD_YMD)
+                                              FROM THRM191
+                                             WHERE ENTER_CD = #{ssnEnterCd}
+                                               AND SABUN IN (#{sabun})
+                                             GROUP BY ENTER_CD
+                                                     ,SABUN)
+                                     GROUP BY ENTER_CD
+                                             ,SABUN
+                                             ,ORD_YMD)
+                                   ) C
+                          ,THRM221 D
+                     WHERE A.ENTER_CD = B.ENTER_CD(+)
+                       AND A.ENTER_CD = C.ENTER_CD(+)
+                       AND A.SABUN = C.SABUN(+)
+                       AND A.ENTER_CD = D.ENTER_CD(+)
+                       AND A.ORD_DETAIL_CD = D.ORD_DETAIL_CD(+)
+                       AND A.SABUN = D.SABUN(+)
+                       AND A.ORD_YMD = D.ORD_YMD(+)
+                       AND ROWNUM = 1
+
+        </select>
+        
+        <!-- 대량발령 저장 -->
+        <insert parameterType="map" id="insertOrgAppmtMgrTab2a">
+
+                <![CDATA[
+                    INSERT INTO THRM221
+                          (ENTER_CD
+                          ,ORD_DETAIL_CD
+                          ,SABUN
+                          ,NAME
+                          ,ORD_YMD
+                          ,APPLY_SEQ
+                          ,ORD_TYPE_CD
+                          ,ORD_REASON_CD
+                          ,PROCESS_NO
+                          ,ORD_YN
+                          ,VISUAL_YN
+                          ,MEMO
+                          ,CHKDATE
+                          ,CHKID)
+                        SELECT #{enterCd}
+                          ,#{ordDetailCd}
+                          ,#{sabun}
+                          ,DECODE(#{name},NULL,(SELECT NAME FROM THRM100 WHERE ENTER_CD = #{enterCd} AND SABUN = #{sabun} ),#{name} )
+                          ,#{ordYmd}
+                          ,#{newApplySeq}
+                          ,#{ordTypeCd}
+                          ,#{ordReasonCd}
+                          ,#{processNo}
+                          ,'N'
+                          ,#{visualYn}
+                          ,NULL
+                          ,SYSDATE
+                          ,#{ssnSabun}
+                           FROM DUAL
+                ]]>
+
+        </insert>
+        
+        
+        <insert parameterType="map" id="insertOrgAppmtMgrTab2b">
+
+                <![CDATA[
+                    INSERT INTO THRM223
+                      (ENTER_CD
+                      ,ORD_DETAIL_CD
+                      ,SABUN
+                      ,ORD_YMD
+                      ,APPLY_SEQ
+                      ,POST_ITEM
+                      ,ORD_TYPE_CD
+                      ,CHKDATE
+                      ,CHKID
+                      ,POST_ITEM_VALUE)
+                        ]]>
+<bind name="icnt" value="0" />
+<foreach item="rm" collection="postItemList" >
+    <choose><when test='icnt > 0'>
+                        UNION ALL
+</when><otherwise>
+        <bind name="icnt" value="1" />
+    </otherwise>
+    </choose>
+                      SELECT #{enterCd} AS ENTER_CD
+                            ,#{ordDetailCd} AS ORD_DETAIL_CD
+                            ,#{sabun} AS SABUN
+                            ,#{ordYmd} AS ORD_YMD
+                            ,#{newApplySeq} AS APPLY_SEQ
+                            ,#{rm.postItem} AS POST_ITEM
+                            ,#{ordTypeCd} AS ORD_TYPE_CD
+                            ,SYSDATE AS CHKDATE
+                            ,#{ssnSabun} AS CHKID
+                            ,NVL(#{rm.value}
+                            <choose><when test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+                                ,CASE
+                                   WHEN #{maxOrdYmd211} IS NULL OR #{maxApplySeq211} IS NULL THEN
+                                    #{rm.value191}
+                                   ELSE
+                                    (SELECT POST_ITEM_VALUE
+                                       FROM THRM223
+                                      WHERE ENTER_CD = #{enterCd}
+                                        AND SABUN = #{sabun}
+                                        AND ORD_YMD = #{maxOrdYmd211}
+                                        AND APPLY_SEQ = #{maxApplySeq211}
+                                        AND POST_ITEM = #{rm.postItem})
+                                 END
+                            </when><otherwise>
+                            ,#{rm.value}
+                            </otherwise>
+                            </choose>
+                                 ) POST_ITEM_VALUE
+                        FROM DUAL
+    <if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+                        UNION ALL   
+                      SELECT #{enterCd} AS ENTER_CD
+                            ,#{ordDetailCd} AS ORD_DETAIL_CD
+                            ,#{sabun} AS SABUN
+                            ,#{ordYmd} AS ORD_YMD
+                            ,#{newApplySeq} AS APPLY_SEQ
+                            ,#{rm.postItem}||'_NM' AS POST_ITEM
+                            ,#{ordTypeCd} AS ORD_TYPE_CD
+                            ,SYSDATE AS CHKDATE
+                            ,#{ssnSabun} AS CHKID
+                            ,DECODE(#{rm.value},NULL
+                                    ,CASE
+                                       WHEN #{maxOrdYmd211} IS NULL OR #{maxApplySeq211} IS NULL THEN
+                                        #{rm.nmValue191}
+                                       ELSE
+                                        (SELECT POST_ITEM_VALUE
+                                           FROM THRM223
+                                          WHERE ENTER_CD = #{enterCd}
+                                            AND SABUN = #{sabun}
+                                            AND ORD_YMD = #{maxOrdYmd211}
+                                            AND APPLY_SEQ = #{maxApplySeq211}
+                                            AND POST_ITEM = #{rm.postItem})
+                                     END
+                                    ,
+                                    <choose><when test='rm.popupType != null and rm.popupType.equals("ORG")'>
+                                        F_COM_GET_ORG_NM( #{enterCd} , #{rm.value}    , #{ordYmd})
+                                    </when><when test='rm.popupType != null and rm.popupType.equals("JOB")'>
+                                        F_COM_GET_JOB_NM_201( #{enterCd} , #{rm.value}    , #{ordYmd})
+                                    </when><when test='rm.popupType != null and rm.popupType.equals("LOCATION")'>
+                                        F_COM_GET_LOCATION_NM( #{enterCd}, #{rm.value}    )
+                                    </when><otherwise>
+                                        F_COM_GET_GRCODE_NAME( TRIM( #{enterCd} ) , #{rm.popupType}, #{rm.value})
+                                    </otherwise>
+                                    </choose>
+                             ) AS  POST_ITEM_VALUE
+                        FROM DUAL       
+    </if>
+</foreach>
+        </insert>
+        
+        <delete parameterType="map" id="deleteOrgAppmtMgrTab2Exec">
+
+                    DELETE FROM THRM221 WHERE
+                    (ENTER_CD, ORD_TYPE_CD, ORD_DETAIL_CD, SABUN, ORD_YMD, APPLY_SEQ)
+                    IN 
+                    ( (NULL, NULL, NULL, NULL, NULL, NULL)
+                    <foreach item="rm" collection="deleteRows" >
+                      ,(#{ssnEnterCd}, #{rm.ordTypeCd}, #{rm.ordDetailCd}, #{rm.sabun}, #{rm.ordYmd}, #{rm.applySeq})
+                    </foreach>
+                    )
+
+        </delete>
+
+        
+        <delete parameterType="map" id="deleteOrgAppmtMgrTab2Exec2">
+
+
+                    DELETE FROM THRM223 WHERE
+                    (ENTER_CD, ORD_TYPE_CD, ORD_DETAIL_CD, SABUN, ORD_YMD, APPLY_SEQ)
+                    IN 
+                    ( (NULL, NULL, NULL, NULL, NULL, NULL)
+                    <foreach item="rm" collection="deleteRows" >
+                      ,(#{ssnEnterCd}, #{rm.ordTypeCd}, #{rm.ordDetailCd}, #{rm.sabun}, #{rm.ordYmd}, #{rm.applySeq})
+                    </foreach>
+                    )
+        </delete>
+
+
+</mapper>

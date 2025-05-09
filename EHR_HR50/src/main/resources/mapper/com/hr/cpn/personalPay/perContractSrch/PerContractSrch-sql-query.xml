@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perContractSrch">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerContractSrchList">
+			
+				<![CDATA[
+					SELECT 0 AS DETAIL,
+					       A.CONT_TYPE,
+					       F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.SDATE, #{ssnLocaleCd}) AS ORG_NM,
+					       F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME,
+					       A.SDATE,
+					       A.EDATE,
+					       A.AGREE_YN,
+					       A.BASE_YEAR_MON,
+					       A.FACTORY_YEAR_MON,
+					       A.FOOD_YEAR_MON,
+					       A.BONUS_YEAR_MON,
+					       A.BASE_MON,
+					       A.FACTORY_MON,
+					       A.FOOD_MON,
+					       A.BONUS_MON,
+					       A.SABUN,
+					       B.PATH||B.FILE_NM AS RD_MRD,
+					       DECODE(A.AGREE_DATE,NULL,NULL,TO_CHAR(A.AGREE_DATE,'YYYY-MM-DD  HH24:MI:SS')) AS AGREE_DATE,
+					       A.FILE_SEQ
+					  FROM TCPN412 A
+					  	 , TCPN410 B
+					  WHERE B.ENTER_CD = A.ENTER_CD
+                      AND B.CONT_TYPE = A.CONT_TYPE
+                      AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					  AND A.ENTER_CD = #{ssnEnterCd}
+					  AND A.SABUN = #{searchSabun}
+					 ORDER BY A.SDATE DESC
+				]]>
+		</select>
+		
+<!-- 		저장 -->
+		<update parameterType="map" id="savePerContractSrch">
+                        MERGE INTO TCPN412 T
+                        USING (
+                            SELECT     A.ENTER_CD
+                                    ,  A.SABUN
+                                    ,  A.SDATE
+                                    ,  A.EDATE
+                                    ,  A.CONT_TYPE
+                                    ,  A.AGREE_YN
+                                    ,  A.AGREE_DATE
+                                    ,  A.FILE_SEQ
+                                FROM  (
+                                    SELECT     NULL AS ENTER_CD
+                                        ,  NULL AS SABUN
+                                        ,  NULL AS SDATE
+                                        ,  NULL AS EDATE
+                                        ,  NULL AS CONT_TYPE
+                                        ,  NULL AS AGREE_YN
+                                        ,  NULL AS AGREE_DATE
+                                        ,  NULL AS FILE_SEQ
+                                    FROM  DUAL
+<foreach item="rm" collection="mergeRows">
+                                UNION ALL
+                                    SELECT    TRIM( #{ssnEnterCd} )       AS ENTER_CD
+                                        , TRIM(#{rm.sabun})       AS SABUN
+                                        , TRIM(#{rm.sdate})       AS SDATE
+                                        , TRIM(#{rm.edate})       AS EDATE
+                                        , TRIM(#{rm.contType})      AS CONT_TYPE
+                                        , TRIM(#{rm.agreeYn})     AS AGREE_YN 
+<choose><when test='rm.agreeYn != null and rm.agreeYn eq "Y" and rm.agreeDate != null and rm.agreeDate neq ""'>
+										, TO_DATE(#{rm.agreeDate' ,'YYYY-MM-DD HH24:MI:SS')	AS  AGREE_DATE
+</when><when test='rm.agreeYn != null and rm.agreeYn eq "Y" and (rm.agreeDate == null or rm.agreeDate eq "")'>
+										, SYSDATE				  AS AGREE_DATE
+</when><otherwise>
+										, NULL					  AS AGREE_DATE
+</otherwise></choose>
+                      					, TRIM(#{rm.fileSeq})     AS FILE_SEQ
+                                    FROM   DUAL
+</foreach>
+                                    ) A WHERE A.SABUN IS NOT NULL
+                                ) S
+                            ON (        T.ENTER_CD = #{ssnEnterCd}
+                                  AND T.SABUN   = S.SABUN
+                                  AND T.SDATE   = S.SDATE
+                                  AND T.CONT_TYPE  = S.CONT_TYPE
+                                      )
+                            WHEN MATCHED THEN
+                              UPDATE SET   T.AGREE_YN         = S.AGREE_YN
+                              		,T.AGREE_DATE   = S.AGREE_DATE
+		                  			,T.FILE_SEQ     = S.FILE_SEQ
+                                    ,T.CHKDATE       = SYSDATE
+                                    ,T.CHKID        = #{ssnSabun}
+		</update>
+</mapper>

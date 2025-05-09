@@ -1,0 +1,305 @@
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="yjungsan.util.*"%>
+<%@ page import="yjungsan.util.StringUtil"%>
+<%@ page import="java.util.Map"%>
+<%@ page import="java.util.HashMap"%>
+<%@ page import="org.apache.log4j.Logger" %>
+<%@ page import="java.util.Iterator" %>
+
+<%!
+private Logger logYjungsan = Logger.getLogger(this.getClass());
+
+public String securityCheck(HttpServletRequest request, String sClientIP, String securityXmlPath) throws Exception {
+//보안체크
+	try{
+		HttpSession session	= request.getSession(false);
+
+		String relativeUrlYjungsan = StringUtil.getRelativeUrl(request);
+		String commPageYjungsan = "";
+		String extYjungsan = "";
+
+		if ( relativeUrlYjungsan.lastIndexOf("/") > -1 ) {
+			extYjungsan = relativeUrlYjungsan.substring(relativeUrlYjungsan.lastIndexOf("/"));
+
+			if ( relativeUrlYjungsan.lastIndexOf("/jsp_jungsan/") > -1 ) {
+				commPageYjungsan = relativeUrlYjungsan.substring(relativeUrlYjungsan.lastIndexOf("/jsp_jungsan/"), relativeUrlYjungsan.lastIndexOf("/")+1);
+			}
+		}
+
+		if ( "/jsp_jungsan/common/".equals(commPageYjungsan)
+				&& ( "/commonCode.jsp".equals(extYjungsan)||"/commonSelect.jsp".equals(extYjungsan) ) ) {
+			//공통 디렉토리 아래의 파일
+
+		} else if ( relativeUrlYjungsan.lastIndexOf("Rst.jsp")==(relativeUrlYjungsan.length()-7)
+					|| relativeUrlYjungsan.lastIndexOf("Rst2.jsp")==(relativeUrlYjungsan.length()-8) ) {
+			//Rst파일
+
+		} else {
+			String isAccessPage = "";
+
+			//1.1. 권한체크/로그인 체크/세션변조
+			Map queryMapYjungsanAuth =XmlQueryParser.getQueryMap(securityXmlPath+"/security/securityMgr.xml");
+			Map mpYjungsanAuth = new HashMap();
+			//쿼리 맵 셋팅
+			mpYjungsanAuth.put("ssnEnterCd"	,(String)session.getAttribute("ssnEnterCd"));
+			mpYjungsanAuth.put("ssnSecurityDetail",(session.getAttribute("ssnSecurityDetail")==null?"":(String)session.getAttribute("ssnSecurityDetail")));//보안체크 개별 체크 여부
+			mpYjungsanAuth.put("ssnSabun"	,(String)session.getAttribute("ssnSabun"));
+			mpYjungsanAuth.put("ssnGrpCd"	,(String)session.getAttribute("ssnGrpCd"));
+			mpYjungsanAuth.put("cmd"		,(request.getParameter("cmd")==null?"":(String)request.getParameter("cmd")));
+			mpYjungsanAuth.put("ssnAdmin"	,(session.getAttribute("ssnAdmin")==null?"":(String)session.getAttribute("ssnAdmin")));
+			mpYjungsanAuth.put("clientIp"	,sClientIP);
+			mpYjungsanAuth.put("sessionId"	,session.getId());
+			mpYjungsanAuth.put("relUrl"		,relativeUrlYjungsan);
+
+			String mrdYjungsan = (String)request.getParameter("rdMrd");
+			if( mrdYjungsan != null ) mrdYjungsan = mrdYjungsan.substring(mrdYjungsan.lastIndexOf("/")+1);
+			mpYjungsanAuth.put("mrd", 		(mrdYjungsan==null?"":mrdYjungsan));
+			mpYjungsanAuth.put("rdParam", 	((String)request.getParameter("rdParam")==null?"":(String)request.getParameter("rdParam")));
+
+			//1.1.1. //체크 프로시저 호출및 결과 받기.
+			Map rstMp  = DBConn.executeQueryMap(queryMapYjungsanAuth, "PrcCall_F_SEC_GET_AUTH_CHK_YJUNGSAN", mpYjungsanAuth);
+
+			logYjungsan.debug("PrcCall_F_SEC_GET_AUTH_CHK_YJUNGSAN : " + rstMp );
+			String result = (String)rstMp.get("result");
+
+			//JSONObject jObject  = JSONObject.fromObject(result); //CODE, SECURITY_KEY, DATA_RW_TYPE, DATA_PRG_TYPE
+			net.sf.json.JSONObject jObject  = net.sf.json.JSONObject.fromObject(result); //CODE, SECURITY_KEY, DATA_RW_TYPE, DATA_PRG_TYPE
+			String code = jObject.getString("CODE");
+
+			if( code.equals("0")){
+
+				String securityKey = jObject.getString("SECURITY_KEY");
+
+				if(  securityKey != null && !securityKey.equals("")){ //securityKey
+					request.setAttribute("securityKey", securityKey);
+				} else {
+					request.setAttribute("securityKey", "");
+				}
+
+			}else{
+				return code; //에러
+			}
+
+		}
+
+		//1.2. 조회구분이 '자신만조회'이고, 파라미터 변조 체크(P)를 할 경우 param조작 체크
+		if ( "P".equals((String)session.getAttribute("ssnSearchType"))
+				&& ((String)session.getAttribute("ssnSecurityDetail")).indexOf("P") > -1 ) {
+			String ssnCheckSabun = (String)session.getAttribute("ssnCheckSabun"); //체크 파라미터 명
+			String arr[] = ssnCheckSabun.split(",");
+			for(int i = 0; i < arr.length; i++) {
+				String str = (String)request.getParameter(arr[i]);
+				//1.2.2. 체크 파라미터값이 변조 된 경우
+				if( str != null && !str.equals("") && !str.equals((String)session.getAttribute("ssnSabun")) ){
+					logYjungsan.debug("■■■■■■■■■■■■■■■■■■■ 파라미터 변조 체크 ■■■■■■■■■■■■■■■■■■■■■■■■");
+					logYjungsan.debug("name :" + arr[i] +", param : "+request.getParameter(arr[i]) +", session : "+(String)session.getAttribute("ssnSabun"));
+					session.setAttribute("errorMsg", "[sabun="+str+"]");
+					return "993";
+				}
+			}
+		}
+	} catch(Exception e) {
+
+		logYjungsan.debug("□□□□□□□□□□□□□□□□□□□□□ Exception 보안체크 실패! " + e.getMessage() );
+		e.printStackTrace();
+		return "에러";
+	}
+	return "";
+}
+
+public String decryptUrl(HttpServletRequest request, String securityXmlPath) {
+//암호화URL 조회
+
+	String rtnStr = "";
+	try{
+		HttpSession session	= request.getSession(false);
+
+		Map queryMapYjungsan =XmlQueryParser.getQueryMap(securityXmlPath+"/security/securityMgr.xml");
+		//쿼리 맵 셋팅
+		Map mpYjungsan = new HashMap();
+
+		mpYjungsan.put("url"			,(request.getParameter("surl")==null?"":(String)request.getParameter("surl")));
+		mpYjungsan.put("ssnEncodedKey"	, (session.getAttribute("ssnEncodedKey")==null?"":(String)session.getAttribute("ssnEncodedKey")));
+		//암호화URL 조회 쿼리 실행및 결과 받기.
+		Map rstMp  = DBConn.executeQueryMap(queryMapYjungsan, "getDecryptUrl", mpYjungsan);
+
+		String rn =rstMp.get("sjson").toString();
+
+		//JSONObject jObject = JSONObject.fromObject(rn);
+		net.sf.json.JSONObject jObject  = net.sf.json.JSONObject.fromObject(rn);
+		Iterator keys = jObject.keySet().iterator();
+
+		String key   = "";
+		String value = "";
+		String dataRwType = "";
+		String dataPrgType = "";
+
+		while( keys.hasNext() ){
+			key = (String)keys.next();
+			value = jObject.getString(key);
+			if ( "dataRwType".equals(key) )  dataRwType  = value;
+			if ( "dataPrgType".equals(key) ) dataPrgType = value;
+		}
+		if(  dataPrgType != null && "P".equals(dataPrgType)){  //프로그램 권한.
+			rtnStr = dataRwType;
+		}else{
+			rtnStr = (String)session.getAttribute("ssnDataRwType");
+		}
+
+	} catch(Exception e) {
+		logYjungsan.debug("□□□□□□□□□□□□□□□□□□□□□ Exception 암호화URL 조회 실패! " + e.getMessage() );
+		e.printStackTrace();
+	}
+	return rtnStr;
+}
+
+public void saveError(HttpServletRequest request, String sClientIP, String securityXmlPath, String code) {
+
+	try{
+		HttpSession session	= request.getSession(false);
+
+		String msg = "Error";
+		/*
+		 * 990 : 로그인 정보가 DB에 존재하지 않음
+		 * 991 : 세션 변조
+		 * 992 : 중복 로그인
+		 * 993 : 파라미터 변조
+		 * 994 : 권한 없는 화면 접근
+		 * 995 : URL 직접 접근
+		 */
+		if( code.equals("990")){
+			msg = "로그인 정보가 DB에 존재하지 않음";
+		}else if( code.equals("991")){
+			msg = "세션 변조";
+		}else if( code.equals("992")){
+			msg = "중복 로그인";
+		}else if( code.equals("993")){
+			msg = "파라미터 변조 => " + session.getAttribute("errorMsg");
+		}else if( code.equals("994")){
+			msg = "권한 없는 화면 접근";
+		}else if( code.equals("995")){
+			msg = "URL 직접 접근";
+		}
+
+		String[] type =  new String[]{"STR","STR","STR","STR","STR"
+									,"STR","STR","STR","STR","STR"
+									,"STR"};
+
+		String[] param = new String[]{(String)session.getAttribute("ssnEnterCd"),"view",sClientIP,"",(String)session.getAttribute("errorUrl")
+									,"",code,"",(String)session.getAttribute("ssnGrpCd"),msg
+									,(String)session.getAttribute("ssnSabun")};
+		//에러로그 프로시저 호출.
+		DBConn.executeProcedure("P_COM_SET_OBSERVER",type,param);
+		logYjungsan.debug("P_COM_SET_OBSERVER : ");
+
+	} catch(Exception e) {
+		logYjungsan.debug("□□□□□□□□□□□□□□□□□□□□□ Exception 에러로그 등록 실패! " + e.getMessage() );
+		e.printStackTrace();
+	}
+}
+%>
+<%
+String sUrlAuthPg = "";
+
+try {
+	String isError = "";
+	String chkCode = "";
+
+	session.setAttribute("errorUrl", StringUtil.getRelativeUrl(request));
+
+	//시스템 버전(1 = ActiveX, 2=html)
+	String securityXmlPath = "";
+	if("1".equals(StringUtil.getPropertiesValue("SYS.VERSION"))) {
+		securityXmlPath = session.getServletContext().getRealPath("/JSP/yjungsan/common_jungsan/xml_query");
+	} else {
+		securityXmlPath = session.getServletContext().getRealPath("/yjungsan/common_jungsan/xml_query");
+	}
+
+	//1. Referer null check
+	String referrerYjungsan = (String)request.getHeader("Referer");
+	if ( null==referrerYjungsan||"".equals(referrerYjungsan) ) {
+		logYjungsan.debug("■■■■■■■■■■■■■■■■■■■ 페이지 직접 접근  체크 ■■■■■■■■■■■■■■■■■■■■■■■■");
+		isError = "Y";
+		chkCode = "905";
+
+	} else {
+
+	//2. 시스템 보안체크 여부가 Y이면 보안체크한다.
+		String ssnSecurityYn = (String)session.getAttribute("ssnSecurityYn"); //시스템 보안체크 여부
+
+		if( null!=ssnSecurityYn && "Y".equals(ssnSecurityYn) ){
+
+			String sClientIP = request.getHeader("X-FORWARDED-FOR");
+			if (sClientIP == null || sClientIP.length() == 0) {
+				sClientIP = request.getHeader("Proxy-Client-IP");
+			}
+			if (sClientIP == null || sClientIP.length() == 0) {
+				sClientIP = request.getHeader("WL-Proxy-Client-IP");  // 웹로직
+			}
+			if (sClientIP == null || sClientIP.length() == 0) {
+				sClientIP = request.getRemoteAddr() ;
+			}
+
+			logYjungsan.debug("■■■■■■■■■■■■■■■■■ [ 보안 체크 시작 ]■■■■■■■■■■■■■■■■■■■■■■■■■■");
+
+			chkCode = securityCheck(request, sClientIP, securityXmlPath);
+			logYjungsan.debug("■ [ code: "+chkCode+" ] ");
+
+			//에러 발생시
+			if( !chkCode.equals("") ){
+				//에러 로그 등록 프로시저 호출
+				saveError(request, sClientIP, securityXmlPath, chkCode);
+				isError = "Y";
+			}
+			logYjungsan.debug("■■■■■■■■■■■■■■■■■[ 보안 체크 종료 ]■■■■■■■■■■■■■■■■■■■■■■■■■");
+
+		} else {
+			if(  request.getAttribute("securityKey") == null ){ //securityKey
+				request.setAttribute("securityKey", "");
+			}
+		}
+	}
+
+	//에러 발생 시
+	if ( "Y".equals(isError) ) {
+
+		//세션 끊기
+		session.invalidate();
+
+		if("ajax".equals( request.getHeader("IBUserAgent")) || "ibsheet".equals( request.getHeader("IBUserAgent"))) {
+			//ajax로 넘어옴
+			out.print("{\"Data\":{},\"Result\":{\"Code\":\""+chkCode+"\",\"Message\":\"\"}}");
+			return;
+
+		} else {
+
+			if (chkCode.equals("905")) {
+				if("1".equals(StringUtil.getPropertiesValue("SYS.VERSION"))) {
+					response.sendRedirect("/JSP/ErrorPage.jsp");
+				} else {
+					response.sendRedirect("/Login.do");
+				}
+			} else {
+				if("1".equals(StringUtil.getPropertiesValue("SYS.VERSION"))) {
+					response.sendRedirect("/JSP/info.jsp?code="+chkCode);
+				} else {
+					response.sendRedirect("/Info.do?code="+chkCode);
+				}
+			}
+
+			return;
+		}
+	}
+
+	//3. left메뉴에서 surl이 넘어올 경우 암호화URL 조회
+	if ( null != request.getParameter("surl") && !"".equals((String)request.getParameter("surl"))) {
+
+		sUrlAuthPg = decryptUrl(request, securityXmlPath);
+	}
+
+} catch(Exception e) {
+	logYjungsan.debug("□□□□□□□□□□□□□□□□□□□□□ Exception 체크 실패1! " + e.getMessage() );
+	throw new Exception();
+}
+%>
+

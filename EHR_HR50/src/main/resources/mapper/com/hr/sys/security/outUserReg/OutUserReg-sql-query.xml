@@ -1,0 +1,593 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+	<mapper namespace="sys.security.outUserReg">
+<!--		조회(외부사용자) -->
+		<select parameterType="map" resultType="cMap" id="getOutUserRegList">
+
+				<![CDATA[
+					SELECT 	  '0' AS PWD_RESET
+							, A.ID
+		 					, A.SKIN_TYPE
+		 					, A.FONT_TYPE
+		 					, A.ROCKING_YN
+		 					, B.SABUN
+		 					, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) AS NAME
+		 					, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS') AS ALIAS
+		 					, F_COM_GET_CONT_ADDRESS(B.ENTER_CD,B.SABUN,'OM') AS MAIL_ID
+		 					, F_COM_GET_CONT_ADDRESS(B.ENTER_CD,B.SABUN,'HP') AS HAND_PHONE
+		 					, D.GRP_CD
+		 					, D.DATA_RW_TYPE
+		 					, D.SEARCH_TYPE
+		 					, E.COM_NM
+		 					, E.ORG_NM
+		 					, E.JIKCHAK_NM
+		 					, E.JIKGUB_NM
+		 					, F_COM_GET_JIKWEE_NM (B.ENTER_CD,B.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+		 					, F.SDATE
+		 					, F.EDATE
+		 					, E.MAIN_MENU_CD
+		 					, (SELECT AA.PRG_NM FROM TSYS301 AA WHERE AA.PRG_CD = E.MAIN_MENU_CD) AS MAIN_MENU_NM
+		 					, E.NOTE
+		 					, DECODE ( A.PASSWORD , NULL, '', '**********' ) AS PASSWORD
+					FROM TSYS305 A, THRM100 B, TSYS313 D, TSYS911 E, THRM151 F
+                	WHERE A.ENTER_CD 	= B.ENTER_CD
+                  		AND A.SABUN 	= B.SABUN	]]>
+	              	<if test='searchSabunName != null and !searchSabunName.equals("")'>
+	              		AND ( F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) LIKE '%'||trim(#{searchSabunName})||'%' OR UPPER(A.SABUN) 	= UPPER(trim(#{searchSabunName})) )
+					</if>
+	                   	AND A.ENTER_CD 	= D.ENTER_CD(+)
+		              	AND A.SABUN 	= D.SABUN(+)
+
+	                   	AND A.ENTER_CD 	= E.ENTER_CD(+)
+		              	AND A.SABUN 	= E.SABUN(+)
+		              	
+		              	AND A.ENTER_CD 	= F.ENTER_CD (+)
+		              	AND A.SABUN 	= F.SABUN (+)
+					<if test='searchUseYn != null and searchUseYn.equals("Y")'>
+	              		AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN F.SDATE AND NVL(F.EDATE, '29991231')
+					</if>
+	              	
+		              	AND A.ENTER_CD	= #{ssnEnterCd}
+		              	AND NVL(A.EXTRA_YN, 'N')	= 'Y' -- 외부사용자
+	              	<if test='searchId != null and !searchId.equals("")'>
+	              		AND A.ID 	LIKE '%'||trim(#{searchId})||'%'
+					</if>
+
+					ORDER BY B.NAME, E.S_YMD
+
+
+		</select>
+		
+<!--		조회(중복체크) -->
+		<select parameterType="map" resultType="cMap" id="getOutUserRegPopMap">
+
+				<![CDATA[
+					SELECT COUNT(*) AS CNT 
+					]]>
+					<if test='searchType.equals("SABUN")'>
+	              		FROM THRM100 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM( #{searchSabun} )
+					</if>
+					<if test='searchType.equals("ID")'>
+	              		FROM TSYS305 WHERE ENTER_CD = #{ssnEnterCd} AND ID = TRIM( #{searchId} )
+					</if>
+
+
+
+		</select>
+		
+<!--		저장(사원정보) -->
+		<update parameterType="map" id="saveOutUserReg100">
+
+   					MERGE INTO THRM100 T
+                  	USING (
+               				SELECT    A.ENTER_CD
+               						, A.SABUN
+                                	, A.NAME
+                     		FROM   (
+                               		SELECT    NULL			AS ENTER_CD
+                                			, NULL			AS SABUN
+                                			, NULL			AS NAME
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT    #{ssnEnterCd}		AS ENTER_CD
+                                       		, TRIM(#{rm.sabun})	AS SABUN
+                                       		, TRIM(#{rm.name})	AS NAME
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.ENTER_CD IS NOT NULL
+                           ) S
+                        ON ( T.ENTER_CD = #{ssnEnterCd} AND T.SABUN = S.SABUN )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.NAME			= S.NAME
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD
+               				, T.SABUN
+               				, T.NAME
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			) 
+               			VALUES 
+               			(
+               				  S.ENTER_CD
+               				, S.SABUN
+               				, S.NAME
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+
+
+		</update>
+		
+<!--		저장(연락처) -->	
+		<update parameterType="map" id="saveOutUserReg124">
+
+   					MERGE INTO THRM124 T
+                  	USING (
+               				SELECT    A.ENTER_CD
+               						, A.SABUN
+                                	, A.CONT_TYPE
+                                	, A.CONT_ADDRESS
+                     		FROM   (
+                               		SELECT    NULL			AS ENTER_CD
+                                			, NULL			AS SABUN
+                                			, NULL			AS CONT_TYPE
+                                			, NULL			AS CONT_ADDRESS
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+					<if test='rm.mailId != null and !rm.mailId.equals("")'>
+                  	UNION ALL
+                                	SELECT    #{ssnEnterCd}			AS ENTER_CD
+                                       		, TRIM(#{rm.sabun})		AS SABUN
+                                       		, F_COM_GET_GRCODE_CODE(#{ssnEnterCd}, 'H12410', '사외이메일')	AS CONT_TYPE
+                                       		, TRIM(#{rm.mailId})	AS CONT_ADDRESS
+                                	FROM   DUAL
+					</if>
+    				<if test='rm.handPhone != null and !rm.handPhone.equals("")'>
+                  	UNION ALL
+                                	SELECT    #{ssnEnterCd}			AS ENTER_CD
+                                       		, TRIM(#{rm.sabun})		AS SABUN
+                                       		, F_COM_GET_GRCODE_CODE(#{ssnEnterCd}, 'H12410', '휴대전화')	AS CONT_TYPE
+                                       		, TRIM(#{rm.handPhone})	AS CONT_ADDRESS
+                                	FROM   DUAL
+					</if>
+</foreach>
+									) A
+							WHERE A.ENTER_CD IS NOT NULL
+                           ) S
+                        ON ( T.ENTER_CD = #{ssnEnterCd} AND T.SABUN = S.SABUN AND T.CONT_TYPE = S.CONT_TYPE)
+           			WHEN MATCHED THEN
+         				UPDATE SET  T.CONT_ADDRESS		= S.CONT_ADDRESS
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD
+               				, T.SABUN
+               				, T.CONT_TYPE
+               				, T.CONT_ADDRESS
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			) 
+               			VALUES 
+               			(
+               				  S.ENTER_CD
+               				, S.SABUN
+               				, S.CONT_TYPE
+               				, S.CONT_ADDRESS
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+
+
+		</update>
+		
+<!--		저장(사원정보) -->
+		<update parameterType="map" id="saveOutUserReg151">
+
+   					MERGE INTO THRM151 T
+                  	USING (
+               				SELECT    A.ENTER_CD
+               						, A.SABUN
+                                	, A.SDATE
+                                	, A.EDATE
+                     		FROM   (
+                               		SELECT    NULL			AS ENTER_CD
+                                			, NULL			AS SABUN
+                                			, NULL			AS SDATE
+                                			, NULL			AS EDATE
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT    #{ssnEnterCd}		AS ENTER_CD
+                                       		, TRIM(#{rm.sabun})	AS SABUN
+                                       		, TRIM(#{rm.sdate})	AS SDATE
+                                       		, TRIM(#{rm.edate})	AS EDATE
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.ENTER_CD IS NOT NULL
+                           ) S
+                        ON ( T.ENTER_CD = #{ssnEnterCd} AND T.SABUN = S.SABUN )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.SDATE			= S.SDATE
+                                  	, T.EDATE			= S.EDATE
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD
+               				, T.SABUN
+               				, T.SDATE
+               				, T.EDATE
+               				, T.STATUS_CD
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			) 
+               			VALUES 
+               			(
+               				  S.ENTER_CD
+               				, S.SABUN
+               				, S.SDATE
+               				, S.EDATE
+               				, 'RAA'
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		
+<!--		저장(ID) -->	
+		<update parameterType="map" id="saveOutUserReg305">
+
+   					MERGE INTO TSYS305 T
+                  	USING (
+               				SELECT    A.ENTER_CD
+               						, A.SABUN
+                                	, A.ID
+                                	, A.MAINPAGE_TYPE
+                                	, A.SEARCH_TYPE
+                                	, A.ROCKING_YN
+                                	, A.SKIN_TYPE
+                                	, A.FONT_TYPE
+                                	, A.GW_USE_TYPE
+                                	, A.FOC_TYPE
+                                	, A.EXTRA_YN
+                                	, A.PASSWORD
+               						, A.PASS_UDT_YN
+                     		FROM   (
+                               		SELECT    NULL			AS ENTER_CD
+                               				, NULL			AS SABUN
+                                			, NULL			AS ID
+                                			, NULL			AS MAINPAGE_TYPE
+                                			, NULL			AS SEARCH_TYPE
+                                			, NULL			AS ROCKING_YN
+                                			, NULL			AS SKIN_TYPE
+                                			, NULL			AS FONT_TYPE
+                                			, NULL          AS GW_USE_TYPE
+                                			, NULL          AS FOC_TYPE
+                                			, NULL          AS EXTRA_YN
+                                			, NULL          AS PASSWORD
+											, NULL          AS PASS_UDT_YN
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT    #{ssnEnterCd}				AS ENTER_CD
+                                			, TRIM(#{rm.sabun})  		AS SABUN
+                                       		, TRIM(#{rm.id})			AS ID
+                                       		, TRIM(#{rm.mainpageType})	AS MAINPAGE_TYPE
+                                       		, 'P'		AS SEARCH_TYPE
+                                       		, TRIM(#{rm.rockingYn})	AS ROCKING_YN
+                                       		, TRIM(#{rm.skinType})		AS SKIN_TYPE
+                                       		, TRIM(#{rm.fontType})		AS FONT_TYPE
+                                       		, ''		AS GW_USE_TYPE
+                                       		, ''		AS FOC_TYPE
+                                       		, 'Y'		AS EXTRA_YN
+                                       		, TRIM(#{rm.password})		AS PASSWORD
+											, TRIM(#{rm.passUdtYn})		AS PASS_UDT_YN
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.ENTER_CD IS NOT NULL
+                           ) S
+                        ON ( T.ENTER_CD = #{ssnEnterCd} AND T.SABUN = S.SABUN )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.ID				= S.ID
+                                  	, T.MAINPAGE_TYPE	= S.MAINPAGE_TYPE
+                                  	, T.SEARCH_TYPE		= S.SEARCH_TYPE
+                                  	, T.ROCKING_YN		= S.ROCKING_YN
+                                  	, T.SKIN_TYPE		= S.SKIN_TYPE
+                                  	, T.FONT_TYPE		= S.FONT_TYPE
+                                  	, T.GW_USE_TYPE		= S.GW_USE_TYPE
+                                  	, T.FOC_TYPE		= S.FOC_TYPE
+                                  	, T.EXTRA_YN		= S.EXTRA_YN
+                                  	, T.PASSWORD		= NVL2(S.PASS_UDT_YN, CRYPTIT.CRYPT( S.PASSWORD, #{ssnEnterCd} ), T.PASSWORD)
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD
+               				, T.SABUN
+               				, T.ID
+                          	, T.MAINPAGE_TYPE
+                          	, T.SEARCH_TYPE
+                          	, T.ROCKING_YN
+                          	, T.SKIN_TYPE
+                          	, T.FONT_TYPE
+                          	, T.GW_USE_TYPE
+                          	, T.FOC_TYPE
+                          	, T.EXTRA_YN
+                          	, T.PASSWORD
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			) 
+               			VALUES 
+               			(
+               				  S.ENTER_CD
+               				, S.SABUN
+               				, S.ID
+               				, S.MAINPAGE_TYPE
+               				, S.SEARCH_TYPE
+               				, S.ROCKING_YN
+               				, S.SKIN_TYPE
+               				, S.FONT_TYPE
+               				, S.GW_USE_TYPE
+               				, S.FOC_TYPE
+               				, S.EXTRA_YN
+               				, CRYPTIT.CRYPT( S.PASSWORD, #{ssnEnterCd} )
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		
+<!--		저장(권한) -->	
+		<update parameterType="map" id="saveOutUserReg313">
+
+   					MERGE INTO TSYS313 T
+                  	USING (
+               				SELECT    A.ENTER_CD
+                                	, A.GRP_CD
+                                	, A.SABUN
+                                	, A.DATA_RW_TYPE
+                                	, A.SEARCH_TYPE
+                     		FROM   (
+                               		SELECT    NULL			AS ENTER_CD
+                                			, NULL			AS GRP_CD
+                                			, NULL			AS SABUN
+                                			, NULL			AS DATA_RW_TYPE
+                                			, NULL			AS SEARCH_TYPE
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT    #{ssnEnterCd}		AS ENTER_CD
+                                       		, TRIM(#{rm.grpCd})	AS GRP_CD
+                                       		, TRIM(#{rm.sabun})	AS SABUN
+                                       		, TRIM(#{rm.dataRwType})	AS DATA_RW_TYPE
+                                       		, TRIM(#{rm.searchType})	AS SEARCH_TYPE
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.ENTER_CD IS NOT NULL
+                           ) S
+                        ON ( T.ENTER_CD = #{ssnEnterCd} AND T.SABUN = S.SABUN )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.GRP_CD			= S.GRP_CD
+                                  	, T.DATA_RW_TYPE	= S.DATA_RW_TYPE
+                                  	, T.SEARCH_TYPE		= S.SEARCH_TYPE
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD
+               				, T.GRP_CD
+               				, T.SABUN
+                          	, T.DATA_RW_TYPE
+                          	, T.SEARCH_TYPE
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			)
+               			VALUES 
+               			(
+               				  S.ENTER_CD
+               				, S.GRP_CD
+               				, S.SABUN
+                          	, S.DATA_RW_TYPE
+                          	, S.SEARCH_TYPE
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		
+<!--		저장(외부사용자정보) -->	
+		<update parameterType="map" id="saveOutUserReg911">
+
+   					MERGE INTO TSYS911 T
+                  	USING (
+               				SELECT    A.ENTER_CD
+                                	, A.SABUN
+                                	, A.NAME
+                                	, A.COM_NM
+                                	, A.ORG_NM
+                                	, A.JIKCHAK_NM
+                                	, A.JIKGUB_NM
+                                	, A.S_YMD
+                                	, A.E_YMD
+                                	, A.MAIN_MENU_CD
+                                	, A.NOTE
+                     		FROM   (
+                               		SELECT    NULL			AS ENTER_CD
+                                			, NULL			AS SABUN
+                                			, NULL			AS NAME
+                                			, NULL			AS COM_NM
+                                			, NULL			AS ORG_NM
+                                			, NULL			AS JIKCHAK_NM
+                                			, NULL			AS JIKGUB_NM
+                                			, NULL			AS S_YMD
+                                			, NULL			AS E_YMD
+                                			, NULL			AS MAIN_MENU_CD
+                                			, NULL			AS NOTE
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT    #{ssnEnterCd}				AS ENTER_CD
+                                       		, TRIM(#{rm.sabun})			AS SABUN
+                                       		, TRIM(#{rm.name})			AS NAME
+                                       		, TRIM(#{rm.comNm})			AS COM_NM
+                                       		, TRIM(#{rm.orgNm})			AS ORG_NM
+                                       		, TRIM(#{rm.jikchakNm})		AS JIKCHAK_NM
+                                       		, TRIM(#{rm.jikgubNm})		AS JIKGUB_NM
+                                       		, TRIM(#{rm.sdate})			AS S_YMD
+                                       		, TRIM(#{rm.edate})			AS E_YMD
+                                       		, TRIM(#{rm.mainMenuCd})	AS MAIN_MENU_CD
+                                       		, TRIM(#{rm.note})			AS NOTE
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.ENTER_CD IS NOT NULL
+                           ) S
+                        ON ( T.ENTER_CD = #{ssnEnterCd} AND T.SABUN = S.SABUN )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.COM_NM			= S.COM_NM
+		                           	, T.ORG_NM			= S.ORG_NM
+		                           	, T.NAME            = S.NAME
+		                           	, T.JIKCHAK_NM		= S.JIKCHAK_NM
+		                           	, T.JIKGUB_NM		= S.JIKGUB_NM
+		                           	, T.S_YMD			= S.S_YMD
+		                           	, T.E_YMD			= S.E_YMD
+		                           	, T.MAIN_MENU_CD	= S.MAIN_MENU_CD
+		                           	, T.NOTE			= S.NOTE
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD
+                           	, T.SABUN
+                           	, T.NAME
+                           	, T.COM_NM
+                           	, T.ORG_NM
+                           	, T.JIKCHAK_NM
+                           	, T.JIKGUB_NM
+                           	, T.S_YMD
+                           	, T.E_YMD
+                           	, T.MAIN_MENU_CD
+                           	, T.NOTE
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			) 
+               			VALUES 
+               			(
+               				  S.ENTER_CD
+                           	, S.SABUN
+                           	, S.NAME
+                           	, S.COM_NM
+                           	, S.ORG_NM
+                           	, S.JIKCHAK_NM
+                           	, S.JIKGUB_NM
+                           	, S.S_YMD
+                           	, S.E_YMD
+                           	, S.MAIN_MENU_CD
+                           	, S.NOTE
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		
+<!--		삭제(사원정보) -->
+		<delete parameterType="map" id="deleteOutUserReg100">
+
+   					DELETE FROM THRM100 
+					WHERE (ENTER_CD, SABUN) IN (  (NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+							, ( #{ssnEnterCd}, TRIM(#{rm.sabun}) )
+					</foreach>
+					)
+
+
+
+		</delete>
+
+<!--		삭제(연락처) -->
+		<delete parameterType="map" id="deleteOutUserReg124">
+
+   					DELETE FROM THRM124 
+					WHERE (ENTER_CD, SABUN) IN (  (NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+							, ( #{ssnEnterCd}, TRIM(#{rm.sabun}) )
+					</foreach>
+					)
+		</delete>
+		
+<!--		삭제(연락처) -->
+		<delete parameterType="map" id="deleteOutUserReg151">
+
+   					DELETE FROM THRM151
+					WHERE (ENTER_CD, SABUN) IN (  (NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+							, ( #{ssnEnterCd}, TRIM(#{rm.sabun}) )
+					</foreach>
+					)
+		</delete>
+		
+<!--		삭제(ID) -->
+		<delete parameterType="map" id="deleteOutUserReg305">
+
+   					DELETE FROM TSYS305 
+					WHERE (ENTER_CD, SABUN) IN (  (NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+							, ( #{ssnEnterCd}, TRIM(#{rm.sabun}) )
+					</foreach>
+					)
+		</delete>
+		
+<!--		삭제(권한) -->
+		<delete parameterType="map" id="deleteOutUserReg313">
+
+   					DELETE FROM TSYS313 
+					WHERE (ENTER_CD, SABUN) IN (  (NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+							, ( #{ssnEnterCd}, TRIM(#{rm.sabun}) )
+					</foreach>
+					)
+		</delete>
+		
+<!--		삭제(외부사용자) -->
+		<delete parameterType="map" id="deleteOutUserReg911">
+
+   					DELETE FROM TSYS911 
+					WHERE (ENTER_CD, SABUN) IN (  (NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+							, ( #{ssnEnterCd}, TRIM(#{rm.sabun}) )
+					</foreach>
+					)
+		</delete>
+
+<!--		콤보(권한코드) -->
+		<select parameterType="map" resultType="cMap" id="getOutUserRegGrpCd">
+
+				<![CDATA[
+					SELECT GRP_CD AS CODE, GRP_NM AS CODE_NM
+					FROM TSYS307
+					WHERE ENTER_CD = #{ssnEnterCd}
+				]]>
+
+
+		</select>
+		
+
+
+
+</mapper>
+

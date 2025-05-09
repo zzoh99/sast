@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.etc.psnalPcMgr">
+
+	<!-- 조직도 조회 -->
+	<select id="getPsnalPcMgrOrgList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.LVL AS "_level"
+                , A.ORG_CD 
+                , A.ORG_NM
+                , NVL(B.MAP_CD, F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'TIM_STD_WORK_ORG_CD')) AS WORK_ORG_CD
+				, B.MAP_NM AS WORK_ORG_NM
+             FROM (
+			    SELECT LEVEL AS LVL
+                        , A.ENTER_CD
+                        , A.ORG_CD
+			    	 , B.ORG_NM
+                        , A.ORDER_SEQ
+			      FROM (
+			               SELECT T.ENTER_CD, T.ORG_CD, T.PRIOR_ORG_CD, T.SDATE, T.SEQ, T.ORDER_SEQ
+			                 FROM TORG105 T
+			                WHERE T.ENTER_CD = TRIM( #{ssnEnterCd} )
+			                  AND T.SDATE =
+			                      ( SELECT MAX(SDATE)
+			                          FROM TORG103
+			                         WHERE ENTER_CD = T.ENTER_CD
+			                           AND TRIM(#{searchSdate}) BETWEEN SDATE AND NVL(EDATE, '29991231') )
+			           ) A, TORG101 B
+			     WHERE A.ENTER_CD = B.ENTER_CD
+		           AND A.ORG_CD   = B.ORG_CD
+		           AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+			     START WITH A.PRIOR_ORG_CD = '0'
+			   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+				   AND PRIOR A.SDATE       = A.SDATE
+				   AND PRIOR A.ORG_CD      = A.PRIOR_ORG_CD
+                  ) A 
+                , (
+                   SELECT ENTER_CD, ORG_CD, MAP_CD, F_COM_GET_MAP_NM2(ENTER_CD, MAP_TYPE_CD, MAP_CD, SDATE) AS MAP_NM
+                     FROM TORG107
+                    WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                      AND MAP_TYPE_CD = '500'
+                      AND NVL(TRIM(#{searchSdate}),'99991231') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                   ) B
+            WHERE A.ENTER_CD = B.ENTER_CD(+)
+              AND A.ORG_CD   = B.ORG_CD(+)
+            ORDER BY ORDER_SEQ      
+	]]>
+	</select>
+
+	<select id="getPsnalPcMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[		
+			SELECT A.ENTER_CD
+				 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+				 , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, B.SDATE) AS ORG_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020' , B.JIKCHAK_CD) AS JIKCHAK_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030' , B.JIKWEE_CD) AS JIKWEE_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010' , B.JIKGUB_CD) AS JIKGUB_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H100
+			     50' , B.WORK_TYPE) AS WORKTYPE_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010' , B.STATUS_CD) AS STATUS_NM
+			     , A.SEQ
+			     , A.ORG_CD
+			     , A.SABUN
+			     , A.SDATE
+			     , A.EDATE
+			     , A.SERIAL_NO
+			     , A.PROD_NM
+			     , A.PROD_TYPE
+			     , A.PROD_COMP
+			     , A.PROD_YM
+			     , A.PROCESSOR
+			     , A.RAM
+			     , A.STATUS_CD
+			     , A.NOTE		
+			  FROM TBEN740 A , THRM151 B
+			 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND A.ENTER_CD = B.ENTER_CD(+)
+			   AND A.SABUN    = B.SABUN(+) 
+			   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE(+) AND NVL(B.EDATE(+),'99991231') ]]>
+		<if test="searchStatusCd != null and searchStatusCd neq ''">
+			   AND A.STATUS_CD    = TRIM(#{searchStatusCd})
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+			   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+		</if>
+		<if test="searchOrgCd != null and searchOrgCd neq ''">
+			   AND A.ORG_CD IN (SELECT #{searchOrgCd}
+                                  FROM DUAL
+				<if test="searchOrgType != null and searchOrgType neq ''">
+								  UNION ALL
+								SELECT ORG_CD
+								  FROM ( SELECT ENTER_CD, SDATE, ORG_CD, PRIOR_ORG_CD
+                                           FROM TORG105
+                                          WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                            AND SDATE    = TRIM( #{searchSdate} ) )
+                                 START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                               CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                   AND PRIOR SDATE    = SDATE
+                                   AND PRIOR ORG_CD   = PRIOR_ORG_CD
+				</if>
+								)
+		</if>				 
+		     ORDER BY DECODE(A.SABUN, NULL, 1, 2), F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+	</select>
+
+	<update id="savePsnalPcMgr" parameterType="map">
+	<![CDATA[			
+		 MERGE INTO TBEN740 T 
+		 USING ( ]]>
+		 <foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+		 	  SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+		            , TRIM(#{rm.seq})  			AS  SEQ
+		            , TRIM(#{rm.orgCd})  		AS  ORG_CD
+		            , TRIM(#{rm.sabun})  		AS  SABUN
+		            , TRIM(#{rm.sdate})  		AS  SDATE
+		            , TRIM(#{rm.edate})  		AS  EDATE
+		            , TRIM(#{rm.serialNo})  	AS  SERIAL_NO
+		            , TRIM(#{rm.prodNm})  		AS  PROD_NM
+		            , TRIM(#{rm.prodType})  	AS  PROD_TYPE
+		            , TRIM(#{rm.prodComp})  	AS  PROD_COMP
+		            , TRIM(#{rm.prodYm})  		AS  PROD_YM
+		            , TRIM(#{rm.processor})  	AS  PROCESSOR
+		            , TRIM(#{rm.ram})  			AS  RAM
+		            , TRIM(#{rm.statusCd})  	AS  STATUS_CD
+		            , TRIM(#{rm.note})  		AS  NOTE
+	        FROM DUAL
+		 </foreach>
+		<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD = S.ENTER_CD 
+		     AND  T.SEQ = S.SEQ 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE		= sysdate 
+		            , T.CHKID		= #{ssnSabun} 
+		            , T.ORG_CD 		= S.ORG_CD 
+		            , T.SABUN 		= S.SABUN 
+		            , T.SDATE 		= S.SDATE 
+		            , T.EDATE 		= S.EDATE 
+		            , T.SERIAL_NO 	= S.SERIAL_NO 
+		            , T.PROD_NM		= S.PROD_NM 
+		            , T.PROD_TYPE 	= S.PROD_TYPE 
+		            , T.PROD_COMP 	= S.PROD_COMP 
+		            , T.PROD_YM 	= S.PROD_YM 
+		            , T.PROCESSOR 	= S.PROCESSOR 
+		            , T.RAM 		= S.RAM 
+		            , T.STATUS_CD 	= S.STATUS_CD 
+		            , T.NOTE 		= S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.SEQ
+		            , T.ORG_CD
+		            , T.SABUN
+		            , T.SDATE
+		            , T.EDATE
+		            , T.SERIAL_NO
+		            , T.PROD_NM
+		            , T.PROD_TYPE
+		            , T.PROD_COMP
+		            , T.PROD_YM
+		            , T.PROCESSOR
+		            , T.RAM
+		            , T.STATUS_CD
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S_TBEN740.NEXTVAL
+		            , S.ORG_CD
+		            , S.SABUN
+		            , S.SDATE
+		            , S.EDATE
+		            , S.SERIAL_NO
+		            , S.PROD_NM
+		            , S.PROD_TYPE
+		            , S.PROD_COMP
+		            , S.PROD_YM
+		            , S.PROCESSOR
+		            , S.RAM
+		            , S.STATUS_CD
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+
+	<delete id="deletePsnalPcMgr" parameterType="map">
+	<![CDATA[
+	DELETE FROM TBEN740
+	 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+	   AND ( SEQ ) IN ( ( NULL) ]]>
+	<foreach item="rm" collection="deleteRows">
+		<if test="rm.seq != null and rm.seq neq ''">
+			, ( TRIM( #{rm.seq} ) ) 
+		</if>
+	</foreach>
+		)
+	</delete>
+</mapper>

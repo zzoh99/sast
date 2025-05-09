@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="pap.evaluation.mltsrcEvlt">
+<!--        조회 -->
+        <select parameterType="map" resultType="cMap" id="getMltsrcEvltList">
+
+                <![CDATA[
+                    SELECT A.ENTER_CD
+                         , A.APPRAISAL_CD
+                         , A.SABUN
+                         , A.APP_ORG_CD
+                         , A.APP_SEQ_CD
+                         , A.APP_SABUN
+                         , A.COMPETENCY_CD
+                         , A.COMPETENCY_NM
+                         , B.MEMO AS COMPETENCY_DETAIL
+                         , A.COMP_POINT
+                         , A.COMP_CLASS_CD
+                         , A.COMP_OPINION
+                         , C.APP_MEMO1
+                         , C.APP_MEMO2
+                         , C.APP_UP_MEMO1
+                         , C.APP_UP_MEMO2
+                         , C.APP_UP_MEMO3
+                    FROM   TPAP404 A
+                         , TORG051 B
+                         , TPAP406 C
+                    WHERE  A.ENTER_CD      = B.ENTER_CD
+                    AND    A.COMPETENCY_CD = B.COMPETENCY_CD
+
+                    AND    A.ENTER_CD      = C.ENTER_CD(+)
+					AND    A.APPRAISAL_CD  = C.APPRAISAL_CD(+)
+					AND    A.SABUN         = C.SABUN(+)
+					AND    A.APP_ORG_CD    = C.APP_ORG_CD(+)
+					AND    A.APP_SEQ_CD    = C.APP_SEQ_CD(+)
+					AND    A.APP_SABUN     = C.APP_SABUN(+)
+
+                    AND    A.ENTER_CD      = TRIM(#{ssnEnterCd})
+                    AND    A.APPRAISAL_CD  = TRIM(#{searchAppraisalCd})
+                    AND    A.SABUN         = TRIM(#{searchSabun})
+                    AND    A.APP_ORG_CD    = TRIM(#{searchAppOrgCd})
+                    AND    A.APP_SEQ_CD    = TRIM(#{searchAppSeqCd})
+                    AND    A.APP_SABUN     = TRIM(#{searchAppSabun})
+                    ORDER BY A.COMPETENCY_CD
+                ]]>
+
+
+        </select>
+
+
+        <select parameterType="map" resultType="cMap" id="getMltsrcEvltMap">
+
+                <![CDATA[
+                    SELECT A.APPRAISAL_YN AS STATUS_CD
+                          ,DECODE(A.APPRAISAL_YN,'Y','평가완료','미완료') AS STATUS_NM
+                          ,(SELECT JIKGUB_NM
+                              FROM TPAP201
+                             WHERE ENTER_CD     = A.ENTER_CD
+                               AND APPRAISAL_CD = A.APPRAISAL_CD
+                               AND APP_STEP_CD  = A.APP_STEP_CD
+                               AND SABUN        = A.SABUN
+                               AND APP_ORG_CD   = A.APP_ORG_CD
+                            ) AS JIKGUB_NM
+                          ,(SELECT JIKWEE_NM
+                              FROM TPAP201
+                             WHERE ENTER_CD     = A.ENTER_CD
+                               AND APPRAISAL_CD = A.APPRAISAL_CD
+                               AND APP_STEP_CD  = A.APP_STEP_CD
+                               AND SABUN        = A.SABUN
+                               AND APP_ORG_CD   = A.APP_ORG_CD
+                            ) AS JIKWEE_NM
+                          ,B.APP_MEMO1
+                          ,B.APP_MEMO2
+                          ,B.APP_UP_MEMO1
+                          ,B.APP_UP_MEMO2
+                          ,B.APP_UP_MEMO3
+                      FROM TPAP202 A , TPAP406 B
+                     WHERE A.ENTER_CD     = #{ssnEnterCd}
+                       AND A.APPRAISAL_CD = #{searchAppraisalCd}
+                       AND A.APP_STEP_CD  = '5'
+                       AND A.SABUN        = #{searchSabun}
+                       AND A.APP_ORG_CD   = #{searchAppOrgCd}
+                       AND A.APP_SEQ_CD   = #{searchAppSeqCd}
+                       AND A.APP_SABUN    = #{searchAppSabun}
+                       AND A.ENTER_CD     = B.ENTER_CD(+)
+                       AND A.APPRAISAL_CD = B.APPRAISAL_CD(+)
+                       AND A.SABUN        = B.SABUN(+)
+                       AND A.APP_ORG_CD   = B.APP_ORG_CD(+)
+                       AND A.APP_SEQ_CD   = B.APP_SEQ_CD(+)
+                       AND A.APP_SABUN    = B.APP_SABUN(+)
+                ]]>
+
+
+        </select>
+
+<!--        저장 -->
+        <update parameterType="map" id="saveMltsrcEvlt">
+
+                    MERGE INTO TPAP404 T
+                    USING   (
+                            SELECT A.ENTER_CD
+                                 , A.APPRAISAL_CD
+                                 , A.SABUN
+                                 , A.APP_SABUN
+                                 , A.APP_ORG_CD
+                                 , A.APP_SEQ_CD
+                                 , A.COMPETENCY_CD
+                                 , A.COMP_CLASS_CD
+                            FROM    (
+                                    SELECT  NULL AS ENTER_CD
+                                          , NULL AS APPRAISAL_CD
+                                          , NULL AS SABUN
+                                          , NULL AS APP_SABUN
+                                          , NULL AS APP_ORG_CD
+                                          , NULL AS APP_SEQ_CD
+                                          , NULL AS COMPETENCY_CD
+                                          , NULL AS COMP_CLASS_CD
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT  #{ssnEnterCd}                        AS ENTER_CD
+                                            , TRIM( #{rm.appraisalCd} )        AS APPRAISAL_CD
+                                            , TRIM( #{rm.sabun} )              AS SABUN
+                                            , TRIM( #{rm.appSabun} )           AS APP_SABUN
+                                            , TRIM( #{rm.appOrgCd} )           AS APP_ORG_CD
+                                            , TRIM( #{rm.appSeqCd} )           AS APP_SEQ_CD
+                                            , TRIM( #{rm.competencyCd} )       AS COMPETENCY_CD
+                                            , TRIM( #{rm.compClassCd} )       AS COMP_CLASS_CD
+                                        FROM   DUAL
+</foreach>
+                                ) A WHERE A.ENTER_CD IS NOT NULL
+                            ) S
+                    ON (     T.ENTER_CD             = S.ENTER_CD
+                        AND  T.APPRAISAL_CD         = S.APPRAISAL_CD
+                        AND  T.SABUN                = S.SABUN
+                        AND  T.APP_ORG_CD           = S.APP_ORG_CD
+                        AND  T.APP_SEQ_CD           = S.APP_SEQ_CD
+                        AND  T.APP_SABUN            = S.APP_SABUN
+                        AND  T.COMPETENCY_CD        = S.COMPETENCY_CD
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.COMP_CLASS_CD = S.COMP_CLASS_CD
+                                    , T.CHKDATE       = SYSDATE
+                                    , T.CHKID         = #{ssnSabun}
+        </update>
+
+<!-- 다면평가 의견 저장 -->
+		<update parameterType="map" id="saveMltsrcEvltMemo">
+
+
+                    MERGE INTO TPAP406 T
+                    USING   (
+                            SELECT A.ENTER_CD
+                                 , A.APPRAISAL_CD
+                                 , A.SABUN
+                                 , A.APP_SABUN
+                                 , A.APP_ORG_CD
+                                 , A.APP_SEQ_CD
+								<if test='searchAppSeqCd != null and searchAppSeqCd.equals("3")'>
+								 , A.APP_UP_MEMO1
+	                             , A.APP_UP_MEMO2
+	                             , A.APP_UP_MEMO3
+                                </if>
+								<if test='searchAppSeqCd != null and searchAppSeqCd.equals("4")'>
+	                             , A.APP_MEMO1
+	                             , A.APP_MEMO2
+                                </if>
+                            FROM    (
+                                    SELECT  NULL AS ENTER_CD
+                                          , NULL AS APPRAISAL_CD
+                                          , NULL AS SABUN
+                                          , NULL AS APP_SABUN
+                                          , NULL AS APP_ORG_CD
+                                          , NULL AS APP_SEQ_CD
+											<if test='searchAppSeqCd != null and searchAppSeqCd.equals("3")'>
+											, NULL       			AS APP_UP_MEMO1
+                                            , NULL       			AS APP_UP_MEMO2
+                                            , NULL       			AS APP_UP_MEMO3
+                                            </if>
+                                            <if test='searchAppSeqCd != null and searchAppSeqCd.equals("4")'>
+											, NULL       			AS APP_MEMO1
+                                            , NULL       			AS APP_MEMO2
+                                            </if>
+                                    FROM    DUAL
+                            UNION ALL
+                                    SELECT  #{ssnEnterCd}                        	AS ENTER_CD
+                                            , TRIM( #{searchAppraisalCd} )        AS APPRAISAL_CD
+                                            , TRIM( #{searchSabun} )              AS SABUN
+                                            , TRIM( #{searchAppSabun} )           AS APP_SABUN
+                                            , TRIM( #{searchAppOrgCd} )           AS APP_ORG_CD
+                                            , TRIM( #{searchAppSeqCd} )           AS APP_SEQ_CD
+											<if test='searchAppSeqCd != null and searchAppSeqCd.equals("3")'>
+											, TRIM( #{appUpMemo1} )       			AS APP_UP_MEMO1
+                                            , TRIM( #{appUpMemo2} )       			AS APP_UP_MEMO2
+                                            , TRIM( #{appUpMemo3} )       			AS APP_UP_MEMO3
+                                            </if>
+											<if test='searchAppSeqCd != null and searchAppSeqCd.equals("4")'>
+                                            , TRIM( #{appMemo1} )       			AS APP_MEMO1
+                                            , TRIM( #{appMemo2} )       			AS APP_MEMO2
+                                            </if>
+                                        FROM   DUAL
+                                ) A WHERE A.ENTER_CD IS NOT NULL
+                            ) S
+                    ON (     T.ENTER_CD             = S.ENTER_CD
+                        AND  T.APPRAISAL_CD         = S.APPRAISAL_CD
+                        AND  T.SABUN                = S.SABUN
+                        AND  T.APP_ORG_CD           = S.APP_ORG_CD
+                        AND  T.APP_SEQ_CD           = S.APP_SEQ_CD
+                        AND  T.APP_SABUN            = S.APP_SABUN
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET
+                                      T.CHKDATE     = SYSDATE
+                                    , T.CHKID       = #{ssnSabun}
+								<if test='searchAppSeqCd != null and searchAppSeqCd.equals("3")'>
+                        			,  T.APP_UP_MEMO1 	= S.APP_UP_MEMO1
+                        			,  T.APP_UP_MEMO2 	= S.APP_UP_MEMO2
+                        			,  T.APP_UP_MEMO3 	= S.APP_UP_MEMO3
+                                </if>
+								<if test='searchAppSeqCd != null and searchAppSeqCd.equals("4")'>
+                        			,  T.APP_MEMO1 	= S.APP_MEMO1
+                                    , T.APP_MEMO2 	= S.APP_MEMO2
+                                </if>
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.SABUN
+							, T.APP_ORG_CD
+							, T.APP_SEQ_CD
+							, T.APP_SABUN
+								<if test='searchAppSeqCd != null and searchAppSeqCd.equals("3")'>
+                        			,  T.APP_UP_MEMO1
+                        			,  T.APP_UP_MEMO2
+                        			,  T.APP_UP_MEMO3
+								</if><if test='searchAppSeqCd != null and searchAppSeqCd.equals("4")'>
+                        			,  T.APP_MEMO1
+                                    , T.APP_MEMO2
+                                </if>
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.SABUN
+							, S.APP_ORG_CD
+							, S.APP_SEQ_CD
+							, S.APP_SABUN
+								<if test='searchAppSeqCd != null and searchAppSeqCd.equals("3")'>
+                        			, S.APP_UP_MEMO1
+                        			, S.APP_UP_MEMO2
+                        			, S.APP_UP_MEMO3
+								</if><if test='searchAppSeqCd != null and searchAppSeqCd.equals("4")'>
+                        			, S.APP_MEMO1
+                                    , S.APP_MEMO2
+                                </if>
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+        </update>
+
+        <update parameterType="map" id="prcMltsrcEvltUpd" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_TPAP406_UPDATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchAppOrgCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSeqCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+        </update>
+
+        <update parameterType="map" id="prcMltsrcEvlt" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_TPAP406_UPDATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchAppOrgCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSeqCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+        </update>
+
+
+<!-- 평가항목의견 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMltsrcEvltAppItemOpinionList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPRAISAL_CD
+					     , TRIM( #{searchSabun} ) AS SABUN
+					     , TRIM( #{searchAppOrgCd} ) AS APP_ORG_CD
+					     , A.APP_SEQ_CD
+					     , A.SEQ
+					     , A.APP_ITEM
+					     , (
+					        SELECT B.APP_OPINION
+					          FROM TPAP408 B
+					         WHERE B.ENTER_CD     = A.ENTER_CD
+					           AND B.APPRAISAL_CD = A.APPRAISAL_CD
+					           AND B.APP_SEQ_CD   = A.APP_SEQ_CD
+					           AND B.SEQ          = A.SEQ
+					           AND B.SABUN        = TRIM( #{searchSabun} )
+					           AND B.APP_ORG_CD   = TRIM( #{searchAppOrgCd} )
+					           AND B.APP_SABUN    = TRIM( #{searchAppSabun} )
+					       ) AS APP_OPINION
+					  FROM TPAP407 A
+					 WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+					   AND A.APPRAISAL_CD = TRIM( #{searchAppraisalCd} )
+					   AND A.APP_SEQ_CD = TRIM( #{searchAppSeqCd} )
+				]]>
+
+
+		</select>
+
+<!-- 개인별 평가항목의견 저장 -->
+		<update parameterType="map" id="saveMltsrcEvltAppItemOpinion">
+
+					MERGE INTO TPAP408 T
+					USING (
+					          SELECT A.ENTER_CD
+					               , A.APPRAISAL_CD
+					               , A.SABUN
+					               , A.APP_ORG_CD
+					               , A.APP_SEQ_CD
+					               , A.APP_SABUN
+					               , A.SEQ
+					               , A.APP_OPINION
+					            FROM (
+					                      SELECT NULL AS ENTER_CD
+					                           , NULL AS APPRAISAL_CD
+					                           , NULL AS SABUN
+					                           , NULL AS APP_ORG_CD
+					                           , NULL AS APP_SEQ_CD
+					                           , NULL AS APP_SABUN
+					                           , NULL AS SEQ
+					                           , NULL AS APP_OPINION
+					                        FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+					                       UNION ALL
+					                      SELECT #{ssnEnterCd} AS ENTER_CD
+					                           , TRIM( #{rm.appraisalCd} ) AS APPRAISAL_CD
+					                           , TRIM( #{rm.sabun} ) AS SABUN
+					                           , TRIM( #{rm.appOrgCd} ) AS APP_ORG_CD
+					                           , TRIM( #{rm.appSeqCd} ) AS APP_SEQ_CD
+					                           , TRIM( #{searchAppSabun} ) AS APP_SABUN
+					                           , TRIM( #{rm.seq} ) AS SEQ
+					                           , TRIM( #{rm.appOpinion} ) AS APP_OPINION
+					                        FROM DUAL
+</foreach>
+					                 ) A
+					           WHERE A.ENTER_CD IS NOT NULL
+					      ) S
+					   ON (
+					                T.ENTER_CD     = S.ENTER_CD
+					           AND  T.APPRAISAL_CD = S.APPRAISAL_CD
+					           AND  T.SABUN        = S.SABUN
+					           AND  T.APP_ORG_CD   = S.APP_ORG_CD
+					           AND  T.APP_SEQ_CD   = S.APP_SEQ_CD
+					           AND  T.APP_SABUN    = S.APP_SABUN
+					           AND  T.SEQ          = S.SEQ
+					               )
+					WHEN MATCHED THEN
+					     UPDATE SET T.CHKDATE     = SYSDATE
+					              , T.CHKID       = #{ssnSabun}
+					              , T.APP_OPINION = S.APP_OPINION
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					           T.ENTER_CD
+					         , T.APPRAISAL_CD
+					         , T.SABUN
+					         , T.APP_ORG_CD
+					         , T.APP_SEQ_CD
+					         , T.APP_SABUN
+					         , T.SEQ
+					         , T.APP_OPINION
+					         , T.CHKDATE
+					         , T.CHKID
+					     ) VALUES (
+					           S.ENTER_CD
+					         , S.APPRAISAL_CD
+					         , S.SABUN
+					         , S.APP_ORG_CD
+					         , S.APP_SEQ_CD
+					         , S.APP_SABUN
+					         , S.SEQ
+					         , S.APP_OPINION
+					         , SYSDATE
+					         , #{ssnSabun}
+					     )
+        </update>
+
+</mapper>

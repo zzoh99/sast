@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobSchemeIBOrgSrch">
+		<!-- 18.10.12 발령 기준일(orderDate) 추가 예정 -->
+		
+		<select parameterType="map" resultType="cMap" id="getJobSchemeIBOrgSrchListOrg">
+
+				<![CDATA[
+						SELECT LVL AS "_level"
+						,   LVL2 AS DEPTLEVEL
+						,   ENTER_CD AS ENTERCD
+						,   SDATE
+						,   PRIOR_JOB_CD AS UPDEPTCD
+						,   JOB_CD AS DEPTCD
+						,   SEQ
+						,   DIRECT AS SUPPORTSLOT
+						,   NODEDESIGN
+						,   JOB_NM AS DEPTNM
+						,   '' AS EMPCD
+						,   LINKCOLOR
+						,   '' AS INLINE
+						,   '' AS HP
+						,   '' AS EMAIL
+						,   '' AS POSITION
+						,   '' AS TITLE
+						,   '' AS EMPNM
+						,   '' AS EMP_YMD
+						,   '' AS BIR_YMD
+						,   '' AS ORI_ENTER_CD
+						,   '' AS DOUBLE_YN
+						FROM (
+	                        SELECT 1 AS LVL
+	                        , 1 AS LVL2
+	                        , '/' || NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AS JOB_PATH
+	                        , NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AS ENTER_CD
+	                        , '18000101' AS SDATE
+	                        , '0' AS PRIOR_JOB_CD
+	                        , NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AS JOB_CD
+	                        , 1 AS SEQ
+	                        , '' AS DIRECT
+	                        , 1 AS NODEDESIGN
+	                        , '직무' AS JOB_NM
+	                        , '#4D8FBB' AS LINKCOLOR
+	                        FROM DUAL
+	                        UNION ALL 
+	                        SELECT * FROM (
+							SELECT LEVEL + 1 AS LVL
+							    ,   length(JOB_CD)-length(replace(JOB_CD,'-','')) + 2 AS LVL2
+							    ,   '/' || NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) || SYS_CONNECT_BY_PATH(JOB_CD, '/') AS JOB_PATH
+							    ,   ENTER_CD
+							    ,	(SELECT SDATE FROM TORG201 WHERE ENTER_CD = NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AND JOB_CD = A.JOB_CD AND #{baseDate} BETWEEN SDATE AND NVL(EDATE, '99991231') AND ROWNUM = 1 ) AS SDATE
+							    ,   CASE WHEN PRIOR_JOB_CD = '0' THEN ENTER_CD ELSE PRIOR_JOB_CD END AS PRIOR_JOB_CD
+							    ,   JOB_CD
+							    ,   ROWNUM AS SEQ
+							    ,   '' AS DIRECT
+							    ,   length(JOB_CD)-length(replace(JOB_CD,'-','')) + 2 AS NODEDESIGN
+							    , ' '|| REPLACE ( F_COM_GET_JOB_NM_201 (ENTER_CD, JOB_CD, #{baseDate} ), F_COM_GET_JOB_NM_201 (ENTER_CD, PRIOR_JOB_CD, #{baseDate} )|| '-','') AS JOB_NM
+							    ,   DECODE ( length(JOB_CD)-length(replace(JOB_CD,'-','')) + 2, 1, '#4D8FBB',
+							                                                                    3, '#45951D',
+							                                                                    4, '#D45231',
+							                                                                    6, '#006491',
+							                                                                    7, '#4EA98B', '#F0A830') LINKCOLOR
+							FROM TORG204 A
+							WHERE ENTER_CD = NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd}))
+							START WITH PRIOR_JOB_CD 	= '0'
+							CONNECT BY	PRIOR ENTER_CD  = ENTER_CD
+							        AND PRIOR SDATE     = SDATE
+							        AND PRIOR JOB_CD    = PRIOR_JOB_CD
+							ORDER SIBLINGS BY PRIOR_JOB_CD, JOB_CD
+							) A
+						) A
+						ORDER BY SEQ
+				]]>
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getJobSchemeIBOrgSrchListPhotoBox2">
+
+				<![CDATA[
+					SELECT
+					CASE WHEN LISTPID is not null THEN count(*) over (partition by LISTPID) ELSE 0 END LISTCOUNT
+					, SUM(EMPCNT) OVER (PARTITION BY JOB_CD) AS EMPCNT
+					, LVL AS "_level", LVL2 AS DEPTLEVEL
+					, NVL(F_COM_GET_JOB_NM_201 (ENTER_CD, JOB_CD, SDATE ), '직무') AS DEPTNM
+					, F_COM_GET_CONT_ADDRESS (ENTER_CD,SABUN,'OT')  AS INLINE
+					, F_COM_GET_CONT_ADDRESS (ENTER_CD,SABUN,'HP')  AS HP
+					, F_COM_GET_CONT_ADDRESS (ENTER_CD,SABUN,'IM')  AS EMAIL
+					, ENTER_CD AS ENTERCD
+					, SDATE
+					, PRIOR_JOB_CD AS UPDEPTCD
+					, JOB_CD AS DEPTCD, SEQ, DIRECT AS SUPPORTSLOT, SABUN AS EMPCD, LINKCOLOR
+					, JIKWEE_NM AS POSITION, JIKWEE_NM AS TITLE
+					, NAME AS EMPNM, EMP_YMD
+					, BIR_YMD, NODEDESIGN, LISTPID, NODEID, HIDDENCOL AS "_hidden", DUALEMP
+					, DECODE(ENTER_CD,ORI_ENTER_CD,NULL,     DECODE(  SUBSTR(ORI_ENTER_CD,-2)  ,'EL','E','EP','P','HN','H',NULL)             ) AS ORI_ENTER_CD
+					, DOUBLE_YN
+					FROM (
+					    SELECT DISTINCT A.LVL, A.LVL2, A.ENTER_CD, A.SDATE,  A.PRIOR_JOB_CD, A.JOB_CD, A.SEQ,  A.DIRECT,  A.SABUN, LINKCOLOR
+					         , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, #{baseDate}) AS JIKWEE_NM
+					         , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, #{baseDate}) AS JIKCHAK_NM
+					         , '' AS FILENAME, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+					         , TO_CHAR (TO_DATE (B.EMP_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')AS EMP_YMD
+					         , TO_CHAR (TO_DATE (B.BIR_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')AS BIR_YMD
+					         , '' AS LISTPID
+					         , JOB_CD AS NODEID
+					         , DECODE ((SELECT COUNT (1)
+					                      FROM THRM151
+					                     WHERE ENTER_CD = NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd}))
+					                       AND STATUS_CD NOT IN ('RA', 'RAA','RT')
+					                       AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL ( EDATE, '99991231')
+					                       AND JOB_CD = A.JOB_CD
+					                       AND SABUN NOT IN (SELECT D.SABUN FROM TORG111 D
+					                                         WHERE D.ENTER_CD = ENTER_CD
+					                                           AND D.JOB_CD = JOB_CD
+					                                           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND NVL(D.EDATE, '99991231'))
+					                   ), 0, 'GridList', 'GridList') AS NODEDESIGN
+					         , 0 AS HIDDENCOL
+					         , DUALEMP
+					         , F_COM_GET_ORIGIN_ENTER_CD(A.ENTER_CD,A.SABUN,#{baseDate}) AS ORI_ENTER_CD
+					         , F_HRM_GET_DOUBLE_JOB(A.ENTER_CD, '02',A.SABUN) AS DOUBLE_YN
+					         , SUM(DISTINCT A.EMPCNT) OVER(partition by A.JOB_CD) EMPCNT
+					    FROM (
+					          SELECT T.*, RANK() OVER(ORDER BY JOB_CD) AS SEQ
+					            FROM (
+					                    SELECT LEVEL AS LVL, LVL2, ENTER_CD, SDATE, PRIOR_JOB_CD, JOB_CD, DIRECT, NODEDESIGN
+					                    , JOB_NM, SABUN, LINKCOLOR, DUALEMP, '/' || NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) || SYS_CONNECT_BY_PATH(JOB_CD, '/') AS JOB_PATH, EMPCNT
+					                      FROM(
+						                      SELECT
+	                                                  1 AS LVL2
+	                                                , NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AS ENTER_CD
+	                                                , '18000101' AS SDATE
+	                                                , '0' AS PRIOR_JOB_CD
+	                                                , NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AS JOB_CD
+	                                                , '' AS DIRECT
+	                                                , 1 AS NODEDESIGN
+	                                                , '직무' AS JOB_NM
+	                                                , 'N' AS DUALEMP
+	                                                , '' AS SABUN
+	                                                , '#4D8FBB' AS LINKCOLOR
+	                                                , 0 AS EMPCNT
+	                                            FROM DUAL
+	                                            UNION ALL
+					                            SELECT 
+					                                length(A.JOB_CD)-length(replace(A.JOB_CD,'-','')) + 2 AS LVL2
+					                                , A.ENTER_CD
+					                                , (SELECT SDATE FROM TORG201 WHERE ENTER_CD = NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AND JOB_CD = A.JOB_CD AND #{baseDate} BETWEEN SDATE AND NVL(EDATE, '99991231') AND ROWNUM = 1 ) AS SDATE
+					                                , CASE WHEN PRIOR_JOB_CD = '0' THEN ENTER_CD ELSE PRIOR_JOB_CD END AS PRIOR_JOB_CD
+					                                , A.JOB_CD AS JOB_CD
+					                                , '' AS DIRECT
+					                                , length(JOB_CD)-length(replace(JOB_CD,'-','')) + 2 AS NODEDESIGN
+					                                , ' '|| REPLACE ( F_COM_GET_JOB_NM_201 (ENTER_CD, JOB_CD, #{baseDate} ), F_COM_GET_JOB_NM_201 (ENTER_CD, PRIOR_JOB_CD, #{baseDate})|| '-','') AS JOB_NM
+					                                , 'N' AS DUALEMP
+					                                , '' AS SABUN
+					                                , DECODE (length(JOB_CD)-length(replace(JOB_CD,'-','')) + 2, 1, '#4D8FBB',3, '#45951D',4, '#D45231',6, '#006491',7, '#4EA98B','#F0A830') AS LINKCOLOR
+					                                , 0 AS EMPCNT
+					                                FROM TORG204 A
+					                                WHERE A.ENTER_CD = NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd}))
+					                                AND A.JOB_CD <> 'A-2-1'
+					                           )
+					                    START WITH PRIOR_JOB_CD = '0' 
+					                    CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					                        --AND PRIOR SDATE = SDATE
+					                        AND PRIOR JOB_CD = PRIOR_JOB_CD
+					                    ORDER SIBLINGS BY PRIOR_JOB_CD
+					                )T
+					         )A, THRM100 B
+					    WHERE A.SABUN = B.SABUN(+)
+					      AND A.ENTER_CD = B.ENTER_CD(+)
+					    UNION ALL
+					    SELECT LVL, LV2, ENTER_CD, SDATE, PRIOR_JOB_CD
+					     , JOB_CD, SEQ, DIRECT, SABUN, LINKCOLOR, JIKWEE_NM, JIKCHAK_NM, FILENAME, NAME, EMP_YMD, BIR_YMD, LISTPID, NODEID, NODEDESIGN
+					     , HIDDENCOL, DUALEMP, ORI_ENTER_CD, DOUBLE_YN
+					     , COUNT(DISTINCT EMPCNT) OVER(partition by JOB_CD) EMPCNT
+					    FROM (
+					        SELECT 2 AS LVL
+					             , length(C.JOB_CD)-length(replace(C.JOB_CD,'-','')) + 2 AS LV2
+					             , C.ENTER_CD
+					             , (SELECT SDATE FROM TORG201 WHERE ENTER_CD = NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd})) AND JOB_CD = D.JOB_CD AND #{baseDate} BETWEEN SDATE AND NVL(EDATE, '99991231') AND ROWNUM = 1 ) AS SDATE
+					             , D.PRIOR_JOB_CD
+					             , C.JOB_CD
+					             , 99 AS SEQ
+					             , '' DIRECT
+					             , C.SABUN
+					             , DECODE (length(C.JOB_CD)-length(replace(C.JOB_CD,'-','')) + 2
+					                ,	1, '#4D8FBB',3, '#45951D',4, '#D45231',6, '#006491',7, '#4EA98B','#F0A830') AS LINKCOLOR
+					             , F_COM_GET_JIKWEE_NM(C.ENTER_CD, C.SABUN, #{baseDate}) AS JIKWEE_NM
+					             , F_COM_GET_JIKCHAK_NM(C.ENTER_CD, C.SABUN, #{baseDate}) AS JIKCHAK_NM
+					             , '' FILENAME
+					             , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN) AS NAME
+					             , EMP_YMD, BIR_YMD
+					             , C.JOB_CD AS LISTPID
+					             , C.JOB_CD || '_' || C.SABUN NODEID
+					             , 'OrgBox' NODEDESIGN
+					             , 0 AS HIDDENCOL
+					             , 'N' AS DUALEMP
+					             , F_COM_GET_ORIGIN_ENTER_CD(C.ENTER_CD,C.SABUN,#{baseDate}) AS ORI_ENTER_CD
+					             , F_HRM_GET_DOUBLE_JOB(C.ENTER_CD, '02',C.SABUN) AS DOUBLE_YN
+					             , CASE WHEN C.SABUN is not null THEN count(*) over (partition by C.JOB_CD) ELSE 0 END EMPCNT
+					          FROM THRM151 C, TORG204 D, THRM100 E
+					         WHERE C.ENTER_CD = D.ENTER_CD
+					           AND C.ENTER_CD = E.ENTER_CD
+					           AND C.SABUN = E.SABUN
+					           AND C.JOB_CD = D.JOB_CD
+					           AND C.ENTER_CD = NVL(TRIM(#{schEnterCd}), TRIM(#{ssnEnterCd}))
+					           AND STATUS_CD NOT IN ('RA', 'RAA','RT')
+					           AND #{baseDate} BETWEEN C.SDATE AND NVL (C.EDATE, '99991231')
+					       )
+					)
+					ORDER BY SEQ,JOB_CD
+
+				]]>
+
+
+		</select>
+		
+
+</mapper>
+

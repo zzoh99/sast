@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 연말정산계산 -->
+<root>
+
+	<!-- 연말정산 급여코드 조회 -->
+	<query id="selectYeaPayActionInfo">
+		<![CDATA[
+			SELECT PAY_ACTION_CD
+				 , PAY_ACTION_NM
+			  FROM tcpn201
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_YM  LIKE #searchYear# || '%'
+			   AND PAY_CD = 'Y1'
+		]]>
+	</query>
+
+	<query id="selectYeaCalcCreSheet1List">
+		<![CDATA[
+			SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0,'Y','N') FINAL_CLOSE_YN
+			  FROM TCPN811
+			 WHERE ENTER_CD       = #ssnEnterCd#
+			   AND WORK_YY  	  = #searchWorkYy#
+			   AND ADJUST_TYPE    = #searchAdjustType#
+			   AND PAY_ACTION_CD  = #searchPayActionCd#
+			   $query$
+		]]>
+	</query>
+
+	<query id="selectYeaCalcCreSheet2List">
+		<![CDATA[
+			SELECT
+				(SELECT COUNT(*)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   $query$
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#) AS T_CNT,
+				(SELECT COUNT(*)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   $query$
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#) AS ALL_811_CNT,
+				(SELECT COUNT(PAY_PEOPLE_STATUS)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   $query$
+				   AND UPPER(PAY_PEOPLE_STATUS) = 'C') AS C_CNT,
+				(SELECT COUNT(PAY_PEOPLE_STATUS)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   $query$
+				   AND (UPPER(PAY_PEOPLE_STATUS) = 'P' OR UPPER(PAY_PEOPLE_STATUS) = 'M') OR UPPER(PAY_PEOPLE_STATUS) = 'PM') AS P_CNT,
+				(SELECT COUNT(PAY_PEOPLE_STATUS)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   $query$
+				   AND UPPER(PAY_PEOPLE_STATUS) = 'J') AS J_CNT,
+				(SELECT COUNT(FINAL_CLOSE_YN)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   $query$
+				   AND UPPER(FINAL_CLOSE_YN) = 'Y') AS FINAL_Y_CNT,
+				(SELECT COUNT(FINAL_CLOSE_YN)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   $query$
+				   AND UPPER(FINAL_CLOSE_YN) = 'N') AS FINAL_N_CNT
+			FROM DUAL
+		]]>
+	</query>
+
+	<!-- 대상인원전체 상태 저장 -->
+	<query id="savePayPeopleStatus">
+		<![CDATA[
+			UPDATE TCPN811
+			   SET PAY_PEOPLE_STATUS  = #searchPayPeopleStatus#
+				 , CHKDATE	  = SYSDATE
+				 , CHKID     = #ssnSabun#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+			   $query$
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="saveFinalCloseTCPN811">
+		<![CDATA[
+			UPDATE TCPN811
+			   SET FINAL_CLOSE_YN  = #searchFinalCloseYN#
+				 , CHKDATE	  = SYSDATE
+				 , CHKID     = #ssnSabun#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #searchWorkYy#
+			   AND ADJUST_TYPE = #searchAdjustType#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="deleteFinalCloseTCPN981">
+		<![CDATA[
+			DELETE FROM TCPN981
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="insertFinalCloseTCPN981">
+		<![CDATA[
+			INSERT INTO TCPN981
+			(
+				ENTER_CD
+				, PAY_ACTION_CD
+				, CLOSE_YN
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #searchPayActionCd#
+				, #closeYn#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="saveFinalCloseTCPN983">
+		<![CDATA[
+			UPDATE TCPN983
+			   SET CLOSE_ST  = '10005'
+				 , CHKDATE	  = SYSDATE
+				 , CHKID     = #ssnSabun#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]>
+	</query>
+
+	<!-- FAQ 게시판 조회 -->
+	<query id="selectFaqActionInList">
+		<![CDATA[
+			SELECT ENTER_CD
+				,WORK_YY
+				,ADJUST_TYPE
+				,BIZ_CD
+				,F_COM_GET_GRCODE_NAME(#ssnEnterCd#,'YEA005',BIZ_CD) AS BIZ_NM
+				,SEQ
+				,TITLE
+				,REPLY
+				,BIGO
+				,CHKDATE
+				,CHKID
+			  FROM TYEA932
+			 WHERE ENTER_CD       = #ssnEnterCd#
+			   AND ADJUST_TYPE    = #searchAdjustType#
+			   AND WORK_YY        = #searchWorkYy#
+			   $query$
+			   $query2$
+			ORDER BY TO_NUMBER(BIZ_CD), SEQ
+		]]>
+	</query>
+	<!-- 연말정산 급여일자 생성 -->
+	<query id="insertYeaPayDayTCPN201">
+		<![CDATA[
+            INSERT INTO TCPN201
+       		(
+	           ENTER_CD,
+	           PAY_ACTION_CD,
+	           PAY_ACTION_NM,
+	           PAY_YM,
+	           PAY_CD,
+	           PAYMENT_YMD,
+	           ORD_SYMD,
+	           ORD_EYMD,
+	           TIME_YM,
+	           CAL_TAX_METHOD,
+	           CHKDATE,
+	           CHKID
+     		)
+	       VALUES
+	       (
+	           #ssnEnterCd#,
+			   #searchWorkYy#||'12'||TRIM((SELECT TO_CHAR(TO_NUMBER(NVL(MAX(SUBSTR(PAY_ACTION_CD, 7, 3)), '0')) + 1, '000')
+	           						         FROM TCPN201
+	                                        WHERE ENTER_CD = #ssnEnterCd#
+	                                          AND SUBSTR (PAY_ACTION_CD, 1, 6) = #searchWorkYy#||'12' )),
+	           #searchWorkYy#||'.12.31 연말정산',
+	           #searchWorkYy#||'12',
+	           'Y1',
+	           #searchWorkYy#||'1231',
+	           #searchWorkYy#||'1201',
+	           #searchWorkYy#||'1231',
+	           #searchWorkYy#||'12',
+	           'B',
+	           SYSDATE,
+	           #ssnSabun#
+	          )
+		]]>
+	</query>
+	<!-- 임직원 메뉴 오픈 조회 -->
+	<query id="selectOrgAuthStatus">
+		<![CDATA[
+			SELECT DECODE(NVL(MAX(USE_YN),'0'), 'Y', '1', 'N', '0', NVL(MAX(USE_YN),'0')) AS USE_YN
+			  FROM TSYS311 A
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.MAIN_MENU_CD = '07'
+			   AND (A.MENU_NM IN ('연말정산_' || #searchWorkYy#, '종(전)근무지', '소득공제자료관리', '정산계산/결과')
+			       OR A.PRG_CD IN ('yjungsan/y_' || #searchWorkYy# || '/jsp_jungsan/befComMgr/befComMgr.jsp'
+			                     , 'yjungsan/y_' || #searchWorkYy# || '/jsp_jungsan/yeaData/yeaData.jsp'
+			                     , 'yjungsan/y_' || #searchWorkYy# || '/jsp_jungsan/yeaCalcLst/yeaCalcLst.jsp') )
+			   AND (A.GRP_CD IN ('99') OR A.GRP_CD IN (SELECT GRP_CD
+			                                             FROM TSYS307
+			                                            WHERE ENTER_CD = A.ENTER_CD
+			                                              AND GRP_NM LIKE '%임직원공통%'))
+			   AND A.MENU_CD IN ( SELECT MENU_CD FROM TSYS311 B
+			                       WHERE B.ENTER_CD = #ssnEnterCd#
+			                         AND B.MAIN_MENU_CD = '07'
+			                       START WITH B.MENU_NM = '연말정산_' || #searchWorkYy#
+			                      CONNECT BY PRIOR B.ENTER_CD = B.ENTER_CD
+			                             AND PRIOR B.MAIN_MENU_CD = B.MAIN_MENU_CD
+			                             AND PRIOR B.GRP_CD = B.GRP_CD
+			                             AND PRIOR B.MENU_SEQ = B.MENU_SEQ
+			                             AND PRIOR B.MENU_CD = B.PRIOR_MENU_CD )
+		]]>
+	</query>
+
+	<!-- 임직원 메뉴 오픈 저장 -->
+	<query id="saveOrgAuthStatus">
+		<![CDATA[
+			MERGE INTO TSYS311 T
+			USING (
+						SELECT A.ENTER_CD
+			           , A.MAIN_MENU_CD
+			           , A.PRIOR_MENU_CD
+			           , A.MENU_CD
+			           , A.MENU_SEQ
+			           , '99' AS GRP_CD
+			           , A.MENU_NM
+			           , A.TYPE
+			           , A.PRG_CD
+			           , A.CNT
+			           , A.SEQ
+			           , DECODE(A.TYPE, 'P', 'A', '') AS DATA_RW_TYPE
+			           , DECODE(A.TYPE, 'P', 'P', '') AS DATA_PRG_TYPE
+			           , NVL((SELECT MAX(USE_YN) FROM TSYS311 WHERE ENTER_CD = A.ENTER_CD AND MAIN_MENU_CD = A.MAIN_MENU_CD), '1') AS USE_YN
+			        FROM TSYS303 A
+			       WHERE A.ENTER_CD = #ssnEnterCd#
+			         AND A.MAIN_MENU_CD = '07'
+			         AND (A.MENU_NM IN ('연말정산_' || #searchWorkYy#, '종(전)근무지', '소득공제자료관리', '정산계산/결과')
+			             OR A.PRG_CD IN ('yjungsan/y_' || #searchWorkYy# || '/jsp_jungsan/befComMgr/befComMgr.jsp'
+			                           , 'yjungsan/y_' || #searchWorkYy# || '/jsp_jungsan/yeaData/yeaData.jsp'
+			                           , 'yjungsan/y_' || #searchWorkYy# || '/jsp_jungsan/yeaCalcLst/yeaCalcLst.jsp') )
+			         AND A.MENU_CD IN ( SELECT MENU_CD
+			                              FROM TSYS303 B
+			                             WHERE B.ENTER_CD = #ssnEnterCd#
+			                               AND B.MAIN_MENU_CD = '07'
+			                             START WITH B.MENU_NM = '연말정산_' || #searchWorkYy#
+			                             CONNECT BY PRIOR B.ENTER_CD = B.ENTER_CD
+			                                    AND PRIOR B.MAIN_MENU_CD = B.MAIN_MENU_CD
+			                                    AND PRIOR B.MENU_CD = B.PRIOR_MENU_CD)
+			       ) S
+			   ON (
+			           T.ENTER_CD = S.ENTER_CD
+			       AND T.MAIN_MENU_CD = S.MAIN_MENU_CD
+			       AND T.PRIOR_MENU_CD = S.PRIOR_MENU_CD
+			       AND T.MENU_CD = S.MENU_CD
+			       AND T.MENU_SEQ = S.MENU_SEQ
+			       AND T.GRP_CD = S.GRP_CD
+
+			   )
+			  WHEN MATCHED THEN
+			  		UPDATE SET T.USE_YN = (CASE WHEN S.USE_YN = 'Y'
+			                                  	THEN #useyn#
+			                                  ELSE DECODE(#useyn#, 'Y', '1', '0')
+			                             END)
+			               , T.CHKDATE = SYSDATE
+			               , T.CHKID = #ssnSabun#
+			  WHEN NOT MATCHED THEN
+			  		INSERT
+			      (
+			      		T.ENTER_CD
+			        , T.MAIN_MENU_CD
+			        , T.PRIOR_MENU_CD
+			        , T.MENU_CD
+			        , T.MENU_SEQ
+			        , T.GRP_CD
+			        , T.MENU_NM
+			        , T.TYPE
+			        , T.PRG_CD
+			        , T.CNT
+			        , T.SEQ
+			        , T.DATA_RW_TYPE
+			        , T.DATA_PRG_TYPE
+			        , T.USE_YN
+			        , T.CHKDATE
+			        , T.CHKID
+			      )
+			      VALUES
+			      (
+			      		S.ENTER_CD
+			        , S.MAIN_MENU_CD
+			        , S.PRIOR_MENU_CD
+			        , S.MENU_CD
+			        , S.MENU_SEQ
+			        , S.GRP_CD
+			        , S.MENU_NM
+			        , S.TYPE
+			        , S.PRG_CD
+			        , S.CNT
+			        , S.SEQ
+			        , S.DATA_RW_TYPE
+			        , S.DATA_PRG_TYPE
+			        , (CASE WHEN S.USE_YN = 'Y'
+			                  THEN #useyn#
+			                ELSE DECODE(#useyn#, 'Y', '1', '0')
+			           END)
+			        , SYSDATE
+			        , #ssnSabun#
+			      )
+		]]>
+	</query>
+</root>

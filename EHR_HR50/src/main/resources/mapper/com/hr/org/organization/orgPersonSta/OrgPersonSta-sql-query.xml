@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.orgPersonSta">
+<!-- 		조직종합관리 조직도 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgPersonStaList">
+
+				<![CDATA[
+				    SELECT 	LEVEL AS "_level",
+				    		A.PRIOR_ORG_CD,
+				    		A.ORG_CD,
+				    		NVL(F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, #{searchSdate}, #{ssnLocaleCd}), A.ORG_NM) AS ORG_NM,
+				    		A.ORG_TYPE,
+				    		A.INOUT_TYPE,
+				    		A.LOCATION_CD,
+				    		A.SDATE,
+				    		A.EDATE,
+				    		A.MEMO,
+				    		F_ORG_GET_CHIEF_SABUN(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS CHIEF_SABUN,
+                            F_ORG_GET_CHIEF_NAME(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS CHIEF_NAME
+				      FROM (
+				          	SELECT A.ENTER_CD
+								 , A.ORG_CD
+								 , A.SDATE AS SDATE_105
+								 , A.SEQ
+								 , A.ORG_LEVEL
+								 , A.PRIOR_ORG_CD
+				          	     , B.ORG_TYPE
+				          	     , B.INOUT_TYPE
+				          	     , B.LOCATION_CD
+				          	     , B.SDATE
+				          	     , B.EDATE
+				          	     , B.MEMO
+				          	     , B.ORG_NM
+				          	  FROM TORG105 A, TORG101 B
+							 WHERE A.ENTER_CD = B.ENTER_CD
+							   AND A.ORG_CD = B.ORG_CD
+							   AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+							   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+							   AND A.SDATE = TRIM(#{searchSdate})
+						   ) A
+				     START WITH A.PRIOR_ORG_CD = '0'
+				   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					   AND PRIOR A.SDATE_105 = A.SDATE_105
+					   AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+				]]>
+
+
+		</select>
+
+
+		<!-- 조직원 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgPersonStaMeberList1">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL
+						  , A.ENTER_CD
+						  , A.SABUN
+						  , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN, #{ssnLocaleCd}) AS NAME
+						  , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						  , A.EMP_YMD
+						  , A.BIR_YMD
+						  , (   SELECT ACA_SCH_NM
+						  		  FROM   THRM115 T1
+						  		 WHERE T1.ENTER_CD = A.ENTER_CD
+                          		   AND T1.ACA_TYPE = 'Y'
+						  	       AND T1.SABUN    = A.SABUN
+                          	 	   AND ROWNUM = 1
+							)  AS LAST_SCH_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020', B.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+					      , F_COM_GET_ORG_NM(B.ENTER_CD,B.ORG_CD, #{searchSdate}, #{ssnLocaleCd}) AS ORG_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010', B.STATUS_CD, #{ssnLocaleCd}) AS STATUS_NM
+					      , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN ||  chr(38) || 'type=1' AS PHOTO
+						  --파일이 없으면 12003 시퀀스를 넘겨서 없는파일로 표시되도록 한다.
+					      --, DECODE( (SELECT DECODE( NVL(FILENAME, '0'), '0', '0', '1') FROM THRM911 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN), '1', ROWNUM+100, '12003') AS PHOTO_INDEX
+					      --, DECODE( (SELECT DECODE( NVL(FILENAME, '0'), '0', '0', '1') FROM THRM911 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN), '1', ROWNUM+100, '12003') AS PHOTO
+					      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE
+					      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+					      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OT') AS OFFICE_TEL
+					  FROM  THRM100 A,(SELECT ENTER_CD, SABUN, JIKWEE_CD,JIKCHAK_CD,JIKGUB_CD, STATUS_CD , ORG_CD  ,SAL_CLASS
+								    	 FROM 	THRM151
+					                	WHERE 	ENTER_CD = TRIM(#{ssnEnterCd})
+					                	]]>
+					                    --오늘이 조직도의 시작~종료일자에 걸리는지 체크하여 조건을 달리넘김
+										<if test='searchSht2Gbn  != null and searchSht2Gbn.equals("1")'>
+					                      AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+										</if>
+             							<if test='searchSht2Gbn  != null and searchSht2Gbn.equals("0")'>
+					                      AND #{searchSdate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+										</if>
+					                 )  B
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND B.ORG_CD = #{searchOrgCd}
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN =B.SABUN
+					   AND B.STATUS_CD NOT IN ('RA','RAA')
+					 ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD,B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getOrgPersonStaMeberList2">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL
+						  , A.SABUN
+						  , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN, #{ssnLocaleCd}) AS NAME
+						  , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						  , A.EMP_YMD
+						  , A.BIR_YMD
+						  , (   SELECT ACA_SCH_NM
+						  		  FROM   THRM115 T1
+						  		 WHERE T1.ENTER_CD = A.ENTER_CD
+                          		   AND T1.ACA_TYPE = 'Y'
+						  	       AND T1.SABUN    = A.SABUN
+                          	 	   AND ROWNUM = 1
+							)  AS LAST_SCH_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020', B.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+					      , F_COM_GET_ORG_NM(B.ENTER_CD,B.ORG_CD, #{searchSdate}, #{ssnLocaleCd}) AS ORG_NM
+					      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010', B.STATUS_CD, #{ssnLocaleCd}) AS STATUS_NM
+					      , (SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20020' AND CODE = B.JIKCHAK_CD) AS SORT_JIKCHAK
+					      , (SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20030' AND CODE = B.JIKWEE_CD) AS SORT_JIKWEE
+					      , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN ||  chr(38) || 'type=1' AS PHOTO
+					      --, DECODE( (SELECT DECODE( NVL(FILENAME, '0'), '0', '0', '1') FROM THRM911 WHERE SABUN = A.SABUN), '1', ROWNUM+100, '12003') AS PHOTO
+					      --, DECODE( (SELECT DECODE( NVL(FILENAME, '0'), '0', '0', '1') FROM THRM911 WHERE SABUN = A.SABUN), '1', ROWNUM+100, '12003') AS PHOTO_INDEX
+					      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE
+					      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+					      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OT') AS OFFICE_TEL
+					  FROM  THRM100 A,(SELECT ENTER_CD, SABUN, JIKWEE_CD,JIKCHAK_CD,JIKGUB_CD, STATUS_CD , ORG_CD  ,SAL_CLASS
+					                     FROM  THRM151
+					                    WHERE  ENTER_CD = TRIM(#{ssnEnterCd})
+					                    ]]>
+					                    --오늘이 조직도의 시작~종료일자에 걸리는지 체크하여 조건을 달리넘김
+										<if test='searchSht2Gbn  != null and searchSht2Gbn.equals("1")'>
+					                      AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+										</if>
+             							<if test='searchSht2Gbn  != null and searchSht2Gbn.equals("0")'>
+					                      AND #{searchSdate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+										</if>
+					                )  B
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND B.ORG_CD IN (SELECT #{searchOrgCd}
+										  FROM DUAL
+										 UNION
+										SELECT ORG_CD
+										  FROM (
+										      	SELECT *
+												  FROM TORG105
+												 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+												   AND SDATE = #{searchSdate}
+											   )
+										 START WITH PRIOR_ORG_CD = #{searchOrgCd}
+										 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+											 AND PRIOR SDATE = SDATE
+											 AND PRIOR ORG_CD = PRIOR_ORG_CD )
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN =B.SABUN
+					   AND B.STATUS_CD NOT IN ('RA','RAA')
+					ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD,B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getCompareEmpOpenPrgMap">
+
+				<![CDATA[
+					SELECT  DM.*
+							, REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+							"url": "'||PRG_CD||'"
+							,"dataPrgType":"'||DATA_PRG_TYPE||'"
+							,"dataRwType":"'||DATA_RW_TYPE||'"
+							,"cnt":"'||CNT||'"
+							,"mainMenuCd":"'||MAIN_MENU_CD||'"
+							,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+							,"type":"'||TYPE||'"
+							,"menuCd":"'||MENU_CD||'"
+							,"menuSeq":"'||MENU_SEQ||'"
+							,"grpCd":"'||GRP_CD||'"
+							,"prgCd":"'||PRG_CD||'"
+							,"popupUseYn":"'||POPUP_USE_YN||'"
+							,"helpUseYn":"'||HELP_USE_YN||'"
+							,"myMenu":"'||MY_MENU||'"
+							}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'')AS SURL
+							,MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+						FROM
+						(
+					SELECT LEVEL AS LVL
+						 , C.MAIN_MENU_CD
+						 , C.PRIOR_MENU_CD
+						 , C.MENU_CD
+						 , C.MENU_SEQ
+						 , A.GRP_CD
+						 , C.TYPE
+						 , NVL(A.MENU_NM, C.MENU_NM) AS MENU_NM
+						 , SUBSTR(SYS_CONNECT_BY_PATH(A.MENU_NM, '>'),2) AS MENU_NM_PATH
+						 , C.PRG_CD
+						 , NVL(A.SEARCH_SEQ, '') AS SRCH_SEQ
+						 , A.DATA_RW_TYPE
+						 , A.DATA_PRG_TYPE
+						 , A.SEQ
+						 , A.CNT
+						 , '' PRG_PATH
+						 , A.USE_YN
+						 , A.INQ_S_YMD
+						 , A.INQ_E_YMD
+						 , ''  AS DATE_TRACK_YN
+						 , (SELECT MAIN_MENU_NM
+						      FROM TSYS309
+						     WHERE MAIN_MENU_CD = A.MAIN_MENU_CD
+						     AND ENTER_CD = #{ssnEnterCd}
+						     AND USE_YN = '1'
+						   ) AS MAIN_MENU_NM
+						 , POPUP_USE_YN
+						 , LAST_SESSION_USE_YN
+						 , SEARCH_USE_YN
+						 , NVL('1','0') HELP_USE_YN
+						, DECODE( (	SELECT 'Y'
+									FROM TSYS331 D
+									WHERE D.ENTER_CD	= A.ENTER_CD
+									AND D.MENU_SEQ		= A.MENU_SEQ
+									AND D.PRIOR_MENU_CD	= A.PRIOR_MENU_CD
+									AND D.MENU_CD		= A.MENU_CD
+									AND D.MAIN_MENU_CD	= A.MAIN_MENU_CD
+									AND D.GRP_CD		= A.GRP_CD
+									AND D.SABUN			= #{ssnSabun}
+									AND D.GRP_CD        = #{ssnGrpCd}
+									AND ROWNUM =1 ),NULL, 'N','Y') AS MY_MENU
+					FROM TSYS311 A,  TSYS303 C
+					WHERE 1 = 1
+					AND A.ENTER_CD   	= C.ENTER_CD
+					AND A.MENU_SEQ 		= C.MENU_SEQ
+					AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+					AND A.MENU_CD 		= C.MENU_CD
+					AND A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+					AND A.TYPE <> 'T'
+					AND A.USE_YN = '1'
+					AND A.ENTER_CD  	=  #{ssnEnterCd}
+					AND C.PRG_CD 		= #{prgCd}
+					AND ROWNUM = 1
+					START WITH A.PRIOR_MENU_CD 	= '0'
+					AND A.ENTER_CD      	=  #{ssnEnterCd}
+					AND A.MAIN_MENU_CD     	=  (SELECT MAIN_MENU_CD FROM TSYS303 WHERE ENTER_CD = #{ssnEnterCd} AND PRG_CD = #{prgCd} AND ROWNUM=1)
+					AND A.GRP_CD        	=  #{ssnGrpCd}
+					CONNECT BY PRIOR A.ENTER_CD     = A.ENTER_CD
+					AND PRIOR A.MAIN_MENU_CD     = A.MAIN_MENU_CD
+					AND PRIOR A.GRP_CD           = A.GRP_CD
+					AND PRIOR A.MENU_CD          = A.PRIOR_MENU_CD
+					AND PRIOR A.USE_YN			= A.USE_YN
+					ORDER SIBLINGS BY A.PRIOR_MENU_CD, A.SEQ) DM
+				]]>
+
+
+		</select>
+
+
+</mapper>

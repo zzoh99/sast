@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.capacity.orgCapaPlanApr">
+
+<!-- 인력충원요청현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAprList_">
+
+				<![CDATA[
+					SELECT	A.ENTER_CD
+					, 		'0' AS IBS_IMAGE
+					, 		C.APPL_YMD           --신청일자
+					, 		C.APPL_STATUS_CD     --신청상태
+					, 		A.APPL_SEQ           --신청서순번
+					, 		A.SABUN				      
+					, 		F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, C.APPL_YMD)    AS ORG_NM					     
+					, 		F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME --성명
+					, 		A.ORG_CD
+					, 		F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD) AS JIKCHAK_NM
+					, 		F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD)  AS JIKGUB_NM
+					, 		C.APPL_IN_SABUN
+					, 		C.APPL_SABUN
+					, 		NVL(A.NOW_CNT1,0) + NVL(A.NOW_CNT2,0) AS TOT_NOW_CNT
+					, 		NVL(A.REQ_CNT1,0) + NVL(A.REQ_CNT2,0) AS TOT_REQ_CNT
+					, 		NVL(A.NOW_CNT1,0) + NVL(A.NOW_CNT2,0) + NVL(A.REQ_CNT1,0) + NVL(A.REQ_CNT2,0) AS TOT_AFT_CNT
+					, 		NVL((
+								SELECT	B.ORG_JIK_CNT
+				            	FROM 	THRM313 B
+				           	   WHERE 	B.ENTER_CD = A.ENTER_CD
+				                 AND 	B.ORG_CD = A.ORG_CD 
+				             	 AND 	SUBSTR(B.SDATE,0,4) = SUBSTR(A.PLAN_YM,0,4)
+			       			),0) AS ORG_TO_CNT
+					FROM  	THRM328 A
+					, 		THRI103 C
+					WHERE 	A.APPL_SEQ = C.APPL_SEQ
+					  AND 	A.SABUN    = C.APPL_SABUN
+					  AND 	A.ENTER_CD = #{ssnEnterCd}
+					  AND 	C.APPL_YMD BETWEEN TRIM( #{sYmd} ) AND TRIM( #{eYmd} )
+					  AND 	C.APPL_STATUS_CD != '11'					   
+]]>
+					<if test='applStatusCd != null and !applStatusCd.equals("")'>
+					   AND C.APPL_STATUS_CD = TRIM( #{applStatusCd} )
+					</if>
+					
+					<if test='orgNm != null and !orgNm.equals("")'>
+					   AND F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, C.APPL_YMD) LIKE '%'||TRIM(#{orgNm})||'%'
+					</if>
+					
+					<if test='name != null and !name.equals("")'>
+					   AND (A.SABUN LIKE '%'||TRIM( #{name} )||'%' OR  F_COM_GET_NAMES(C.ENTER_CD, A.SABUN) LIKE '%'||TRIM( #{name} )||'%')
+					</if>
+					ORDER BY C.APPL_YMD DESC, C.APPL_STATUS_CD
+
+
+
+		</select>
+
+
+	<!-- 인력충원요청 삭제 HR 4.0 이관 START -->
+	<!-- 인력충원요청현황 조회 -->
+	<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAprList">
+		<![CDATA[
+			SELECT  A.ENTER_CD
+			,       '0' AS IBS_IMAGE
+			,       C.APPL_YMD           --신청일자
+			,       C.APPL_STATUS_CD     --신청상태
+			,       A.APPL_SEQ           --신청서순번
+			,       A.SABUN
+			,       F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, C.APPL_YMD)    AS APP_ORG_NM
+			,       F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME --성명
+			,       A.ORG_CD
+			,       F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, C.APPL_YMD) AS JIKWEE_NM
+			,       F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD) AS JIKCHAK_NM
+			,       F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD)  AS JIKGUB_NM
+			,       C.APPL_IN_SABUN
+			,       C.APPL_SABUN
+			,       A.REQ_GUBUN
+			,       A.REQ_CNT
+			FROM    THRM329 A
+			,       THRI103 C
+			WHERE   A.APPL_SEQ = C.APPL_SEQ
+			  AND   A.SABUN    = C.APPL_SABUN
+			  AND   A.ENTER_CD  = C.ENTER_CD
+			  AND   A.ENTER_CD = #{ssnEnterCd}
+			  AND   C.APPL_YMD BETWEEN TRIM( REPLACE(#{sYmd}, '-', '') ) AND TRIM( REPLACE(#{eYmd}, '-', '') )
+			  AND   C.APPL_STATUS_CD != '11'
+			 ]]>
+
+			<if test="applStatusCd != null and applStatusCd neq ''">
+			   AND C.APPL_STATUS_CD = TRIM( #{applStatusCd} )
+			</if>
+
+			<if test="orgNm != null and orgNm neq ''">
+			   AND F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, C.APPL_YMD) LIKE '%'||TRIM(#{orgNm})||'%'
+			</if>
+
+			<if test="name != null and name neq ''">
+			   AND (A.SABUN LIKE '%'||TRIM( #{name} )||'%' OR  F_COM_GET_NAMES(C.ENTER_CD, A.SABUN) LIKE '%'||TRIM( #{name} )||'%')
+			</if>
+			ORDER BY C.APPL_YMD DESC, C.APPL_STATUS_CD
+
+	</select>
+	<!-- 인력충원요청 삭제 HR 4.0 이관 END -->
+
+		
+
+
+</mapper>

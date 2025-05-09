@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.loan.loanStd">
+	
+	<!-- 대출기준관리 조회 -->
+	<select id="getLoanStdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.LOAN_CD
+		     , A.SDATE
+		     , A.EDATE
+		     , A.LOAN_ORG_NM
+		     , A.LOAN_LMT_MON
+		     , A.INT_RATE
+		     , A.LOAN_PERIOD
+		     , A.LOAN_DOC
+		     , A.LOAN_NOTE
+		     , A.SEARCH_SEQ
+		     , A.USE_YN
+		     , A.INTEREST_SUPPORT_YN
+		     , A.NOTE
+			 , ( SELECT X.SEARCH_DESC
+			       FROM THRI201 X
+			      WHERE X.ENTER_CD   = A.ENTER_CD
+			        AND X.SEARCH_SEQ = A.SEARCH_SEQ
+			    ) AS SEARCH_DESC
+			 , ELEMENT_CD1
+			 , ( SELECT MAX(X.ELEMENT_NM) KEEP(DENSE_RANK FIRST ORDER BY X.SDATE DESC)
+			       FROM TCPN011 X
+			      WHERE X.ENTER_CD   = A.ENTER_CD
+			 	    AND X.ELEMENT_CD = A.ELEMENT_CD1 ]]>
+			<choose>
+				<when test="searchYmd != null and searchYmd neq ''">
+					AND REPLACE(#{searchYmd},'-','') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+				</when>
+				<otherwise>
+					AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+				</otherwise>
+			</choose>					 		    
+			   ) AS ELEMENT_NM1
+			 , ELEMENT_CD2
+			 , ( SELECT MAX(X.ELEMENT_NM) KEEP(DENSE_RANK FIRST ORDER BY X.SDATE DESC)
+			       FROM TCPN011 X
+			      WHERE X.ENTER_CD   = A.ENTER_CD
+			 	    AND X.ELEMENT_CD = A.ELEMENT_CD2
+			<choose>
+				<when test="searchYmd != null and searchYmd neq ''">
+					AND REPLACE(#{searchYmd},'-','') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+				</when>
+				<otherwise>
+					AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+				</otherwise>
+			</choose>
+			   ) AS ELEMENT_NM2
+		  FROM TBEN621 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		<if test="searchYmd != null and searchYmd neq ''">
+		   AND REPLACE(#{searchYmd},'-','') BETWEEN SDATE AND NVL(EDATE,'29991231')
+		</if>
+	</select>
+
+	<!-- 대출기준관리 저장 -->
+	<update id="saveLoanStd" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN621 T 
+		 USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+		       SELECT TRIM(#{ssnEnterCd}) 			AS ENTER_CD 
+		            , TRIM(#{rm.loanCd}) 			AS LOAN_CD
+		            , TRIM(#{rm.sdate}) 			AS SDATE
+		            , TRIM(#{rm.edate}) 			AS EDATE
+		            , TRIM(#{rm.loanOrgNm}) 		AS LOAN_ORG_NM
+		            , TRIM(#{rm.loanLmtMon}) 		AS LOAN_LMT_MON
+		            , TRIM(#{rm.intRate}) 			AS INT_RATE
+		            , TRIM(#{rm.loanPeriod}) 		AS LOAN_PERIOD
+		            , TRIM(#{rm.loanDoc})	 		AS LOAN_DOC
+		            , TRIM(#{rm.loanNote})	 		AS LOAN_NOTE
+		            , TRIM(#{rm.searchSeq}) 		AS SEARCH_SEQ
+		            , TRIM(#{rm.useYn}) 			AS USE_YN
+		            , TRIM(#{rm.interestSupportYn})	AS INTEREST_SUPPORT_YN
+		            , TRIM(#{rm.note}) 				AS NOTE
+		            , TRIM(#{rm.elementCd1})		AS ELEMENT_CD1
+		            , TRIM(#{rm.elementCd2})		AS ELEMENT_CD2
+		        FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.LOAN_CD 	= S.LOAN_CD 
+		     AND  T.SDATE 		= S.SDATE 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE				= sysdate 
+		            , T.CHKID	    		= #{ssnSabun} 
+		            , T.EDATE 				= S.EDATE 
+		            , T.LOAN_ORG_NM 		= S.LOAN_ORG_NM 
+		            , T.LOAN_LMT_MON 		= S.LOAN_LMT_MON 
+		            , T.INT_RATE 			= S.INT_RATE 
+		            , T.LOAN_PERIOD 		= S.LOAN_PERIOD 
+		            , T.LOAN_DOC 			= S.LOAN_DOC 
+		            , T.LOAN_NOTE 			= S.LOAN_NOTE 
+		            , T.SEARCH_SEQ 			= S.SEARCH_SEQ 
+		            , T.USE_YN 				= S.USE_YN 
+		            , T.INTEREST_SUPPORT_YN	= S.INTEREST_SUPPORT_YN 
+		            , T.NOTE 				= S.NOTE 
+		            , T.ELEMENT_CD1 		= S.ELEMENT_CD1 
+		            , T.ELEMENT_CD2 		= S.ELEMENT_CD2 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.LOAN_CD
+		            , T.SDATE
+		            , T.EDATE
+		            , T.LOAN_ORG_NM
+		            , T.LOAN_LMT_MON
+		            , T.INT_RATE
+		            , T.LOAN_PERIOD
+		            , T.LOAN_DOC
+		            , T.LOAN_NOTE
+		            , T.SEARCH_SEQ
+		            , T.USE_YN
+		            , T.INTEREST_SUPPORT_YN
+		            , T.NOTE
+		            , T.ELEMENT_CD1
+		            , T.ELEMENT_CD2
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.LOAN_CD
+		            , S.SDATE
+		            , S.EDATE
+		            , S.LOAN_ORG_NM
+		            , S.LOAN_LMT_MON
+		            , S.INT_RATE
+		            , S.LOAN_PERIOD
+		            , S.LOAN_DOC
+		            , S.LOAN_NOTE
+		            , S.SEARCH_SEQ
+		            , S.USE_YN
+		            , S.INTEREST_SUPPORT_YN
+		            , S.NOTE
+		            , S.ELEMENT_CD1
+		            , S.ELEMENT_CD2
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+
+	<!-- 대출기준관리 삭제 -->
+	<delete id="deleteLoanStd" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN621 
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( LOAN_CD,SDATE ) IN ( ( NULL,NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.loanCd != null and rm.loanCd neq '' and rm.sdate != null and rm.sdate neq ''">
+				, ( TRIM( #{rm.loanCd} ),TRIM( #{rm.sdate} ) )
+			</if>
+		</foreach>
+			)
+	</delete>
+
+	<!-- 대출상세기준관리 조회 -->
+	<select id="getLoanStdDetailList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.LOAN_CD
+		     , A.SDATE
+		     , A.WORK_MONTH
+		     , A.USE_S_YMD
+		     , A.USE_E_YMD
+		     , A.LOAN_LMT_RATE
+		     , A.INT_RATE
+		     , A.LOAN_PERIOD
+		     , A.USE_YN
+		     , A.NOTE
+		  FROM TBEN622 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.LOAN_CD  = TRIM(#{searchLoanCd})
+		   AND A.SDATE    = TRIM(#{searchSdate})
+		 ORDER BY A.USE_YN DESC, A.USE_S_YMD, A.WORK_MONTH
+	]]>
+	</select>
+
+	<!-- 대출상세기준관리 저장 -->
+	<update id="saveLoanStdDetail" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN622 T 
+		USING ( ]]> 
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD 
+		             , TRIM(#{rm.loanCd}) AS LOAN_CD
+		             , TRIM(#{rm.sdate}) AS SDATE
+		             , TRIM(#{rm.workMonth}) AS WORK_MONTH
+		             , TRIM(#{rm.useSYmd}) AS USE_S_YMD
+		             , TRIM(#{rm.useEYmd}) AS USE_E_YMD
+		             , TRIM(#{rm.loanLmtRate}) AS LOAN_LMT_RATE
+		             , TRIM(#{rm.intRate}) AS INT_RATE
+		             , TRIM(#{rm.loanPeriod}) AS LOAN_PERIOD
+		             , TRIM(#{rm.useYn}) AS USE_YN
+		             , TRIM(#{rm.note}) AS NOTE
+		          FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD   = S.ENTER_CD 
+		     AND  T.LOAN_CD    = S.LOAN_CD 
+		     AND  T.SDATE      = S.SDATE 
+		     AND  T.WORK_MONTH = S.WORK_MONTH 
+		     AND  T.USE_S_YMD  = S.USE_S_YMD 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE       = sysdate 
+		            , T.CHKID         = #{ssnSabun} 
+		            , T.USE_E_YMD     = S.USE_E_YMD 
+		            , T.LOAN_LMT_RATE = S.LOAN_LMT_RATE 
+		            , T.INT_RATE      = S.INT_RATE 
+		            , T.LOAN_PERIOD   = S.LOAN_PERIOD 
+		            , T.USE_YN        = S.USE_YN 
+		            , T.NOTE          = S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.LOAN_CD
+		            , T.SDATE
+		            , T.WORK_MONTH
+		            , T.USE_S_YMD
+		            , T.USE_E_YMD
+		            , T.LOAN_LMT_RATE
+		            , T.INT_RATE
+		            , T.LOAN_PERIOD
+		            , T.USE_YN
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.LOAN_CD
+		            , S.SDATE
+		            , S.WORK_MONTH
+		            , S.USE_S_YMD
+		            , S.USE_E_YMD
+		            , S.LOAN_LMT_RATE
+		            , S.INT_RATE
+		            , S.LOAN_PERIOD
+		            , S.USE_YN
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   )
+	]]>
+	</update>
+
+	<!-- 대출상세기준관리 삭제 -->
+	<delete id="deleteLoanStdDetail" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN622
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( LOAN_CD,SDATE,WORK_MONTH,USE_S_YMD ) IN ( ( NULL,NULL,NULL,NULL) ]]>
+		 <foreach item="rm" collection="deleteRows">
+		 	<if test="rm.loanCd != null and rm.loanCd neq '' and rm.sdate != null and rm.sdate neq ''
+		 			and rm.workMonth != null and rm.workMonth neq '' and rm.useSYmd != null and rm.useSYmd neq ''">
+		 		, ( TRIM( #{rm.loanCd} ),TRIM( #{rm.sdate} ),TRIM( #{rm.workMonth} ),TRIM( #{rm.useSYmd} ) )
+		 	</if>
+		 </foreach>
+		       )
+	</delete>
+</mapper>

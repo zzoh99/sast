@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.psnalInfoCopy">
+
+<!-- 인사정보 복사 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlInfoCopyList">
+
+				<![CDATA[
+					SELECT	A.ENTER_CD
+						,	A.SABUN
+						,	C.NAME
+						,	B.RET_YMD
+						,	A.ORI_ENTER_CD
+						,	A.ORI_ENTER_NM
+						,	A.ORI_ORG_NM
+						,	A.ORI_JIKWEE_NM
+						,	F_COM_GET_JIKGUB_NM (A.ORI_ENTER_CD,A.ORI_SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORI_JIKGUB_NM
+						,	A.ORI_SABUN
+						,	B.NAME AS ORI_NAME
+						,	A.COPY_YN
+						,	A.CANCEL_YN
+						,	F_COM_GET_GRCODE_NAME( A.ENTER_CD, 'H10080', A.END_CD ) AS END_NM
+						,	A.NOTE
+						,	A.CHKDATE
+						,	A.CHKID
+					FROM	THRM810	A, THRM100 B, THRM100 C
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.ORI_SABUN = B.SABUN
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.SABUN = C.SABUN
+					           ]]>
+					<if test='srchName != null and !srchName.equals("")'>
+					   AND (LOWER(A.SABUN) LIKE '%'||LOWER(TRIM( #{srchName} ))||'%' OR LOWER(A.NAME) LIKE '%'||LOWER(TRIM( #{srchName} ))||'%')
+					</if>
+
+
+		</select>
+
+<!-- 인사정보 복사 저장 -->
+		<update parameterType="map" id="savePsnlInfoCopy">
+
+						MERGE INTO THRM810	T
+						USING	
+						(
+									SELECT	ENTER_CD
+										,	SABUN
+										,	NAME
+										,	ORI_ENTER_CD
+										,	ORI_ENTER_NM
+										,	ORI_ORG_NM
+										,	ORI_JIKWEE_NM
+										,	ORI_SABUN
+										,	COPY_YN
+										,	CANCEL_YN
+										,	'STDMODE' AS END_CD
+										,	NOTE
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	SABUN
+										,	NULL		AS	NAME
+										,	NULL		AS	ORI_ENTER_CD
+										,	NULL		AS	ORI_ENTER_NM
+										,	NULL		AS	ORI_ORG_NM
+										,	NULL		AS	ORI_JIKWEE_NM
+										,	NULL		AS	ORI_SABUN
+										,	NULL		AS	COPY_YN
+										,	NULL		AS	CANCEL_YN
+										,	NULL		AS	NOTE
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+										,	TRIM(#{rm.sabun})				AS	SABUN
+										,	TRIM(#{rm.name})				AS	NAME
+										,	TRIM(#{rm.oriEnterCd})				AS	ORI_ENTER_CD
+										,	TRIM(#{rm.oriEnterNm})				AS	ORI_ENTER_NM
+										,	TRIM(#{rm.oriOrgNm})				AS	ORI_ORG_NM
+										,	TRIM(#{rm.oriJikweeNm})				AS	ORI_JIKWEE_NM
+										,	TRIM(#{rm.oriSabun})				AS	ORI_SABUN
+										,	TRIM(#{rm.copyYn})				AS	COPY_YN
+										,	TRIM(#{rm.cancelYn})				AS	CANCEL_YN
+										,	TRIM(#{rm.note})				AS	NOTE
+										,	SYSDATE						AS	CHKDATE
+										,	#{ssnSabun}						AS	CHKID
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND	SABUN IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.SABUN				=		S.SABUN
+						)
+					WHEN MATCHED THEN 
+					UPDATE SET	
+							T.ORI_ENTER_CD		=	S.ORI_ENTER_CD
+						,	T.ORI_ENTER_NM		=	S.ORI_ENTER_NM
+						,	T.ORI_ORG_NM		=	S.ORI_ORG_NM
+						,	T.ORI_JIKWEE_NM		=	S.ORI_JIKWEE_NM
+						,	T.ORI_SABUN			=	S.ORI_SABUN
+						,	T.COPY_YN			=	S.COPY_YN
+						,	T.CANCEL_YN			=	S.CANCEL_YN
+						,	T.END_CD			=	S.END_CD
+						,	T.NOTE				=	S.NOTE
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					( 
+							T.ENTER_CD
+						,	T.SABUN
+						,	T.NAME
+						,	T.ORI_ENTER_CD
+						,	T.ORI_ENTER_NM
+						,	T.ORI_ORG_NM
+						,	T.ORI_JIKWEE_NM
+						,	T.ORI_SABUN
+						,	T.COPY_YN
+						,	T.CANCEL_YN
+						,	T.END_CD
+						,	T.NOTE
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.SABUN
+						,	S.NAME
+						,	S.ORI_ENTER_CD
+						,	S.ORI_ENTER_NM
+						,	S.ORI_ORG_NM
+						,	S.ORI_JIKWEE_NM
+						,	S.ORI_SABUN
+						,	S.COPY_YN
+						,	S.CANCEL_YN
+						,	S.END_CD
+						,	S.NOTE
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+		</update>
+
+<!-- 인사정보 복사 삭제 -->
+		<delete parameterType="map" id="deletePsnlInfoCopy">
+
+					DELETE	FROM THRM810
+					WHERE	(ENTER_CD, SABUN) IN ((NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.sabun} ) )
+										</if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 인사정보 복사 복사실행 프로시저 -->
+		<update parameterType="map" id="prcPsnlInfoCopySave" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_PSNL_INFO_COPY(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+<!-- 인사정보 복사 복사취소 프로시저 -->
+		<update parameterType="map" id="prcPsnlInfoCopyCancel" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_PSNL_INFO_COPY_CANCEL(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+</mapper>

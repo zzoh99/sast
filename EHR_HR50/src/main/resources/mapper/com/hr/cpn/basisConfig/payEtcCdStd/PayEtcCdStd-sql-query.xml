@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.payEtcCdStd">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayEtcCdStdList">
+				 SELECT ENTER_CD
+				      , GLOBAL_VALUE_CD
+				      , SDATE
+				      , GLOBAL_VALUE_NM
+				      , DESCRIPTION
+				      , DATA_TYPE
+				      , GLOBAL_VALUE
+				      , EDATE
+				      , CHKDATE
+				      , CHKID
+                 FROM  TCPN081 
+                 WHERE ENTER_CD  = #{ssnEnterCd}
+                 <if test='searchGlobalValueNm != null and !searchGlobalValueNm.equals("")'>
+                    AND GLOBAL_VALUE_NM LIKE '%'|| #{searchGlobalValueNm} ||'%'
+				 </if>
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePayEtcCdStd">
+
+
+					MERGE INTO TCPN081 T
+					USING	(
+							SELECT	  A.GLOBAL_VALUE_CD
+									, A.SDATE
+									, A.GLOBAL_VALUE_NM
+									, A.DESCRIPTION
+									, A.DATA_TYPE
+									, A.GLOBAL_VALUE
+									, A.EDATE
+							FROM	(
+									SELECT	  NULL AS GLOBAL_VALUE_CD
+											, NULL AS SDATE
+											, NULL AS GLOBAL_VALUE_NM
+											, NULL AS DESCRIPTION
+											, NULL AS DATA_TYPE
+											, NULL AS GLOBAL_VALUE
+											, NULL AS EDATE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM(#{rm.globalValueCd})  AS GLOBAL_VALUE_CD
+											, TRIM(#{rm.sdate})          AS SDATE
+											, TRIM(#{rm.globalValueNm} ) AS GLOBAL_VALUE_NM
+											, TRIM(#{rm.description} )   AS DESCRIPTION
+											, TRIM(#{rm.dataType} )      AS DATA_TYPE
+											, TRIM(#{rm.globalValue} )   AS GLOBAL_VALUE
+											, TRIM(#{rm.edate} )         AS EDATE
+										FROM   DUAL
+</foreach>
+									) A WHERE A.GLOBAL_VALUE_CD IS NOT NULL
+							) S
+					ON (    T.ENTER_CD	= #{ssnEnterCd}
+					    AND T.GLOBAL_VALUE_CD = S.GLOBAL_VALUE_CD 
+					    AND T.SDATE = S.SDATE
+					   )
+					WHEN MATCHED THEN
+						UPDATE SET	 
+							  T.GLOBAL_VALUE_NM = S.GLOBAL_VALUE_NM 
+							, T.DESCRIPTION     = S.DESCRIPTION     
+							, T.DATA_TYPE       = S.DATA_TYPE       
+							, T.GLOBAL_VALUE    = S.GLOBAL_VALUE    
+							, T.EDATE           = S.EDATE           
+                            , T.CHKDATE         = SYSDATE
+                            , T.CHKID           = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.GLOBAL_VALUE_CD
+							, T.SDATE
+							, T.GLOBAL_VALUE_NM
+							, T.DESCRIPTION
+							, T.DATA_TYPE
+							, T.GLOBAL_VALUE
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+							, S.GLOBAL_VALUE_CD
+							, S.SDATE
+							, S.GLOBAL_VALUE_NM
+							, S.DESCRIPTION
+							, S.DATA_TYPE
+							, S.GLOBAL_VALUE
+							, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayEtcCdStd">
+					DELETE FROM TCPN081 
+					WHERE 	(ENTER_CD, GLOBAL_VALUE_CD, SDATE) IN 	(  (NULL, NULL, NULL) 
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test='rm.globalValueCd != null and !rm.globalValueCd.equals("")'>
+											  <if test='rm.sdate != null and !rm.sdate.equals("")'>
+												( #{ssnEnterCd}, TRIM(#{rm.globalValueCd}), TRIM(#{rm.sdate}) )
+											  </if>
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+		
+</mapper>

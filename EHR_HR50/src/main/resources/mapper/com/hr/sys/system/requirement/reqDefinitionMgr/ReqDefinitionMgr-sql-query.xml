@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.system.requirement.reqDefinitionMgr">
+
+		<select parameterType="map" resultType="cMap" id="getReqDefinitionMgrModuleCdList">
+
+				<![CDATA[
+				SELECT	CODE
+					,	CODE_NM
+				FROM	TSYS005
+				WHERE	ENTER_CD	=	#{ssnEnterCd}
+				AND		GRCODE_CD	=	'S99995'
+				AND		USE_YN		=	'Y' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+				ORDER	BY
+						SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getReqDefinitionMgrPopErrorAccYnMap">
+
+				<![CDATA[
+				SELECT (SELECT ERROR_ADMIN_YN FROM TSYS307 WHERE ENTER_CD =  #{ssnEnterCd}  AND GRP_CD = #{ssnGrpCd} ) AS GRP_YN
+				FROM	DUAL
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getReqDefinitionMgrGrpCdList">
+
+				<![CDATA[
+				SELECT GRP_CD AS CODE, GRP_NM AS CODE_NM
+				FROM TSYS307
+				WHERE ENTER_CD =  #{ssnEnterCd}
+				ORDER BY GRP_CD
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getReqDefinitionMgrMainMenuCdList">
+
+				<![CDATA[
+				SELECT MAIN_MENU_CD AS CODE, MAIN_MENU_NM AS CODE_NM
+				FROM TSYS309
+				WHERE ENTER_CD =  #{ssnEnterCd}
+				AND MAIN_MENU_CD IN (SELECT NOTE1 FROM TSYS005 WHERE ENTER_CD =  #{ssnEnterCd}  AND GRCODE_CD = 'S99995' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD)
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getReqDefinitionMgrList">
+
+
+				SELECT	A.ENTER_CD				/*	회사구분코드(TORG900)		*/
+					,	A.MODULE_CD				/*	모듈코드(S99995)		*/
+					,	A.MAIN_MENU_CD			/*	메인메뉴코드(TSYS303)		*/
+					,	A.PRIOR_MENU_CD			/*	상위메뉴코드				*/
+					,	F_SYS_PRIOR_MENU_NM( A.ENTER_CD, A.MAIN_MENU_CD, A.PRIOR_MENU_CD, A.GRP_CD)	AS	PRIOR_MENU_NM
+					,	A.MENU_CD				/*	메뉴코드				*/
+					,	A.MENU_SEQ				/*	메뉴SEQ				*/
+					,	A.GRP_CD				/*	권한코드(TSYS307)		*/
+					,	A.MENU_NM				/*	메뉴명					*/
+					,	A.PRG_CD				/*	프로그램ID				*/
+					,	A.PRIOR_PRO_ID			/*	상위프로그램ID			*/
+					,	A.PRIOR_PRO_NM			/*	상위프로그램명				*/
+					,	A.PRO_ID				/*	프로그램ID				*/
+					,	A.PRO_NM				/*	프로그램명				*/
+					,	A.SEC_CD				/*	개발종류(S99993)		*/
+					,	A.DEV_SEC_CD			/*	개발구분(S99994)		*/
+					,	A.AS_IS					/*	AS-IS내용				*/
+					,	A.TO_BE					/*	TO-BE내용				*/
+					,	A.REQ_CON				/*	요구사항				*/
+					,	A.PARTNER				/*	현업					*/
+					,	A.PER_IN_CHAR			/*	담당자					*/
+					,	A.WRITE_YMD				/*	작성일					*/
+					,	A.PLAN_SDATE			/*	개발계획시작일				*/
+					,	A.PLAN_EDATE			/*	개발계획종료일				*/
+					,	A.FINISH_YMD			/*	개발완료일				*/
+					,	A.DEV_NAME				/*	개발자					*/
+					,	A.DEV_STATUS_CD			/*	개발상태(S99996)		*/
+					,	A.CH_REQ_CON			/*	변경요구사항				*/
+					,	A.NOTE					/*	비고					*/
+					,	TO_CHAR( A.CHKDATE, 'YYYY-MM-DD hh:mi:ss' ) AS CHKDATE	/*	최종수정시간			*/
+					,	A.CHKID					/*	최종수정자				*/
+					,	A.DESIGN_SDATE
+					,	A.DESIGN_EDATE
+					,	A.DESIGN_FINISH_YMD
+					,	A.DESIGN_STATUS_CD
+					,	A.MD
+				FROM	TSYS800	A
+				WHERE	A.ENTER_CD			=	 #{ssnEnterCd}
+				<if test='searchModuleCd != null and !searchModuleCd.equals("")'>
+				AND		A.MODULE_CD			=	#{searchModuleCd}
+				</if>
+				<if test='searchMainMenuCd != null and !searchMainMenuCd.equals("")'>
+				AND		A.MAIN_MENU_CD		=	#{searchMainMenuCd}
+				</if>
+				<if test='searchMenuNm != null and !searchMenuNm.equals("")'>
+				AND		A.MENU_NM		LIKE	'%' || #{searchMenuNm} || '%'
+				</if>
+				<if test='searchSecCd != null and !searchSecCd.equals("")'>
+				AND		A.SEC_CD			=	#{searchSecCd}
+				</if>
+				<if test='searchDevSecCd != null and !searchDevSecCd.equals("")'>
+				AND		A.DEV_SEC_CD		=	#{searchDevSecCd}
+				</if>
+				<if test='multiDesignStatusCd != null and !multiDesignStatusCd.equals("")'> 
+							AND NVL(A.DESIGN_STATUS_CD,'empty')  IN
+		<foreach collection="multiDesignStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+                </if>
+				<if test='multiDevStatusCd != null and !multiDevStatusCd.equals("")'> 
+							AND NVL(A.DEV_STATUS_CD,'empty')  IN
+		<foreach collection="multiDevStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+                </if>
+				ORDER	BY
+						TO_NUMBER(A.MODULE_CD)
+					,	TO_NUMBER(TO_NUMBER(REGEXP_REPLACE(SUBSTR(A.PRIOR_PRO_ID, INSTR(A.PRIOR_PRO_ID, '.', 3)), '[^0-9]'))||LPAD(TO_NUMBER(REGEXP_REPLACE(SUBSTR(A.PRO_ID, INSTR(A.PRO_ID, '.', 9)), '[^0-9]')), 2, 0))
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getReqDefinitionMgrPopList">
+
+				<![CDATA[
+					SELECT (SELECT CODE FROM TSYS005 WHERE ENTER_CD = T1.ENTER_CD AND GRCODE_CD = 'S99995' AND NOTE1 = T1.MAIN_MENU_CD AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD) AS MODULE_CD,
+							T1.MAIN_MENU_CD, T1.PRIOR_MENU_CD, T1.MENU_CD, T1.MENU_SEQ, T1.MENU_NM, T1.PRG_CD, T1.GRP_CD, T1.TYPE, T1."_level",
+							F_SYS_PRIOR_MENU_NM( T1.ENTER_CD, T1.MAIN_MENU_CD, T1.PRIOR_MENU_CD, T1.GRP_CD)	AS	PRIOR_MENU_NM, T1.ENTER_CD, T1.LANGUAGE_CD
+					  FROM (SELECT LEVEL AS "_level", ROWNUM AS RNUM, AA.ENTER_CD,
+					               AA.MAIN_MENU_CD, AA.PRIOR_MENU_CD, AA.MENU_CD, AA.MENU_SEQ, AA.MENU_NM, AA.PRG_CD, AA.GRP_CD, AA.TYPE, AA.LANGUAGE_CD
+					          FROM (SELECT TRIM( #{searchMainMenuCd} ) AS ENTER_CD,
+					                       MAIN_MENU_CD,
+					                       ''  AS PRIOR_MENU_CD,
+					                       '0' AS MENU_CD,
+					                       0   AS MENU_SEQ,
+					                       MAIN_MENU_NM AS MENU_NM,
+					                       ''  AS TYPE,
+					                       ''  AS PRG_CD,
+					                       0   AS SEARCH_SEQ,
+					                       0   AS CNT,
+					                       0   AS SEQ,
+					                       ''  AS GRP_CD,
+					                       ''  AS POPUP_USE_YN,
+					                       ''  AS LAST_SESSION_USE_YN,
+					                       ''  AS SEARCH_USE_YN,
+					                       ''  AS USE_YN,
+					                       ''  AS TMP_USE_YN,
+					                       ''  AS LANGUAGE_CD
+					                  FROM TSYS309
+					                 WHERE MAIN_MENU_CD = TRIM( #{searchMainMenuCd} )
+					                   AND ENTER_CD = #{ssnEnterCd}
+					                   AND USE_YN = '1'
+					               UNION ALL
+					                SELECT A.ENTER_CD,
+					                       A.MAIN_MENU_CD,
+					                       A.PRIOR_MENU_CD,
+					                       A.MENU_CD,
+					                       A.MENU_SEQ,
+					                       NVL(B.MENU_NM, A.MENU_NM) AS MENU_NM,
+					                       A.TYPE,
+					                       A.PRG_CD,
+					                       NVL(B.SEARCH_SEQ, A.SEARCH_SEQ) AS SEARCH_SEQ,
+					                       NVL(B.CNT, A.CNT) AS CNT,
+					                       NVL(B.SEQ, A.SEQ) AS SEQ,
+					                       NVL(B.GRP_CD , #{searchGrpCd} ) AS GRP_CD,
+					                       B.POPUP_USE_YN,
+					                       B.LAST_SESSION_USE_YN,
+					                       B.SEARCH_USE_YN,
+					                       B.USE_YN,
+					                       B.USE_YN AS TMP_USE_YN,
+					                       A.LANGUAGE_CD
+					                  FROM TSYS303 A, TSYS311 B
+					                 WHERE A.ENTER_CD = #{ssnEnterCd}
+					                   AND A.ENTER_CD = B.ENTER_CD(+)
+					                   AND A.MAIN_MENU_CD = B.MAIN_MENU_CD(+)
+					                   AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD(+)
+					                   AND A.MENU_CD = B.MENU_CD(+)
+					                   AND A.MENU_SEQ = B.MENU_SEQ(+)
+					                   AND B.GRP_CD(+) = #{searchGrpCd}
+					                   AND A.MAIN_MENU_CD = #{searchMainMenuCd}
+					                   AND B.USE_YN = '1') AA
+					    WHERE 1=1
+					    START WITH AA.PRIOR_MENU_CD = '0'
+					    CONNECT BY PRIOR AA.ENTER_CD = AA.ENTER_CD
+					    AND PRIOR AA.MAIN_MENU_CD = AA.MAIN_MENU_CD
+					    AND PRIOR AA.MENU_CD = AA.PRIOR_MENU_CD
+					    ORDER SIBLINGS BY AA.SEQ) T1
+					ORDER BY T1.RNUM
+				]]>
+
+
+		</select>
+
+		<update parameterType="map" id="saveReqDefinitionMgr">
+
+
+						MERGE INTO TSYS800	T
+						USING
+						(
+									SELECT	#{ssnEnterCd}				AS	ENTER_CD
+										,	#{ssnSabun}				AS	CHKID
+										,	SYSDATE					AS	CHKDATE
+										,	MODULE_CD
+										,	MAIN_MENU_CD
+										,	PRIOR_MENU_CD
+										,	MENU_CD
+										,	MENU_SEQ
+										,	GRP_CD
+										,	MENU_NM
+										,	PRG_CD
+										,	PRIOR_PRO_ID
+										,	PRIOR_PRO_NM
+										,	PRO_ID
+										,	PRO_NM
+										,	SEC_CD
+										,	DEV_SEC_CD
+										,	AS_IS
+										,	TO_BE
+										,	REQ_CON
+										,	PARTNER
+										,	PER_IN_CHAR
+										,	WRITE_YMD
+										,	PLAN_SDATE
+										,	PLAN_EDATE
+										,	FINISH_YMD
+										,	DEV_NAME
+										,	DEV_STATUS_CD
+										,	CH_REQ_CON
+										,	NOTE
+										,	DESIGN_SDATE
+										,	DESIGN_EDATE
+										,	DESIGN_FINISH_YMD
+										,	DESIGN_STATUS_CD
+										,	MD
+							FROM	(
+									SELECT	NULL		AS	MODULE_CD
+										,	NULL		AS	MAIN_MENU_CD
+										,	NULL		AS	PRIOR_MENU_CD
+										,	NULL		AS	MENU_CD
+										,	NULL		AS	MENU_SEQ
+										,	NULL		AS	GRP_CD
+										,	NULL		AS	MENU_NM
+										,	NULL		AS	PRG_CD
+										,	NULL		AS	PRIOR_PRO_ID
+										,	NULL		AS	PRIOR_PRO_NM
+										,	NULL		AS	PRO_ID
+										,	NULL		AS	PRO_NM
+										,	NULL		AS	SEC_CD
+										,	NULL		AS	DEV_SEC_CD
+										,	NULL		AS	AS_IS
+										,	NULL		AS	TO_BE
+										,	NULL		AS	REQ_CON
+										,	NULL		AS	PARTNER
+										,	NULL		AS	PER_IN_CHAR
+										,	NULL		AS	WRITE_YMD
+										,	NULL		AS	PLAN_SDATE
+										,	NULL		AS	PLAN_EDATE
+										,	NULL		AS	FINISH_YMD
+										,	NULL		AS	DEV_NAME
+										,	NULL		AS	DEV_STATUS_CD
+										,	NULL		AS	CH_REQ_CON
+										,	NULL		AS	NOTE
+										,	NULL		AS	DESIGN_SDATE
+										,	NULL		AS	DESIGN_EDATE
+										,	NULL		AS	DESIGN_FINISH_YMD
+										,	NULL		AS	DESIGN_STATUS_CD
+										,	NULL		AS	MD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									SELECT	TRIM(#{rm.moduleCd})			AS	MODULE_CD
+										,	TRIM(#{rm.mainMenuCd})			AS	MAIN_MENU_CD
+										,	TRIM(#{rm.priorMenuCd})			AS	PRIOR_MENU_CD
+										,	TRIM(#{rm.menuCd})				AS	MENU_CD
+										,	TRIM(#{rm.menuSeq})				AS	MENU_SEQ
+										,	TRIM(#{rm.grpCd})				AS	GRP_CD
+										,	TRIM(#{rm.menuNm})				AS	MENU_NM
+										,	TRIM(#{rm.prgCd})				AS	PRG_CD
+										,	TRIM(#{rm.priorProId})			AS	PRIOR_PRO_ID
+										,	TRIM(#{rm.priorProNm})			AS	PRIOR_PRO_NM
+										,	TRIM(#{rm.proId})				AS	PRO_ID
+										,	TRIM(#{rm.proNm})				AS	PRO_NM
+										,	TRIM(#{rm.secCd})				AS	SEC_CD
+										,	TRIM(#{rm.devSecCd})			AS	DEV_SEC_CD
+										,	TRIM(#{rm.asIs})				AS	AS_IS
+										,	TRIM(#{rm.toBe})				AS	TO_BE
+										,	TRIM(#{rm.reqCon})				AS	REQ_CON
+										,	TRIM(#{rm.partner})				AS	PARTNER
+										,	TRIM(#{rm.perInChar})			AS	PER_IN_CHAR
+										,	TRIM(#{rm.writeYmd})			AS	WRITE_YMD
+										,	TRIM(#{rm.planSdate})			AS	PLAN_SDATE
+										,	TRIM(#{rm.planEdate})			AS	PLAN_EDATE
+										,	TRIM(#{rm.finishYmd})			AS	FINISH_YMD
+										,	TRIM(#{rm.devName})				AS	DEV_NAME
+										,	TRIM(#{rm.devStatusCd})			AS	DEV_STATUS_CD
+										,	TRIM(#{rm.chReqCon})			AS	CH_REQ_CON
+										,	TRIM(#{rm.note})				AS	NOTE
+										,	TRIM(#{rm.designSdate})			AS	DESIGN_SDATE
+										,	TRIM(#{rm.designEdate})			AS	DESIGN_EDATE
+										,	TRIM(#{rm.designFinishYmd})		AS	DESIGN_FINISH_YMD
+										,	TRIM(#{rm.designStatusCd})		AS	DESIGN_STATUS_CD
+										,	TRIM(#{rm.md})					AS	MD
+									FROM	DUAL
+</foreach>
+									)	WHERE	MODULE_CD IS NOT NULL
+										AND		MAIN_MENU_CD IS NOT NULL
+										AND		PRIOR_MENU_CD IS NOT NULL
+										AND		MENU_CD IS NOT NULL
+										AND		MENU_SEQ IS NOT NULL
+										AND		GRP_CD IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD			=		S.ENTER_CD
+							AND	T.MODULE_CD			=		S.MODULE_CD
+							AND	T.MAIN_MENU_CD		=		S.MAIN_MENU_CD
+							AND	T.PRIOR_MENU_CD		=		S.PRIOR_MENU_CD
+							AND	T.MENU_CD			=		S.MENU_CD
+							AND	T.MENU_SEQ			=		S.MENU_SEQ
+							AND	T.GRP_CD			=		S.GRP_CD
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.MENU_NM			=	S.MENU_NM
+						,	T.PRG_CD			=	S.PRG_CD
+						,	T.PRIOR_PRO_ID		=	S.PRIOR_PRO_ID
+						,	T.PRIOR_PRO_NM		=	S.PRIOR_PRO_NM
+						,	T.PRO_ID			=	S.PRO_ID
+						,	T.PRO_NM			=	S.PRO_NM
+						,	T.SEC_CD			=	S.SEC_CD
+						,	T.DEV_SEC_CD		=	S.DEV_SEC_CD
+						,	T.AS_IS				=	S.AS_IS
+						,	T.TO_BE				=	S.TO_BE
+						,	T.REQ_CON			=	S.REQ_CON
+						,	T.PARTNER			=	S.PARTNER
+						,	T.PER_IN_CHAR		=	S.PER_IN_CHAR
+						,	T.WRITE_YMD			=	S.WRITE_YMD
+						,	T.PLAN_SDATE		=	S.PLAN_SDATE
+						,	T.PLAN_EDATE		=	S.PLAN_EDATE
+						,	T.FINISH_YMD		=	S.FINISH_YMD
+						,	T.DEV_NAME			=	S.DEV_NAME
+						,	T.DEV_STATUS_CD		=	S.DEV_STATUS_CD
+						,	T.CH_REQ_CON		=	S.CH_REQ_CON
+						,	T.NOTE				=	S.NOTE
+						,	T.DESIGN_SDATE		=	S.DESIGN_SDATE
+						,	T.DESIGN_EDATE		=	S.DESIGN_EDATE
+						,	T.DESIGN_FINISH_YMD	=	S.DESIGN_FINISH_YMD
+						,	T.DESIGN_STATUS_CD	=	S.DESIGN_STATUS_CD
+						,	T.MD				=	S.MD
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					(
+							T.ENTER_CD
+						,	T.MODULE_CD
+						,	T.MAIN_MENU_CD
+						,	T.PRIOR_MENU_CD
+						,	T.MENU_CD
+						,	T.MENU_SEQ
+						,	T.GRP_CD
+						,	T.MENU_NM
+						,	T.PRG_CD
+						,	T.PRIOR_PRO_ID
+						,	T.PRIOR_PRO_NM
+						,	T.PRO_ID
+						,	T.PRO_NM
+						,	T.SEC_CD
+						,	T.DEV_SEC_CD
+						,	T.AS_IS
+						,	T.TO_BE
+						,	T.REQ_CON
+						,	T.PARTNER
+						,	T.PER_IN_CHAR
+						,	T.WRITE_YMD
+						,	T.PLAN_SDATE
+						,	T.PLAN_EDATE
+						,	T.FINISH_YMD
+						,	T.DEV_NAME
+						,	T.DEV_STATUS_CD
+						,	T.CH_REQ_CON
+						,	T.NOTE
+						,	T.DESIGN_SDATE
+						,	T.DESIGN_EDATE
+						,	T.DESIGN_FINISH_YMD
+						,	T.DESIGN_STATUS_CD
+						,	T.MD
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.MODULE_CD
+						,	S.MAIN_MENU_CD
+						,	S.PRIOR_MENU_CD
+						,	S.MENU_CD
+						,	S.MENU_SEQ
+						,	S.GRP_CD
+						,	S.MENU_NM
+						,	S.PRG_CD
+						,	S.PRIOR_PRO_ID
+						,	S.PRIOR_PRO_NM
+						,	S.PRO_ID
+						,	S.PRO_NM
+						,	S.SEC_CD
+						,	S.DEV_SEC_CD
+						,	S.AS_IS
+						,	S.TO_BE
+						,	S.REQ_CON
+						,	S.PARTNER
+						,	S.PER_IN_CHAR
+						,	S.WRITE_YMD
+						,	S.PLAN_SDATE
+						,	S.PLAN_EDATE
+						,	S.FINISH_YMD
+						,	S.DEV_NAME
+						,	S.DEV_STATUS_CD
+						,	S.CH_REQ_CON
+						,	S.NOTE
+						,	S.DESIGN_SDATE
+						,	S.DESIGN_EDATE
+						,	S.DESIGN_FINISH_YMD
+						,	S.DESIGN_STATUS_CD
+						,	S.MD
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+		</update>
+
+		<delete parameterType="map" id="deleteReqDefinitionMgr">
+
+
+					DELETE	FROM TSYS800
+					WHERE	(ENTER_CD, MODULE_CD, MAIN_MENU_CD, PRIOR_MENU_CD, MENU_CD, MENU_SEQ, GRP_CD) IN ((NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.moduleCd != null and !rm.moduleCd.equals("")'>
+										<if test='rm.mainMenuCd != null and !rm.mainMenuCd.equals("")'>
+										<if test='rm.priorMenuCd != null and !rm.priorMenuCd.equals("")'>
+										<if test='rm.menuCd != null and !rm.menuCd.equals("")'>
+										<if test='rm.menuSeq != null and !rm.menuSeq.equals("")'>
+										<if test='rm.grpCd != null and !rm.grpCd.equals("")'>
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.moduleCd} ) , TRIM( #{rm.mainMenuCd} ) , TRIM( #{rm.priorMenuCd} ) , TRIM( #{rm.menuCd} ) , TRIM( #{rm.menuSeq} ) , TRIM( #{rm.grpCd} ) )
+										</if>
+										</if>
+										</if>
+										</if>
+										</if>
+										</if>
+										</if>
+</foreach>
+
+										)
+		</delete>
+
+		<update parameterType="map" id="procP_SYS_REQ_CRE" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_SYS_REQ_CRE(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{cModuleCd,mode=IN,jdbcType=VARCHAR},
+				#{cGrpCd,mode=IN,jdbcType=VARCHAR},
+				#{cChkYn,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+</mapper>

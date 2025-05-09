@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.salDayPopup">
+
+	<select id="getSalDayLastestPaymentInfoMap" parameterType="map" resultType="cMap" >
+		<![CDATA[
+			SELECT A.PAY_ACTION_CD
+				 , TRIM(A.PAY_ACTION_NM) AS PAY_ACTION_NM
+				 , A.PAY_CD
+				 , B.PAY_NM
+				 , A.PAYMENT_YMD
+				 , TO_CHAR(TO_DATE(A.PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+			  FROM TCPN201 A
+				 , TCPN051 B
+			 WHERE A.ENTER_CD		= B.ENTER_CD
+			   AND A.PAY_CD			= B.PAY_CD
+			   AND A.ENTER_CD		= #{ssnEnterCd} ]]>
+			   AND A.PAY_ACTION_CD	= ( SELECT MAX(A.PAY_ACTION_CD)
+										  FROM TCPN201 A
+											 , TCPN051 B
+											 , TCPN203 D
+										 WHERE A.ENTER_CD		= #{ssnEnterCd}
+										   AND B.ENTER_CD		= A.ENTER_CD
+										   AND B.PAY_CD			= A.PAY_CD
+										   AND A.ENTER_CD		= D.ENTER_CD(+)
+										   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD(+)
+								<if test="payCdIn != null and payCdIn neq ''">
+									AND B.PAY_CD	IN
+		<foreach collection="payCdIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+								</if>
+								<if test="payCdNotIn != null and payCdNotIn neq ''">
+									AND B.PAY_CD	IN
+		<foreach collection="payCdNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+								</if>
+								<if test="runTypeIn != null and runTypeIn neq ''">
+									AND B.RUN_TYPE	IN
+		<foreach collection="runTypeIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+								</if>
+								<if test="runTypeNotIn != null and runTypeNotIn neq ''">
+									AND B.RUN_TYPE	NOT IN
+		<foreach collection="runTypeNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+								</if>
+								<if test="sabun != null and sabun neq ''">
+								   AND D.SABUN			= #{sabun}
+								</if>
+								<if test='ssnSearchType eq "O"'>
+								<![CDATA[
+								            AND (B.BUSINESS_PLACE_CD IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+								                                          FROM (SELECT F_COM_GET_AUTH_PARSE(TRIM(#{ssnEnterCd}),'C10',F_COM_GET_AUTH_VALUE(TRIM(#{ssnEnterCd}),TRIM(#{ssnSabun}),TRIM(#{ssnGrpCd}))) AS PARAM FROM dual) A
+								                                        CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+											  OR B.BUSINESS_PLACE_CD IS NULL)
+								]]>
+								</if>
+										)
+	</select>
+
+	<select id="getSalDayPopupPayCdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+	       SELECT DISTINCT  PAY_CD AS CODE
+	       				  , PAY_NM AS CODE_NM
+	       FROM TCPN051
+	       WHERE ENTER_CD = #{ssnEnterCd} ]]>
+	<if test="payCdIn != null and payCdIn neq ''">
+			AND PAY_CD	IN
+		<foreach collection="payCdIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	</if>
+	<if test="payCdNotIn != null and payCdNotIn neq ''">
+			AND PAY_CD	IN
+		<foreach collection="payCdNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	</if>
+	<if test="runTypeIn != null and runTypeIn neq ''">
+			AND RUN_TYPE	IN
+		<foreach collection="runTypeIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	</if>
+	<if test="runTypeNotIn != null and runTypeNotIn neq ''">
+			AND RUN_TYPE	NOT IN
+		<foreach collection="runTypeNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	</if>
+	<if test='ssnSearchType eq "O"'>
+	<![CDATA[
+           AND (BUSINESS_PLACE_CD IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+                                         FROM (SELECT F_COM_GET_AUTH_PARSE(TRIM(#{ssnEnterCd}),'C10',F_COM_GET_AUTH_VALUE(TRIM(#{ssnEnterCd}),TRIM(#{ssnSabun}),TRIM(#{ssnGrpCd}))) AS PARAM FROM dual) A
+                                       CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+		  		OR BUSINESS_PLACE_CD IS NULL)
+	]]>
+	</if>
+       ORDER BY PAY_CD ASC
+	</select>
+
+	<select id="getSalDayPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ROWNUM AS RNUM
+		     , ENTER_CD
+		     , PAY_ACTION_CD
+		     , PAY_ACTION_NM
+		     , PAY_YM
+		     , PAY_CD
+		     , RUN_TYPE
+		     , PAYMENT_YMD
+		     , TO_CHAR(TO_DATE(PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+		     , ORD_SYMD
+		     , ORD_EYMD
+		     , TIME_YM
+		     , CAL_TAX_METHOD
+		     , CAL_TAX_SYM
+		     , CAL_TAX_EYM
+		     , ADD_TAX_RATE
+		     , BON_SYMD
+		     , BON_EYMD
+		     , GNT_SYMD
+		     , GNT_EYMD
+		     , BON_CAL_TYPE
+		     , BON_STD_CNT
+		     , BON_APPLY_TYPE
+		     , BON_MON_RATE
+		     , PAYMENT_METHOD
+		     , MAN_CNT
+		     , DECODE(CLOSE_YN,'Y','1','0') AS CLOSE_YN
+		     , PAY_NM
+		     , BIGO
+		FROM (
+				SELECT DISTINCT A.ENTER_CD
+                      , A.PAY_ACTION_CD
+                      , A.PAY_ACTION_NM
+                      , A.PAY_YM
+                      , A.PAY_CD
+                      , B.RUN_TYPE
+                      , A.PAYMENT_YMD
+                      , A.ORD_SYMD
+                      , A.ORD_EYMD
+                      , A.TIME_YM
+                      , A.CAL_TAX_METHOD
+                      , A.CAL_TAX_SYM
+                      , A.CAL_TAX_EYM
+                      , A.ADD_TAX_RATE
+                      , A.BON_SYMD
+                      , A.BON_EYMD
+                      , A.GNT_SYMD
+                      , A.GNT_EYMD
+                      , A.BON_CAL_TYPE
+                      , A.BON_STD_CNT
+                      , A.BON_APPLY_TYPE
+                      , A.BON_MON_RATE
+                      , A.PAYMENT_METHOD
+                            , (SELECT COUNT(*)
+                              FROM TCPN203
+                              WHERE ENTER_CD = A.ENTER_CD
+                              AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS MAN_CNT
+                            , C.CLOSE_YN
+                            , B.PAY_NM
+                            , A.BIGO
+				  FROM TCPN201 A
+		      		 , TCPN051 B
+		             , TCPN981 C
+		             , TCPN203 D
+				 WHERE A.ENTER_CD		= B.ENTER_CD
+				   AND A.PAY_CD			= B.PAY_CD
+				   AND A.ENTER_CD		= D.ENTER_CD(+)
+				   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD(+)
+				   AND A.ENTER_CD		= C.ENTER_CD(+)
+				   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD(+)
+				   AND A.ENTER_CD		= #{ssnEnterCd} ]]>
+	         <if test="searchPayCd != null and searchPayCd neq ''">
+	         	AND A.PAY_CD	LIKE '%'|| #{searchPayCd} ||'%'
+	         </if>
+	         <if test="searchMonthFrom != null and searchMonthFrom neq '' and searchMonthTo != null and searchMonthTo neq ''">
+	         	AND A.PAY_YM	BETWEEN REPLACE(#{searchMonthFrom}, '-', '') AND REPLACE(#{searchMonthTo}, '-', '')
+	         </if>
+			<if test="payCdIn != null and payCdIn neq ''">
+				AND B.PAY_CD	IN
+		<foreach collection="payCdIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			</if>
+			<if test="payCdNotIn != null and payCdNotIn neq ''">
+				AND B.PAY_CD	IN
+		<foreach collection="payCdNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			</if>
+			<if test="runTypeIn != null and runTypeIn neq ''">
+				AND B.RUN_TYPE	IN
+		<foreach collection="runTypeIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			</if>
+			<if test="runTypeNotIn != null and runTypeNotIn neq ''">
+				AND B.RUN_TYPE	NOT IN
+		<foreach collection="runTypeNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			</if>
+			<if test="searchSabun != null and searchSabun neq ''">
+			   AND D.SABUN		= #{searchSabun}
+			</if>
+			<if test='ssnSearchType eq "O"'>
+			<![CDATA[
+	          AND (B.BUSINESS_PLACE_CD IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+	                                          FROM (SELECT F_COM_GET_AUTH_PARSE(TRIM(#{ssnEnterCd}),'C10',F_COM_GET_AUTH_VALUE(TRIM(#{ssnEnterCd}),TRIM(#{ssnSabun}),TRIM(#{ssnGrpCd}))) AS PARAM FROM dual) A
+	                                        CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+				  OR B.BUSINESS_PLACE_CD IS NULL)
+			]]>
+			</if>
+		         ORDER BY A.PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+		    )
+	</select>
+
+	<select id="getSalDayAdminPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ROWNUM AS RNUM
+			 , ENTER_CD
+			 , PAY_ACTION_CD
+			 , PAY_ACTION_NM
+			 , PAY_YM
+			 , PAY_CD
+			 , RUN_TYPE
+			 , PAYMENT_YMD
+			 , TO_CHAR(TO_DATE(PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+			 , ORD_SYMD
+			 , ORD_EYMD
+			 , TIME_YM
+			 , CAL_TAX_METHOD
+			 , CAL_TAX_SYM
+			 , CAL_TAX_EYM
+			 , ADD_TAX_RATE
+			 , BON_SYMD
+			 , BON_EYMD
+			 , GNT_SYMD
+			 , GNT_EYMD
+			 , BON_CAL_TYPE
+			 , BON_STD_CNT
+			 , BON_APPLY_TYPE
+			 , BON_MON_RATE
+			 , PAYMENT_METHOD
+			 , MAN_CNT
+			 , DECODE(CLOSE_YN,'Y','1','0') AS CLOSE_YN
+			 , PAY_NM
+			 , BIGO
+		FROM (	SELECT DISTINCT
+					   A.ENTER_CD
+					 , A.PAY_ACTION_CD
+					 , A.PAY_ACTION_NM
+					 , A.PAY_YM
+					 , A.PAY_CD
+					 , B.RUN_TYPE
+					 , A.PAYMENT_YMD
+					 , A.ORD_SYMD
+					 , A.ORD_EYMD
+					 , A.TIME_YM
+					 , A.CAL_TAX_METHOD
+					 , A.CAL_TAX_SYM
+					 , A.CAL_TAX_EYM
+					 , A.ADD_TAX_RATE
+					 , A.BON_SYMD
+					 , A.BON_EYMD
+					 , A.GNT_SYMD
+					 , A.GNT_EYMD
+					 , A.BON_CAL_TYPE
+					 , A.BON_STD_CNT
+					 , A.BON_APPLY_TYPE
+					 , A.BON_MON_RATE
+					 , A.PAYMENT_METHOD
+					 , (SELECT COUNT(*) FROM TCPN203
+						WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS MAN_CNT
+					 , C.CLOSE_YN
+					 , B.PAY_NM
+					 , A.BIGO
+				  FROM TCPN201 A
+					 , TCPN051 B
+					 , TCPN981 C
+					 , TCPN203 D
+				 WHERE A.ENTER_CD		= B.ENTER_CD
+				   AND A.PAY_CD			= B.PAY_CD
+				   AND A.ENTER_CD		= D.ENTER_CD
+				   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD
+				   AND A.ENTER_CD		= C.ENTER_CD(+)
+				   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD(+)
+				   AND A.ENTER_CD		= #{ssnEnterCd} ]]>
+		<if test="searchPayCd != null and searchPayCd neq ''">
+				   AND A.PAY_CD LIKE '%'|| #{searchPayCd} ||'%'
+		</if>
+		<if test="searchMonthFrom != null and searchMonthFrom neq '' and searchMonthTo != null and searchMonthTo neq ''">
+				   AND A.PAY_YM BETWEEN REPLACE(#{searchMonthFrom}, '-', '') AND REPLACE(#{searchMonthTo}, '-', '')
+		</if>
+				   AND B.RUN_TYPE NOT IN ('00004','Y0001','TEMP')
+		<if test="payCdIn != null and payCdIn neq ''">
+				   AND B.PAY_CD	IN
+		<foreach collection="payCdIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="payCdNotIn != null and payCdNotIn neq ''">
+				   AND B.PAY_CD	IN
+		<foreach collection="payCdNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="runTypeIn != null and runTypeIn neq ''">
+				   AND B.RUN_TYPE	IN
+		<foreach collection="runTypeIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="runTypeNotIn != null and runTypeNotIn neq ''">
+				   AND B.RUN_TYPE	NOT IN
+		<foreach collection="runTypeNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="searchSabun != null and searchSabun neq ''">
+				   AND D.SABUN			= #{searchSabun}
+		</if>
+	<![CDATA[
+				ORDER BY A.PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+			)
+	]]>
+	</select>
+		
+	<select id="getSalDayUserPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ROWNUM AS RNUM
+			 , ENTER_CD
+			 , PAY_ACTION_CD
+			 , PAY_ACTION_NM
+			 , PAY_YM
+			 , PAY_CD
+			 , RUN_TYPE
+			 , PAYMENT_YMD
+			 , TO_CHAR(TO_DATE(PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+			 , ORD_SYMD
+			 , ORD_EYMD
+			 , TIME_YM
+			 , CAL_TAX_METHOD
+			 , CAL_TAX_SYM
+			 , CAL_TAX_EYM
+			 , ADD_TAX_RATE
+			 , BON_SYMD
+			 , BON_EYMD
+			 , GNT_SYMD
+			 , GNT_EYMD
+			 , BON_CAL_TYPE
+			 , BON_STD_CNT
+			 , BON_APPLY_TYPE
+			 , BON_MON_RATE
+			 , PAYMENT_METHOD
+			 , MAN_CNT
+			 , DECODE(CLOSE_YN,'Y','1','0') AS CLOSE_YN
+			 , PAY_NM
+			 , BIGO
+		FROM (	SELECT DISTINCT
+					   A.ENTER_CD
+					 , A.PAY_ACTION_CD
+					 , A.PAY_ACTION_NM
+					 , A.PAY_YM
+					 , A.PAY_CD
+					 , B.RUN_TYPE
+					 , A.PAYMENT_YMD
+					 , A.ORD_SYMD
+					 , A.ORD_EYMD
+					 , A.TIME_YM
+					 , A.CAL_TAX_METHOD
+					 , A.CAL_TAX_SYM
+					 , A.CAL_TAX_EYM
+					 , A.ADD_TAX_RATE
+					 , A.BON_SYMD
+					 , A.BON_EYMD
+					 , A.GNT_SYMD
+					 , A.GNT_EYMD
+					 , A.BON_CAL_TYPE
+					 , A.BON_STD_CNT
+					 , A.BON_APPLY_TYPE
+					 , A.BON_MON_RATE
+					 , A.PAYMENT_METHOD
+					 , (SELECT COUNT(*) FROM TCPN203
+						WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS MAN_CNT
+					 , C.CLOSE_YN
+					 , B.PAY_NM
+					 , A.BIGO
+				  FROM TCPN201 A
+					 , TCPN051 B
+					 , TCPN981 C
+					 , TCPN203 D
+					 , TCPN991 E
+				 WHERE A.ENTER_CD		= B.ENTER_CD
+				   AND A.PAY_CD			= B.PAY_CD
+				   AND A.ENTER_CD		= C.ENTER_CD
+				   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+				   AND A.ENTER_CD		= D.ENTER_CD
+				   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD
+				   AND A.PAY_CD			= E.PAY_CD(+)
+				   AND A.ENTER_CD		= E.ENTER_CD(+)
+				   AND A.ENTER_CD		= #{ssnEnterCd} ]]>
+		<if test="searchPayCd != null and searchPayCd neq ''">
+				   AND A.PAY_CD LIKE '%'|| #{searchPayCd} ||'%'
+		</if>
+		<if test="searchMonthFrom != null and searchMonthFrom neq '' and searchMonthTo != null and searchMonthTo neq ''">
+				   AND A.PAY_YM BETWEEN REPLACE(#{searchMonthFrom}, '-', '') AND REPLACE(#{searchMonthTo}, '-', '')
+		</if>
+				   AND NVL(C.CLOSE_YN,'N') = 'Y'
+		<if test="searchSabun != null and searchSabun neq ''">
+				   AND D.SABUN			= #{searchSabun}
+		</if>
+		<if test="payCdIn != null and payCdIn neq ''">
+				   AND B.PAY_CD	IN
+		<foreach collection="payCdIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="payCdNotIn != null and payCdNotIn neq ''">
+				   AND B.PAY_CD	IN
+		<foreach collection="payCdNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="runTypeIn != null and runTypeIn neq ''">
+				   AND B.RUN_TYPE	IN
+		<foreach collection="runTypeIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="runTypeNotIn != null and runTypeNotIn neq ''">
+				   AND B.RUN_TYPE	NOT IN
+		<foreach collection="runTypeNotIn" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+	<![CDATA[
+				   AND B.RUN_TYPE NOT IN ('00004','Y0001','TEMP')
+				   AND (CASE WHEN B.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+							 ELSE
+								CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') THEN -1
+								     WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') THEN
+								         CASE WHEN E.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+								     ELSE 0
+								END
+						END
+			           ) < 0
+				ORDER BY A.PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+			)
+	]]>
+	</select>
+</mapper>

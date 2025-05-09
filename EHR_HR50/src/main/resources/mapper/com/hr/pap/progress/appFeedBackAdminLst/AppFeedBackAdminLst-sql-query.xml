@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appFeedBackAdminLst">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppFeedBackAdminLstList">
+
+				<![CDATA[
+					SELECT 	 A.ENTER_CD
+					        ,A.APPRAISAL_CD
+					        ,G.APPRAISAL_NM
+					        ,G.APPRAISAL_YY
+					        ,A.SABUN
+					        ,D.NAME
+					        ,E.ORG_CD
+					        ,F_COM_GET_ORG_NM(E.ENTER_CD, E.ORG_CD, E.SDATE) AS ORG_NM
+					        ,E.JIKWEE_CD
+					        ,E.JIKGUB_CD
+					        ,E.JIKCHAK_CD
+					        ,E.JIKWEE_NM
+					        ,E.JIKGUB_NM
+					        ,F_COM_GET_JIKGUB_YEUNCHA(#{ssnEnterCd}, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKGUB_YEUNCHA
+					        ,E.SAL_CLASS_NM
+					        ,E.JIKCHAK_NM
+					        ,E.JOB_CD
+					        ,F_COM_GET_JOB_NM_201(E.ENTER_CD, E.JOB_CD, E.SDATE)  AS JOB_NM
+					        ,E.WORK_TYPE
+					        ,E.WORK_TYPE_NM
+					        ,C.APP_GROUP_CD
+					        ,(SELECT APP_GROUP_NM
+					            FROM TPAP133
+					           WHERE ENTER_CD = C.ENTER_CD
+					             AND APPRAISAL_CD = C.APPRAISAL_CD
+					             AND APP_GROUP_CD = C.APP_GROUP_CD
+					         ) AS APP_GROUP_NM -- 평가그룹명
+					        ,B.D_BASE_YMD
+					        ,A.MBO_SELF_POINT     /* 업적평가점수_본인 */
+					        ,A.MBO_SELF_CLASS_CD  /* 업적평가등급코드_본인 */
+					        ,A.MBO_1ST_POINT      /* 업적평가점수_1차 */
+					        ,A.MBO_1ST_CLASS_CD   /* 업적평가등급코드_1차 */
+					        ,A.MBO_2ND_POINT      /* 업적평가점수_2차 */
+					        ,A.MBO_2ND_CLASS_CD   /* 업적평가등급코드_2차 */
+					        ,A.MBO_POINT          /* 업적평가점수 */
+					        ,A.MBO_CLASS_CD       /* 업적평가등급코드 */
+					        ,A.COMP_SELF_POINT     /* 역량평가점수_본인 */
+					        ,A.COMP_SELF_CLASS_CD  /* 역량평가등급코드_본인 */
+					        ,A.COMP_1ST_POINT      /* 역량평가점수_1차 */
+					        ,A.COMP_1ST_CLASS_CD   /* 역량평가등급코드_1차 */
+					        ,A.COMP_2ND_POINT      /* 역량평가점수_2차 */
+					        ,A.COMP_2ND_CLASS_CD   /* 역량평가등급코드_2차 */
+					        ,A.COMP_POINT          /* 역량평가점수 */
+					        ,A.COMP_CLASS_CD       /* 역량평가등급코드 */
+					        ,A.APP_POINT           /* 종합평가점수 */
+					        ,A.APP_CLASS_CD        /* 종합평가등급코드(P00001) */
+					        ,A.MEMO                /* 비고 */
+					        ,A.FB_YN               /* 개별평가결과F/B여부 */
+					        ,A.SUM_SJ_POINT        /* 누적승진포인트 */
+					        ,'0' AS PRIZE
+					        ,'0' AS RESULT
+					        ,'0' AS APP_MEMO
+					 FROM   TPAP571 A,
+					        TPAP105 B,
+					        TPAP201 C,
+					        THRM100 D,
+					        THRM151 E,
+					        TPAP101 G
+					WHERE A.ENTER_CD        = B.ENTER_CD
+					   AND A.APPRAISAL_CD   = B.APPRAISAL_CD
+					   AND B.APP_STEP_CD    = '5'	-- 최종평가
+					   AND A.ENTER_CD       = C.ENTER_CD(+)
+					   AND A.APPRAISAL_CD   = C.APPRAISAL_CD(+)
+					   AND A.SABUN          = C.SABUN(+)
+					   AND C.APP_STEP_CD(+) = '5'	-- 최종평가
+					   AND C.APP_YN(+)      = 'Y'
+					   AND A.ENTER_CD       = D.ENTER_CD
+					   AND A.SABUN          = D.SABUN
+					   AND A.ENTER_CD       = E.ENTER_CD
+					   AND A.SABUN          = E.SABUN
+					   AND E.SDATE          = ( SELECT MAX(SDATE) FROM THRM151 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND B.D_BASE_YMD BETWEEN SDATE AND NVL(EDATE, '99991231') )
+					   AND A.ENTER_CD       = G.ENTER_CD
+					   AND A.APPRAISAL_CD   = G.APPRAISAL_CD
+					   AND A.ENTER_CD       = #{ssnEnterCd}
+					   AND A.SABUN          = #{searchSabun}
+					   AND G.CLOSE_YN       = 'Y'
+					   AND G.APP_TYPE_CD    = 'C'
+					 ORDER BY APPRAISAL_YY DESC, APP_TIME_CD DESC, F_COM_GET_GRCODE_SEQ(ENTER_CD, 'P10003', APP_TYPE_CD), APP_S_YMD DESC, APP_E_YMD DESC, APPRAISAL_CD
+				]]>
+
+
+		</select>
+		<!-- 평가의견	조회 -->
+<select parameterType="map" resultType="cMap" id="getAppFeedBackAdminLstPopupList">
+
+				<![CDATA[
+						SELECT 	A.APPRAISAL_CD
+					     	   ,A.SABUN
+					           ,A.APP_APP_MEMO
+					           ,A.APP_APP_MEMO2
+					      FROM	TPAP402 A
+					     WHERE  A.ENTER_CD       = #{ssnEnterCd}
+                           AND	A.SABUN          = #{searchSabun}
+                           AND (A.APP_APP_MEMO IS NOT NULL OR A.APP_APP_MEMO2 IS NOT NULL)
+					   	   AND	A.APPRAISAL_CD =(  SELECT APPRAISAL_CD
+                                              		 FROM TPAP101
+                                             		WHERE APP_TYPE_CD='B'
+                                                	  AND APPRAISAL_YY =#{searchYear} )
+
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAppFeedBackAdminLstMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppFeedBackAdminLst">
+
+					MERGE INTO ZTST002 T
+					USING	(
+							SELECT	  A.COL1
+									, A.COL2
+									, A.COL3
+									, A.COL4
+									, A.COL5
+									, A.COL6
+							FROM	(
+									SELECT	  NULL		AS COL1
+											, NULL		AS COL2
+											, NULL		AS COL3
+											, NULL		AS COL4
+											, NULL		AS COL5
+											, NULL		AS COL6
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.col1 != null and !rm.col1.equals("")'>
+												TRIM(#{rm.col1}) 			AS COL1
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+												TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(COL1)),0) + ${icnt}) FROM ZTST002) )	AS COL1
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+
+											, TRIM( #{rm.col2} )	AS COL2
+											, TRIM( #{rm.col3} )	AS COL3
+											, TRIM( #{rm.col4} )	AS COL4
+											, TRIM( #{rm.col5} )	AS COL5
+											, TRIM( #{rm.col6} )	AS COL6
+											FROM   DUAL
+</foreach>
+									) A WHERE A.COL1 IS NOT NULL
+							) S
+					ON ( T.COL1		= S.COL1 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.COL2	= S.COL2
+									, T.COL3	= S.COL3
+									, T.COL4	= S.COL4
+									, T.COL5	= S.COL5
+									, T.COL6	= S.COL6
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.COL1
+							, T.COL2
+							, T.COL3
+							, T.COL4
+							, T.COL5
+							, T.COL6
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.COL1
+							, S.COL2
+							, S.COL3
+							, S.COL4
+							, S.COL5
+							, S.COL6
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppFeedBackAdminLst">
+
+					DELETE FROM ZTST002
+					WHERE 	COL1 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.col1 != null and !rm.col1.equals("")'>
+											TRIM( #{rm.col1} )
+										</if>
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppFeedBackAdminLst">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppFeedBackAdminLst">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+</mapper>

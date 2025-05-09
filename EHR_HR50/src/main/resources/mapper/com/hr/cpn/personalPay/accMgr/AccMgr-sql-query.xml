@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.accMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAccMgrList">
+			
+				<![CDATA[
+				SELECT
+				       F_COM_GET_GRCODE_SEQ(CC.ENTER_CD, 'H20010', CC.JIKGUB_CD ) AS JIKGUB_SEQ
+				     , F_COM_GET_GRCODE_SEQ(CC.ENTER_CD, 'H20020', CC.JIKCHAK_CD) AS JIKCHAK_SEQ
+				     , F_COM_GET_GRCODE_SEQ(CC.ENTER_CD, 'H20020', CC.JIKWEE_CD ) AS JIKWEE_SEQ
+				     , A.SABUN
+				     , A.ACCOUNT_TYPE
+				     , A.SDATE
+				     , A.EDATE
+				     , A.BANK_CD
+				     , CRYPTIT.DECRYPT(A.ACCOUNT_NO,A.ENTER_CD) AS ACCOUNT_NO
+				     , A.ACC_NAME
+				     , TO_CHAR(A.CHKDATE, 'YYYY-MM-DD HH24:MI:SS') AS CHKDATE
+				     , A.CHKID
+				     , A.ACC_STATUS_CD
+				     , BB.NAME
+				     , CC.STATUS_CD
+				     , CC.ORG_CD
+				     , F_COM_GET_ORG_NM(CC.ENTER_CD, CC.ORG_CD, CC.SDATE)         AS ORG_NM
+				     , CC.JIKGUB_CD
+				     , CC.JIKWEE_CD
+				     , CC.JIKWEE_NM
+				     , CC.MANAGE_NM
+				 FROM TCPN180  A
+				    , THRM100 BB
+				    , THRM151 CC
+				WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+				<if test="searchAccountType != null and searchAccountType neq ''">
+					AND A.ACCOUNT_TYPE LIKE '%'|| #{searchAccountType} ||'%'
+				</if>
+				<if test="searchSabunName != null and searchSabunName neq ''">
+					AND (A.SABUN LIKE  '%'|| #{searchSabunName} ||'%' OR BB.NAME LIKE '%'|| #{searchSabunName} ||'%')
+				</if>
+				  <if test="searchStatusCdHidden != null and searchStatusCdHidden neq ''">
+					AND CC.STATUS_CD IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				  </if>
+				  <![CDATA[
+				  AND A.ENTER_CD       = BB.ENTER_CD
+				  AND BB.ENTER_CD      = CC.ENTER_CD
+				  AND BB.SABUN         = CC.SABUN
+				  AND BB.SABUN         = A.SABUN
+				  AND CC.SDATE         = (
+				                           SELECT MAX(D.SDATE)
+				                           FROM THRM151 D
+				                           WHERE D.ENTER_CD = CC.ENTER_CD
+				                           AND D.SABUN      = CC.SABUN
+				                           AND D.SDATE     <= TO_CHAR(SYSDATE, 'YYYYMMDD')
+				                          )
+				 ORDER BY CC.ORG_CD
+				        , F_COM_GET_ORG_NM(CC.ENTER_CD, CC.ORG_CD, CC.SDATE)
+				        , BB.NAME
+				        , A.SDATE DESC
+				        , 1,2,3
+				]]>
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAccMgr">
+						MERGE INTO TCPN180	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	SABUN
+										,	ACCOUNT_TYPE
+										,	SDATE
+										,	EDATE
+										,	BANK_CD
+										,	ACCOUNT_NO
+										,	ACC_NAME
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	SABUN
+										,	NULL		AS	ACCOUNT_TYPE
+										,	NULL		AS	SDATE
+										,	NULL		AS	EDATE
+										,	NULL		AS	BANK_CD
+										,	NULL		AS	ACCOUNT_NO
+										,	NULL		AS	ACC_NAME
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+										,	TRIM(#{rm.sabun})				AS	SABUN
+										,	TRIM(#{rm.accountType})			AS	ACCOUNT_TYPE
+										,	TRIM(#{rm.sdate})				AS	SDATE
+										,	TRIM(#{rm.edate})				AS	EDATE
+										,	TRIM(#{rm.bankCd})				AS	BANK_CD
+										,	CRYPTIT.ENCRYPT(TRIM(#{rm.accountNo}),#{ssnEnterCd})	AS	ACCOUNT_NO
+										,	TRIM(#{rm.accName})				AS	ACC_NAME
+										,	SYSDATE							AS	CHKDATE
+										,	#{ssnSabun}						AS	CHKID
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		SABUN IS NOT NULL
+										AND		ACCOUNT_TYPE IS NOT NULL
+										AND		SDATE IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD			=		S.ENTER_CD
+							AND	T.SABUN				=		S.SABUN
+							AND	T.ACCOUNT_TYPE		=		S.ACCOUNT_TYPE
+							AND	T.SDATE				=		S.SDATE
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.EDATE				=	S.EDATE
+						,	T.BANK_CD			=	S.BANK_CD
+						,	T.ACCOUNT_NO		=	S.ACCOUNT_NO
+						,	T.ACC_NAME			=	S.ACC_NAME
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					(
+							T.ENTER_CD
+						,	T.SABUN
+						,	T.ACCOUNT_TYPE
+						,	T.SDATE
+						,	T.EDATE
+						,	T.BANK_CD
+						,	T.ACCOUNT_NO
+						,	T.ACC_NAME
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.SABUN
+						,	S.ACCOUNT_TYPE
+						,	S.SDATE
+						,	S.EDATE
+						,	S.BANK_CD
+						,	S.ACCOUNT_NO
+						,	S.ACC_NAME
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+		</update>
+		
+		<update parameterType="map" id="saveAccMgrTCPN183">
+			
+						MERGE INTO TCPN183	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	SABUN
+										,	REQ_SEQ
+										,	REQ_DATE
+										,	STATUS
+										,	AGREE_DATE
+										,	ACCOUNT_TYPE
+										,	BANK_CD
+										,	ACCOUNT_NO
+										,	ACC_NAME
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	SABUN
+										,	NULL		AS	REQ_SEQ
+										,	NULL		AS	REQ_DATE
+										,	NULL		AS	STATUS
+										,	NULL		AS	AGREE_DATE
+										,	NULL		AS	ACCOUNT_TYPE
+										,	NULL		AS	BANK_CD
+										,	NULL		AS	ACCOUNT_NO
+										,	NULL		AS	ACC_NAME
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" index="idx">
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+										,	TRIM(#{rm.sabun})				AS	SABUN
+										,  NVL( 	TO_CHAR( (
+														SELECT	MAX(TO_NUMBER(REQ_SEQ))
+														FROM	TCPN183
+														WHERE	ENTER_CD	=	TRIM(#{ssnEnterCd})
+														AND		SABUN		=	TRIM(#{rm.sabun})
+													) )
+
+												,	TO_CHAR( (
+														SELECT (NVL(MAX(TO_NUMBER(REQ_SEQ)),0) + 1)
+														FROM	TCPN183
+														WHERE	ENTER_CD	=	TRIM(#{ssnEnterCd})
+														AND		SABUN		=	TRIM(#{rm.sabun})
+													) )
+
+												)	AS REQ_SEQ
+										,	TRIM(#{rm.sdate})				AS	REQ_DATE
+										,	'Y'								AS	STATUS
+										,	TRIM(#{rm.sdate})				AS	AGREE_DATE
+										,	TRIM(#{rm.accountType})			AS	ACCOUNT_TYPE
+										,	TRIM(#{rm.bankCd})				AS	BANK_CD
+										,	CRYPTIT.ENCRYPT(TRIM(#{rm.accountNo}),#{ssnEnterCd})	AS	ACCOUNT_NO
+										,	TRIM(#{rm.accName})				AS	ACC_NAME
+										,	SYSDATE							AS	CHKDATE
+										,	#{ssnSabun}						AS	CHKID
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		SABUN IS NOT NULL
+										AND		REQ_SEQ IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD			=		S.ENTER_CD
+							AND	T.SABUN				=		S.SABUN
+							AND	T.REQ_SEQ			=		S.REQ_SEQ
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.REQ_DATE			=	S.REQ_DATE
+						,	T.STATUS			=	S.STATUS
+						,	T.AGREE_DATE		=	S.AGREE_DATE
+						,	T.ACCOUNT_TYPE		=	S.ACCOUNT_TYPE
+						,	T.BANK_CD			=	S.BANK_CD
+						,	T.ACCOUNT_NO		=	S.ACCOUNT_NO
+						,	T.ACC_NAME			=	S.ACC_NAME
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					(
+							T.ENTER_CD
+						,	T.SABUN
+						,	T.REQ_SEQ
+						,	T.REQ_DATE
+						,	T.STATUS
+						,	T.AGREE_DATE
+						,	T.ACCOUNT_TYPE
+						,	T.BANK_CD
+						,	T.ACCOUNT_NO
+						,	T.ACC_NAME
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.SABUN
+						,	S.REQ_SEQ
+						,	S.REQ_DATE
+						,	S.STATUS
+						,	S.AGREE_DATE
+						,	S.ACCOUNT_TYPE
+						,	S.BANK_CD
+						,	S.ACCOUNT_NO
+						,	S.ACC_NAME
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAccMgr">
+			
+					DELETE FROM TCPN180
+					WHERE 	(ENTER_CD, SABUN, ACCOUNT_TYPE, SDATE) IN 	(  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+						<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+							<if test="rm.sabun != null and rm.sabun neq ''">
+									<if test="rm.sdate != null and sdate neq '' and rm.accountType != null and rm.accountType neq ''">
+											(#{ssnEnterCd}, TRIM(#{rm.sabun}), TRIM(#{rm.accountType}), TRIM(#{rm.sdate}))
+									</if>
+							</if>
+						</if>
+</foreach>
+										)
+		</delete>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAccMgrTCPN183">
+			
+					DELETE FROM TCPN183
+					WHERE 	(ENTER_CD, SABUN, REQ_DATE) IN 	(  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+						<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+							<if test="rm.sabun != null and rm.sabun neq ''">
+								<if test="rm.sdate != null and sdate neq ''">
+											(#{ssnEnterCd}, TRIM(#{rm.sabun}), TRIM(#{rm.sdate}))
+								</if>
+							</if>
+						</if>
+</foreach>
+										)
+			
+			
+		</delete>
+		
+		<update parameterType="map" id="updatePerAccChgTCPN180">
+            
+                <![CDATA[
+					UPDATE	TCPN180	A
+					SET		EDATE	=	(
+											SELECT	EDATE
+											FROM	(
+														SELECT	ENTER_CD
+															,	SABUN
+															,	ACCOUNT_TYPE
+															,	SDATE
+															,	NVL(LEAD(TO_CHAR(TO_DATE(SDATE,'YYYYMMDD')-1,'YYYYMMDD')) OVER( ORDER BY SEQ), '99991231')	AS	EDATE
+														FROM	(
+																	SELECT	TO_CHAR( ROW_NUMBER() OVER(PARTITION BY ENTER_CD ORDER BY SDATE))	AS	SEQ
+																		,	SABUN
+																		,	ENTER_CD
+																		,	SDATE
+																		,	ACCOUNT_TYPE
+																	FROM	TCPN180
+																	WHERE	ENTER_CD		=	#{ssnEnterCd}
+																	AND		SABUN			=	#{sabun}
+																	AND		ACCOUNT_TYPE	=	#{accountType}
+																	ORDER	BY
+																			SDATE	DESC
+																)
+														ORDER	BY
+																	SEQ	DESC
+													)
+											WHERE	ENTER_CD		=	A.ENTER_CD
+											AND		SABUN			=	A.SABUN
+											AND		ACCOUNT_TYPE	=	A.ACCOUNT_TYPE
+											AND		SDATE			=	A.SDATE
+										)
+					WHERE	A.ENTER_CD		=	#{ssnEnterCd}
+					AND		A.SABUN			=	#{sabun}
+					AND		A.ACCOUNT_TYPE	=	#{accountType}
+                ]]>
+        </update>
+        
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertPayAccMgr">
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<foreach item="rm" collection="insertRows" index="idx">
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + (#{idx} + 1)) FROM ZTST002) )	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+		
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePayAccMgr">
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows">
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+<foreach item="rm" collection="updateRows"> UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+			
+		</update>
+</mapper>

@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.empEmpHisSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpEmpHisStaList1">
+				<![CDATA[
+					SELECT CODE
+					     , CODE_NM
+					     , NVL(SUM(CNT), 0) AS CNT
+					     , ROUND(RATIO_TO_REPORT(NVL(SUM(CNT), 0)) OVER() * 100, 1) AS PER_CNT
+					  FROM (
+					        SELECT CODE
+					             , NVL(CODE_NM, '구분없음') AS CODE_NM
+					             , NVL(SEQ,9999) AS SEQ
+					             , CNT
+					          FROM (
+					                --부사장~상무보 까지는 1로 넘겨서 상단에서 임원으로 판단 by JSG
+					                SELECT C.STF_TYPE AS STF_TYPE
+					                     , COUNT(DISTINCT A.SABUN) AS CNT
+					                  FROM THRM151 A
+					                     , (
+					                        SELECT MAX(A.SDATE) AS SDATE
+					                             , A.ENTER_CD
+					                             , A.SABUN
+					                             , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, #{searchYyyy} || '1231') AS ORG_NM
+					                          FROM THRM151 A
+					                         WHERE A.ENTER_CD = #{groupEnterCd}
+					                           AND (A.ENTER_CD, A.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+				                                                           FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900 WHERE ENTER_CD = #{groupEnterCd}) A
+				                                                        CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+<if test="jikgubCd != null and jikgubCd neq ''"> 
+					                           AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="workType != null and workType neq ''">
+					                           AND A.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if> <![CDATA[
+					                           AND #{searchYyyy} || '0101' <= NVL(A.EDATE, '99991231')
+					                           AND #{searchYyyy} || '1231' >= A.SDATE
+					                         GROUP BY A.ENTER_CD, A.SABUN, A.ORG_CD
+					                     ) B
+				              ,THRM100 C
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.SABUN    = B.SABUN
+				           AND A.SDATE    = B.SDATE
+				           AND A.ENTER_CD = C.ENTER_CD
+				           AND A.SABUN    = C.SABUN
+				           AND C.EMP_YMD LIKE #{searchYyyy} || '%'  ]]>
+<if test="sexType != null and sexType neq ''">
+			           	   AND C.SEX_TYPE IN
+		<foreach collection="sexType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchOrgNm != null and searchOrgNm neq ''">
+			           	   AND B.ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+</if>
+				         GROUP BY C.STF_TYPE
+				       ) X
+				       ,(SELECT CODE, CODE_NM, SEQ
+		                  FROM TSYS005
+		                 WHERE ENTER_CD = #{groupEnterCd}
+		                   AND GRCODE_CD = 'F10001'
+		                   AND USE_YN = 'Y'
+		               ) D
+                WHERE X.STF_TYPE = D.CODE(+)
+				ORDER BY SEQ, CODE
+				)
+				GROUP BY CODE,CODE_NM, SEQ
+				ORDER BY TO_NUMBER(NVL(SEQ, 0))
+		</select>
+		
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpEmpHisStaList2">
+				<![CDATA[
+					SELECT T3.YYYY AS CODE_NM
+					     , NVL(T1.CNT, 0) AS CNT
+					     , NVL(T2.ENTER_CNT, 0) AS ENTER_CNT
+					     , ROUND(NVL(ENTER_CNT,0) / NVL(CNT,1) * 100, 0) AS PER_CNT 
+					  FROM (
+					        SELECT Y.DEF_YEAR AS YYYY
+					             , COUNT(DISTINCT X.SABUN) AS CNT
+					          FROM (
+					                SELECT A.SABUN
+					                     , A.EMP_YMD
+					                     , B.SDATE
+					                     , B.EDATE
+					                  FROM THRM100 A
+					                     , THRM151 B
+					                 WHERE A.ENTER_CD = B.ENTER_CD
+					                   AND A.SABUN    = B.SABUN
+					                   AND A.ENTER_CD = #{groupEnterCd} ]]>
+									<if test="jikgubCd != null and jikgubCd neq ''"> 
+					                   AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+									</if>
+									<if test="manageCd != null and manageCd neq ''">
+					                   AND A.MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+									</if>
+									<if test="sexType != null and sexType neq ''">
+					                   AND A.SEX_TYPE IN
+		<foreach collection="sexType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+									</if>
+					                   AND F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%' || #{searchOrgNm} || '%'
+					                   AND B.STATUS_CD NOT IN ('RAA', 'XA', 'RA')
+									<if test="workType != null and workType neq ''">
+					                   AND B.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+									</if> <![CDATA[
+					             ) X
+					             , (
+					                SELECT LEVEL
+					                     , ( #{searchYyyy} - LEVEL +1 ) AS DEF_YEAR
+					                  FROM DUAL
+					               CONNECT BY LEVEL <= 4
+					                 ORDER BY LEVEL DESC
+					             ) Y
+					         WHERE 1=1
+					           AND Y.DEF_YEAR||'0101' <= NVL(X.EDATE, '99999999')
+					           AND Y.DEF_YEAR||'1231' >= X.SDATE
+					         GROUP BY Y.DEF_YEAR
+					     ) T1
+					     , (
+					        SELECT Y.DEF_YEAR AS YYYY
+					             , COUNT(DISTINCT X.SABUN) AS ENTER_CNT
+					          FROM (
+					                SELECT A.SABUN
+					                     , A.EMP_YMD
+					                     , B.SDATE
+					                     , B.EDATE
+					                  FROM THRM100 A
+					                     , THRM151 B
+					                 WHERE A.ENTER_CD = B.ENTER_CD
+					                   AND A.SABUN    = B.SABUN
+					                   AND A.ENTER_CD = #{groupEnterCd} ]]>
+<if test="jikgubCd != null and jikgubCd neq ''"> 
+					                   AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="manageCd != null and manageCd neq ''">
+					                   AND A.MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="sexType != null and sexType neq ''">
+					                   AND A.SEX_TYPE IN
+		<foreach collection="sexType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+					                   AND F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%' || #{searchOrgNm} || '%'
+					                   AND B.STATUS_CD NOT IN ('RAA', 'XA')
+<if test="workType != null and workType neq ''">
+					                   AND B.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if> <![CDATA[
+					             ) X
+					             , (
+					                SELECT LEVEL
+					                     , ( #{searchYyyy} - LEVEL +1 ) AS DEF_YEAR
+					                  FROM DUAL
+					               CONNECT BY LEVEL <= 4
+					                 ORDER BY LEVEL DESC
+					             ) Y
+					         WHERE 1=1
+					           AND Y.DEF_YEAR||'0101' <= NVL(X.EDATE, '99999999')
+					           AND Y.DEF_YEAR||'1231' >= X.SDATE
+					           AND X.EMP_YMD LIKE DEF_YEAR || '%'
+					         GROUP BY Y.DEF_YEAR
+					     ) T2
+					     , (
+					        SELECT LEVEL
+					             , ( #{searchYyyy} - LEVEL +1 ) AS YYYY
+					          FROM DUAL
+					       CONNECT BY LEVEL <= 4
+					         ORDER BY LEVEL DESC
+					     ) T3
+					 WHERE T3.YYYY = T2.YYYY(+)
+					   AND T3.YYYY = T1.YYYY(+)
+					 ORDER BY T1.YYYY
+				]]>
+		</select>
+</mapper>

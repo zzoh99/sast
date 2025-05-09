@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.searchMenuAllLayer">
+	<!-- 조회 -->
+	<select id="getSearchMenuAllLayerList" parameterType="map" resultType="cMap">
+	<![CDATA[
+           SELECT REPLACE(A.PRG_CD,'&','||') AS PRG_CD
+                , MAIN_MENU_CD
+                , PRIOR_MENU_CD
+                , MENU_CD
+	         	, MENU_NM
+                , MENU_SEQ
+                , LEV
+                , TYPE
+                , BOOKMARK_YN
+             FROM (
+				  SELECT A.*, COUNT(*) OVER(PARTITION BY MAIN_MENU_CD) AS CNT
+					FROM (
+							 SELECT A.*, rownum AS RNUM, LEVEL AS LEV
+							 FROM (
+									  SELECT ENTER_CD,MAIN_MENU_CD,'0'  AS PRIOR_MENU_CD,'T' || MAIN_MENU_CD AS MENU_CD,0 AS MENU_SEQ,MAIN_MENU_NM AS MENU_NM,'' AS PRG_CD,'' AS TYPE,0 AS SEQ, SEQ AS SEQ2
+										   , 1 AS AUTH_YN
+									       , 'N' AS BOOKMARK_YN
+									  FROM TSYS309
+									  WHERE ENTER_CD = #{ssnEnterCd}
+										AND USE_YN = '1'
+									  UNION ALL
+									  SELECT B.ENTER_CD, B.MAIN_MENU_CD, DECODE(B.PRIOR_MENU_CD, '0', 'T' || B.MAIN_MENU_CD, B.PRIOR_MENU_CD) AS PRIOR_MENU_CD
+										   , B.MENU_CD, B.MENU_SEQ, B.MENU_NM, B.PRG_CD, B.TYPE, B.SEQ, B.SEQ AS SEQ2
+										   ,  CASE WHEN A.AUTH_SEARCH_SEQ IS NOT NULL THEN F_COM_GET_SEARCH_YN(A.ENTER_CD, #{ssnSabun}, A.AUTH_SEARCH_SEQ, TO_CHAR(sysdate,'YYYYMMDD') )
+												   ELSE 1 END AS AUTH_YN
+									      , NVL2(C.SABUN, 'Y' ,'N') AS BOOKMARK_YN
+									   FROM TSYS311 A, TSYS303 B, TSYS333 C
+									  WHERE A.ENTER_CD = #{ssnEnterCd}
+										AND A.GRP_CD   = #{ssnGrpCd}
+										AND A.USE_YN   = '1'
+										AND A.ENTER_CD      = B.ENTER_CD
+										AND A.MAIN_MENU_CD  = B.MAIN_MENU_CD
+										AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+										AND A.MENU_CD       = B.MENU_CD
+										AND A.MENU_SEQ      = B.MENU_SEQ
+										AND A.ENTER_CD      = C.ENTER_CD (+)
+										AND A.MAIN_MENU_CD  = C.MAIN_MENU_CD (+)
+										AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD (+)
+										AND A.MENU_CD       = C.MENU_CD (+)
+										AND A.MENU_SEQ      = C.MENU_SEQ (+)
+									    AND A.GRP_CD        = C.GRP_CD (+)
+										AND A.PRG_CD        = C.PRG_CD (+)
+										AND C.SABUN (+) = #{ssnSabun}
+								  ) A
+								 START WITH A.PRIOR_MENU_CD    = '0'
+							 CONNECT BY PRIOR A.ENTER_CD     = A.ENTER_CD
+									AND    PRIOR A.MAIN_MENU_CD = A.MAIN_MENU_CD
+									AND    PRIOR A.MENU_CD      = A.PRIOR_MENU_CD
+							 ORDER SIBLINGS BY A.SEQ, A.SEQ2
+						 )	A
+
+                 ) A
+           WHERE NVL(TYPE,'M') <>'T' AND AUTH_YN > 0 
+             AND MAIN_MENU_CD <> '20'  --게시판 제외
+			 AND CNT > 1 -- 권한 부여된 프로그램이 없는 모듈 출력 제외
+		ORDER BY RNUM
+	]]>
+	</select>
+</mapper>

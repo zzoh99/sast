@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급/상여대장검색(개인별)
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payReport.paySearchSta">
+		<select parameterType="map" resultType="cMap" id="getPaySearchStaTitleList">
+
+
+					SELECT 'ELEMENT_10'||ROWNUM AS ELEMENT_CD
+						 , ELEMENT_NM
+					  FROM (
+                            SELECT DISTINCT 11 AS NUM
+                            <choose>
+								<when test='ssnEnterCd.equals("DBO")'>
+								/*기본급 + 고정연장수당 = 기본급*/
+								, DECODE(MIN(SEQ), 270, 20, MIN(SEQ)) AS SEQ
+								, DECODE(ELEMENT_NM, '고정연장수당', '기본급', ELEMENT_NM) AS ELEMENT_NM
+								</when>
+								<when test='ssnEnterCd.equals("SWD")'>
+                                    /*식대(과세) + 식대(비과세) = 식대*/
+                                    , DECODE(MIN(SEQ), 902, 901, MIN(SEQ)) AS SEQ
+                                    , DECODE(ELEMENT_NM, '식대(비과세)', '식대', '식대(과세)', '식대', ELEMENT_NM) AS ELEMENT_NM
+                                </when>
+								<otherwise>
+                                    , MIN(SEQ) AS SEQ
+                                    , ELEMENT_NM
+                                </otherwise>
+							</choose>
+
+
+                            FROM (
+                                SELECT DECODE(#{reportYn},'EOO',Z.ELEMENT_NM,'ROO',Z.REPORT_NM,'ERO',Z.ELEMENT_NM||CHR(10)||Z.REPORT_NM,'CEO',Z.ELEMENT_CD||CHR(10)||Z.ELEMENT_NM,'CRO',Z.ELEMENT_CD||CHR(10)||Z.REPORT_NM,'CER',Z.ELEMENT_CD||CHR(10)||Z.ELEMENT_NM||CHR(10)||Z.REPORT_NM) AS ELEMENT_NM
+                                     , Z.PRIORITY AS SEQ
+                                  FROM TCPN201 X
+                                     , TCPN205 Y
+                                     , (
+                                        SELECT SUB1.*
+                                          FROM TCPN011 SUB1
+                                             , (SELECT MAX(SDATE) AS SDATE
+                                                 , ELEMENT_CD
+                                                  FROM TCPN011
+                                                 WHERE ENTER_CD	= #{ssnEnterCd}
+                                                   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                GROUP BY ELEMENT_CD
+                                                ) SUB2
+                                         WHERE SUB1.ENTER_CD    = SUB1.ENTER_CD
+                                           AND SUB1.ELEMENT_CD    = SUB2.ELEMENT_CD
+                                           AND SUB1.SDATE        = SUB2.SDATE
+                                    ) Z
+                                  WHERE X.ENTER_CD        = Y.ENTER_CD
+                                    AND X.PAY_ACTION_CD    = Y.PAY_ACTION_CD
+                                    AND Y.ENTER_CD        = Z.ENTER_CD
+                                    AND Y.ELEMENT_CD    = Z.ELEMENT_CD
+                                    AND X.ENTER_CD		= #{ssnEnterCd}
+                                    AND X.PAY_YM BETWEEN REPLACE(#{fromPayYm},'-','') AND REPLACE(#{toPayYm},'-','')
+                                    AND Z.ELEMENT_TYPE    = 'A'
+	<if test='multiPayCd != null and !multiPayCd.equals("")'>
+								   AND X.PAY_CD		IN
+		<foreach collection="multiPayCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+    </if>
+                                 ORDER BY Z.PRIORITY
+                                ) GROUP BY ELEMENT_NM
+							UNION
+							SELECT 12 AS NUM
+								 , 0 AS SEQ
+								 , '과세총액' AS ELEMENT_NM
+							  FROM DUAL
+							UNION
+							SELECT 13 AS NUM
+								 , 0 AS SEQ
+								 , '비과세총액' AS ELEMENT_NM
+							  FROM DUAL
+							UNION
+							SELECT 14 AS NUM
+								 , 0 AS SEQ
+								 , '지급총액' AS ELEMENT_NM
+							  FROM DUAL
+							UNION
+                            SELECT DISTINCT 15 AS NUM
+                                 , MAX(SEQ) AS SEQ
+                                 , ELEMENT_NM
+                            FROM (
+                                SELECT DECODE(#{reportYn},'EOO',Z.ELEMENT_NM,'ROO',Z.REPORT_NM,'ERO',Z.ELEMENT_NM||CHR(10)||Z.REPORT_NM,'CEO',Z.ELEMENT_CD||CHR(10)||Z.ELEMENT_NM,'CRO',Z.ELEMENT_CD||CHR(10)||Z.REPORT_NM,'CER',Z.ELEMENT_CD||CHR(10)||Z.ELEMENT_NM||CHR(10)||Z.REPORT_NM) AS ELEMENT_NM
+                                     , Z.PRIORITY AS SEQ
+                                  FROM TCPN201 X
+                                     , TCPN205 Y
+                                     , (
+                                        SELECT SUB1.*
+                                          FROM TCPN011 SUB1
+                                             , (SELECT MAX(SDATE) AS SDATE
+                                                 , ELEMENT_CD
+                                                  FROM TCPN011
+                                                 WHERE ENTER_CD	= #{ssnEnterCd}
+                                                   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                GROUP BY ELEMENT_CD
+                                                ) SUB2
+                                         WHERE SUB1.ENTER_CD    = SUB1.ENTER_CD
+                                           AND SUB1.ELEMENT_CD    = SUB2.ELEMENT_CD
+                                           AND SUB1.SDATE        = SUB2.SDATE
+                                    ) Z
+                                  WHERE X.ENTER_CD        = Y.ENTER_CD
+                                    AND X.PAY_ACTION_CD    = Y.PAY_ACTION_CD
+                                    AND Y.ENTER_CD        = Z.ENTER_CD
+                                    AND Y.ELEMENT_CD    = Z.ELEMENT_CD
+                                    AND X.ENTER_CD		= #{ssnEnterCd}
+                                    AND X.PAY_YM BETWEEN REPLACE(#{fromPayYm},'-','') AND REPLACE(#{toPayYm},'-','')
+                                    AND Z.ELEMENT_TYPE    = 'D'
+<if test='multiPayCd != null and !multiPayCd.equals("")'>
+								   AND X.PAY_CD		IN
+		<foreach collection="multiPayCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+                                 ORDER BY Z.PRIORITY
+                                ) GROUP BY ELEMENT_NM
+							UNION
+							SELECT 16 AS NUM
+								 , 0 AS SEQ
+								 , '공제총액' AS ELEMENT_NM
+							  FROM DUAL
+							UNION
+							SELECT 17 AS NUM
+								 , 0 AS SEQ
+								 , '실지급액' AS ELEMENT_NM
+							 FROM DUAL
+						)
+					ORDER BY NUM, SEQ
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPaySearchStaList">
+    		<choose>
+        		<when test='sumYn != null and sumYn.equals("Y")'>
+        			SELECT A.ENTER_CD, A.SABUN
+        		</when>
+        		<when test='sumYn != null and sumYn.equals("M")'>
+        			SELECT A.ENTER_CD, A.SABUN, A.PAY_YM
+				</when>
+				<otherwise>
+					SELECT A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, D.PAY_ACTION_NM
+				</otherwise>
+    		</choose>
+			<foreach item="tCnt" collection="titles" >
+						 , ${tCnt.elementCd}
+			</foreach>
+								 , B.ORG_CD
+								 , B.ORG_NM
+								 , B.JIKGUB_CD
+								 , B.MANAGE_CD
+								 , B.STATUS_CD
+								 , B.NAME
+								 , B.NAME AS EMP_ALIAS
+								 , B.WORK_TYPE
+								 , B.JIKCHAK_CD
+								 , B.JIKWEE_CD
+								 , B.EMP_YMD
+								 , B.GEMP_YMD
+								 , B.RET_YMD
+								 , B.LOCATION_CD
+								 , B.PAY_TYPE
+								 , B.CC_CD 
+								 , B.BP_CD
+								 , B.SAL_CLASS
+							  FROM 
+							(
+			<choose>
+				<when test='sumYn != null and sumYn.equals("Y")'>
+							    SELECT ENTER_CD, SABUN
+				</when>
+				<when test='sumYn != null and sumYn.equals("M")'>
+							    SELECT ENTER_CD, SABUN, PAY_YM
+				</when>
+				<otherwise>
+								SELECT ENTER_CD, SABUN, PAY_ACTION_CD
+				</otherwise>
+			</choose>
+
+
+
+<foreach item="tCnt" collection="titles" >
+<if test='tCnt.elementNm != null and !tCnt.elementNm.equals("과세총액") and !tCnt.elementNm.equals("비과세총액") and !tCnt.elementNm.equals("지급총액") and !tCnt.elementNm.equals("공제총액") and !tCnt.elementNm.equals("실지급액")'>
+									 , SUM(DECODE(DECODE(#{reportYn},'EOO',ELEMENT_NM,'ROO',REPORT_NM,'ERO',ELEMENT_NM||CHR(10)||REPORT_NM,'CEO',ELEMENT_CD||CHR(10)||ELEMENT_NM,'CRO',ELEMENT_CD||CHR(10)||REPORT_NM,'CER',ELEMENT_CD||CHR(10)||ELEMENT_NM||CHR(10)||REPORT_NM), TRIM(#{tCnt.elementNm}), MON, DECODE(#{sumYn},'Y',0,NULL))) AS "${tCnt.elementCd}"
+</if>
+</foreach>
+							      FROM (
+                                              SELECT AA.ENTER_CD, AA.PAY_ACTION_CD, AA.PAY_YM, BB.SABUN
+                                                         ,ELE.ELEMENT_CD, ELE.ELEMENT_NM, ELE.REPORT_NM, SUM(NVL(ELE.RESULT_MON,0)) AS MON
+                                                FROM TCPN201 AA, TCPN203 BB,
+                                                          (  SELECT A.ENTER_CD, A.PAY_ACTION_CD, A.SABUN, A.ELEMENT_CD, B.ELEMENT_NM, B.REPORT_NM, A.RESULT_MON                                                            
+                                                                FROM TCPN205 A, TCPN011 B
+                                                              WHERE A.ENTER_CD = B.ENTER_CD
+                                                                  AND A.ELEMENT_CD = B.ELEMENT_CD
+                                                                  AND B.SDATE = (SELECT MAX(SDATE)
+                                                                                           FROM TCPN011
+                                                                                         WHERE ENTER_CD = B.ENTER_CD
+                                                                                            AND ELEMENT_CD = B.ELEMENT_CD  
+                                                                                            AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+                                                              ) ELE  
+                                              WHERE AA.ENTER_CD = BB.ENTER_CD
+                                                  AND AA.PAY_ACTION_CD = BB.PAY_ACTION_CD  
+                                                  AND ELE.ENTER_CD = AA.ENTER_CD
+                                                  AND ELE.PAY_ACTION_CD = AA.PAY_ACTION_CD          
+                                                  AND ELE.SABUN = BB.SABUN
+							               AND AA.PAY_YM BETWEEN REPLACE(#{fromPayYm},'-','') AND REPLACE(#{toPayYm},'-','')
+<if test='searchPaymentYmd != null and !searchPaymentYmd.equals("")'>
+							               AND AA.PAYMENT_YMD = REPLACE(#{searchPaymentYmd},'-','')
+</if>
+<if test='multiPayCd != null and !multiPayCd.equals("")'>
+										   AND AA.PAY_CD		IN
+		<foreach collection="multiPayCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+										   AND BB.BUSINESS_PLACE_CD	= #{businessPlaceCd}
+</if>
+                                          GROUP BY AA.ENTER_CD, AA.PAY_ACTION_CD, AA.PAY_YM
+                                                       , BB.SABUN
+                                                       , BB.SAL_CLASS
+                                                       , ELE.ELEMENT_CD
+                                                       , ELE.ELEMENT_NM
+                                                       , ELE.REPORT_NM
+							            )
+<choose>
+			<when test='sumYn != null and sumYn.equals("Y")'>
+							     GROUP BY ENTER_CD, SABUN
+			</when>
+<when test='sumYn != null and sumYn.equals("M")'>
+							     GROUP BY ENTER_CD, SABUN, PAY_YM
+</when>
+							         <otherwise>
+
+
+
+							     GROUP BY ENTER_CD, SABUN, PAY_ACTION_CD
+									 </otherwise>
+</choose>
+							) A
+							  LEFT OUTER JOIN
+							(
+<choose>
+	<when test='sumYn != null and sumYn.equals("Y")'>
+							    SELECT ENTER_CD, SABUN
+	</when>
+	<when test='sumYn != null and sumYn.equals("M")'>
+							    SELECT ENTER_CD, SABUN, PAY_YM
+	</when>
+	<otherwise>
+							    SELECT ENTER_CD, SABUN, PAY_ACTION_CD
+	 </otherwise>
+</choose>
+<foreach item="tCnt" collection="titles" >
+<if test='tCnt.elementNm.equals("과세총액") or tCnt.elementNm.equals("비과세총액") or tCnt.elementNm.equals("지급총액") or tCnt.elementNm.equals("공제총액") or tCnt.elementNm.equals("실지급액")'>
+									 , SUM(DECODE(TRIM(#{tCnt.elementNm}),'과세총액',TAXIBLE_EARN_MON,'비과세총액',NOTAX_TOT_MON,'지급총액',TOT_EARNING_MON,'공제총액',TOT_DED_MON,'실지급액',PAYMENT_MON, DECODE(#{sumYn},'Y',0,NULL))) AS "${tCnt.elementCd}"
+</if>
+</foreach>
+							      FROM (
+							            SELECT A.ENTER_CD, A.PAY_ACTION_CD, A.PAY_YM
+							                 , B.SABUN
+							                 , C.TAXIBLE_EARN_MON
+							                 , C.NOTAX_TOT_MON
+							                 , C.TOT_EARNING_MON
+							                 , C.TOT_DED_MON
+							                 , C.PAYMENT_MON
+							              FROM TCPN201 A, TCPN203 B, TCPN303 C
+                                        WHERE A.ENTER_CD = B.ENTER_CD
+							               AND A.PAY_ACTION_CD = B.PAY_ACTION_CD							             
+							               AND C.ENTER_CD = A.ENTER_CD
+							               AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+							               AND C.SABUN = B.SABUN
+							               AND A.PAY_YM BETWEEN REPLACE(#{fromPayYm},'-','') AND REPLACE(#{toPayYm},'-','')
+<if test='multiPayCd != null and !multiPayCd.equals("")'>
+										   AND A.PAY_CD		IN
+		<foreach collection="multiPayCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+										   AND B.BUSINESS_PLACE_CD	= #{businessPlaceCd}
+</if>
+							            )
+<choose><when test='sumYn != null and sumYn.equals("Y")'>
+							     GROUP BY ENTER_CD, SABUN
+		</when>
+<when test='sumYn != null and sumYn.equals("M")'>
+							     GROUP BY ENTER_CD, SABUN, PAY_YM
+</when>
+							         <otherwise>
+										 GROUP BY ENTER_CD, SABUN, PAY_ACTION_CD
+									 </otherwise>
+</choose>
+							) C
+							    ON C.ENTER_CD = A.ENTER_CD
+<choose><when test='sumYn != null and sumYn.equals("Y")'>
+							   AND C.SABUN = A.SABUN
+		</when>
+<when test='sumYn != null and sumYn.equals("M")'>
+							   AND C.SABUN = A.SABUN
+							   AND C.PAY_YM = A.PAY_YM
+</when>
+<otherwise>
+
+
+							   AND C.SABUN = A.SABUN
+							   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+</otherwise>
+</choose>
+<if test='ssnSearchType.equals("O")'>
+							 INNER JOIN ${query} AUTH
+							    ON AUTH.ENTER_CD = A.ENTER_CD
+							   AND AUTH.SABUN = A.SABUN 
+</if>
+							  LEFT OUTER JOIN
+							(
+							    SELECT X.ENTER_CD
+							         , Y.ORG_CD
+							         , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+							         , Y.WORK_TYPE
+							         , Y.JIKGUB_CD
+							         , Y.JIKCHAK_CD
+							         , Y.JIKWEE_CD
+							         , Y.MANAGE_CD
+							         , Y.STATUS_CD
+							         , X.SABUN
+							         , X.NAME
+							         , X.EMP_YMD
+							         , X.GEMP_YMD
+							         --, CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+							         , X.RET_YMD
+							         , Y.SAL_CLASS_NM
+							         , Y.LOCATION_CD
+							         , Y.SAL_CLASS
+							         , Y.PAY_TYPE
+							         ,'' AS CC_CD--, F_COM_GET_COSTCENTER_CD(X.ENTER_CD, X.SABUN,	TO_CHAR(SYSDATE,'YYYYMMDD')) AS CC_CD
+							         ,'' AS BP_CD--,NVL(F_COM_GET_BP_CD(X.ENTER_CD, X.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')),'') AS BP_CD
+							         ,'' AS BP_NM --,NVL(F_COM_GET_BP_NM(X.ENTER_CD, X.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')),'') AS BP_NM
+							      FROM THRM100 X, THRM151 Y
+ 						        WHERE X.ENTER_CD	= Y.ENTER_CD
+							        AND X.SABUN		= Y.SABUN 
+							        AND Y.SDATE		= (	SELECT MAX(SDATE)
+                                                                  FROM THRM151
+                                                                 WHERE ENTER_CD	= Y.ENTER_CD
+                                                                   AND SABUN	= Y.SABUN
+                                                                   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+							) B
+							    ON A.ENTER_CD			= B.ENTER_CD
+							   AND A.SABUN				= B.SABUN
+<if test='sumYn != null and sumYn.equals("")'>
+							  LEFT OUTER JOIN TCPN201 D
+							    ON D.ENTER_CD = A.ENTER_CD
+							   AND D.PAY_ACTION_CD = A.PAY_ACTION_CD
+</if>
+							 WHERE A.ENTER_CD = #{ssnEnterCd}
+<if test='multiStatusCd != null and !multiStatusCd.equals("")'>
+							   AND B.STATUS_CD	IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='multiWorkType != null and !multiWorkType.equals("")'>
+							   AND B.WORK_TYPE	IN
+		<foreach collection="multiWorkType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='multiManageCd != null and !multiManageCd.equals("")'>
+							   AND B.MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='multiJikgubCd != null and !multiJikgubCd.equals("")'>
+							   AND B.JIKGUB_CD	IN
+		<foreach collection="multiJikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='multiPayType != null and !multiPayType.equals("")'>
+							   AND B.PAY_TYPE	IN
+		<foreach collection="multiPayType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='multiSalClass != null and !multiSalClass.equals("")'>
+							   AND B.SAL_CLASS	IN
+		<foreach collection="multiSalClass" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='sabunName != null and !sabunName.equals("")'>
+							   AND A.SABUN||B.NAME LIKE '%'||trim(#{sabunName})||'%'
+</if>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+							   AND B.ORG_CD	= #{searchOrgCd}
+</if>
+<choose><when test='sumYn != null and sumYn.equals("Y")'>
+							 --ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))
+							 ORDER BY A.SABUN
+		</when>
+<when test='sumYn != null and sumYn.equals("M")'>
+							 --ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')), A.PAY_YM
+							 ORDER BY A.PAY_YM, A.SABUN
+</when>
+<otherwise>
+
+
+							 --ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')), A.PAY_ACTION_CD
+							 ORDER BY A.PAY_ACTION_CD, A.SABUN
+</otherwise>
+
+</choose>
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPaySearchStaCpnPayCdList">
+
+				<![CDATA[
+					SELECT DISTINCT PAY_CD AS CODE
+						 , PAY_NM AS CODE_NM
+					  FROM TCPN051
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND PAY_CD NOT IN ('S2','S3','Y1','Y3','Y5')
+					ORDER BY PAY_NM ASC
+				]]>
+
+
+		</select>
+	</mapper>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.medical.medApr">
+
+	<select id="getMedAprList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT A.ENTER_CD
+				, A.APPL_SEQ
+				, A.SABUN
+				, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+				, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+				, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+				, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+				, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+				, F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS WORKTYPE_NM
+				, A.FAM_CD
+				, A.FAM_NM
+				, A.FAM_YMD
+				, A.FAM_RES_NO
+				, A.MED_CODE
+				, A.MED_NAME
+				, A.MED_S_YM
+				, A.APPL_MON
+				, A.NOTE
+				, A.PAY_MON
+				, A.PAY_YM
+				, A.PAY_NOTE
+				, A.CLOSE_YN
+				, CASE WHEN SUBSTR(CRYPTIT.DECRYPT(A.FAM_RES_NO, A.ENTER_CD), 7, 1) IN ('1', '3', '5', '7', '9')
+					THEN '남' 
+				 	WHEN SUBSTR(CRYPTIT.DECRYPT(A.FAM_RES_NO, A.ENTER_CD), 7, 1) IN ('2', '4', '6', '8', '0') 
+				 	THEN '여'
+				 	ELSE '' END AS SEX_TYPE_NM
+				, B.APPL_YMD
+				, B.APPL_SABUN
+				, B.APPL_IN_SABUN
+				, B.APPL_STATUS_CD
+				, B.FILE_SEQ
+				, '0' AS DETAIL
+				, CASE WHEN A.CLOSE_YN = 'Y' THEN '0' ELSE '1' END AS SHTCOL_EDIT
+                , SUM( CASE WHEN B.APPL_STATUS_CD = '99' THEN (CASE WHEN SUBSTR( A.PAY_YM, 1, 4) = SUBSTR(B.APPL_YMD, 1, 4) THEN NVL(A.PAY_MON,0) ELSE 0 END) ELSE 0 END ) OVER(PARTITION By A.SABUN, SUBSTR(B.APPL_YMD, 1, 4)) AS TOTAL_PAY_MON
+                , '<a class=sbasic>다운로드</a>' AS BTN_FILE
+		     FROM TBEN703 A, THRI103 B
+		    WHERE A.ENTER_CD   = #{ssnEnterCd}
+		      AND A.ENTER_CD   = B.ENTER_CD
+		      AND A.APPL_SEQ   = B.APPL_SEQ
+		      AND B.APPL_STATUS_CD NOT IN ('11') ]]>
+		<if test="searchFrom != null and searchFrom neq '' and searchTo != null and searchTo neq ''">
+			  AND B.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+		</if>
+		<if test="searchApplStatusCd != null and searchApplStatusCd neq ''">
+			  AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+		</if>
+		<if test="searchPayYm != null and searchPayYm neq ''">
+			  AND (A.PAY_YM IS NOT NULL AND A.PAY_YM = REPLACE(#{searchPayYm}, '-',''))
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+			  AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+		</if>
+		<if test="searchOrgNm != null and searchOrgNm neq ''">
+			  AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+		</if>
+		    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC
+	</select>
+
+	<update id="saveMedApr" parameterType="map">
+	<![CDATA[
+        MERGE INTO TBEN703 T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				SELECT TRIM(#{ssnEnterCd})			AS	ENTER_CD
+			         , TRIM(#{rm.applSeq})			AS	APPL_SEQ
+			         , TRIM(#{rm.sabun})			AS	SABUN
+                     , REPLACE(TRIM(#{rm.applMon}), ',', '')		AS	APPL_MON
+                     , REPLACE(TRIM(#{rm.payMon}), ',', '')			AS	PAY_MON
+                     , REPLACE(TRIM(#{rm.payYm}), '-', '')			AS	PAY_YM
+                     , TRIM(#{rm.payNote})			                AS	PAY_NOTE
+                     , TRIM(#{rm.closeYn})                          AS  CLOSE_YN
+			      FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S
+		ON	(
+				T.ENTER_CD	=	S.ENTER_CD
+			AND	T.APPL_SEQ	=	S.APPL_SEQ
+		)
+		WHEN MATCHED THEN
+			UPDATE SET T.PAY_YM			=	S.PAY_YM
+					 , T.APPL_MON   	=	S.APPL_MON
+					 , T.PAY_MON   		=	S.PAY_MON
+				     , T.PAY_NOTE   	=	S.PAY_NOTE
+				     , T.CLOSE_YN       =   S.CLOSE_YN
+				     , T.CHKDATE		=	sysdate
+				     , T.CHKID			=	#{ssnSabun}
+	]]>
+	</update>
+</mapper>

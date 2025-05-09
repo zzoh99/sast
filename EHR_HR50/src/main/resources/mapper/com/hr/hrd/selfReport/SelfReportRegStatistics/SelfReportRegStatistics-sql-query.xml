@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.selfReport.selfReportRegStatistics">
+		<select parameterType="map" resultType="cMap" id="getRegistRadioList">
+
+				<![CDATA[
+					SELECT 'Y' AS CODE
+						 , '등록' AS CODE_NM
+					  FROM DUAL
+					 UNION ALL
+					SELECT 'N' AS CODE
+						 , '미등록' AS CODE_NM
+					  FROM DUAL
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getActiveYyyyList">
+
+				<![CDATA[
+					SELECT DISTINCT ACTIVE_YYYY AS CODE
+						 , ACTIVE_YYYY AS CODE_NM
+					  FROM TCDPV000
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					 ORDER BY ACTIVE_YYYY DESC
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getSelfReportRegStatisticsList">
+
+				<![CDATA[
+					SELECT NAME
+						 , SABUN
+						 , ORG_CD
+						 , ORG_NM
+						 , JIKGUB_CD
+						 , JIKWEE_CD
+						 , JIKCHAK_CD
+						 , JIKGUB_NM
+						 , JIKWEE_NM
+						 , JIKCHAK_NM
+						 , APPROVAL_REQ_YMD
+						 , REG_YMD
+						 , REGISTED
+					  FROM (SELECT T1.NAME
+								 , T1.SABUN
+								 , F_COM_GET_ORG_CD(     T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD) AS ORG_CD
+								 , F_COM_GET_ORG_NM(     T1.ENTER_CD, F_COM_GET_ORG_CD( T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD), T1.ACTIVE_START_YMD, 'ko_KR') AS ORG_NM
+								 , F_COM_GET_JIKGUB_CD(  T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD ) AS JIKGUB_CD
+								 , F_COM_GET_JIKWEE_CD(  T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD ) AS JIKWEE_CD
+								 , F_COM_GET_JIKCHAK_CD( T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD ) AS JIKCHAK_CD
+								 , F_COM_GET_JIKGUB_NM(  T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD , #{ssnLocaleCd}) AS JIKGUB_NM
+								 , F_COM_GET_JIKWEE_NM(  T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD , #{ssnLocaleCd}) AS JIKWEE_NM
+								 , F_COM_GET_JIKCHAK_NM( T1.ENTER_CD, T1.SABUN, T1.ACTIVE_START_YMD , #{ssnLocaleCd}) AS JIKCHAK_NM
+								 , T2.APPROVAL_REQ_YMD
+								 , T2.REG_YMD
+								 , CASE WHEN T2.REG_YMD IS NULL THEN 'N' ELSE 'Y' END AS REGISTED
+							  FROM (SELECT A.ENTER_CD
+							  			 , A.SABUN
+							  			 , A.NAME
+										 , B.ACTIVE_YYYY
+										 , B.HALF_GUBUN_TYPE
+										 , B.ACTIVE_START_YMD
+										 , B.ACTIVE_END_YMD
+									  FROM THRM100 A, (SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE, ACTIVE_START_YMD, ACTIVE_END_YMD
+														 FROM TCDPV000
+														WHERE ENTER_CD        = #{ssnEnterCd}
+														  AND ACTIVE_YYYY     = #{searchActiveYyyy}
+														  AND HALF_GUBUN_TYPE = #{searchHalfGubunType}) B
+									 WHERE A.ENTER_CD = B.ENTER_CD
+									   AND F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, B.ACTIVE_START_YMD) = 'AA'
+								   ) T1 LEFT OUTER JOIN
+								   (SELECT *
+									  FROM TCDPV201 A
+									 WHERE A.ENTER_CD        = #{ssnEnterCd}
+									   AND A.ACTIVE_YYYY     = #{searchActiveYyyy}
+									   AND A.HALF_GUBUN_TYPE = #{searchHalfGubunType}) T2
+								ON T1.ENTER_CD        = T2.ENTER_CD
+							   AND T1.SABUN           = T2.SABUN
+							   AND T1.ACTIVE_YYYY     = T2.ACTIVE_YYYY
+							   AND T1.HALF_GUBUN_TYPE = T2.HALF_GUBUN_TYPE)
+						WHERE 1=1
+						          ]]>
+					<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+			    		  AND ORG_CD = TRIM(#{searchOrgCd})
+					</if>
+					<if test='searchSabunName != null and !searchSabunName.equals("")'>
+			    		  AND (SABUN LIKE '%' || #{searchSabunName} || '%' OR NAME LIKE '%' || #{searchSabunName} || '%')
+					</if>
+					<if test='searchRegist != null and !searchRegist.equals("")'>
+			    		  AND REGISTED = TRIM(#{searchRegist})
+					</if>
+						ORDER BY REGISTED DESC, SABUN
+
+
+		</select>
+
+</mapper>

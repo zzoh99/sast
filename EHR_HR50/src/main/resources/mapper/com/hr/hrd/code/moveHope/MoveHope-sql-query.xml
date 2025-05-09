@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.code.moveHope">
+		<select parameterType="map" resultType="cMap" id="getMoveHopeList">
+
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						   , A.MOVE_HOPE_CD
+						   , A.MOVE_HOPE_NM
+						   , A.START_YMD
+						   , A.END_YMD
+						   , A.SEQ
+						   , A.CHKDATE
+						   , A.CHKID
+					  FROM TCDPV210 A
+					 WHERE ENTER_CD=#{ssnEnterCd}
+					   AND (LENGTH(#{searchMoveHopeNm}) IS NULL OR LOWER(A.MOVE_HOPE_NM) LIKE '%' || LOWER(#{searchMoveHopeNm}) || '%')
+					 ORDER BY A.SEQ
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveMoveHope">
+
+					MERGE INTO TCDPV210 T
+					USING (
+						 SELECT  A.ENTER_CD
+							   , A.MOVE_HOPE_CD
+							   , A.MOVE_HOPE_NM
+							   , A.START_YMD
+							   , A.END_YMD
+							   , A.SEQ
+						FROM (
+							 SELECT  NULL AS ENTER_CD
+								   , NULL AS MOVE_HOPE_CD
+								   , NULL AS MOVE_HOPE_NM
+								   , NULL AS START_YMD
+								   , NULL AS END_YMD
+								   , NULL AS SEQ
+							FROM DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+							 SELECT  TRIM(#{rm.enterCd}) AS ENTER_CD
+								 		 <choose><when test='rm.moveHopeCd != null and !rm.moveHopeCd.equals("")'>
+								 		   , TO_NUMBER(TRIM(#{rm.moveHopeCd})) AS MOVE_HOPE_CD
+										 </when><otherwise>
+										   , (SELECT NVL(MAX(MOVE_HOPE_CD),0) + ${icnt} FROM TCDPV210 WHERE ENTER_CD=#{ssnEnterCd})  AS MOVE_HOPE_CD
+											<bind name="icnt" value="icnt + 1" />
+										 </otherwise>
+										 </choose>
+								   , TRIM(#{rm.moveHopeNm}) AS MOVE_HOPE_NM
+								   , TRIM(#{rm.startYmd}) AS START_YMD
+								   , TRIM(#{rm.endYmd}) AS END_YMD
+								   , TRIM(#{rm.seq}) AS SEQ
+							FROM DUAL
+					</foreach>
+						) A WHERE A.ENTER_CD IS NOT NULL
+					 AND A.MOVE_HOPE_CD IS NOT NULL
+					) S
+					ON (T.ENTER_CD=S.ENTER_CD AND T.MOVE_HOPE_CD=S.MOVE_HOPE_CD)
+					WHEN MATCHED THEN
+						UPDATE SET  T.MOVE_HOPE_NM = S.MOVE_HOPE_NM
+								  , T.START_YMD = S.START_YMD
+								  , T.END_YMD = S.END_YMD
+								  , T.SEQ = S.SEQ
+					WHEN NOT MATCHED THEN
+						INSERT (
+							  T.ENTER_CD
+							, T.MOVE_HOPE_CD
+							, T.MOVE_HOPE_NM
+							, T.START_YMD
+							, T.END_YMD
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						) VALUES (
+							  S.ENTER_CD
+							, S.MOVE_HOPE_CD
+							, S.MOVE_HOPE_NM
+							, S.START_YMD
+							, S.END_YMD
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		<delete parameterType="map" id="deleteMoveHope">
+
+						DELETE FROM TCDPV210
+						 WHERE 1=1
+						   AND ENTER_CD||'_'||MOVE_HOPE_CD IN ( NULL
+							<foreach item="rm" collection="deleteRows" >
+							,
+								<if test='rm.enterCd != null and !rm.enterCd.equals("") and
+							rm.moveHopeCd != null and !rm.moveHopeCd.equals("")'>
+									TRIM(#{rm.enterCd})||'_'||TRIM(#{rm.moveHopeCd})
+								</if>
+							</foreach>
+						)
+
+		</delete>
+
+</mapper>

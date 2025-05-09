@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.month.dailyWorkStatus">
+
+	<!-- 헤더 조회 -->
+		<select parameterType="map" resultType="cMap" id="getDailyWorkStatusHeaderList">
+
+				<![CDATA[
+                SELECT
+                    X.CODE 
+                    ,CASE WHEN LENGTH(X.CODE_NM) > 2 THEN SUBSTR(CODE_NM,0,2)||CHR(13)||CHR(10)||SUBSTR(CODE_NM,3) ELSE X.CODE_NM END AS CODE_NM
+                    ,X.SAVE_NAME
+                    ,X.SAVE_NAME_DISP
+                    ,X.SUM_SAVE_NAME
+                    ,X.SUM_SAVE_NAME_DISP
+                FROM(
+				    SELECT CODE
+						  , (SELECT WORK_NM FROM TTIM015 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_CD = CODE) CODE_NM
+						  , 'WORK_CD_'     || ROWNUM SAVE_NAME
+						  , 'workCd'       || ROWNUM SAVE_NAME_DISP
+						  , 'SUM_WORK_CD_' || ROWNUM SUM_SAVE_NAME
+						  , 'sumWorkCd'    || ROWNUM SUM_SAVE_NAME_DISP
+						FROM (
+						 SELECT DECODE(ROWNUM,1 ,WORK_INPUT_CD1
+											 ,2 ,WORK_INPUT_CD2
+											 ,3 ,WORK_INPUT_CD3
+											 ,4 ,WORK_INPUT_CD4
+											 ,5 ,WORK_INPUT_CD5
+											 ,6 ,WORK_INPUT_CD6
+											 ,7 ,WORK_INPUT_CD7
+											 ,8 ,WORK_INPUT_CD8
+											 ,9 ,WORK_INPUT_CD9
+											 ,10, WORK_INPUT_CD10
+											 ,11, WORK_INPUT_CD11
+											 ,12, WORK_INPUT_CD12
+											 ,13, WORK_INPUT_CD13
+											 ,14, WORK_INPUT_CD14
+											 ,15, WORK_INPUT_CD15
+											 ,16, WORK_INPUT_CD16
+											 ,17, WORK_INPUT_CD17
+											 ,18, WORK_INPUT_CD18
+											 ,19, WORK_INPUT_CD19
+											 ,20, WORK_INPUT_CD20
+											 ) AS CODE
+						   FROM (SELECT WORK_INPUT_CD1
+					                  , WORK_INPUT_CD2
+				                      , WORK_INPUT_CD3
+				                      , WORK_INPUT_CD4
+				                      , WORK_INPUT_CD5
+				                      , WORK_INPUT_CD6
+				                      , WORK_INPUT_CD7
+				                      , WORK_INPUT_CD8
+				                      , WORK_INPUT_CD9
+				                      , WORK_INPUT_CD10
+				                      , WORK_INPUT_CD11
+				                      , WORK_INPUT_CD12
+				                      , WORK_INPUT_CD13
+				                      , WORK_INPUT_CD14
+				                      , WORK_INPUT_CD15
+				                      , WORK_INPUT_CD16
+				                      , WORK_INPUT_CD17
+				                      , WORK_INPUT_CD18
+				                      , WORK_INPUT_CD19
+				                      , WORK_INPUT_CD20
+						           FROM TTIM355
+						          WHERE ENTER_CD = #{ssnEnterCd}
+						            AND WORK_GUBUN_CD = 'A'
+						           )
+						   CONNECT BY LEVEL <= 20
+					) A, TTIM015 B
+					WHERE A.CODE = B.WORK_CD
+						AND B.ENTER_CD = #{ssnEnterCd}
+						AND A.CODE IS NOT NULL
+                )X
+				]]>
+
+
+		</select>
+
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getDailyWorkStatusList">
+
+				<![CDATA[
+				SELECT
+					  A.ENTER_CD
+					, A.SABUN
+					, A.BP_CD
+					, A.ORG_NM
+					, F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ko_KR') AS NAME
+					, A.JIKWEE_NM
+					, A.JIKCHAK_NM
+					, A.JIKGUB_NM
+					, A.MANAGE_NM
+					, A.WORK_TYPE_NM
+					, A.PAY_TYPE_NM
+					, A.PAY_TYPE
+					, A.WORK_ORG_CD
+					, (SELECT MAP_NM FROM TORG109 WHERE ENTER_CD = A.ENTER_CD AND MAP_TYPE_CD = '500' AND MAP_CD = A.WORK_ORG_CD) AS WORK_ORG_NM
+					, A.LOCATION_CD
+				    , A.BUSINESS_PLACE_NM
+					, (CASE WHEN B.REAL_WORK_TIME = ':' THEN '' ELSE B.REAL_WORK_TIME END) AS REAL_WORK_TIME
+					]]>
+<choose><when test='searchSumFlag != null and searchSumFlag.equals("Y")'>
+-- 합계행만
+	<foreach item="rtitles" collection="titles" >
+					, REPLACE(TO_CHAR((SELECT SUM(TO_NUMBER(X.WORK_HH)) + TRUNC(SUM(TO_NUMBER(X.WORK_MM))/60)||LPAD(MOD( SUM(TO_NUMBER(X.WORK_MM)),60),2,0)
+		           		FROM TTIM337 X WHERE X.ENTER_CD = B.ENTER_CD AND X.YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+		           		AND X.SABUN = B.SABUN AND X.WORK_CD = #{rtitles.code}),'FM900,00'),',',':') AS ${rtitles.saveName}
+					, ( SELECT SUM(X.WORK_HH * 60 + X.WORK_MM)
+		           		FROM TTIM337 X WHERE X.ENTER_CD = B.ENTER_CD AND X.YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+		           		AND X.SABUN = B.SABUN AND X.WORK_CD = #{rtitles.code}) AS ${rtitles.sumSaveName}
+	</foreach>
+		</when><otherwise>
+					, F_TIM_GET_DAY_GNT_NM(B.ENTER_CD, B.SABUN, B.YMD) AS GNT_CD
+					, B.YMD
+					, B.IN_HM
+					, B.OUT_HM
+					, (SELECT IN_HM FROM TTIM330 WHERE ENTER_CD = A.ENTER_CD AND YMD = B.YMD AND SABUN = B.SABUN ) AS TC_IN_HM
+					, (SELECT OUT_HM FROM TTIM330 WHERE ENTER_CD = A.ENTER_CD AND YMD = B.YMD AND SABUN = B.SABUN ) AS TC_OUT_HM
+	<foreach item="rtitles" collection="titles" >
+					, REPLACE(TO_CHAR((SELECT SUM(TO_NUMBER(X.WORK_HH)) + TRUNC(SUM(TO_NUMBER(X.WORK_MM))/60)||LPAD(MOD( SUM(TO_NUMBER(X.WORK_MM)),60),2,0)
+		           		FROM TTIM337 X WHERE X.ENTER_CD = B.ENTER_CD AND X.YMD = B.YMD
+		           		AND X.SABUN = B.SABUN AND X.WORK_CD = #{rtitles.code}),'FM900,00'),',',':') AS ${rtitles.saveName}
+					, ( SELECT SUM(X.WORK_HH * 60 + X.WORK_MM)
+		           		FROM TTIM337 X WHERE X.ENTER_CD = B.ENTER_CD AND X.YMD = B.YMD
+		           		AND X.SABUN = B.SABUN AND X.WORK_CD = #{rtitles.code}) AS ${rtitles.sumSaveName}
+	</foreach>
+</otherwise>
+</choose>
+
+				  FROM (
+						 SELECT
+				  			A1.ENTER_CD
+				  			, A1.SABUN
+				  			, A1.NAME
+				  			, B.STATUS_CD
+				            , B.JIKGUB_NM
+				            , B.JIKWEE_NM
+				            , B.JIKCHAK_NM
+				            , B.MANAGE_NM
+				            , B.SDATE
+				            , B.ORG_CD
+				            , F_COM_GET_ORG_NM(A1.ENTER_CD,B.ORG_CD,B.SDATE) AS ORG_NM
+				            , B.WORK_TYPE_NM
+				            , B.PAY_TYPE_NM
+				            , B.PAY_TYPE
+							, F_COM_GET_LOCATION_CD2( B.ENTER_CD, B.SABUN, REPLACE(#{searchEymd},'-','')) AS LOCATION_CD
+                            , F_COM_GET_BP_CD(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) BP_CD
+                            , NVL(C.MAP_CD, NVL((SELECT MAP_CD FROM TORG107
+                                                  WHERE ENTER_CD = B.ENTER_CD
+                                                    AND MAP_TYPE_CD = '500'
+                                                    AND ORG_CD = B.ORG_CD
+                                                    AND REPLACE( #{searchSymd} ,'-','') BETWEEN SDATE AND NVL(EDATE,'99991231')),F_COM_GET_STD_CD_VALUE (B.ENTER_CD,'TIM_STD_WORK_ORG_CD')
+                                                    )) AS WORK_ORG_CD
+							 , F_COM_GET_BP_NM(B.ENTER_CD, B.SABUN, REPLACE(#{searchEymd},'-','')) AS BUSINESS_PLACE_NM
+						  FROM THRM100 A1, THRM151 B, TORG113 C
+						 WHERE A1.ENTER_CD = TRIM( #{ssnEnterCd} )
+							AND A1.ENTER_CD = B.ENTER_CD
+							AND A1.SABUN    = B.SABUN
+							AND B.STATUS_CD = 'AA'
+							AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+							AND A1.ENTER_CD = C.ENTER_CD(+)
+							AND A1.SABUN = C.SABUN(+)
+							AND A1.SABUN IN (SELECT SABUN
+					   				   FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+					   				   )
+
+							AND C.MAP_TYPE_CD(+) = '500'/*고정코드(근무조)*/
+							AND REPLACE(#{searchEymd},'-','') BETWEEN C.SDATE(+) AND NVL(C.EDATE(+), '99991231')
+						<if test='searchSabun != null and !searchSabun.equals("")'>
+						    AND A1.SABUN || A1.NAME LIKE '%'|| #{searchSabun} ||'%'
+						</if>
+
+						<if test='searchJikweeCd != null and !searchJikweeCd.equals("")'>
+							AND B.JIKWEE_CD = #{searchJikweeCd}
+						</if>
+						<if test='searchManageCd != null and !searchManageCd.equals("")'>
+							AND B.MANAGE_CD = #{searchManageCd}
+						</if>
+						<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+		                   AND B.ORG_CD IN (SELECT #{searchOrgCd}
+                                              FROM DUAL
+
+							<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+                                              <![CDATA[
+                                            UNION
+                                            SELECT ORG_CD
+                                              FROM (
+                                                  	SELECT *
+													  FROM TORG105
+													 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+													   AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','') )
+                                              	   )
+                                             START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+                                                      ]]>
+							</if>
+											)
+						</if>
+						<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+
+		                   AND B.ORG_CD IN (SELECT SCOPE_VALUE
+											  FROM TSYS319
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											 AND GRP_CD  = #{ssnGrpCd}
+											 AND AUTH_SCOPE_CD = 'W10'
+											 AND SABUN = #{ssnSabun}
+
+
+							<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+				  <![CDATA[
+                                            UNION
+                                            SELECT ORG_CD
+                                              FROM TORG105
+                                             WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                               AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','') )
+                                             START WITH PRIOR_ORG_CD   in (SELECT SCOPE_VALUE FROM TSYS319 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+																			 AND GRP_CD  = #{ssnGrpCd}
+																			 AND AUTH_SCOPE_CD = 'W10'
+																			 AND SABUN = #{ssnSabun})
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+				  ]]>
+							</if>
+											)
+						</if>
+
+						 ) A
+					 , (
+<choose><when test='searchSumFlag != null and searchSumFlag.equals("Y")'>
+-- 합계행만
+                        SELECT AA.ENTER_CD
+                             , AA.SABUN
+                             , SUM(TO_NUMBER(AA.REAL_WORK_HH)) + TRUNC(SUM(TO_NUMBER(AA.REAL_WORK_MM))/60)||':'||LPAD(MOD( SUM(TO_NUMBER(AA.REAL_WORK_MM)),60),2,0) REAL_WORK_TIME
+                        FROM(
+                            SELECT B.ENTER_CD
+                                 , B.SABUN
+                                --, (CASE WHEN B.IN_HM IS NOT NULL AND B.OUT_HM IS NOT NULL THEN F_TIM_WORK_HM_TEXT(B.ENTER_CD,B.SABUN,B.YMD,'HH') ELSE NULL END) AS REAL_WORK_HH
+                                --, (CASE WHEN B.IN_HM IS NOT NULL AND B.OUT_HM IS NOT NULL THEN F_TIM_WORK_HM_TEXT(B.ENTER_CD,B.SABUN,B.YMD,'MM') ELSE NULL END) AS REAL_WORK_MM
+                                  , F_TIM_WORK_HM_TEXT(B.ENTER_CD,B.SABUN,B.YMD,'HH') AS REAL_WORK_HH
+                                  , F_TIM_WORK_HM_TEXT(B.ENTER_CD,B.SABUN,B.YMD,'MM') AS REAL_WORK_MM
+                            FROM
+                                TTIM335 B
+                            WHERE ENTER_CD = #{ssnEnterCd}
+                            AND B.YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+                        ) AA
+                        GROUP BY AA.ENTER_CD,AA.SABUN
+		</when><otherwise>
+                            SELECT B.ENTER_CD
+                                 , B.SABUN
+                                 , B.YMD
+                                 , B.IN_HM
+                                 , B.OUT_HM
+                                 , F_TIM_WORK_HM_TEXT(B.ENTER_CD,B.SABUN,B.YMD,'HH') || ':' ||
+                                   F_TIM_WORK_HM_TEXT(B.ENTER_CD,B.SABUN,B.YMD,'MM') AS REAL_WORK_TIME
+                              FROM TTIM335 B
+                             WHERE ENTER_CD = #{ssnEnterCd}
+                               AND B.YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+</otherwise>
+</choose>
+                     ) B
+				 WHERE A.ENTER_CD = B.ENTER_CD(+)
+			       AND A.SABUN    = B.SABUN(+)
+			       AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+                   AND A.BP_CD = #{searchBizPlaceCd}
+</if>
+
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+				   AND A.LOCATION_CD = #{searchLocationCd}
+</if>
+<if test='multiPayType != null and !multiPayType.equals("")'>
+					AND A.PAY_TYPE	IN
+		<foreach collection="multiPayType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+
+<if test='multiWorkOrgCd != null and !multiWorkOrgCd.equals("")'>
+                   AND A.WORK_ORG_CD IN
+		<foreach collection="multiWorkOrgCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+
+				ORDER BY A.BP_CD, A.SABUN
+<choose><when test='searchSumFlag != null and searchSumFlag.equals("Y")'>
+-- 합계행만
+		</when><otherwise>
+					, B.YMD
+</otherwise>
+</choose>
+
+
+
+		</select>
+
+
+</mapper>

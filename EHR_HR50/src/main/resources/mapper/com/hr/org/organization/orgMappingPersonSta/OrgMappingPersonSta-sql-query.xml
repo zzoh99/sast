@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.orgMappingPersonSta">
+<!-- 		개인별조직구분현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgMappingPersonStaTitleList">
+
+				<![CDATA[
+				SELECT /* OrgMappingPersonSta-mapping-query.getOrgMappingPersonStaTitleList */
+				       LISTAGG('mapCd'||CODE_CAMEL||'|'||'mapNm'||CODE_CAMEL, '|') WITHIN GROUP ( ORDER BY SEQ)	AS	COL_SAVE_NAME
+				      ,LISTAGG(COL_NM||'코드'||'|'||COL_NM, '|') WITHIN GROUP ( ORDER BY SEQ)	AS	COL_HEADER
+				      ,LISTAGG('MAP_CD_'||CODE_CAMEL||'|'||'MAP_NM_'||CODE_CAMEL, '|') WITHIN GROUP ( ORDER BY SEQ)	AS	COL_NAME
+				  FROM (
+				        SELECT A.ENTER_CD
+				             , REPLACE(INITCAP(A.MAP_TYPE_CD),'_') AS CODE_CAMEL
+				             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'W20020', A.MAP_TYPE_CD) AS COL_NM
+				             , F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'W20020', A.MAP_TYPE_CD) AS SEQ
+				          FROM TORG109 A
+				         WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				           AND A.SDATE = (SELECT MAX (SDATE) FROM TORG109
+					                       WHERE ENTER_CD = A.ENTER_CD
+					                         AND MAP_TYPE_CD = A.MAP_TYPE_CD
+					                         AND MAP_CD = A.MAP_CD
+					                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+				         GROUP BY A.ENTER_CD, A.MAP_TYPE_CD
+				       )
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getOrgMappingPersonStaList">
+
+				<![CDATA[
+				SELECT /* OrgMappingPersonSta-mapping-query.getOrgMappingPersonStaList */
+			             F_COM_GET_ORG_NM2 ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS ORG_NM
+			        ,    F_COM_GET_JIKCHAK_NM( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKCHAK_NM
+			        ,    F_COM_GET_JIKGUB_NM ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKGUB_NM
+			        ,    F_COM_GET_JIKWEE_NM ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKWEE_NM
+			        ,    F_COM_GET_WORKTYPE_NM (A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) ) AS WORK_TYPE_NM
+			        ,    F_COM_GET_NAMES ( A.ENTER_CD, A.SABUN) AS NAME
+			        ,    F_COM_GET_NAMES ( A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+			        ,    A.SABUN AS SABUN
+			    ]]>
+			    	<foreach collection="colName" item="item" index="index" open="," separator=",">
+			    		${item}
+			    	</foreach>
+			    <![CDATA[
+				FROM	THRM151 A
+				LEFT OUTER JOIN
+						(
+						SELECT	*
+						FROM	(
+						      SELECT ENTER_CD, SABUN, COL_DIV||MAP_TYPE_CD AS COL_DIV, COL_VALUE
+						        FROM (
+						            SELECT X.ENTER_CD
+						                 , X.SABUN
+						                 , Y.MAP_TYPE_CD
+						                 , F_COM_GET_MAP_CD(X.ENTER_CD, Y.MAP_TYPE_CD, X.SABUN, REPLACE(#{searchDate},'-','')) AS MAP_CD
+						                 , F_COM_GET_MAP_NM(X.ENTER_CD, Y.MAP_TYPE_CD, X.SABUN, REPLACE(#{searchDate},'-','')) AS MAP_NM
+						              FROM THRM151 X
+						             CROSS JOIN (
+						                    SELECT A.ENTER_CD
+						                         , A.MAP_TYPE_CD
+						                      FROM TORG109 A
+       									     WHERE A.SDATE = (SELECT MAX (SDATE) FROM TORG109
+											                     WHERE ENTER_CD = A.ENTER_CD
+											                       AND MAP_TYPE_CD = A.MAP_TYPE_CD
+											                       AND MAP_CD = A.MAP_CD
+											                       AND REPLACE(#{searchDate},'-','') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+						                     GROUP BY A.ENTER_CD, A.MAP_TYPE_CD
+						                   ) Y
+						             WHERE REPLACE(#{searchDate},'-','') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+						               AND X.STATUS_CD NOT IN ('RA')
+						             )
+						         UNPIVOT (COL_VALUE FOR COL_DIV IN ("MAP_CD" AS 'mapCd'
+						                                           ,"MAP_NM" AS 'mapNm')
+						                                            )
+						    ) X
+						PIVOT	(
+						      MAX(COL_VALUE) FOR COL_DIV IN
+				]]>
+						      <foreach collection="colSaveName" item="item" index="index" open="(" close=")" separator=",">
+							  	 '${item}' AS ${colName[index]}
+							  </foreach>
+			<![CDATA[
+						    )
+						)	B
+				   ON B.ENTER_CD = A.ENTER_CD
+				  AND B.SABUN = A.SABUN
+			]]>
+
+<if test='ssnSearchType  != null and ssnSearchType.equals("O")'>
+			 INNER JOIN	(${query}) AUTH
+			    ON AUTH.ENTER_CD = A.ENTER_CD
+			   AND AUTH.SABUN = A.SABUN
+</if>
+				<![CDATA[
+				WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				  AND REPLACE(#{searchDate},'-','') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+                  AND A.STATUS_CD NOT IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+                        FROM (SELECT NVL(F_COM_GET_STD_CD_VALUE( #{ssnEnterCd}, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM dual) A
+                     CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+                     ]]>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				  AND	F_COM_GET_ORG_CD ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))	=	TRIM(#{searchOrgCd})
+</if>
+<if test='searchNm != null and !searchNm.equals("")'>
+				  AND	(F_COM_GET_NAMES ( A.ENTER_CD, A.SABUN) LIKE '%' || #{searchNm} || '%' OR A.SABUN = #{searchNm})
+</if>
+				ORDER	BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getOrgMappingPersonStaListNull">
+
+				<![CDATA[
+				SELECT /* OrgMappingPersonSta-mapping-query.getOrgMappingPersonStaList */
+			             F_COM_GET_ORG_NM2 ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS ORG_NM
+			        ,    F_COM_GET_JIKCHAK_NM( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKCHAK_NM
+			        ,    F_COM_GET_JIKGUB_NM ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKGUB_NM
+			        ,    F_COM_GET_JIKWEE_NM ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS JIKWEE_NM
+			        ,    F_COM_GET_WORKTYPE_NM (A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) ) AS WORK_TYPE_NM
+			        ,    F_COM_GET_NAMES ( A.ENTER_CD, A.SABUN) AS NAME
+			        ,    F_COM_GET_NAMES ( A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+			        ,    A.SABUN AS SABUN
+				FROM	THRM151 A
+				LEFT OUTER JOIN
+						(
+						SELECT	*
+						FROM	(
+						      SELECT ENTER_CD, SABUN
+						        FROM (
+						            SELECT X.ENTER_CD
+						                 , X.SABUN
+						                 , Y.MAP_TYPE_CD
+						                 , F_COM_GET_MAP_CD(X.ENTER_CD, Y.MAP_TYPE_CD, X.SABUN, REPLACE(#{searchDate},'-','')) AS MAP_CD
+						                 , F_COM_GET_MAP_NM(X.ENTER_CD, Y.MAP_TYPE_CD, X.SABUN, REPLACE(#{searchDate},'-','')) AS MAP_NM
+						              FROM THRM151 X
+						             CROSS JOIN (
+						                    SELECT A.ENTER_CD
+						                         , A.MAP_TYPE_CD
+						                      FROM TORG109 A
+       									     WHERE A.SDATE = (SELECT MAX (SDATE) FROM TORG109
+											                     WHERE ENTER_CD = A.ENTER_CD
+											                       AND MAP_TYPE_CD = A.MAP_TYPE_CD
+											                       AND MAP_CD = A.MAP_CD
+											                       AND REPLACE(#{searchDate},'-','') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+						                     GROUP BY A.ENTER_CD, A.MAP_TYPE_CD
+						                   ) Y
+						             WHERE REPLACE(#{searchDate},'-','') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+						               AND X.STATUS_CD NOT IN ('RA')
+						             )
+						    ) X
+						)	B
+				   ON B.ENTER_CD = A.ENTER_CD
+				  AND B.SABUN = A.SABUN
+				          ]]>
+<if test='ssnSearchType  != null and ssnSearchType.equals("O")'>
+			 INNER JOIN	(${query}) AUTH
+			    ON AUTH.ENTER_CD = A.ENTER_CD
+			   AND AUTH.SABUN = A.SABUN
+</if>
+				<![CDATA[
+				WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				  AND REPLACE(#{searchDate},'-','') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+                  AND A.STATUS_CD NOT IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+                        FROM (SELECT NVL(F_COM_GET_STD_CD_VALUE( #{ssnEnterCd}, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM dual) A
+                     CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+                     ]]>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				  AND	F_COM_GET_ORG_CD ( A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))	=	TRIM(#{searchOrgCd})
+</if>
+<if test='searchNm != null and !searchNm.equals("")'>
+				  AND	(F_COM_GET_NAMES ( A.ENTER_CD, A.SABUN) LIKE '%' || #{searchNm} || '%' OR A.SABUN = #{searchNm})
+</if>
+				ORDER	BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+
+
+		</select>
+
+
+</mapper>

@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.workday">
+
+
+<!-- 근태신청(잔여휴가내역) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkdayAppList">
+
+				<![CDATA[
+                    SELECT X.ENTER_CD
+                         , SUBSTR(X.USE_S_YMD,1,4) AS YEAR
+                         , X.SABUN
+                         , X.GNT_CD
+                         , NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'ttim014', Y.LANGUAGE_CD, #{ssnLocaleCd}), Y.GNT_NM)  AS GNT_NM
+                         , X.CRE_CNT -- 총발생일수(당해년도발생일수)
+                         , X.USE_CNT   -- 사용가능일
+                         , X.USED_CNT  -- 사용일(당해년도사용일수)
+                         , X.REST_CNT  -- 현잔여일수
+                         , CASE WHEN X.FRD_CNT = 0 THEN NULL ELSE X.FRD_CNT END AS FRD_CNT -- 전년도이월일수
+                         , CASE WHEN X.MOD_CNT = 0 THEN NULL ELSE X.MOD_CNT END AS MOD_CNT -- 하계휴가차감일수
+                         , X.STACK_CNT
+                         , TO_CHAR(TO_DATE(X.USE_S_YMD,'YYYYMMDD'), 'YYYY-MM-DD') AS USE_S_YMD -- 시작일
+                         , TO_CHAR(TO_DATE(X.USE_E_YMD,'YYYYMMDD'), 'YYYY-MM-DD') AS USE_E_YMD -- 종료일
+               			 , X.USE_S_YMD AS BASE_YMD --기준일
+                      FROM TTIM511 X
+                         , TTIM014 Y
+                     WHERE X.ENTER_CD = Y.ENTER_CD
+                       AND X.GNT_CD   = Y.GNT_CD
+                       AND X.ENTER_CD =  #{ssnEnterCd}
+                       AND X.SABUN    = TRIM( #{searchSabun} )
+                       AND X.GNT_CD = F_COM_GET_STD_CD_VALUE(X.ENTER_CD, 'TIM_YY_GNT_CD')
+                       ]]>
+<if test='searchBaseYmd != null and !searchBaseYmd.equals("")'>
+					   AND REPLACE(#{searchBaseYmd}, '-', '') BETWEEN NVL(X.USE_S_YMD, '19000101') AND NVL(X.USE_E_YMD,'99991231')
+</if>
+                     ORDER BY X.USE_S_YMD DESC, X.USE_E_YMD DESC
+
+
+		</select>
+
+<!-- 근태신청(휴가사용내역) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkdayAppExList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.APPL_YMD		--신청일자
+					     , A.APPL_STATUS_CD --신청상태
+					     , A.APPL_SEQ		--신청서순번
+					     , A.APPL_SABUN
+					     , A.APPL_IN_SABUN
+					     , B.GNT_CD 		--근태종류
+					     , B.SABUN
+					     , SUBSTR(B.S_YMD,1,4) AS YEAR
+					     , Y.GNT_NM
+					     , CASE WHEN B.GNT_CD = '70' THEN
+					                 F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'B60020', B.OCC_CD) || '-' || F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'B60030', B.FAM_CD)
+					            ELSE '' END AS OCC_NM
+					     , B.S_YMD 			--신청시작일
+					     , B.E_YMD 			--신청종료일
+					     , B.HOL_DAY 		--총일수
+					     , B.CLOSE_DAY 		--적용일수
+					     , B.UPDATE_YN 		--취소여부
+					     , B.GNT_REQ_RESON 	--근태신청사유
+						 , D.APPL_SEQ 		AS APPL_SEQ2
+						 , D.APPL_YMD		AS APPL_YMD2
+						 , D.APPL_SABUN		AS APPL_SABUN2
+						 , D.APPL_IN_SABUN 	AS APPL_IN_SABUN2
+						 , D.APPL_STATUS_CD	AS APPL_STATUS_CD2
+						 , D.APPL_CD 		AS CANCLE_APPL_CD
+						 , '0' AS DETAIL
+					     , DECODE(A.APPL_STATUS_CD, '11', '<a class="sbasic">' || DECODE(#{ssnLocaleCd}, NULL, '삭제', NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', '113460'), '삭제')) || '</a>', '') AS BTN_DEL
+					     
+					     , CASE WHEN D.APPL_STATUS_CD = '11' THEN '<a class="sbasic">' || DECODE(#{ssnLocaleCd}, NULL, '삭제', NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', '113460'), '삭제')) || '</a>'
+							    ELSE '' END AS BTN_DEL2
+					     , CASE WHEN A.APPL_STATUS_CD <> '99' OR NVL(B.UPDATE_YN, 'N') = 'Y' THEN ''
+					            WHEN D.RNUM <> 1 THEN ''
+					            WHEN D.APPL_SEQ IS NULL OR D.APPL_STATUS_CD IN ('23', '33') THEN '<a class="btn thinner filled">' || DECODE(#{ssnLocaleCd}, NULL, '취소신청', NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', 'cancelApp'), '취소신청')) || '</a>'
+							    ELSE '' END AS BTN_APP2 
+						 , CASE WHEN A.APPL_STATUS_CD <> '99' OR NVL(B.UPDATE_YN, 'N') = 'Y' THEN ''
+					            WHEN D.RNUM <> 1 THEN '' 
+					            WHEN D.APPL_SEQ IS NULL OR D.APPL_STATUS_CD IN ('23', '33') THEN '<a class="btn thinner filled">' || DECODE(#{ssnLocaleCd}, NULL, '변경신청', NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', 'modApp'), '변경신청')) || '</a>'
+							    ELSE '' END AS BTN_APP3  
+						 , CASE WHEN D.APPL_SEQ IS NULL THEN '1' ELSE '0' END AS DETAIL2
+						 , SUM( CASE WHEN NVL(B.UPDATE_YN,'N') = 'N' AND NVL(RNUM,1) = 1 THEN B.CLOSE_DAY ELSE 0 END ) over() AS SUM_DAY
+						 , D.TYPE_NM
+						 , D.S_YMD  AS S_YMD2			-- 변경신청시작일
+						 , D.E_YMD  AS E_YMD2			-- 변경신청종료일
+					  FROM THRI103 A, TTIM301 B, TTIM014 Y
+				        ,  ( SELECT X.B_APPL_SEQ, Y.*  --근태취소신청내역 
+				                 , ROW_NUMBER()OVER(PARTITION BY X.ENTER_CD, X.B_APPL_SEQ ORDER BY Y.APPL_SEQ DESC ) AS RNUM
+						         , '(취소신청)' AS TYPE_NM
+						         , '' AS S_YMD, '' AS E_YMD
+				              FROM TTIM383 X, THRI103 Y
+				             WHERE X.ENTER_CD     = #{ssnEnterCd}
+				               AND X.ENTER_CD     = Y.ENTER_CD
+				               AND X.APPL_SEQ     = Y.APPL_SEQ
+				               AND X.SABUN        = TRIM( #{searchSabun} )
+				            UNION ALL
+				            SELECT X.B_APPL_SEQ, Y.*  --근태취소신청내역 
+				                 , ROW_NUMBER()OVER(PARTITION BY X.ENTER_CD, X.B_APPL_SEQ ORDER BY Y.APPL_SEQ DESC ) AS RNUM
+				                 , '(변경신청)' AS TYPE_NM
+								 , (SELECT MIN(VACATION_YMD) AS S_YMD FROM TTIM387 WHERE ENTER_CD = X.ENTER_CD AND APPL_SEQ = X.APPL_SEQ AND SABUN = X.SABUN) AS S_YMD
+								 , (SELECT MAX(VACATION_YMD) AS E_YMD FROM TTIM387 WHERE ENTER_CD = X.ENTER_CD AND APPL_SEQ = X.APPL_SEQ AND SABUN = X.SABUN) AS E_YMD
+				              FROM TTIM385 X, THRI103 Y
+				             WHERE X.ENTER_CD     = #{ssnEnterCd}
+				               AND X.ENTER_CD     = Y.ENTER_CD
+				               AND X.APPL_SEQ     = Y.APPL_SEQ
+				               AND X.SABUN        = TRIM( #{searchSabun} )
+				          ) D
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+                       AND B.ENTER_CD = Y.ENTER_CD
+                       AND B.GNT_CD   = Y.GNT_CD
+                       AND A.APPL_CD  = '22' /* 근태신청 */
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND B.SABUN    = TRIM( #{searchSabun} )
+					   AND (B.S_YMD BETWEEN TRIM( REPLACE(#{searchAppSYmd}, '-', '') ) AND TRIM( REPLACE(#{searchAppEYmd}, '-', '') )
+					        OR D.S_YMD BETWEEN TRIM( REPLACE(#{searchAppSYmd}, '-', '') ) AND TRIM( REPLACE(#{searchAppEYmd}, '-', '') )
+					       )
+                       AND A.ENTER_CD   = D.ENTER_CD(+)
+                       AND A.APPL_SEQ   = D.B_APPL_SEQ(+)
+                       AND (1 = (CASE WHEN D.APPL_CD = '23' THEN DECODE(D.APPL_STATUS_CD, '99', 0, 1) ELSE 1 END)) /* 취소 완료된 결재건 출력 X */
+                       ]]>
+<if test='searchWorkdayYn != null and !searchWorkdayYn.equals("")'>
+					   AND B.GNT_CD IN ('14' /* 연차 */, '15' /* 오전반차 */, '16' /* 오후반차 */, '17' /* 오전반반차 */, '18' /* 오후반반차 */)
+</if>
+					 ORDER BY A.APPL_YMD DESC, A.APPL_SEQ DESC, D.RNUM
+
+		</select>
+
+<!-- 기본근무, 연장근무 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorktimeAppPlan">
+
+				<![CDATA[
+                   SELECT TO_CHAR(TO_DATE(T1.S_YMD, 'YYYYMMDD'), 'YYYY.MM.DD') AS S_YMD, TO_CHAR(TO_DATE(T1.E_YMD, 'YYYYMMDD'), 'YYYY.MM.DD') AS E_YMD, T1.SABUN, NVL(SUM(T2.WORK_HH), 0) AS WORKTIME 
+					    , T6.WORK_HOUR  AS WORKTIME_DEFAULT
+					    , F_TIM_GET_OT_WORK_TIME(T1.ENTER_CD, T1.SABUN, T1.WORK_GRP_CD, #{searchBaseYmd}, 'W') AS WORKTIME_OVER
+					  FROM TABLE(EMP_WORK_TERM(#{ssnEnterCd},TRIM( #{searchSabun} ), #{searchBaseYmd})) T1
+					     , TTIM337 T2
+					     , (SELECT MIN(T3.YMD) AS SYMD, MAX(T3.YMD) AS EYMD, T3.TIME_CD, SUM((TO_DATE(T4.EHM, 'HH24MI') - TO_DATE(T4.SHM, 'HH24MI') ) *24) AS WORK_HOUR
+					          FROM TTIM120_V T3
+					             , TTIM018 T4
+					             , TABLE(EMP_WORK_TERM(#{ssnEnterCd},TRIM( #{searchSabun} ), #{searchBaseYmd})) T5
+					         WHERE T3.ENTER_CD = T4.ENTER_CD
+					           AND T3.TIME_CD = T4.TIME_CD
+					           AND T3.ENTER_CD = T5.ENTER_CD
+					           AND T3.SABUN = T5.SABUN
+					           AND T3.WORK_GRP_CD = T5.WORK_GRP_CD
+					           AND T3.YMD BETWEEN T5.S_YMD AND T5.E_YMD
+					           AND T3.WORK_YN = 'N'
+					           AND T4.WORK_CD = '0010'
+					           AND T3.ENTER_CD = #{ssnEnterCd}
+					           AND T3.SABUN = TRIM( #{searchSabun} )
+					           AND #{searchBaseYmd} BETWEEN T5.S_YMD AND T5.E_YMD
+					        GROUP BY T3.TIME_CD) T6
+					 WHERE T1.ENTER_CD = #{ssnEnterCd}
+					   AND T1.ENTER_CD = T2.ENTER_CD(+)
+					   AND T1.SABUN = T2.SABUN(+)
+					   AND T2.YMD(+) BETWEEN T1.S_YMD AND #{searchBaseYmd}
+					   AND #{searchBaseYmd} BETWEEN T1.S_YMD AND T1.E_YMD
+					GROUP BY T1.ENTER_CD, T1.WORK_GRP_CD, T1.S_YMD, T1.E_YMD, T1.SABUN, T6.WORK_HOUR
+                 ]]>
+		</select>
+
+
+<!-- 근태신청(휴가사용내역) 삭제 -->
+		<delete parameterType="map" id="deleteWorkdayAppEx103">
+
+
+					DELETE FROM THRI103
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 근태신청(휴가사용내역) 삭제 -->
+		<delete parameterType="map" id="deleteWorkdayAppEx">
+
+					DELETE FROM TTIM301
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+<!-- 근태신청 삭제 -->
+		<delete parameterType="map" id="deleteWorkdayApp">
+
+					DELETE FROM TTIM301
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						<if test=' rm.applSeq != null and !rm.applSeq.equals("")'>
+						,TRIM(#{rm.applSeq})
+						</if>
+</foreach>
+						)
+		</delete>
+
+<!-- 근태취소신청 삭제 -->
+		<delete parameterType="map" id="deleteWorkdayAppUpd">
+
+					DELETE FROM TTIM383
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						<if test=' rm.applSeq2 != null and !rm.applSeq2.equals("")'>
+						,TRIM(#{rm.applSeq2})
+						</if>
+</foreach>
+						)
+		</delete>
+
+		
+		<delete parameterType="map" id="deleteWorkdayAppEx107">
+
+					DELETE FROM THRI107
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+				
+
+</mapper>

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payTransFileCre">
+		<select parameterType="map" resultType="cMap" id="getPayTransFileCreList">
+
+				<![CDATA[
+					SELECT	X1.PAY_YM
+						,	X1.PAYMENT_YMD
+						,	X1.CNT
+						--,	F_CPN_PAY_NM_LIST(X1.ENTER_CD, X1.PAY_YM, X1.PAYMENT_YMD)	AS	NOTE
+						,   X1.PAY_NM AS NOTE
+						,	X1.MON
+						,   X1.PAY_ACTION_NM
+ 						,   X1.PAY_ACTION_CD
+					FROM
+							(
+								SELECT	T2.ENTER_CD
+									,	T2.PAY_YM
+									,	T2.PAYMENT_YMD
+									,	COUNT(*) AS CNT
+									,	NVL(SUM(T3.PAYMENT_MON), 0)	AS	MON
+									,   T1.PAY_NM
+									, 	T2.PAY_ACTION_CD
+                  					, 	T2.PAY_ACTION_NM
+								FROM	TCPN051	T1
+									,	TCPN201 T2
+									,	TCPN303 T3
+								WHERE	T1.ENTER_CD			=	#{ssnEnterCd}
+								AND		T2.ENTER_CD			=	T1.ENTER_CD
+								AND		T3.ENTER_CD			=	T2.ENTER_CD
+								AND		T2.PAY_CD			=	T1.PAY_CD
+								AND		T1.RUN_TYPE	IN	('00001','00002')
+								AND		T3.PAY_ACTION_CD	=	T2.PAY_ACTION_CD
+								GROUP	BY
+										T2.ENTER_CD
+									,	T2.PAY_YM
+									,	T2.PAYMENT_YMD
+									,   T1.PAY_CD
+									,	T1.PAY_NM
+									, 	T2.PAY_ACTION_CD
+                  					, 	T2.PAY_ACTION_NM
+							)	X1
+					WHERE	1 = 1
+					          			]]>
+					<if test='searchPayYm != null and !searchPayYm.equals("")'>
+					AND		X1.PAY_YM		=	REPLACE(#{searchPayYm},'-','')
+					</if>
+					<if test='searchPaymentYmd != null and !searchPaymentYmd.equals("")'>
+					AND		X1.PAYMENT_YMD	=	REPLACE(#{searchPaymentYmd},'-','')
+					</if>
+					ORDER	BY
+							X1.PAY_YM		DESC
+						,	X1.PAYMENT_YMD	DESC
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayTransFileCreListDetail">
+
+				<![CDATA[
+					SELECT B.BANK_CD,
+					       F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H30001', B.BANK_CD) AS BANK_NM,
+					       REPLACE(CRYPTIT.DECRYPT(B.ACCOUNT_NO, B.ENTER_CD),'-','')	AS	ACCOUNT_NO,
+					       A.SABUN,
+					       A.NAME,
+					       A.MON
+					 FROM
+							(SELECT T3.SABUN,
+							       T3.NAME,
+							       NVL(SUM(T3.PAYMENT_MON), 0) AS MON,
+							       T1.PAYMENT_YMD,
+							       T1.ENTER_CD,
+							       T5.ACCOUNT_TYPE
+							  FROM TCPN201 T1, TCPN203 T2, TCPN303 T3, TCPN051 T5
+							 WHERE T1.ENTER_CD = #{ssnEnterCd}
+							   AND T1.PAY_ACTION_CD = #{searchPayActionCd}
+							   AND T1.ENTER_CD = T2.ENTER_CD
+							   AND T1.PAY_ACTION_CD = T2.PAY_ACTION_CD
+							   AND T2.ENTER_CD = T3.ENTER_CD
+							   AND T2.PAY_ACTION_CD = T3.PAY_ACTION_CD
+							   AND T2.SABUN = T3.SABUN
+							   AND T1.ENTER_CD = T5.ENTER_CD
+							   AND T1.PAY_CD = T5.PAY_CD
+							GROUP BY T3.SABUN, T3.NAME, T1.PAYMENT_YMD, T1.ENTER_CD, T5.ACCOUNT_TYPE
+							) A, TCPN180 B
+					WHERE A.ENTER_CD = B.ENTER_CD(+)
+					  AND A.SABUN = B.SABUN(+)
+					  AND A.ACCOUNT_TYPE = B.ACCOUNT_TYPE(+)
+					  AND A.PAYMENT_YMD BETWEEN B.SDATE(+) AND NVL(B.EDATE(+),'99991231')
+					          ]]>
+					<if test='searchAccountNo != null and searchAccountNo.equals("Y")'>
+					  AND ( REPLACE(CRYPTIT.DECRYPT(B.ACCOUNT_NO, B.ENTER_CD),'-','') IS NULL OR B.BANK_CD IS NULL )
+					</if>
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayTransFileCreListFileDown">
+
+				<![CDATA[
+					SELECT	DISTINCT CASE WHEN X1.ENTER_CD = #{ssnEnterCd} THEN '000542200' ELSE '021331442' END||'|'||
+							TO_CHAR(TO_DATE(X1.PAYMENT_YMD),'YYYYMMDD')||'|'||'01'||'|'||
+							CASE WHEN X1.ENTER_CD = #{ssnEnterCd} THEN RPAD('SSY618',8,' ') ELSE RPAD('SHJUN620',8,' ') END||'|'||RPAD(' ',20,' ')||'|'||RPAD(' ',10,' ')||'|'||'27'||'|'||
+							CASE WHEN X1.ENTER_CD = #{ssnEnterCd} THEN RPAD('11210080419',16,' ')ELSE RPAD('11252433254',16,' ') END||'|'||'KRW'||'|'||RPAD('급여이체',24,' ')||'|'||
+							LPAD(TO_CHAR(ROWNUM),6,'0')||'|'||LPAD(TO_CHAR(X1.PAYMENT_MON),17,'0')||'|' HEAD_DATA
+					FROM	(
+								SELECT T1.ENTER_CD, T1.PAYMENT_YMD, NVL(SUM(T2.PAYMENT_MON), 0) AS PAYMENT_MON, COUNT(*) AS CNT
+								FROM	TCPN201 T1,
+										TCPN303 T2
+								WHERE	T1.ENTER_CD = #{ssnEnterCd}
+								AND		T2.ENTER_CD = T1.ENTER_CD
+								AND		T2.PAY_ACTION_CD = T1.PAY_ACTION_CD
+								AND		T1.PAY_YM = #{payYmFile}
+								AND		T1.PAYMENT_YMD = #{paymentYmdFile}
+								GROUP BY T1.ENTER_CD, T1.PAYMENT_YMD
+							)	X1
+					UNION	ALL
+					SELECT	LPAD(X1.CNT,6,'0')||'|'||SUBSTR(X1.BANK_CD,2,2)||'|'||RPAD(X1.ACCOUNT_NO,16,' ')||'|'||'KRW'||'|'
+							||LPAD(NVL(X1.PAYMENT_MON, 0),17,'0')||'|'||RPAD(X1.NAME,30,' ')||'|' DETAIL_DATA
+					FROM	(
+								SELECT	T3.BANK_CD,
+										REPLACE(CRYPTIT.DECRYPT(T3.ACCOUNT_NO, T2.ENTER_CD),'-','') AS ACCOUNT_NO,
+										T2.ENTER_CD,
+										NVL(SUM(T2.PAYMENT_MON), 0) AS PAYMENT_MON,
+										T2.NAME,
+										ROW_NUMBER() OVER (PARTITION BY T2.ENTER_CD ORDER BY T2.SABUN DESC) AS CNT
+								FROM	TCPN201 T1,
+										TCPN303 T2,
+										TCPN180 T3
+								WHERE	T1.ENTER_CD = #{ssnEnterCd}
+								AND		T2.ENTER_CD = T1.ENTER_CD
+								AND		T2.PAY_ACTION_CD = T1.PAY_ACTION_CD
+								AND		T1.PAY_YM = #{payYmFile}
+								AND		T1.PAYMENT_YMD = #{paymentYmdFile}
+								AND		T2.ENTER_CD = T3.ENTER_CD(+)
+								AND		T2.SABUN = T3.SABUN(+)
+								AND		T3.ACCOUNT_TYPE(+) = '01'
+								AND		TO_CHAR(TO_DATE(#{paymentYmdFile},'YYYYMMDD'),'YYYYMMDD') BETWEEN T3.SDATE(+) AND NVL(T3.EDATE(+),'99991231')
+								GROUP BY T3.BANK_CD, T2.ENTER_CD, T3.ACCOUNT_NO, T2.SABUN, T2.NAME
+							)	X1
+
+				]]>
+
+
+		</select>
+	</mapper>

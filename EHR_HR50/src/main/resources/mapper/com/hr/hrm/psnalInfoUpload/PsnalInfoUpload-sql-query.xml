@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.psnalInfoUpload">
+
+		<!--조회-->
+		<select parameterType="map" resultType="cMap" id="getTableInfoList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.EMP_TABLE
+					     , A.EMP_TABLE_NM
+					     , A.PRG_CD
+					     , A.TRANS_TYPE
+					     , A.MULTIROW_YN
+					     , A.SEQ AS TAB_SEQ
+					     , A.NOTE
+					     , B.COLUMN_CD
+					     , B.COLUMN_NM
+					     , B.LIMIT_LENGTH
+					     , B.C_TYPE
+					     , B.D_TYPE
+					     , B.D_CONTENT
+					     , B.POPUP_TYPE
+					     , B.READ_ONLY_YN
+					     , B.MERGE_YN
+					     , B.REL_COLUMN_CD
+					     , B.SEQ AS COL_SEQ
+					     , B.NOTE1
+					     , B.NOTE2
+					     , B.NOTE3
+					     , B.NOTE4
+					     , B.NOTE5
+					     , B.GROUP_COLUMN_CD
+					     , B.GROUP_SEPARATOR
+					     , B.PK_TYPE
+					     , B.CRYPT_KEY
+					     , B.NOT_NULL_YN
+					     , B.HIDDEN_VAL_COLUMN_CD
+					     , B.DISPLAY_YN
+					     , B.CONDITION_YN
+					  FROM THRM800 A
+					       LEFT OUTER JOIN THRM802 B
+					            ON B.ENTER_CD = A.ENTER_CD
+					            AND B.EMP_TABLE = A.EMP_TABLE
+					 WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+					 <if test='tableName != null and !tableName.equals("")'>
+					 AND A.EMP_TABLE = #{tableName}
+					 </if>
+					 AND A.DISPLAY_YN = 'Y'
+				   ORDER BY A.SEQ, A.EMP_TABLE, B.SEQ
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getTableNameList">
+
+				<![CDATA[
+					    SELECT A.SEQ
+                         , A.CODE
+                         , A.CODE_NM
+                         , A.USE_YN
+                         , A.ENTER_CD
+                         , B.EMP_TABLE
+                         , B.SABUN
+                         , (CASE WHEN B.EMP_TABLE = 'ALL' AND B.SABUN = #{ssnSabun} THEN 'E'
+                                 WHEN B.EMP_TABLE <> 'ALL' AND B.SABUN = #{ssnSabun} THEN 'S'
+                            END) AS ALL_VAL
+                        FROM (
+                               SELECT  A.SEQ
+                                     , A.EMP_TABLE AS CODE
+                                     , A.EMP_TABLE_NM AS CODE_NM
+                                     , A.USE_YN
+                                     , A.ENTER_CD
+                                 FROM THRM800 A
+                                 WHERE DISPLAY_YN = 'Y' -- 조회가능여부가 Y 인것만 표시함
+                                UNION ALL
+                               SELECT 0 AS SEQ
+                                     , 'ALL' AS CODE
+                                     , '전체' AS CODE_NM
+                                     , 'Y' AS USE_YN
+                                     , #{ssnEnterCd} AS ENTER_CD
+                                 FROM DUAL A
+                        ) A
+                         LEFT JOIN THRM801 B
+                           ON A.ENTER_CD = B.ENTER_CD
+                          AND A.CODE = B.EMP_TABLE
+						  AND B.SABUN = #{ssnSabun}
+                          WHERE A.ENTER_CD = #{ssnEnterCd}
+                          ORDER BY A.SEQ
+				]]>
+		</select>
+
+		<!--조회-->
+		<select parameterType="map" resultType="cMap" id="getPsnalInfoUploadList">
+
+				<![CDATA[
+	SELECT F_COM_GET_NAMES(#{ssnEnterCd}, A.SABUN) AS EMP_NAME,
+	       A.SABUN AS EMP_SABUN,
+		   F_COM_GET_ORG_NM2(#{ssnEnterCd}, A.SABUN, TO_CHAR(sysdate, 'YYYYMMDD')) AS ORG_NM,
+		   ]]>
+<bind name="icnt" value="1" />
+<foreach item="col" collection="selColNames" >
+	<if test='icnt > 1'>
+	,
+	</if>
+	<choose><when test='col.encyn != null and !col.encyn.equals("")'>
+		CRYPTIT.DECRYPT (A.${col.name}, A.ENTER_CD) as ${col.name}
+		</when><otherwise>
+		A.${col.name}
+	</otherwise>
+	</choose>
+	<bind name="icnt" value="icnt + 1" />
+</foreach>
+	  FROM ${searchTableName} A,(
+					         SELECT  A.ENTER_CD
+					                ,A.SABUN
+					                ,A.NAME
+					                ,B.STATUS_NM
+					                ,B.STATUS_CD
+					                ,B.ORG_CD
+					                ,F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					                ,B.JIKWEE_NM
+					                ,B.JIKCHAK_NM
+					                ,B.JIKGUB_NM
+					           FROM THRM100 A
+					               ,THRM151 B
+					          WHERE A.ENTER_CD = #{ssnEnterCd}
+					            AND A.ENTER_CD = B.ENTER_CD
+					            AND A.SABUN    = B.SABUN
+					            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+					       ) Y
+	 WHERE A.ENTER_CD = #{ssnEnterCd}
+	   AND A.SABUN =  Y.SABUN
+	   <if test='multiStatusCd != null and !multiStatusCd.equals("")'>
+		   AND Y.STATUS_CD IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	   </if>
+<foreach item="col" collection="selColNames2" >
+	<if test='col.sNm != null and !col.sNm.equals("")'>
+		<choose><when test='col.encyn != null and !col.encyn.equals("")'>
+			AND CRYPTIT.DECRYPT (A.${col.name}, A.ENTER_CD) LIKE '%${col.sNm}%'
+		</when><otherwise>
+			AND A.${col.name} like REPLACE(TRIM('%${col.sNm}%'),'-','')
+		</otherwise>
+		</choose>
+	</if>
+
+</foreach>
+<if test='searchSaNm != null and !searchSaNm.equals("")'>
+	   AND (F_COM_GET_NAMES(#{ssnEnterCd}, A.SABUN) like '%${searchSaNm}%' or A.SABUN like '%${searchSaNm}%')
+</if>
+		ORDER BY F_COM_JIKJE_SORT(#{ssnEnterCd}, A.SABUN, TO_CHAR(sysdate, 'YYYYMMDD'))
+		</select>
+		
+		<!--조회-->
+		<!--insert parameterType="map" id="insertPsnalInfoUpload">
+
+	INSERT INTO ${searchTableName} (
+<if test='!iudColNames.equals("")'>
+	${iudColNames}
+</if>
+, ENTER_CD
+	) 
+	VALUES (
+<if test='!iudColValus.equals("")'>
+	${iudColValus}
+</if>
+, #{ssnEnterCd}
+	)
+
+		</insert>
+		-->
+
+		<!--조회 20240717 사용안함>
+		<update parameterType="map" id="updatePsnalInfoUpload">-->
+
+<!--	UPDATE ${searchTableName}-->
+<!--	   SET -->
+<!--<if test='!iudColValus.equals("")'>-->
+<!--	${iudColValus}-->
+<!--</if>-->
+<!--     WHERE -->
+<!--<if test='!iudColWhere.equals("")'>-->
+<!--	${iudColWhere}-->
+<!--</if>-->
+<!--AND ENTER_CD = #{ssnEnterCd}-->
+<!--		</update>-->
+<!--		<update parameterType="map" id="mergePsnalInfoUpload">-->
+<!--MERGE INTO ${searchTableName} T-->
+<!--USING (-->
+<!--       SELECT ${iudSelectVal}, #{ssnEnterCd} AS ENTER_CD-->
+<!--         FROM DUAL-->
+<!--) S-->
+<!--   ON (-->
+<!--       ${iudMergeKey} AND T.ENTER_CD = S.ENTER_CD-->
+<!--   )-->
+<!--   WHEN MATCHED THEN-->
+<!--      UPDATE SET -->
+<!--<if test='!iudUpdateVal.equals("")'>-->
+<!--	         ${iudUpdateVal}-->
+<!--</if>-->
+<!--           , CHKDATE = SYSDATE-->
+<!--           , CHKID   = #{ssnSabun}-->
+<!--   WHEN NOT MATCHED THEN -->
+<!--   INSERT-->
+<!--   (-->
+<!--<if test='!iudInsertNm.equals("")'>-->
+<!--      ${iudInsertNm}-->
+<!--</if>-->
+<!--    , ENTER_CD, CHKDATE, CHKID-->
+<!--   ) VALUES (-->
+<!--<if test='!iudInsertVal.equals("")'>-->
+<!--      ${iudInsertVal}-->
+<!--</if>-->
+<!--    , #{ssnEnterCd}, SYSDATE, #{ssnSabun}-->
+<!--   )-->
+<!--		</update>-->
+		<!--삭제 20240717 jyp 사용안함-->
+<!--		<delete parameterType="map" id="deletePsnalInfoUpload">-->
+<!--DELETE FROM ${searchTableName} WHERE-->
+<!--<if test='!iudWhereVal.equals("")'>-->
+<!--	${iudWhereVal}-->
+<!--</if>-->
+<!--AND ENTER_CD = #{ssnEnterCd}-->
+<!--		</delete>-->
+		
+		<!-- 공통코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnalInfoUploadCommonCode">
+
+				<![CDATA[
+					SELECT CODE
+					     , CODE_NM
+					  FROM TSYS005
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND GRCODE_CD = #{grcodeCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+					 ORDER BY SEQ
+				]]>
+
+
+		</select>
+		
+		<update parameterType="map" id="savePsnalInfoUpload3">
+
+					MERGE INTO ${tableName} T
+					USING	(
+									SELECT	${selectQuery}
+									  FROM	DUAL
+							) S
+					ON ( ${onValsQuery} )
+					WHEN MATCHED THEN
+						UPDATE SET	 
+								${updateQuery}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							${insertQuery}
+						)
+						VALUES
+						(
+							${valuesQuery}
+						)
+		</update>
+		
+		<delete parameterType="map" id="deletePsnalInfoUpload3">
+				<![CDATA[
+					DELETE FROM ${tableName}
+					WHERE ${deleteQuery}
+				]]>
+		</delete>
+
+</mapper>

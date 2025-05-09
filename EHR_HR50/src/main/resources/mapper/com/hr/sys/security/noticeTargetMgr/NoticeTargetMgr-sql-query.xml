@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.security.noticeTargetMgr">
+		<!-- 알림대상자관리 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getNoticeTargetMgrList">
+
+				<![CDATA[
+					SELECT
+					    A.NOTICE_TYPE_CD
+					  , A.WORK_TYPE
+					  , A.SABUN
+					  , F_COM_GET_ORG_NM2 (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					  , F_COM_GET_JIKCHAK_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKCHAK_NM
+					  , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_NM
+					  , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+					  , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN) AS NAME
+					  , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+					FROM TSYS210 A
+					WHERE 1=1
+					  AND A.ENTER_CD = #{ssnEnterCd} ]]>
+<if test="searchSabunNameAlias != null and !searchSabunNameAlias.equals('')">
+					  AND ( A.SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN) LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%' )
+</if>
+<if test="searchNoticeTypeCd != null and !searchNoticeTypeCd.equals('')">
+					  AND A.NOTICE_TYPE_CD = TRIM( #{searchNoticeTypeCd} )
+</if>
+
+
+
+		</select>
+
+
+		<!-- 알림대상자관리 단건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getNoticeTargetMgrMap">
+
+				<![CDATA[
+					SELECT *
+					FROM DUAL
+				]]>
+
+
+		</select>
+
+
+		<!-- 알림대상자관리 저장 -->
+		<update parameterType="map" id="saveNoticeTargetMgr">
+
+					MERGE INTO TSYS210 T
+					USING (
+					    SELECT     
+					          A.ENTER_CD
+					        , A.NOTICE_TYPE_CD
+					        , A.WORK_TYPE
+					        , A.SABUN
+					    FROM  (
+					        SELECT     
+					              NULL      AS ENTER_CD
+					            , NULL      AS NOTICE_TYPE_CD
+					            , NULL      AS WORK_TYPE
+					            , NULL      AS SABUN
+					        FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					        UNION ALL
+					        SELECT
+					              TRIM( #{ssnEnterCd} )   AS ENTER_CD
+					            , TRIM( #{rm.noticeTypeCd} ) AS NOTICE_TYPE_CD
+					            , TRIM( #{rm.workType} ) AS WORK_TYPE
+					            , TRIM( #{rm.sabun} ) AS SABUN
+					        FROM DUAL 
+</foreach>
+					    ) A 
+					    WHERE 1=1
+					      AND A.ENTER_CD IS NOT NULL
+					      AND A.NOTICE_TYPE_CD IS NOT NULL
+					      AND A.WORK_TYPE IS NOT NULL
+					      AND A.SABUN IS NOT NULL
+					) S
+					ON ( 
+					        T.ENTER_CD = S.ENTER_CD 
+					    AND T.NOTICE_TYPE_CD = S.NOTICE_TYPE_CD
+					    AND T.WORK_TYPE = S.WORK_TYPE
+					    AND T.SABUN = S.SABUN
+					)
+					WHEN MATCHED THEN
+					    UPDATE SET
+					          T.CHKDATE = SYSDATE
+					        , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					    INSERT
+					    (
+					          T.ENTER_CD
+					        , T.NOTICE_TYPE_CD
+					        , T.WORK_TYPE
+					        , T.SABUN
+					        , CHKDATE
+					        , CHKID
+					    )
+					    VALUES
+					    (
+					          S.ENTER_CD
+					        , S.NOTICE_TYPE_CD
+					        , S.WORK_TYPE
+					        , S.SABUN
+					        , SYSDATE
+					        , #{ssnSabun}
+					    )
+
+
+		</update>
+
+		<!-- 알림대상자관리 삭제 -->
+		<delete parameterType="map" id="deleteNoticeTargetMgr">
+
+					DELETE FROM TSYS210
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||NOTICE_TYPE_CD||'_'||WORK_TYPE||'_'||SABUN IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+					    ,
+    <if test='rm.noticeTypeCd != null and !rm.noticeTypeCd.equals("")
+      and rm.workType != null and !rm.workType.equals("")
+      and rm.sabun != null and !rm.sabun.equals("")'>
+					        TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.noticeTypeCd})||'_'||TRIM(#{rm.workType})||'_'||TRIM(#{rm.sabun})
+	</if>
+</foreach>
+					  )
+
+
+		</delete>
+
+
+</mapper>

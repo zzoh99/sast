@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	퇴직세액 재계산 쿼리
+ -->
+<root>
+
+	<!-- 퇴직세액 재계산 퇴직일자 코드 조회  -->
+	<query id="selectRetTaxReCreCodeList">
+		<![CDATA[
+			SELECT PAY_ACTION_CD AS CODE, PAY_ACTION_NM AS CODE_NM, PAY_CD, PAY_YM
+			  FROM (
+			    SELECT ROWNUM AS RNUM, PAY_ACTION_CD, PAY_ACTION_NM, PAY_CD, PAY_YM
+			      FROM (                
+			       SELECT PAY_ACTION_CD, PAY_ACTION_NM, PAY_CD, PAY_YM
+			         from (                 
+			                SELECT a.PAY_ACTION_CD, a.PAY_ACTION_NM, b.PAY_CD, a.PAY_YM,
+			                       case b.PAY_CD when 'S1' then 1 when 'S2' then 2 else 3 end ORDERBY 
+			                  FROM TCPN201 a, TCPN051 b , TCPN203 c
+			                 WHERE a.ENTER_CD = #ssnEnterCd#
+			                   AND a.ENTER_CD = b.ENTER_CD
+			                   AND a.PAY_CD = b.PAY_CD
+			                   AND a.ENTER_CD = c.ENTER_CD
+			                   AND a.PAY_ACTION_CD = c.PAY_ACTION_CD
+			                   AND c.SABUN = #searchSabun#
+			                   AND b.RUN_TYPE = '00004'
+			                   AND A.PAY_CD NOT IN ('S9', 'S3') /*퇴직 시뮬레이션, 퇴직추계 제외*/
+			                   AND A.PAY_YM < '201601'
+			                ORDER BY ORDERBY, a.PAY_YM DESC  
+			              )
+			           ) 
+			       ) 
+	   ]]> 
+	</query>
+
+	<!-- 퇴직세액 재계산 조회 -->
+	<query id="selectRetTaxReCreList">
+		<![CDATA[
+			SELECT A.SABUN,
+			       A.PAY_ACTION_CD,
+			       A.EMP_YMD AS A_EMP_YMD, 
+			       A.SEP_SYMD AS A_SEP_SYMD,
+			       A.SEP_EYMD AS A_SEP_EYMD,  
+			       A.RET_YMD AS A_RET_YMD, 
+			       A.PAYMENT_YMD AS A_PAYMENT_YMD, 
+			       A.WKP_M_CNT AS A_WKP_M_CNT,
+			       A.LAST_WKP_M_CNT AS A_LAST_WKP_M_CNT,
+			       A.WKP_Y_CNT AS A_WKP_Y_CNT,
+			       A.LAST_WKP_Y_CNT AS A_LAST_WKP_Y_CNT,
+			       A.TWKP_Y_CNT AS A_TWKP_Y_CNT,
+			       A.JUNGSAN_TWKP_Y_CNT AS A_JUNGSAN_TWKP_Y_CNT,
+			       A.WKP_EX_M_CNT AS A_WKP_EX_M_CNT,
+			       A.WKP_ADD_M_CNT AS A_WKP_ADD_M_CNT,
+			       A.NOTAX_MON AS A_NOTAX_MON,
+			       A.RET_MON AS A_RET_MON,
+			       (SELECT ENTER_NM FROM TORG900 WHERE ENTER_CD = A.ENTER_CD) AS A_ENTER_NM,
+			       (SELECT REGINO FROM TCPN121 WHERE ENTER_CD = A.ENTER_CD AND BUSINESS_PLACE_CD = A.BUSINESS_PLACE_CD ) AS A_REGINO_NUM,
+			       A.IMWON_YN AS A_IMWON_YN,
+			       NVL(A.DECLARE_ITAX_MON, 0) AS A_DECLARE_ITAX_MON, 
+			       NVL(A.DECLARE_RTAX_MON, 0) AS A_DECLARE_RTAX_MON, 
+			       NVL(A.DECLARE_STAX_MON, 0) AS A_DECLARE_STAX_MON, 
+			       NVL(A.DECLARE_ITAX_MON,0) + NVL(A.DECLARE_RTAX_MON,0) + NVL(A.DECLARE_STAX_MON,0) AS A_T_DECLARE_MON_TOT, 
+			       NVL(A.T_ITAX_MON, 0) AS A_T_ITAX_MON, 
+			       NVL(A.T_RTAX_MON, 0) AS A_T_RTAX_MON, 
+			       NVL(A.T_STAX_MON, 0) AS A_T_STAX_MON, 
+			       NVL(A.T_ITAX_MON,0) + NVL(A.T_RTAX_MON,0) + NVL(A.T_STAX_MON,0) AS A_T_TAX_TOT,
+			       A.RET_MON_20111231 AS A_RET_MON_20111231,
+			       J.REGINM AS J_REGI_NM,
+			       J.REGINO AS J_REGI_NO,
+			       J.NOTAX_MON AS J_NOTAX_MON,
+			       J.RET_MON AS J_RET_MON,
+			       NVL(A.RET_MON,0)+NVL(A.NOTAX_MON,0) AS A_YTAX_MON,
+			       NVL(J.RET_MON,0)+NVL(J.NOTAX_MON,0) AS J_YTAX_MON,
+			       NVL(A.RET_MON,0)+NVL(J.RET_MON,0) AS HAP_RET_MON,
+			       NVL(A.NOTAX_MON,0)+NVL(J.NOTAX_MON,0) AS HAP_NOTAX_MON,
+			       NVL(A.RET_MON,0)+NVL(J.RET_MON,0)+NVL(A.NOTAX_MON,0)+NVL(J.NOTAX_MON,0) AS HAP_YTAX_MON,
+			       J.PAID_TAX_MON AS J_PAID_TAX_MON,
+			       J.PAID_TAX_MON AS HAP_PAID_TAX_MON,
+			       J.EMP_YMD AS J_EMP_YMD,
+			       J.SEP_SYMD AS J_SEP_SYMD,
+			       J.RET_YMD AS J_RET_YMD,
+			       J.PAYMENT_YMD AS J_PAYMENT_YMD,
+			       J.WKP_M_CNT AS J_WKP_M_CNT,
+			       J.WKP_EX_M_CNT AS J_WKP_EX_M_CNT,
+			       J.WKP_ADD_M_CNT AS J_WKP_ADD_M_CNT,
+			       J.WKP_DUP_M_CNT AS J_WKP_DUP_M_CNT,
+			       J.WKP_Y_CNT AS J_WKP_Y_CNT,
+			       H.WKP_EMP_2012 AS H_WKP_EMP_2012, 
+			       H.WKP_SYMD_2012 AS H_WKP_SYMD_2012, 
+			       H.WKP_RET_2012 AS H_WKP_RET_2012, 
+			       H.WKP_PAYMENT_2012 AS H_WKP_PAYMENT_2012,
+			       H.WKP_M_CNT_2012 AS H_WKP_M_CNT_2012,
+			       NVL(H.WKP_EX_M_CNT_2012, 0) AS H_WKP_EX_M_CNT_2012,
+			       H.WKP_ADD_M_CNT_2012 AS H_WKP_ADD_M_CNT_2012,
+			       H.WKP_DUP_M_CNT_2012 AS H_WKP_DUP_M_CNT_2012,
+			       H.WKP_Y_CNT_2012 AS H_WKP_Y_CNT_2012,
+			       NVL(J.SEP_SYMD, A.SEP_SYMD) AS H_SEP_SYMD_JUNSAN,
+			       A.TWKP_M_CNT AS A_WKP_M_CNT_JUNSAN,    
+			       A.JUNGSAN_TWKP_M_CNT AS A_JUNGSAN_TWKP_M_CNT,
+			       A.WKP_DUP_M_CNT AS A_WKP_DUP_M_CNT,
+			       NVL(A.WKP_EX_M_CNT, 0) + NVL(J.WKP_EX_M_CNT, 0) AS H_WKP_EX_M_CNT_JUNSAN,
+			       NVL(A.WKP_ADD_M_CNT, 0) + NVL(J.WKP_ADD_M_CNT, 0) AS H_WKP_ADD_M_CNT_JUNSAN,
+			       H.WKP_EMP_2013 AS H_WKP_EMP_2013, 
+			       H.WKP_SYMD_2013 AS H_WKP_SYMD_2013, 
+			       H.WKP_RET_2013 AS H_WKP_RET_2013, 
+			       H.WKP_PAYMENT_2013 AS H_WKP_PAYMENT_2013,
+			       H.WKP_M_CNT_2013 AS H_WKP_M_CNT_2013,
+			       H.WKP_EX_M_CNT_2013 AS H_WKP_EX_M_CNT_2013,
+			       H.WKP_ADD_M_CNT_2013 AS H_WKP_ADD_M_CNT_2013,
+			       H.WKP_DUP_M_CNT_2013 AS H_WKP_DUP_M_CNT_2013,
+			       H.WKP_Y_CNT_2013 AS H_WKP_Y_CNT_2013,
+			       K.BANK_NM AS K_BANK_NM,
+			       K.BANK_ENTER_NO AS K_BANK_ENTER_NO,
+			       F_COM_DECRYPT(K.BANK_ACCOUNT,K.ENTER_CD) AS K_BANK_ACCOUNT,
+			       K.DEFER_YMD AS K_DEFER_YMD,
+			       K.CUR_DEFER_MON AS K_CUR_DEFER_MON,
+			       K.CAL_DEFER_TAX_MON AS K_CAL_DEFER_TAX_MON,
+			       TRUNC(K.CAL_DEFER_TAX_MON * 0.1, 0) AS K_DIV_CAL_DEFER_TAX_MON, 
+			       K.CAL_DEFER_TAX_MON + TRUNC(K.CAL_DEFER_TAX_MON * 0.1, 0) AS K_CAL_DEFER_TAX_MON_TOT,
+			       A.RET_REASON AS A_RET_REASON,
+				   A.DB_GAIB_YMD AS A_DB_GAIB_YMD,
+				   A.WKP_EX_M_CNT_2012 AS A_WKP_EX_M_CNT_2012,
+				   A.WKP_EX_M_CNT_2013 AS A_WKP_EX_M_CNT_2013,
+				   A.WKP_ADD_M_CNT_2012 AS A_WKP_ADD_M_CNT_2012,
+				   A.WKP_ADD_M_CNT_2013 AS A_WKP_ADD_M_CNT_2013,
+				   J.WKP_EX_M_CNT_2012 AS J_WKP_EX_M_CNT_2012,
+				   J.WKP_EX_M_CNT_2013 AS J_WKP_EX_M_CNT_2013,
+				   J.WKP_ADD_M_CNT_2012 AS J_WKP_ADD_M_CNT_2012,
+				   J.WKP_ADD_M_CNT_2013 AS J_WKP_ADD_M_CNT_2013				   
+			  FROM TCPN771 A, TCPN772 H, TCPN768 J, TCPN777 K
+			 WHERE A.ENTER_CD = H.ENTER_CD (+)
+			   AND A.PAY_ACTION_CD = H.PAY_ACTION_CD (+)
+			   AND A.SABUN  = H.SABUN (+)
+			   AND A.ENTER_CD = J.ENTER_CD (+)
+			   AND A.PAY_ACTION_CD = J.PAY_ACTION_CD (+)
+			   AND A.SABUN  = J.SABUN (+)
+			   AND A.ENTER_CD = K.ENTER_CD (+)
+			   AND A.PAY_ACTION_CD = K.PAY_ACTION_CD (+)
+			   AND A.SABUN  = K.SABUN (+)
+			   AND A.ENTER_CD = #ssnEnterCd#
+			   AND A.SABUN = #searchSabun#
+			   AND A.PAY_ACTION_CD = #searchPayActionCd#
+		]]> 
+	</query>
+	
+	<!-- 퇴직세액 재계산 TCPN768 저장전 카운트 -->
+	<query id="selectRetTaxReCreCnt768">
+		<![CDATA[
+			SELECT COUNT(*) AS CNT
+			  FROM TCPN768
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN = #searchSabun#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]> 
+	</query>
+
+	<!-- 퇴직세액 재계산 TCPN771 저장전 카운트 -->
+	<query id="selectRetTaxReCreCnt771">
+		<![CDATA[
+			SELECT COUNT(*) AS CNT
+			  FROM TCPN771
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN = #searchSabun#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]> 
+	</query>
+	
+	<!-- 퇴직세액 재계산 TCPN777 저장전 카운트 -->
+	<query id="selectRetTaxReCreCnt777">
+		<![CDATA[
+			SELECT COUNT(*) AS CNT
+			  FROM TCPN777
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN = #searchSabun#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]> 
+	</query>
+	
+	<!-- 퇴직세액 재계산 TCPN768 저장 -->
+	<query id="insertRetTaxReCre768">
+		<![CDATA[
+			INSERT INTO TCPN768
+			(	
+			    ENTER_CD
+				, SABUN
+				, PAY_ACTION_CD
+				, REGINO       
+				, REGINM       
+				, RET_MON      
+				, NOTAX_MON    
+				, PAID_TAX_MON 
+				, EMP_YMD      
+				, SEP_SYMD     
+				, RET_YMD      
+				, PAYMENT_YMD  
+				, WKP_M_CNT    
+				, WKP_EX_M_CNT 
+				, WKP_ADD_M_CNT
+				, WKP_DUP_M_CNT
+				, WKP_Y_CNT  
+			    ,WKP_EX_M_CNT_2012
+			    ,WKP_EX_M_CNT_2013
+			    ,WKP_ADD_M_CNT_2012
+			    ,WKP_ADD_M_CNT_2013				  
+				, CHKDATE      
+				, CHKID        
+			) 
+			VALUES 
+			(
+				#ssnEnterCd#      
+				, #searchSabun#       
+				, #searchPayActionCd#
+				, #j_regi_no#
+				, #j_regi_nm#      
+				, #j_ret_mon#      
+				, #j_notax_mon#    
+				, #j_paid_tax_mon# 
+				, #j_emp_ymd#      
+				, #j_sep_symd#     
+				, #j_ret_ymd#      
+				, #j_payment_ymd#  
+				, #j_wkp_m_cnt#    
+				, #j_wkp_ex_m_cnt# 
+				, #j_wkp_add_m_cnt#
+				, #j_wkp_dup_m_cnt#
+				, #j_wkp_y_cnt#  
+			    , #j_wkp_ex_m_cnt_2012#
+			    , #j_wkp_ex_m_cnt_2013#
+			    , #j_wkp_add_m_cnt_2012#
+			    , #j_wkp_add_m_cnt_2013#			  
+				, SYSDATE          
+				, #ssnSabun#
+			)
+		]]> 
+	</query>
+	
+	<!-- 퇴직세액 재계산 TCPN771 저장 -->
+	<query id="insertRetTaxReCre771">
+		<![CDATA[
+			INSERT INTO TCPN771
+			(	
+			    ENTER_CD
+				, SABUN
+				, PAY_ACTION_CD
+				, RET_MON  	    
+				, NOTAX_MON 	 	 
+				, IMWON_YN		 	 
+				, RET_MON_20111231 
+				, RET_REASON
+				, DB_GAIB_YMD
+				, EARNING_MON
+				, EMP_YMD
+				, SEP_SYMD
+				, SEP_EYMD
+				, RET_YMD
+				, PAYMENT_YMD		
+			    , WKP_EX_M_CNT_2012
+			    , WKP_EX_M_CNT_2013
+			    , WKP_ADD_M_CNT_2012
+			    , WKP_ADD_M_CNT_2013
+				, CHKDATE      
+				, CHKID        
+			) 
+			VALUES 
+			(
+				#ssnEnterCd#      
+				, #searchSabun#       
+				, #searchPayActionCd#
+				, #a_ret_mon#         
+				, #a_notax_mon#       
+				, #a_imwon_yn#        
+				, #a_ret_mon_20111231#
+				, #a_ret_reason#
+				, #a_db_gaib_ymd#
+				, #a_ret_mon#
+				, #a_emp_ymd#
+				, #a_sep_symd#
+				, #a_sep_eymd#
+				, #a_ret_ymd#
+				, #a_payment_ymd#
+			    , #a_wkp_ex_m_cnt_2012#
+			    , #a_wkp_ex_m_cnt_2013#
+			    , #a_wkp_add_m_cnt_2012#
+			    , #a_wkp_add_m_cnt_2013#			
+				, SYSDATE             
+				, #ssnSabun#          
+			)
+		]]> 
+	</query>
+	
+	<!-- 퇴직세액 재계산 TCPN777 저장 -->
+	<query id="insertRetTaxReCre777">
+		<![CDATA[
+			INSERT INTO TCPN777
+			(	
+			    ENTER_CD
+				, SABUN
+				, PAY_ACTION_CD
+				, BANK_NM      
+				, BANK_ENTER_NO 
+				, BANK_ACCOUNT  
+				, DEFER_YMD     
+				, CUR_DEFER_MON
+				, CHKDATE      
+			    , CHKID
+			)        
+			VALUES 
+			(
+				#ssnEnterCd#      
+				, #searchSabun#       
+				, #searchPayActionCd#
+				, #k_bank_nm#      
+				, #k_bank_enter_no#
+				, F_COM_ENCRYPT(#k_bank_account#,#ssnEnterCd#) 
+				, #k_defer_ymd#    
+				, #k_cur_defer_mon#
+				, SYSDATE          
+				, #ssnSabun#       
+			)
+		]]> 
+	</query>			
+	
+	<!-- 퇴직세액 재계산 TCPN768 저장 -->
+	<query id="updateRetTaxReCre768">
+		<![CDATA[
+			UPDATE TCPN768
+			   SET REGINO       	= #j_regi_no#
+				 , REGINM       	= #j_regi_nm#
+				 , RET_MON      	= #j_ret_mon#
+				 , NOTAX_MON    	= #j_notax_mon#
+				 , PAID_TAX_MON 	= #j_paid_tax_mon#
+				 , EMP_YMD      	= #j_emp_ymd#
+				 , SEP_SYMD     	= #j_sep_symd#
+				 , RET_YMD      	= #j_ret_ymd#
+				 , PAYMENT_YMD  	= #j_payment_ymd#
+				 , WKP_M_CNT    	= #j_wkp_m_cnt#
+				 , WKP_EX_M_CNT 	= #j_wkp_ex_m_cnt#
+				 , WKP_ADD_M_CNT	= #j_wkp_add_m_cnt#
+				 , WKP_DUP_M_CNT	= #j_wkp_dup_m_cnt#
+				 , WKP_Y_CNT    	= #j_wkp_y_cnt#
+				 , WKP_EX_M_CNT_2012	= #j_wkp_ex_m_cnt_2012#
+			     , WKP_EX_M_CNT_2013	= #j_wkp_ex_m_cnt_2013#
+			     , WKP_ADD_M_CNT_2012	= #j_wkp_add_m_cnt_2012#
+			     , WKP_ADD_M_CNT_2013	= #j_wkp_add_m_cnt_2013#
+				 , CHKDATE      	= SYSDATE
+				 , CHKID        	= #ssnSabun#
+			 WHERE ENTER_CD 		= #ssnEnterCd#
+			   AND SABUN 			= #searchSabun#
+			   AND PAY_ACTION_CD 	= #searchPayActionCd#
+		]]> 
+	</query>
+	
+	<!-- 퇴직세액 재계산 TCPN771 저장 -->
+	<query id="updateRetTaxReCre771">
+		<![CDATA[
+			UPDATE TCPN771
+			   SET RET_MON  	    = #a_ret_mon#
+				 , NOTAX_MON 	 	= #a_notax_mon#
+				 , IMWON_YN		 	= #a_imwon_yn#
+				 , RET_MON_20111231	= #a_ret_mon_20111231#
+				 , RET_REASON	= #a_ret_reason#
+				 , DB_GAIB_YMD	= #a_db_gaib_ymd#
+				 , EMP_YMD	= #a_emp_ymd#
+				 , SEP_SYMD	= #a_sep_symd#
+				 , SEP_EYMD	= #a_sep_eymd#
+				 , RET_YMD	= #a_ret_ymd#
+				 , PAYMENT_YMD	= #a_payment_ymd#
+				 , WKP_EX_M_CNT 	= #a_wkp_ex_m_cnt#
+				 , WKP_ADD_M_CNT	= #a_wkp_add_m_cnt#				 
+				 , WKP_EX_M_CNT_2012	= #a_wkp_ex_m_cnt_2012#
+			     , WKP_EX_M_CNT_2013	= #a_wkp_ex_m_cnt_2013#
+			     , WKP_ADD_M_CNT_2012	= #a_wkp_add_m_cnt_2012#
+			     , WKP_ADD_M_CNT_2013	= #a_wkp_add_m_cnt_2013#				 
+				 , CHKDATE		 	= SYSDATE
+				 , CHKID			= #ssnSabun#
+			 WHERE ENTER_CD 		= #ssnEnterCd#
+			   AND SABUN 			= #searchSabun#
+			   AND PAY_ACTION_CD 	= #searchPayActionCd#
+		]]> 
+	</query>
+	
+	<!-- 퇴직세액 재계산 TCPN777 저장 -->
+	<query id="updateRetTaxReCre777">
+		<![CDATA[
+			UPDATE TCPN777
+			   SET BANK_NM      	= #k_bank_nm#
+				 , BANK_ENTER_NO	= #k_bank_enter_no#
+				 , BANK_ACCOUNT 	= F_COM_ENCRYPT(#k_bank_account#,#ssnEnterCd#) 
+				 , DEFER_YMD    	= #k_defer_ymd#
+				 , CUR_DEFER_MON	= #k_cur_defer_mon#
+				 , CHKDATE      	= SYSDATE
+				 , CHKID        	= #ssnSabun#
+			 WHERE ENTER_CD 		= #ssnEnterCd#
+			   AND SABUN 			= #searchSabun#
+			   AND PAY_ACTION_CD 	= #searchPayActionCd#
+		]]> 
+	</query>
+	
+</root>

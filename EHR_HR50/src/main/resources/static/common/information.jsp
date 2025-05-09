@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>ISU System</title>
+<link rel="stylesheet" href="/common/blue/css/style.css" />
+<body>
+<div class="error_main">
+	<div class="body">
+		<div class="header">Information</div>
+		<div class="title"></div>
+		<div class="contents">
+			세션이 종료되었습니다.<br />00초 후 로그인화면으로 이동합니다.
+		</div>
+		<div class="bottom">
+			<a class="pink large">바로이동</a>
+		</div>
+	</div>
+</div>
+</body>
+</html>

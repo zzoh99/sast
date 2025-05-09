@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.resort.resortSeasonMgrPop">
+	
+	<!-- 성수기 리조트 지점명 콤보-->		
+	<select id="getResortSeasonMgrPopRsNmCombo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT TRIM(RESORT_NM) AS CODE, TRIM(RESORT_NM) AS CODE_NM
+		  FROM TBEN494
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND PLAN_SEQ = TRIM(#{planSeq})
+		   AND COMPANY_CD = TRIM(#{companyCd})
+		 GROUP BY RESORT_NM 
+		 ORDER BY RESORT_NM 
+	]]>
+	</select>
+		
+	<!-- 성수기 사용기간 콤보-->		
+	<select id="getResortSeasonMgrPopRsDaysCombo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT  RESORT_SEQ AS CODE
+				, TO_CHAR(TO_DATE( SDATE, 'yyyymmdd') , 'yyyy-mm-dd') || ' ~ ' || TO_CHAR(TO_DATE( SDATE, 'yyyymmdd') , 'yyyy-mm-dd') || ' ' || DAYS || ' 박' AS CODE_NM
+		  FROM TBEN494
+		WHERE ENTER_CD = #{ssnEnterCd}
+		    AND PLAN_SEQ = TRIM(#{planSeq})
+		    AND RESORT_NM = TRIM(#{resortNm})
+		ORDER BY SDATE
+	]]>
+	</select>
+	
+	<!-- 성수기 리조트 객실정보-->		
+	<select id="getResortSeasonMgrPopRs" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.PLAN_SEQ
+		     , A.RESORT_SEQ
+		     , A.COMPANY_CD
+		     , (SELECT Z.CODE_NM FROM TSYS005 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.GRCODE_CD = 'B49530' AND Z.CODE = A.COMPANY_CD) AS COMPANY_CD_NM
+		     , A.RESORT_NM
+		     , A.ROOM_TYPE
+		     , A.SDATE
+		     , A.EDATE
+		     , A.DAYS
+		     , A.RSV_NO1
+		     , A.RSV_NO2
+		     , A.RESORT_MON
+		     , A.COM_MON
+		     , A.PSNAL_MON
+		     , (SELECT NVL(MAX(Z.TARGET_YN),'') FROM TBEN492 Z WHERE Z.PLAN_SEQ = A.PLAN_SEQ AND Z.ENTER_CD = A.ENTER_CD) AS TARGET_YN
+		  FROM TBEN494 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.PLAN_SEQ = TRIM(#{planSeq})
+		   AND A.RESORT_SEQ = TRIM(#{resortSeq})
+	]]>
+	</select>
+		
+	<!-- 신청 리스트 -->		
+	<select id="getResortSeasonMgrPopAprList" parameterType="map" resultType="cMap">
+	<![CDATA[ 
+		SELECT  A.ENTER_CD
+				, A.APPL_SEQ
+				, A.SABUN
+				,  (
+					SELECT TO_CHAR(Z.AGREE_TIME, 'yyyy-mm-dd hh24:mi') 
+					  FROM THRI107 Z
+					 WHERE Z.ENTER_CD = A.ENTER_CD 
+					   AND Z.APPL_SEQ = A.APPL_SEQ
+					   AND Z.GUBUN = '0'
+					) AS APPL_AGREE_TIME
+				, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+				, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+				, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+				, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+				, F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+				, A.COMPANY_CD
+				, (SELECT Z.CODE_NM FROM TSYS005 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.GRCODE_CD = 'B49530' AND Z.CODE = A.COMPANY_CD) AS COMPANY_CD_NM
+				, A.RESORT_NM
+				, A.ROOM_TYPE
+				, A.SDATE
+				, A.EDATE
+				, A.DAYS
+				, A.WAIT_YN
+				, A.CNT
+				, A.PHONE_NO
+				, A.MAIL_ID
+				, A.COM_MON_YN
+				, A.NOTE
+				, A.STATUS_CD
+				, A.PLAN_SEQ
+				, A.RESORT_SEQ
+				, A.HOPE_CD
+				, A.RSV_NO1
+				, A.RSV_NO2
+				, A.RESORT_MON
+				, A.COM_MON
+				, A.PSNAL_MON
+				, (
+					SELECT COUNT(1) 
+					  FROM TBEN491 X, THRI103 Y 
+					 WHERE X.ENTER_CD = A.ENTER_CD
+					   AND X.ENTER_CD = Y.ENTER_CD
+					   AND X.APPL_SEQ = Y.APPL_SEQ
+					   AND Y.APPL_STATUS_CD != '11'
+					   AND X.SABUN    = A.SABUN
+					   AND X.PLAN_SEQ = A.PLAN_SEQ
+				  ) AS APPL_CNT
+				, (
+					SELECT COUNT(1) 
+					  FROM TBEN491 X, THRI103 Y 
+					 WHERE X.ENTER_CD = A.ENTER_CD
+					   AND X.ENTER_CD = Y.ENTER_CD
+					   AND X.APPL_SEQ = Y.APPL_SEQ
+					   AND Y.APPL_STATUS_CD != '11'
+					   AND X.SABUN    = A.SABUN
+					   AND X.PLAN_SEQ = A.PLAN_SEQ
+					   AND X.STATUS_CD = 'Y'
+				  ) AS APPL_CMP_CNT
+                  FROM TBEN491 A
+                 WHERE A.ENTER_CD    = #{ssnEnterCd}
+                   AND A.COMPANY_CD 	= TRIM(#{companyCd})
+                   AND A.PLAN_SEQ 	= TRIM(#{planSeq})
+		  AND A.RESORT_SEQ  = TRIM(#{resortSeq})
+		  AND EXISTS ( SELECT 1
+		                 FROM THRI103 X
+		                WHERE X.ENTER_CD = A.ENTER_CD
+	                      AND X.APPL_SEQ = A.APPL_SEQ
+	                      AND X.APPL_STATUS_CD != '11'
+	                 )
+		ORDER BY (SELECT TO_CHAR(AGREE_TIME, 'yyyy-mm-dd hh24:mi') 
+					FROM THRI107
+					WHERE ENTER_CD = #{ssnEnterCd} 
+					AND APPL_SEQ = A.APPL_SEQ
+					AND GUBUN = '0')
+	]]>
+	</select>
+	
+	<!-- 신청 내용 저장 -->
+	<update id="saveResortSeasonMgrPop2" parameterType="map">
+	<![CDATA[
+		    UPDATE TBEN491 T
+   			SET  T.CHKDATE	= sysdate 
+	            , T.CHKID	= #{ssnSabun} 
+	            , T.STATUS_CD = 'Y' 
+            WHERE T.ENTER_CD 	= TRIM(#{ssnEnterCd})
+		   AND T.PLAN_SEQ 	= TRIM(#{planSeq})
+		   AND T.RESORT_SEQ = TRIM(#{resortSeq})
+		   AND T.APPL_SEQ 	= TRIM(#{applSeq})
+	]]>
+	</update>
+		
+	<!-- 신청 내용 저장 -->
+	<update id="saveResortSeasonMgrPop1" parameterType="map">
+	<![CDATA[
+		    UPDATE TBEN491 T
+   			SET  T.CHKDATE	= sysdate 
+	            , T.CHKID	= #{ssnSabun} 
+	            , T.STATUS_CD = 'N' 
+            WHERE T.ENTER_CD 	= TRIM(#{ssnEnterCd})
+		   AND T.PLAN_SEQ 	= TRIM(#{planSeq})
+		   AND T.RESORT_SEQ = TRIM(#{resortSeq})
+	]]>
+	</update>
+	
+	<!-- 신청 내용 저장 -->
+    <update id="saveResortSeasonMgrPop" parameterType="map">
+    <![CDATA[
+        MERGE INTO TBEN491 T
+        USING ( ]]>
+        <foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+            SELECT TRIM(#{ssnEnterCd})          AS  ENTER_CD
+                 , TRIM(#{rm.applSeq})          AS  APPL_SEQ
+                 , TRIM(#{rm.statusCd})         AS  STATUS_CD
+              FROM DUAL
+        </foreach>
+        <![CDATA[
+	        ) S
+	        ON  (
+	                T.ENTER_CD      =   S.ENTER_CD
+	            AND T.APPL_SEQ      =   S.APPL_SEQ
+	        )
+	        WHEN MATCHED THEN
+	            UPDATE 
+	               SET T.CHKDATE    = sysdate 
+			         , T.CHKID      = #{ssnSabun} 
+			         , T.STATUS_CD  = S.STATUS_CD
+        ]]>
+    </update>
+</mapper>

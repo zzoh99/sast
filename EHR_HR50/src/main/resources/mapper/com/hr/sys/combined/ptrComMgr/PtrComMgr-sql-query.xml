@@ -1,0 +1,533 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.combined.ptrComMgr">
+<!-- 		협력업체관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPtrComMgrList">
+
+				SELECT '0' AS DETAIL
+				      , A.ENTER_CD
+				      , A.SABUN
+				      , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) NAME
+				      , A.ENAME1
+				      , B.LOCATION_CD
+				      , B.ORG_CD
+				      , F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				      , CRYPTIT.DECRYPT(A.RES_NO, A.ENTER_CD) AS RES_NO
+				      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+				      , B.JIKWEE_CD
+				      , B.JIKCHAK_CD
+				      , A.BIR_YMD
+				      , A.LUN_TYPE
+				      , B.MANAGE_CD
+				      , A.EMP_YMD
+				      , B.FPROM_YMD
+				      , A.RET_YMD
+				      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OT') AS OFFICE_TEL
+				      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HT') AS HOME_TEL
+				      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'FT') AS FAX_NO
+				      , F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE
+				      , C.ZIP
+				      , C.ADDR1
+				      , C.ADDR2
+				      , B.STATUS_CD
+				      , B.BASE4_CD AS T_LOCATION_CD
+				      , B.BASE3_CD AS T_JIKCHAK_CD
+				      , B.BASE2_CD AS T_JIKWEE_CD
+			      FROM THRM100 A, THRM151 B, THRM123 C
+			 <choose><when test='searchEnterCd != null and !searchEnterCd.equals("")'>
+		 		WHERE A.ENTER_CD = #{searchEnterCd}
+			</when>
+			<otherwise>
+		 	 	WHERE A.ENTER_CD IS NOT NULL
+			</otherwise>
+			 </choose>
+			 <if test='searchSbNm != null and !searchSbNm.equals("")'>
+			      AND ( F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) LIKE '%'|| #{searchSbNm} ||'%' OR A.SABUN LIKE '%'|| #{searchSbNm} ||'%' )
+			 </if>
+			 	   AND A.EMP_YMD BETWEEN NVL(REPLACE(#{searchFromEmpYmd},'-',''),'00000000') AND NVL(REPLACE(#{searchToEmpYmd},'-',''), '99991231')
+			       AND A.ENTER_CD = B.ENTER_CD(+)
+			       AND A.SABUN = B.SABUN(+)
+			       AND B.SDATE = (SELECT MAX(BB.SDATE) FROM THRM151 BB WHERE A.ENTER_CD = BB.ENTER_CD AND A.SABUN = BB.SABUN)
+			       AND A.ENTER_CD = C.ENTER_CD(+)
+			       AND A.SABUN = C.SABUN(+)
+			       AND C.ADD_TYPE(+) = '2'
+			       AND B.STATUS_CD = 'RAA'
+
+
+		</select>
+
+<!-- 		협력업체관리 저장 -->
+		<update parameterType="map" id="savePtrComMgr_THRM100">
+
+					MERGE INTO THRM100 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.NAME
+									, A.ENAME1
+									, A.RES_NO
+									, A.BIR_YMD
+									, A.LUN_TYPE
+									, A.EMP_YMD
+									, A.RET_YMD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS NAME
+											, NULL		AS ENAME1
+											, NULL		AS RES_NO
+											, NULL		AS BIR_YMD
+											, NULL		AS LUN_TYPE
+											, NULL      AS EMP_YMD
+											, NULL		AS RET_YMD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{rm.enterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+											, TRIM( #{rm.name} )		AS NAME
+											, TRIM( #{rm.ename1} )		AS ENAME1
+											, TRIM( #{rm.resNo} )		AS RES_NO
+											, TRIM( #{rm.birYmd} )		AS BIR_YMD
+											, TRIM( #{rm.lunType} )		AS LUN_TYPE
+											, TRIM( #{rm.empYmd} )		AS EMP_YMD
+											, TRIM( #{rm.retYmd} )		AS RET_YMD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SABUN = UPPER(S.SABUN) )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.NAME     	= S.NAME
+									, T.ENAME1   	= S.ENAME1
+									, T.RES_NO    	= CRYPTIT.ENCRYPT(S.RES_NO,S.ENTER_CD)
+									, T.BIR_YMD   	= S.BIR_YMD
+									, T.LUN_TYPE  	= S.LUN_TYPE
+									, T.EMP_YMD   	= S.EMP_YMD
+									, T.RET_YMD   	= S.RET_YMD
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.SABUN
+							, T.NAME
+							, T.ENAME1
+							, T.RES_NO
+							, T.BIR_YMD
+							, T.LUN_TYPE
+							, T.EMP_YMD
+							, T.RET_YMD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.NAME
+							, S.ENAME1
+							, CRYPTIT.ENCRYPT(S.RES_NO,S.ENTER_CD)
+							, S.BIR_YMD
+							, S.LUN_TYPE
+							, S.EMP_YMD
+							, S.RET_YMD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+		<update parameterType="map" id="savePtrComMgr_THRM151">
+
+					MERGE INTO THRM151 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.LOCATION_CD
+									, A.ORG_CD
+									, A.JIKWEE_CD
+									, A.JIKCHAK_CD
+									, A.MANAGE_CD
+									, A.FPROM_YMD
+									, A.BASE2_CD
+									, A.BASE3_CD
+									, A.BASE4_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS LOCATION_CD
+											, NULL		AS ORG_CD
+											, NULL		AS JIKWEE_CD
+											, NULL		AS JIKCHAK_CD
+											, NULL      AS MANAGE_CD
+											, NULL		AS FPROM_YMD
+											, NULL		AS BASE2_CD
+											, NULL		AS BASE3_CD
+											, NULL		AS BASE4_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{rm.enterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+											, TRIM( #{rm.locationCd} )	AS LOCATION_CD
+											, TRIM( #{rm.orgCd} )		AS ORG_CD
+											, TRIM( #{rm.jikweeCd} )	AS JIKWEE_CD
+											, TRIM( #{rm.jikchakCd} )	AS JIKCHAK_CD
+											, TRIM( #{rm.manageCd} )	AS MANAGE_CD
+											, TRIM( #{rm.fpromYmd} )	AS FPROM_YMD
+											, TRIM( #{rm.tJikweeCd} )	AS BASE2_CD
+											, TRIM( #{rm.tJikchakCd} )	AS BASE3_CD
+											, TRIM( #{rm.tLocationCd} )	AS BASE4_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SABUN = UPPER(S.SABUN) )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.LOCATION_CD  	= S.LOCATION_CD
+									, T.ORG_CD       	= S.ORG_CD
+									, T.JIKWEE_CD    	= S.JIKWEE_CD
+									, T.JIKCHAK_CD   	= S.JIKCHAK_CD
+									, T.MANAGE_CD    	= S.MANAGE_CD
+									, T.FPROM_YMD    	= S.FPROM_YMD
+									, T.BASE2_CD    	= S.BASE2_CD
+									, T.BASE3_CD    	= S.BASE3_CD
+									, T.BASE4_CD    	= S.BASE4_CD
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.SABUN
+							, T.LOCATION_CD
+							, T.ORG_CD
+							, T.JIKWEE_CD
+							, T.JIKCHAK_CD
+							, T.MANAGE_CD
+							, T.FPROM_YMD
+							, T.BASE2_CD
+							, T.BASE3_CD
+							, T.BASE4_CD
+							, T.STATUS_CD
+							, T.SDATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.LOCATION_CD
+							, S.ORG_CD
+							, S.JIKWEE_CD
+							, S.JIKCHAK_CD
+							, 'ZZ'
+							, S.FPROM_YMD
+							, S.BASE2_CD
+							, S.BASE3_CD
+							, S.BASE4_CD
+							, 'RAA'
+							, TO_CHAR(SYSDATE, 'YYYYMMDD')
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+		<update parameterType="map" id="savePtrComMgr_THRM123">
+
+					MERGE INTO THRM123 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.ZIP
+									, A.ADDR1
+									, A.ADDR2
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS ZIP
+											, NULL		AS ADDR1
+											, NULL		AS ADDR2
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{rm.enterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+											, TRIM( #{rm.zip} )			AS ZIP
+											, TRIM( #{rm.addr1} )		AS ADDR1
+											, TRIM( #{rm.addr2} )		AS ADDR2
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SABUN = UPPER(S.SABUN) AND T.ADD_TYPE = '2' )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ZIP   	= S.ZIP
+									, T.ADDR1 	= S.ADDR1
+									, T.ADDR2 	= S.ADDR2
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.SABUN
+							, T.ZIP
+							, T.ADDR1
+							, T.ADDR2
+							, T.ADD_TYPE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.ZIP
+							, S.ADDR1
+							, S.ADDR2
+							, '2'
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+		<update parameterType="map" id="savePtrComMgr_THRM124">
+
+					MERGE INTO THRM124 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.MAIL_ID
+									, A.PWARE_YN
+									, A.PWARE_ID_YN
+									, A.OUTLOOK_YN
+									, A.OFFICE_TEL
+									, A.HOME_TEL
+									, A.FAX_NO
+									, A.HAND_PHONE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS MAIL_ID
+											, NULL		AS PWARE_YN
+											, NULL		AS PWARE_ID_YN
+											, NULL		AS OUTLOOK_YN
+											, NULL		AS OFFICE_TEL
+											, NULL      AS HOME_TEL
+											, NULL		AS FAX_NO
+											, NULL		AS HAND_PHONE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{rm.enterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+											, TRIM( #{rm.mailId} )		AS MAIL_ID
+											, TRIM( #{rm.pwareYn} )		AS PWARE_YN
+											, TRIM( #{rm.pwareIdYn} )	AS PWARE_ID_YN
+											, TRIM( #{rm.outlookYn} )	AS OUTLOOK_YN
+											, TRIM( #{rm.officeTel} )	AS OFFICE_TEL
+											, TRIM( #{rm.homeTel} )		AS HOME_TEL
+											, TRIM( #{rm.faxNo} )		AS FAX_NO
+											, TRIM( #{rm.handPhone} )	AS HAND_PHONE
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SABUN = UPPER(S.SABUN) )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MAIL_ID    	= S.MAIL_ID
+									, T.PWARE_YN   	= S.PWARE_YN
+									, T.PWARE_ID_YN	= S.PWARE_ID_YN
+									, T.OUTLOOK_YN 	= S.OUTLOOK_YN
+									, T.OFFICE_TEL 	= S.OFFICE_TEL
+									, T.HOME_TEL   	= S.HOME_TEL
+									, T.FAX_NO     	= S.FAX_NO
+									, T.HAND_PHONE 	= S.HAND_PHONE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.SABUN
+							, T.MAIL_ID
+							, T.PWARE_YN
+							, T.PWARE_ID_YN
+							, T.OUTLOOK_YN
+							, T.OFFICE_TEL
+							, T.HOME_TEL
+							, T.FAX_NO
+							, T.HAND_PHONE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.MAIL_ID
+							, S.PWARE_YN
+							, S.PWARE_ID_YN
+							, S.OUTLOOK_YN
+							, S.OFFICE_TEL
+							, S.HOME_TEL
+							, S.FAX_NO
+							, S.HAND_PHONE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+		</update>
+		<update parameterType="map" id="savePtrComMgr_TSYS305">
+
+					MERGE INTO TSYS305 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{rm.enterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SABUN = UPPER(S.SABUN) )
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.SABUN
+							, T.ID
+							, T.PASSWORD
+							, T.SKIN_TYPE
+							, T.FONT_TYPE
+							, T.SEARCH_TYPE
+							, T.ROCKING_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SABUN
+							, CRYPTIT.CRYPT( S.SABUN||'0', S.ENTER_CD )
+							, 'blue'
+							, 'nanum'
+							, 'P'
+							, 'N'
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+<!-- 		협력업체관리 삭제 -->
+		<delete parameterType="map" id="deletePtrComMgr_THRM100">
+
+					DELETE FROM THRM100
+					WHERE ENTER_CD||'_'||SABUN IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.enterCd != null and !rm.enterCd.equals("")'>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											TRIM(#{rm.enterCd})||'_'||TRIM(#{rm.sabun})
+										</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deletePtrComMgr_THRM151">
+
+					DELETE FROM THRM151
+					WHERE ENTER_CD||'_'||SABUN IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.enterCd != null and !rm.enterCd.equals("")'>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											TRIM(#{rm.enterCd})||'_'||TRIM(#{rm.sabun})
+										</if>
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+		<delete parameterType="map" id="deletePtrComMgr_THRM123">
+
+					DELETE FROM THRM123
+					WHERE ENTER_CD||'_'||SABUN IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.enterCd != null and !rm.enterCd.equals("")'>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											TRIM(#{rm.enterCd})||'_'||TRIM(#{rm.sabun})
+										</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deletePtrComMgr_THRM124">
+
+					DELETE FROM THRM124
+					WHERE ENTER_CD||'_'||SABUN IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.enterCd != null and !rm.enterCd.equals("")'>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											TRIM(#{rm.enterCd})||'_'||TRIM(#{rm.sabun})
+										</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deletePtrComMgr_TSYS305">
+
+					DELETE FROM TSYS305
+					WHERE ENTER_CD||'_'||SABUN IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.enterCd != null and !rm.enterCd.equals("")'>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											TRIM(#{rm.enterCd})||'_'||TRIM(#{rm.sabun})
+										</if>
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+
+</mapper>

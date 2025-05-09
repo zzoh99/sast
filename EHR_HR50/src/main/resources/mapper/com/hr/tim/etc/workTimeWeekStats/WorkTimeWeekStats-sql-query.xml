@@ -1,0 +1,756 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.etc.workTimeWeekStats">
+
+<!-- 주단위 콤보 -->
+          <select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsWeekList">
+
+                <![CDATA[
+                	SELECT WEEK_START AS CODE
+                         , WEEK_START || ' ~ ' || WEEK_END AS CODE_NM
+                         , REPLACE(WEEK_START, '-', '') AS S_YMD
+                         , REPLACE(WEEK_END, '-', '')   AS E_YMD
+                         , CASE WHEN TO_CHAR(SYSDATE, 'YYYY-MM-DD') BETWEEN WEEK_START AND WEEK_END THEN 'Y' ELSE 'N' END AS SEL_YN
+                         , ROW_NUMBER()OVER(ORDER BY WEEK_START) AS SEQ
+                	  FROM (
+							SELECT MIN(WEEK_START ) AS WEEK_START
+							      ,MAX(WEEK_END)    AS WEEK_END
+
+							FROM (
+									SELECT TO_CHAR(WEEK_START, 'YYYY-MM-DD') WEEK_START
+									     , TO_CHAR(WEEK_END, 'YYYY-MM-DD') WEEK_END
+									     , ROW_NUMBER()OVER(ORDER BY WEEK_START) AS RNUM
+									 FROM (
+									        SELECT TRUNC(START_DT + LEVEL, 'D') + 1 WEEK_START
+									             , TRUNC(START_DT + LEVEL, 'D') + 7 WEEK_END
+									          FROM ( SELECT TO_DATE(TRIM(#{searchSYmd}), 'YYYYMMDD') - MOD(( TO_DATE(TRIM(#{searchSYmd}), 'YYYYMMDD') - TO_DATE(TRIM(#{searchSdate}), 'YYYYMMDD') ), TO_NUMBER(TRIM(#{searchIntervalCd}))) -1 START_DT
+									                      , TO_DATE(TRIM(#{searchEYmd}), 'YYYYMMDD') END_DT
+									                   FROM DUAL  /* searchSdate 는 TTIM115의 SDATE로 단위기간의 시작일자임. */
+									               )
+									       CONNECT BY LEVEL <= END_DT - START_DT
+									      )
+									WHERE TO_CHAR(WEEK_END, 'YYYYMMDD') <= TRIM(#{searchEYmd})
+									GROUP BY WEEK_START, WEEK_END
+							)
+							GROUP BY FLOOR( (RNUM-1) / TO_NUMBER(TRIM(#{searchCnt})) )
+						  )
+					ORDER BY WEEK_START
+                ]]>
+
+
+        </select>
+        	
+<!-- 월 단위 콤보 -->
+          <select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsMonthList">
+
+                <![CDATA[
+                	SELECT WEEK_START AS CODE
+                         , WEEK_START || ' ~ ' || WEEK_END AS CODE_NM
+                         , REPLACE(WEEK_START, '-', '') AS S_YMD
+                         , REPLACE(WEEK_END, '-', '')   AS E_YMD
+                         , CASE WHEN TO_CHAR(SYSDATE, 'YYYY-MM-DD') BETWEEN WEEK_START AND WEEK_END THEN 'Y' ELSE 'N' END AS SEL_YN
+                         , ROW_NUMBER()OVER(ORDER BY WEEK_START) AS SEQ
+                	  FROM (
+							SELECT WEEK_START   AS WEEK_START
+							      ,WEEK_END     AS WEEK_END
+
+							FROM (
+									/* 월 단위 */
+                                    SELECT TO_CHAR(YMD , 'YYYY-MM-DD') WEEK_START
+                                         , TO_CHAR(ADD_MONTHS(YMD,1)-TO_NUMBER(TRIM(#{searchCnt})) , 'YYYY-MM-DD') WEEK_END
+                                         , ROW_NUMBER()OVER(ORDER BY YMD) AS RNUM
+                                    FROM(
+                                        SELECT ADD_MONTHS(TO_DATE(TRIM(#{searchSdate}), 'YYYYMMDD'), (LEVEL - 1)* TO_NUMBER(TRIM(#{searchCnt}))) YMD
+                                        FROM DUAL
+                                        CONNECT BY TO_CHAR(ADD_MONTHS(TO_DATE(TRIM(#{searchSdate}), 'YYYYMMDD'), (LEVEL - 1 )* TO_NUMBER(TRIM(#{searchCnt}))), 'YYYYMMDD')  <= TO_DATE (TRIM(#{searchEYmd}), 'YYYYMMDD')
+                                    )
+                                    WHERE TO_CHAR(YMD, 'YYYYMMDD') BETWEEN TRIM(#{searchSYmd}) AND TRIM(#{searchEYmd})
+                                 )
+							ORDER BY RNUM    
+						  )
+					ORDER BY WEEK_START
+                ]]>
+
+
+        </select>
+
+
+        	
+<!-- 월 단위 주차 조회 ( 헤더 ) -->
+          <select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsMonthWeekList">
+
+                <![CDATA[
+                	SELECT TO_CHAR(TO_DATE(WEEK_START, 'YYYYMMDD'), 'YYYY-MM-DD') AS CODE
+                         , TO_CHAR(TO_DATE(WEEK_START, 'YYYYMMDD'), 'YYYY-MM-DD') || ' ~ ' || TO_CHAR(TO_DATE(WEEK_END, 'YYYYMMDD'), 'YYYY-MM-DD') AS CODE_NM
+                         , WEEK_START AS S_YMD
+                         , WEEK_END   AS E_YMD
+                         , CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN WEEK_START AND WEEK_END THEN 'Y' ELSE 'N' END AS SEL_YN
+                         , RNUM AS SEQ
+                	  FROM (
+
+                                SELECT TO_CHAR(WEEK_START, 'YYYYMMDD') WEEK_START
+                                     , TO_CHAR(WEEK_END,   'YYYYMMDD') WEEK_END
+                                     , ROW_NUMBER()OVER(ORDER BY WEEK_START) AS RNUM
+                                  FROM (
+                                         SELECT TRUNC(START_DT + LEVEL, 'D') + 1 WEEK_START
+                                              , TRUNC(START_DT + LEVEL, 'D') + 7 WEEK_END
+                                           FROM ( SELECT TRUNC(TO_DATE(TRIM(#{searchSYmd}), 'YYYYMMDD'),'iw') START_DT
+                                                       , TO_DATE(TRIM(#{searchEYmd}), 'YYYYMMDD') END_DT
+                                                    FROM DUAL
+                                                 )
+                                         CONNECT BY LEVEL <= END_DT - START_DT
+                                        )
+                                 WHERE 1=1
+                                 GROUP BY WEEK_START, WEEK_END
+                                        
+						  )
+					ORDER BY WEEK_START
+                ]]>
+
+
+        </select>
+                
+<!-- 	부서 콤보 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsOrg">
+
+					--조직가져오기
+<choose><when test='ssnSearchType != null and ssnSearchType.equals("A")'>
+						SELECT '전체' AS CODE_NM, '' AS CODE FROM DUAL
+						UNION ALL
+						SELECT ORG_NM AS CODE_NM, ORG_CD AS CODE
+						FROM
+							(
+								 SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, REPLACE(#{searchSYmd},'-','')) AS ORG_NM, A.ORG_CD
+								   FROM (
+    									    SELECT T.ENTER_CD, T.ORG_CD, T.PRIOR_ORG_CD, T.SEQ, T.SDATE
+    									      FROM TORG105 T
+    									     WHERE T.ENTER_CD = TRIM(#{ssnEnterCd})
+    									       AND T.SDATE =
+    									           (
+    									               SELECT MAX(SDATE)
+    									                 FROM TORG103
+    									                WHERE ENTER_CD = T.ENTER_CD
+    									                  AND REPLACE(#{searchSYmd},'-','') BETWEEN SDATE AND NVL(EDATE, '29991231')
+    									           )
+    									) A, TORG101 B
+								  WHERE A.ENTER_CD = B.ENTER_CD
+									AND A.ORG_CD   = B.ORG_CD
+									AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+								  START WITH A.PRIOR_ORG_CD = '0'
+								CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+									AND    PRIOR A.SDATE    = A.SDATE
+									AND    PRIOR A.ORG_CD   = A.PRIOR_ORG_CD
+								ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+							) A
+						WHERE 1=1
+						  AND EXISTS ( SELECT 1
+						                 FROM TORG107 B, TTIM118 C
+									    WHERE B.ENTER_CD    = #{ssnEnterCd}
+									  	  AND B.ORG_CD      = A.ORG_CD
+										  AND B.MAP_TYPE_CD = '500'
+										  AND REPLACE(#{searchSYmd},'-','') BETWEEN B.SDATE AND NVL(B.EDATE, '29991231')
+										  AND B.ENTER_CD    = C.ENTER_CD
+										  AND B.MAP_CD      = C.WORK_ORG_CD
+										  AND C.WORK_GRP_CD = TRIM(#{searchWorkGrpCd})
+										  AND REPLACE(#{searchSYmd},'-','') BETWEEN C.SDATE AND NVL(C.EDATE, '29991231')
+									  )	  
+							
+
+</when><otherwise>
+						SELECT CODE, CODE_NM
+						  FROM (	
+								 SELECT F_COM_GET_ORG_NM(ENTER_CD,SCOPE_VALUE,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CODE_NM, SCOPE_VALUE AS CODE
+								   FROM TSYS319
+								  WHERE ENTER_CD = #{ssnEnterCd}
+									AND AUTH_SCOPE_CD ='W10'
+									AND GRP_CD   = #{ssnGrpCd}
+									AND SABUN    = #{ssnSabun}
+								) A
+					     WHERE 1=1
+						  AND EXISTS ( SELECT 1
+						                 FROM TORG107 B, TTIM118 C
+									    WHERE B.ENTER_CD    = #{ssnEnterCd}
+									  	  AND B.ORG_CD      = A.CODE
+										  AND B.MAP_TYPE_CD = '500'
+										  AND REPLACE(#{searchSYmd},'-','') BETWEEN B.SDATE AND NVL(B.EDATE, '29991231')
+										  AND B.ENTER_CD    = C.ENTER_CD
+										  AND B.MAP_CD      = C.WORK_ORG_CD
+										  AND C.WORK_GRP_CD = TRIM(#{searchWorkGrpCd})
+										  AND REPLACE(#{searchSYmd},'-','') BETWEEN C.SDATE AND NVL(C.EDATE, '29991231')
+									  )
+</otherwise>
+</choose>
+
+		</select>
+		
+<!-- 	 조회단위 콤보 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsGubun">
+
+				<![CDATA[
+					SELECT C.CODE, C.CODE_NM
+					  FROM TTIM115 A, TSYS005 B, TSYS005 C
+					 WHERE A.ENTER_CD    = #{ssnEnterCd}
+					   AND A.WORK_GRP_CD = TRIM(#{searchWorkGrpCd})
+					   AND A.ENTER_CD    = B.ENTER_CD
+					   AND A.INTERVAL_CD = B.CODE
+					   AND B.GRCODE_CD   = 'T90200'
+					   AND B.ENTER_CD    = C.ENTER_CD
+					   AND TRIM(B.NOTE1) = C.GRCODE_CD
+					 ORDER BY C.SEQ
+					
+				]]>
+
+
+		</select>
+
+<!-- 	나의 근무그룹 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsMyWorkGrp">
+
+				<![CDATA[
+			 		   SELECT C.WORK_GRP_CD
+		                 FROM TORG107 B, TTIM118 C
+					    WHERE B.ENTER_CD    = #{ssnEnterCd}
+					  	  AND B.ORG_CD      = F_COM_GET_ORG_CD(#{ssnEnterCd}, #{ssnSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+						  AND B.MAP_TYPE_CD = '500'
+						  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '29991231')
+						  AND B.ENTER_CD    = C.ENTER_CD
+						  AND B.MAP_CD      = C.WORK_ORG_CD
+						  AND TO_CHAR(SYSDATE, 'YYYYMMDD')BETWEEN C.SDATE AND NVL(C.EDATE, '29991231')
+				]]>
+
+
+		</select>
+		
+<!-- 	근무그룹 콤보 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsWorkGrp">
+
+				<![CDATA[
+					SELECT A.WORK_GRP_CD AS CODE
+					     , B.CODE_NM AS CODE_NM
+					     , A.INTERVAL_CD
+					     , A.SDATE
+					     , F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'T90200', A.INTERVAL_CD, '2' ) AS TERM_GUBUN -- 단위구분(M:월단위, W:주단위)
+					  FROM TTIM115 A, TSYS005 B
+					 WHERE A.ENTER_CD    = #{ssnEnterCd}
+					   AND A.ENTER_CD    = B.ENTER_CD
+					   AND A.WORK_GRP_CD = B.CODE
+					   AND B.GRCODE_CD   = 'T11020'
+					   AND B.USE_YN      = 'Y'
+					ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+<!-- 	근무조 콤보 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsWorkOrg">
+
+				<![CDATA[
+					SELECT B.MAP_CD AS CODE
+					     , B.MAP_NM AS CODE_NM
+					  FROM TTIM118 A, TORG109 B
+					 WHERE A.ENTER_CD   = #{ssnEnterCd}
+					   AND A.WORK_GRP_CD = TRIM(#{searchWorkGrpCd})
+					   AND (    TRIM(#{searchYear}) || '0101' BETWEEN A.SDATE AND NVL( A.EDATE, '29991231' )
+					         OR TRIM(#{searchYear}) || '1231' BETWEEN A.SDATE AND NVL( A.EDATE, '29991231' )
+                                OR A.SDATE BETWEEN TRIM(#{searchYear}) || '0101' AND TRIM(#{searchYear}) || '1231'
+                              )
+					  AND A.ENTER_CD   = B.ENTER_CD
+					  AND A.WORK_ORG_CD = B.MAP_CD
+					  AND B.MAP_TYPE_CD = '500'
+					  AND A.SDATE BETWEEN B.SDATE AND NVL( B.EDATE, '29991231')
+                      	GROUP BY B.MAP_CD, B.MAP_NM
+					ORDER BY MIN(A.SEQ)
+				]]>
+
+
+		</select>
+			
+<!-- 	헤더 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsHeaderList">
+
+				<![CDATA[
+						SELECT SEQ
+						     , SEQ+1 AS SEQ2
+						     , TRUNC( SEQ/ITVL ) AS TSEQ
+						     , TRUNC( SEQ/ITVL )+1 AS TSEQ2
+						     , ITVL
+						     , CASE WHEN MOD((SEQ + 1) , ITVL)  = 0 THEN 'Y' ELSE 'N' END AS TERM_YN
+						FROM(
+							SELECT LEVEL-1 AS SEQ, DECODE( TRIM(#{searchTermGubun}), 'W', TO_NUMBER( TRIM(#{searchIntervalCd}))/7, TO_NUMBER( TRIM(#{headerCnt}) ) ) AS ITVL
+							FROM DUAL
+							CONNECT BY LEVEL <= TO_NUMBER( TRIM(#{headerCnt}) )
+						) 
+				]]>
+
+
+		</select>
+
+<!-- 	조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsList">
+
+				<![CDATA[
+						WITH TMP AS (
+													SELECT A.ENTER_CD, A.YMD, A.SABUN, A.WORK_ORG_CD, A.NAME
+                                                         , A.JIKGUB_NM, A.JIKWEE_NM, A.JIKCHAK_NM, A.MANAGE_NM, A.ORG_CD
+													     , NVL(B.WORK_HH_A, 0) + (NVL(B.WORK_MM_A, 0)/60) AS WT_HOUR --기본근무 
+													     , NVL(B.WORK_HH_B, 0) + (NVL(B.WORK_MM_B, 0)/60) AS OT_HOUR --연장근무
+                                                         , D.WEEK_START, D.WEEK_END
+                                                         
+                                                         , D.RNUM-1 AS SEQ
+                                                         , CASE WHEN A.YMD BETWEEN REPLACE(#{searchSYmd},'-','') AND REPLACE(#{searchEYmd},'-','') THEN 'Y' ELSE 'N' END AS TERM_YN
+                                                         , A.PLAN_WORK_YN
+                                                         , D.WEEK_CNT
+													FROM (
+                                                            SELECT A.ENTER_CD
+                                                                 , A.SABUN
+                                                                 , A.NAME
+                                                                 , C.SUN_DATE AS YMD
+                                                                 , B.JIKGUB_NM
+                                                                 , B.JIKWEE_NM
+                                                                 , B.JIKCHAK_NM
+                                                                 , B.MANAGE_NM
+                                                                 , B.ORG_CD
+                                                                 , D.WORK_GRP_CD
+                                                                 , D.WORK_ORG_CD
+                                                                 , D.PLAN_WORK_YN
+                                                              FROM THRM100 A, THRM151 B, TSYS007 C, TTIM120_V D
+                                                             WHERE C.SUN_DATE BETWEEN TO_CHAR(TO_DATE(REPLACE(#{searchSYmd},'-',''),'YYYYMMDD')-7,'YYYYMMDD') AND TO_CHAR(TO_DATE(REPLACE(#{searchEYmd},'-',''),'YYYYMMDD')+7,'YYYYMMDD')
+                                                               AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+                                                               AND A.ENTER_CD = B.ENTER_CD
+                                                               AND A.SABUN    = B.SABUN
+                                                               AND C.SUN_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                                                               AND A.ENTER_CD = D.ENTER_CD
+                                                               AND A.SABUN    = D.SABUN
+                                                               AND C.SUN_DATE = D.YMD    
+                                                               AND D.WORK_GRP_CD = TRIM(#{searchWorkGrpCd})
+                                                                       ]]>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+						   									   AND (A.SABUN = TRIM( #{searchSabunName} ) OR A.NAME LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchWorkOrgCd != null and !searchWorkOrgCd.equals("")'>
+						   									   AND D.WORK_ORG_CD = TRIM( #{searchWorkOrgCd} )
+</if>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+						   									   AND B.ORG_CD IN (  SELECT #{searchOrgCd}  FROM DUAL
+	<if test='searchOrgType and searchOrgType.equals("Y")'>  /*하위조직포함일때 Y , 아닐때 N */
+												                                   UNION
+												                                  SELECT ORG_CD
+												                                    FROM TORG105
+												                                   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+												                                     AND SDATE    = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND REPLACE(#{searchSYmd},'-','') BETWEEN SDATE AND NVL(EDATE, '29991231') )
+												                                   START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+												                                   CONNECT BY PRIOR ENTER_CD = ENTER_CD
+												                                          AND PRIOR SDATE    = SDATE
+												                                          AND PRIOR ORG_CD   = PRIOR_ORG_CD
+	</if>
+										                                        )
+</if>
+
+ 
+<if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+						   									   AND B.JIKGUB_CD = TRIM( #{searchJikgubCd} )
+</if>
+<if test='searchManageCd != null and !searchManageCd.equals("")'>
+						   									   AND B.MANAGE_CD = TRIM( #{searchManageCd} )
+</if>
+<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+                                                               AND A.SABUN IN (SELECT SABUN 
+                                                                                    FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+                                                                                  )
+</if>
+                                                         ) A
+						<![CDATA[
+													   , ( SELECT X.ENTER_CD, X.YMD, X.SABUN
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_HH, 0)),0) AS WORK_HH_A  --기본근무
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_MM, 0)),0) AS WORK_MM_A  --기본근무
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_HH)),0) AS WORK_HH_B  --연장근무
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_MM)),0) AS WORK_MM_B  --연장근무
+													         FROM TTIM337 X, TTIM015 Y
+													        WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+													          AND X.YMD BETWEEN TO_CHAR(TO_DATE(REPLACE(#{searchSYmd},'-',''),'YYYYMMDD')-7,'YYYYMMDD') AND TO_CHAR(TO_DATE(REPLACE(#{searchEYmd},'-',''),'YYYYMMDD')+7,'YYYYMMDD')
+													          AND X.ENTER_CD = Y.ENTER_CD
+													          AND X.WORK_CD  = Y.WORK_CD
+													          AND Y.DAY_TYPE IN ('101', '105', '205' ) --  정규근무(101),야간근무(103),연장근무(105),휴일야간근무(203),휴일연장근무(205)
+													        GROUP BY X.ENTER_CD, X.YMD, X.SABUN
+													     ) B      
+                                                        , (
+                                                               SELECT TO_CHAR(WEEK_START, 'YYYYMMDD') WEEK_START
+                                                                    , TO_CHAR(WEEK_END, 'YYYYMMDD') WEEK_END
+                                                                    , ROW_NUMBER()OVER(ORDER BY WEEK_START) AS RNUM
+                                                                    , SUM( CASE WHEN TO_CHAR(WEEK_START, 'YYYYMMDD') BETWEEN REPLACE(#{searchSYmd},'-','') AND REPLACE(#{searchEYmd},'-','')
+                                                                                 AND TO_CHAR(WEEK_END, 'YYYYMMDD') BETWEEN REPLACE(#{searchSYmd},'-','') AND REPLACE(#{searchEYmd},'-','') THEN 1 ELSE 0 END) OVER() AS WEEK_CNT
+                                                                 FROM (
+                                                                        SELECT TRUNC(START_DT + LEVEL, 'D') + 1 WEEK_START
+                                                                             , TRUNC(START_DT + LEVEL, 'D') + 7 WEEK_END
+                                                                          FROM ( SELECT TRUNC(TO_DATE(TRIM(REPLACE(#{searchSYmd},'-','')), 'YYYYMMDD'),'iw') START_DT
+                                                                                      , TO_DATE(TRIM(REPLACE(#{searchEYmd},'-','')), 'YYYYMMDD') END_DT
+                                                                                   FROM DUAL 
+                                                                                )
+                                                                        CONNECT BY LEVEL < END_DT - START_DT
+                                                                       )
+                                                                WHERE 1=1
+                                                                GROUP BY WEEK_START, WEEK_END
+                                                                                                                       
+                                                          ) D              
+													WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd})
+                                                      AND A.YMD BETWEEN WEEK_START AND WEEK_END
+													  AND A.ENTER_CD    = B.ENTER_CD(+)
+													  AND A.SABUN       = B.SABUN(+) 
+													  AND A.YMD         = B.YMD(+)
+										        
+					)
+					SELECT * FROM (
+                        SELECT  0 AS SEQ
+                              , SABUN
+                              , NAME
+                              , JIKGUB_NM
+                              , JIKWEE_NM
+                              , JIKCHAK_NM
+                              , MANAGE_NM
+                              , ORG_CD
+                              , WORK_ORG_CD
+                              , F_COM_GET_ORG_NM( TRIM(#{ssnEnterCd}), ORG_CD, REPLACE(#{searchSYmd},'-','')) AS ORG_NM
+                              , ( SELECT X.MAP_NM
+                                    FROM TORG109 X
+                                   WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+                                     AND X.MAP_TYPE_CD = '500'
+                                     AND X.MAP_CD   = WORK_ORG_CD
+                                     AND REPLACE(#{searchSYmd},'-','') BETWEEN X.SDATE AND NVL( X.EDATE, '29991231' )
+                                      
+                                ) AS WORK_ORG_NM
+                                ,WT_HOUR
+                                ,OT_HOUR
+                                ,WEEK_START,WEEK_END
+                              , NVL2(SABUN, '/EmpPhotoOut.do'||chr(63)||'enterCd=' || ENTER_CD || chr(38) || 'searchKeyword=' || SABUN ||  chr(38) || 'type=1', NULL) AS PHOTO
+                              , F_COM_JIKJE_SORT(TRIM(#{ssnEnterCd}), SABUN, REPLACE(#{searchSYmd},'-','')) AS JIK_SEQ
+                              ]]>
+<foreach item="tit" collection="titles" >
+                              , F_TIM_FMT_TIME(WT_${tit.seq}, 0) AS "WT${tit.seq2}"
+                              , F_TIM_FMT_TIME(OT_${tit.seq}, 0) AS "OT${tit.seq2}"
+                              , F_TIM_FMT_TIME(WT_${tit.seq} + OT_${tit.seq}, 0) AS "TT${tit.seq2}"
+	<if test='tit.termYn.equals("Y")'>
+                              , F_TIM_FMT_TIME(TM_WT_${tit.tseq}, 0 ) AS "TM_WT${tit.tseq2}"
+                              , F_TIM_FMT_TIME(TM_OT_${tit.tseq}, 0 ) AS "TM_OT${tit.tseq2}"
+                              , F_TIM_FMT_TIME(TM_WT_${tit.tseq} + TM_OT_${tit.tseq}, 0) AS "TM_TT${tit.tseq2}"
+                              -- 일 평균
+                              , DECODE(WORK_CNT,     0, '00:00', F_TIM_FMT_TIME(TM_WT_${tit.tseq} / WORK_CNT    , 0))  AS "AVG_DAY_WT${tit.tseq2}"
+                              , DECODE(WORK_ALL_CNT, 0, '00:00', F_TIM_FMT_TIME(TM_OT_${tit.tseq} / WORK_ALL_CNT, 0))  AS "AVG_DAY_OT${tit.tseq2}"
+                              , CASE WHEN WORK_CNT = 0 AND WORK_ALL_CNT = 0 THEN '00:00'
+                                     WHEN WORK_CNT     = 0 THEN F_TIM_FMT_TIME(TM_OT_${tit.tseq} / WORK_ALL_CNT, 0)
+                                     WHEN WORK_ALL_CNT = 0 THEN F_TIM_FMT_TIME(TM_WT_${tit.tseq} / WORK_CNT    , 0)
+                                     ELSE F_TIM_FMT_TIME( (TM_WT_${tit.tseq} / WORK_CNT) + (TM_OT_${tit.tseq} / WORK_ALL_CNT) , 0 ) END AS "AVG_DAY_TT${tit.tseq2}"
+                              -- 주 평균
+                              , DECODE(WEEK_CNT, 0, '00:00', F_TIM_FMT_TIME(TM_WT_${tit.tseq} / WEEK_CNT    , 0)) AS "AVG_WEEK_WT${tit.tseq2}"
+                              , DECODE(WEEK_CNT, 0, '00:00', F_TIM_FMT_TIME(TM_OT_${tit.tseq} / WEEK_CNT    , 0)) AS "AVG_WEEK_OT${tit.tseq2}"
+                              , DECODE(WEEK_CNT, 0, '00:00', F_TIM_FMT_TIME( (TM_WT_${tit.tseq} / WEEK_CNT) + (TM_OT_${tit.tseq} / WEEK_CNT) , 0 )) AS "AVG_WEEK_TT${tit.tseq2}"
+                              
+	</if>
+</foreach>
+                          FROM (
+                                  SELECT 0 AS SEQ 
+		                               , SABUN
+                                       , NAME
+                                       , JIKGUB_NM
+                                       , JIKWEE_NM
+                                       , JIKCHAK_NM
+                                       , MANAGE_NM
+                                       , ORG_CD
+                                       , WORK_ORG_CD
+                                       , ENTER_CD
+                                       , SUM(WT_HOUR) AS WT_HOUR
+                              		   , SUM(OT_HOUR) AS OT_HOUR
+<foreach item="tit" collection="titles" >
+                                       , SUM(DECODE( SEQ, ${tit.seq}, WT_HOUR, 0)) AS "WT_${tit.seq}"
+                                       , SUM(DECODE( SEQ, ${tit.seq}, OT_HOUR, 0)) AS "OT_${tit.seq}"
+	<if test='tit.termYn.equals("Y")'>
+                                       , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN WT_HOUR ELSE 0 END ) AS "TM_WT_${tit.tseq}"
+                                       , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN OT_HOUR ELSE 0 END ) AS "TM_OT_${tit.tseq}"
+	</if>
+</foreach>
+                                       , SUM( DECODE(PLAN_WORK_YN, 'N', DECODE(TERM_YN, 'Y', 1, 0), 0) ) AS WORK_CNT
+                                       , SUM( DECODE(TERM_YN, 'Y', 1, 0) ) AS WORK_ALL_CNT
+                                       , MAX(WEEK_CNT) AS WEEK_CNT
+                                       ,WEEK_START,WEEK_END
+                                    FROM TMP
+                                   GROUP BY ENTER_CD, SABUN, NAME, JIKGUB_NM, JIKWEE_NM, JIKCHAK_NM, MANAGE_NM, ORG_CD, WORK_ORG_CD,WEEK_START,WEEK_END
+		                           UNION ALL      
+		                          /* 총 합계 */
+                                  SELECT 1 AS SEQ 
+		                               , NULL AS SABUN
+		                               , NULL AS NAME
+		                               , NULL AS JIKGUB_NM
+		                               , NULL AS JIKWEE_NM
+		                               , NULL AS JIKCHAK_NM
+		                               , NULL AS MANAGE_NM
+		                               , NULL AS ORG_CD
+		                               , NULL AS WORK_ORG_CD
+		                               , NULL AS ENTER_CD
+		                               , NULL AS WT_HOUR
+                              		   , NULL AS OT_HOUR
+<foreach item="tit" collection="titles" >
+                                       , SUM(DECODE( SEQ, ${tit.seq}, WT_HOUR, 0)) AS "WT_${tit.seq}"
+                                       , SUM(DECODE( SEQ, ${tit.seq}, OT_HOUR, 0)) AS "OT_${tit.seq}"
+	<if test='tit.termYn.equals("Y")'>
+	                                   , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN WT_HOUR ELSE 0 END ) AS "TM_WT_${tit.tseq}"
+	                                   , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN OT_HOUR ELSE 0 END ) AS "TM_OT_${tit.tseq}"
+	</if>
+</foreach>
+                                       , SUM( DECODE(PLAN_WORK_YN, 'N', DECODE(TERM_YN, 'Y', 1, 0), 0) ) AS WORK_CNT
+                                       , SUM( DECODE(TERM_YN, 'Y', 1, 0) ) AS WORK_ALL_CNT
+                                       , MAX(WEEK_CNT) AS WEEK_CNT
+                                       ,NULL AS WEEK_START, NULL AS WEEK_END
+                                    FROM TMP                                   
+                               )   
+                         )
+                       ORDER BY SEQ, JIK_SEQ, WEEK_START
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekPerList">
+
+				<![CDATA[
+						SELECT A.ymd
+						      , A.sabun
+						      , NVL2(A.in_hm, SUBSTR(A.in_hm, 0, 2)||':'||SUBSTR(A.in_hm, 3), NULL)   AS ST
+						      , NVL2(A.out_hm, SUBSTR(A.out_hm, 0, 2)||':'||SUBSTR(A.out_hm, 3), NULL) AS ET
+						      , NVL(B.WORK_HH_A, 0) + (NVL(B.WORK_MM_A, 0)/60) AS WT_HH --기본근무 
+							  , NVL(B.WORK_HH_B, 0) + (NVL(B.WORK_MM_B, 0)/60) AS OT_HH --연장근무
+						  FROM ttim335 A
+						     , (SELECT X.ENTER_CD, X.YMD, X.SABUN
+						             , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_HH, 0)),0) AS WORK_HH_A  --기본근무
+						             , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_MM, 0)),0) AS WORK_MM_A  --기본근무
+						             , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_HH)),0) AS WORK_HH_B  --연장근무
+						             , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_MM)),0) AS WORK_MM_B  --연장근무
+						           FROM TTIM337 X, TTIM015 Y
+						          WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+						            AND X.YMD BETWEEN #{searchSYmd} AND #{searchEYmd}
+						            AND X.ENTER_CD = Y.ENTER_CD
+						            AND X.WORK_CD  = Y.WORK_CD
+						            AND X.SABUN = #{searchSabun}
+						            AND Y.DAY_TYPE IN ('101', '105', '205' ) --  정규근무(101),야간근무(103),연장근무(105),휴일야간근무(203),휴일연장근무(205)
+						          GROUP BY X.ENTER_CD, X.YMD, X.SABUN) B
+						     --, TTIM015 C
+						 WHERE A.ENTER_CD = B.ENTER_CD
+						   AND A.SABUN = B.SABUN
+						   AND A.YMD   = B.YMD
+						   AND A.ENTER_CD = #{ssnEnterCd}
+						   AND A.SABUN = #{searchSabun}
+						   AND A.YMD BETWEEN #{searchWeekSYmd} AND #{searchWeekEYmd}
+						 ORDER BY A.YMD
+				]]>
+
+
+		</select>
+		
+
+<!--  단위기간근무현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeWeekStatsList2">
+
+				<![CDATA[
+						WITH TMP AS (
+													SELECT A.ENTER_CD, A.YMD, A.SABUN, A.WORK_ORG_CD, A.NAME
+                                                         , A.JIKGUB_NM, A.JIKWEE_NM, A.JIKCHAK_NM, A.MANAGE_NM, A.ORG_CD
+													     , NVL(B.WORK_HH_A, 0) + (NVL(B.WORK_MM_A, 0)/60) AS WT_HOUR --기본근무 
+													     , NVL(B.WORK_HH_B, 0) + (NVL(B.WORK_MM_B, 0)/60) AS OT_HOUR --연장근무
+                                                         , D.WEEK_START, D.WEEK_START
+                                                         , D.RNUM-1 AS SEQ
+                                                         , CASE WHEN A.YMD BETWEEN REPLACE(#{searchSYmd},'-','') AND REPLACE(#{searchEYmd},'-','') THEN 'Y' ELSE 'N' END AS TERM_YN
+                                                         , A.PLAN_WORK_YN
+                                                         , D.WEEK_CNT
+													FROM (
+                                                            SELECT A.ENTER_CD
+                                                                 , A.SABUN
+                                                                 , A.NAME
+                                                                 , C.SUN_DATE AS YMD
+                                                                 , B.JIKGUB_NM
+                                                                 , B.JIKWEE_NM
+                                                                 , B.JIKCHAK_NM
+                                                                 , B.MANAGE_NM
+                                                                 , B.ORG_CD
+                                                                 , D.WORK_GRP_CD
+                                                                 , D.WORK_ORG_CD
+                                                                 , D.PLAN_WORK_YN
+                                                              FROM THRM100 A, THRM151 B, TSYS007 C, TTIM120_V D
+                                                             WHERE C.SUN_DATE BETWEEN TO_CHAR(TO_DATE(REPLACE(#{searchSYmd},'-',''),'YYYYMMDD')-7,'YYYYMMDD') AND TO_CHAR(TO_DATE(REPLACE(#{searchEYmd},'-',''),'YYYYMMDD')+7,'YYYYMMDD')
+                                                               AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+                                                               AND A.ENTER_CD = B.ENTER_CD
+                                                               AND A.SABUN    = B.SABUN
+                                                               AND C.SUN_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                                                               AND A.ENTER_CD = D.ENTER_CD
+                                                               AND A.SABUN    = D.SABUN
+                                                               AND C.SUN_DATE = D.YMD    
+                                                               AND D.WORK_GRP_CD = TRIM(#{searchWorkGrpCd})
+                                                                       ]]>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+						   									   AND (A.SABUN = TRIM( #{searchSabunName} ) OR A.NAME LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchWorkOrgCd != null and !searchWorkOrgCd.equals("")'>
+						   									   AND D.WORK_ORG_CD = TRIM( #{searchWorkOrgCd} )
+</if>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+						   									   AND B.ORG_CD IN (  SELECT #{searchOrgCd}  FROM DUAL
+	<if test='searchOrgType and searchOrgType.equals("Y")'>  /*하위조직포함일때 Y , 아닐때 N */
+												                                   UNION
+												                                  SELECT ORG_CD
+												                                    FROM TORG105
+												                                   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+												                                     AND SDATE    = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND REPLACE(#{searchSYmd},'-','') BETWEEN SDATE AND NVL(EDATE, '29991231') )
+												                                   START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+												                                   CONNECT BY PRIOR ENTER_CD = ENTER_CD
+												                                          AND PRIOR SDATE    = SDATE
+												                                          AND PRIOR ORG_CD   = PRIOR_ORG_CD
+	</if>
+										                                        )
+</if>
+
+ 
+<if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+						   									   AND B.JIKGUB_CD = TRIM( #{searchJikgubCd} )
+</if>
+<if test='searchManageCd != null and !searchManageCd.equals("")'>
+						   									   AND B.MANAGE_CD = TRIM( #{searchManageCd} )
+</if>
+
+<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+                                                               AND A.SABUN IN (SELECT SABUN 
+                                                                                    FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+                                                                                  )
+</if>
+<![CDATA[
+                                                         ) A
+													   , ( SELECT X.ENTER_CD, X.YMD, X.SABUN
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_HH, 0)),0) AS WORK_HH_A  --기본근무
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_MM, 0)),0) AS WORK_MM_A  --기본근무
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_HH)),0) AS WORK_HH_B  --연장근무
+													           , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_MM)),0) AS WORK_MM_B  --연장근무
+													         FROM TTIM337 X, TTIM015 Y
+													        WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+													          AND X.YMD BETWEEN TO_CHAR(TO_DATE(REPLACE(#{searchSYmd},'-',''),'YYYYMMDD')-7,'YYYYMMDD') AND TO_CHAR(TO_DATE(REPLACE(#{searchEYmd},'-',''),'YYYYMMDD')+7,'YYYYMMDD')
+													          AND X.ENTER_CD = Y.ENTER_CD
+													          AND X.WORK_CD  = Y.WORK_CD
+													          AND Y.DAY_TYPE IN ('101', '105', '205' ) --  정규근무(101),야간근무(103),연장근무(105),휴일야간근무(203),휴일연장근무(205)
+													        GROUP BY X.ENTER_CD, X.YMD, X.SABUN
+													     ) B      
+                                                        , (
+                                                               SELECT TO_CHAR(WEEK_START, 'YYYYMMDD') WEEK_START
+                                                                    , TO_CHAR(WEEK_END, 'YYYYMMDD') WEEK_END
+                                                                    , ROW_NUMBER()OVER(ORDER BY WEEK_START) AS RNUM
+                                                                    , SUM( CASE WHEN WEEK_START BETWEEN REPLACE(#{searchSYmd},'-','') AND REPLACE(#{searchEYmd},'-','')
+                                                                                 AND WEEK_END BETWEEN REPLACE(#{searchSYmd},'-','') AND REPLACE(#{searchEYmd},'-','') THEN 1 ELSE 0 END) OVER() AS WEEK_CNT
+                                                                 FROM (
+                                                                        SELECT TRUNC(START_DT + LEVEL, 'D') + 1 WEEK_START
+                                                                             , TRUNC(START_DT + LEVEL, 'D') + 7 WEEK_END
+                                                                          FROM ( SELECT TRUNC(TO_DATE(TRIM(REPLACE(#{searchSYmd},'-','')), 'YYYYMMDD'),'iw') START_DT
+                                                                                      , TO_DATE(TRIM(REPLACE(#{searchEYmd},'-','')), 'YYYYMMDD') END_DT
+                                                                                   FROM DUAL 
+                                                                                )
+                                                                        CONNECT BY LEVEL < END_DT - START_DT
+                                                                       )
+                                                                WHERE 1=1
+                                                                GROUP BY WEEK_START, WEEK_END
+                                                                                                                       
+                                                          ) D              
+													WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd})
+                                                      AND A.YMD BETWEEN WEEK_START AND WEEK_END
+													  AND A.ENTER_CD    = B.ENTER_CD(+)
+													  AND A.SABUN       = B.SABUN(+) 
+													  AND A.YMD         = B.YMD(+)
+										        
+					)
+					SELECT * FROM (
+                        SELECT  0 AS SEQ
+                              , SABUN
+                              , NAME
+                              , JIKGUB_NM
+                              , JIKWEE_NM
+                              , JIKCHAK_NM
+                              , MANAGE_NM
+                              , ORG_CD
+                              , WORK_ORG_CD
+                              , F_COM_GET_ORG_NM( TRIM(#{ssnEnterCd}), ORG_CD, REPLACE(#{searchSYmd},'-','')) AS ORG_NM
+                              , ( SELECT X.MAP_NM
+                                    FROM TORG109 X
+                                   WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+                                     AND X.MAP_TYPE_CD = '500'
+                                     AND X.MAP_CD   = WORK_ORG_CD
+                                     AND REPLACE(#{searchSYmd},'-','') BETWEEN X.SDATE AND NVL( X.EDATE, '29991231' )
+                                      
+                                ) AS WORK_ORG_NM
+                              , F_COM_JIKJE_SORT(TRIM(#{ssnEnterCd}), SABUN, REPLACE(#{searchSYmd},'-','')) AS JIK_SEQ
+                              ]]>
+<foreach item="tit" collection="titles" >
+                              , F_TIM_FMT_TIME(WT_${tit.seq}, 0) AS "WT${tit.seq2}"
+                              , F_TIM_FMT_TIME(OT_${tit.seq}, 0) AS "OT${tit.seq2}"
+                              , F_TIM_FMT_TIME(WT_${tit.seq} + OT_${tit.seq}, 0) AS "TT${tit.seq2}"
+	<if test='tit.termYn.equals("Y")'>
+                              , F_TIM_FMT_TIME(TM_WT_${tit.tseq}, 0 ) AS "TM_WT${tit.tseq2}"
+                              , F_TIM_FMT_TIME(TM_OT_${tit.tseq}, 0 ) AS "TM_OT${tit.tseq2}"
+                              , F_TIM_FMT_TIME(TM_WT_${tit.tseq} + TM_OT_${tit.tseq}, 0) AS "TM_TT${tit.tseq2}"
+                              -- 일 평균
+                              , DECODE(WORK_CNT,     0, '00:00', F_TIM_FMT_TIME(TM_WT_${tit.tseq} / WORK_CNT    , 0))  AS "AVG_DAY_WT${tit.tseq2}"
+                              , DECODE(WORK_ALL_CNT, 0, '00:00', F_TIM_FMT_TIME(TM_OT_${tit.tseq} / WORK_ALL_CNT, 0))  AS "AVG_DAY_OT${tit.tseq2}"
+                              , CASE WHEN WORK_CNT = 0 AND WORK_ALL_CNT = 0 THEN '00:00'
+                                     WHEN WORK_CNT     = 0 THEN F_TIM_FMT_TIME(TM_OT_${tit.tseq} / WORK_ALL_CNT, 0)
+                                     WHEN WORK_ALL_CNT = 0 THEN F_TIM_FMT_TIME(TM_WT_${tit.tseq} / WORK_CNT    , 0)
+                                     ELSE F_TIM_FMT_TIME( (TM_WT_${tit.tseq} / WORK_CNT) + (TM_OT_${tit.tseq} / WORK_ALL_CNT) , 0 ) END AS "AVG_DAY_TT${tit.tseq2}"
+                              -- 주 평균
+                              , DECODE(WEEK_CNT, 0, '00:00', F_TIM_FMT_TIME(TM_WT_${tit.tseq} / WEEK_CNT    , 0)) AS "AVG_WEEK_WT${tit.tseq2}"
+                              , DECODE(WEEK_CNT, 0, '00:00', F_TIM_FMT_TIME(TM_OT_${tit.tseq} / WEEK_CNT    , 0)) AS "AVG_WEEK_OT${tit.tseq2}"
+                              , DECODE(WEEK_CNT, 0, '00:00', F_TIM_FMT_TIME( (TM_WT_${tit.tseq} / WEEK_CNT) + (TM_OT_${tit.tseq} / WEEK_CNT) , 0 )) AS "AVG_WEEK_TT${tit.tseq2}"
+                              
+	</if>
+</foreach>
+                          FROM (
+                                  SELECT 0 AS SEQ 
+		                               , SABUN
+                                       , NAME
+                                       , JIKGUB_NM
+                                       , JIKWEE_NM
+                                       , JIKCHAK_NM
+                                       , MANAGE_NM
+                                       , ORG_CD
+                                       , WORK_ORG_CD
+<foreach item="tit" collection="titles" >
+                                       , SUM(DECODE( SEQ, ${tit.seq}, WT_HOUR, 0)) AS "WT_${tit.seq}"
+                                       , SUM(DECODE( SEQ, ${tit.seq}, OT_HOUR, 0)) AS "OT_${tit.seq}"
+	<if test='tit.termYn.equals("Y")'>
+                                       , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN WT_HOUR ELSE 0 END ) AS "TM_WT_${tit.tseq}"
+                                       , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN OT_HOUR ELSE 0 END ) AS "TM_OT_${tit.tseq}"
+	</if>
+</foreach>
+                                       , SUM( DECODE(PLAN_WORK_YN, 'N', DECODE(TERM_YN, 'Y', 1, 0), 0) ) AS WORK_CNT
+                                       , SUM( DECODE(TERM_YN, 'Y', 1, 0) ) AS WORK_ALL_CNT
+                                       , MAX(WEEK_CNT) AS WEEK_CNT
+                                    FROM TMP
+                                   GROUP BY SABUN, NAME, JIKGUB_NM, JIKWEE_NM, JIKCHAK_NM, MANAGE_NM, ORG_CD, WORK_ORG_CD
+		                           UNION ALL      
+		                          /* 총 합계 */
+                                  SELECT 1 AS SEQ 
+		                               , NULL AS SABUN
+		                               , NULL AS NAME
+		                               , NULL AS JIKGUB_NM
+		                               , NULL AS JIKWEE_NM
+		                               , NULL AS JIKCHAK_NM
+		                               , NULL AS MANAGE_NM
+		                               , NULL AS ORG_CD
+		                               , NULL AS WORK_ORG_CD
+<foreach item="tit" collection="titles" >
+                                       , SUM(DECODE( SEQ, ${tit.seq}, WT_HOUR, 0)) AS "WT_${tit.seq}"
+                                       , SUM(DECODE( SEQ, ${tit.seq}, OT_HOUR, 0)) AS "OT_${tit.seq}"
+	<if test='tit.termYn.equals("Y")'>
+	                                   , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN WT_HOUR ELSE 0 END ) AS "TM_WT_${tit.tseq}"
+	                                   , SUM( CASE WHEN TERM_YN = 'Y' AND TRUNC( SEQ / ${tit.itvl} ) = ${tit.tseq} THEN OT_HOUR ELSE 0 END ) AS "TM_OT_${tit.tseq}"
+	</if>
+</foreach>
+                                       , SUM( DECODE(PLAN_WORK_YN, 'N', DECODE(TERM_YN, 'Y', 1, 0), 0) ) AS WORK_CNT
+                                       , SUM( DECODE(TERM_YN, 'Y', 1, 0) ) AS WORK_ALL_CNT
+                                       , MAX(WEEK_CNT) AS WEEK_CNT
+                                    FROM TMP                                   
+                               )   
+                         )
+                       ORDER BY SEQ, JIK_SEQ
+		</select>
+
+
+</mapper>

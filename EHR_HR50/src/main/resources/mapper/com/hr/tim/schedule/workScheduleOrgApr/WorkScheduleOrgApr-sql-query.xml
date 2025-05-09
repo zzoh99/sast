@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.workScheduleOrgApr">
+
+<!-- 근무스케쥴승인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkScheduleOrgAprList">
+
+				<![CDATA[
+
+					   SELECT A.ENTER_CD
+							, A.APPL_SEQ
+						    , B.APPL_SABUN AS SABUN
+							, (SELECT F_COM_GET_NAMES(A.ENTER_CD, B.APPL_SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME -- 성명
+							, (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							, F_COM_GET_JIKWEE_NM(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							, F_COM_GET_JIKGUB_NM(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+							
+						    , A.SDATE
+						    , A.EDATE
+						    , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS APP_ORG_NM
+							, (SELECT MAP_NM
+							     FROM TORG109 X
+							    WHERE X.ENTER_CD = A.ENTER_CD
+							      AND X.MAP_TYPE_CD = '500'
+							      AND X.MAP_CD      = A.WORK_ORG_CD
+							      AND A.YMD BETWEEN X.SDATE AND NVL( X.EDATE, '29991231' ) ) AS WORK_ORG_NM
+							, A.INTERVAL_CD
+							, F_COM_GET_GRCODE_NAME( A.ENTER_CD 
+					                               , F_COM_GET_GRCODE_NOTE_VAL( A.ENTER_CD, 'T90200', A.INTERVAL_CD, 1 )
+					                               , A.DAY_GUBUN_CD )
+					          AS DAY_GUBUN_NM 
+							, A.YMD
+							, A.EMP_CNT
+							, DECODE(A.ORG_AUTH, '0', '개인', '부서' ) AS ORG_AUTH
+						                  
+							, B.APPL_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+							, B.APPL_STATUS_CD
+							, '0' AS DETAIL
+							
+							, CASE WHEN B.APPL_STATUS_CD = '99' THEN '1' ELSE '0' END AS SHTCOL_EDIT
+							
+					     FROM (
+						  		  SELECT ENTER_CD,APPL_SEQ,WORK_ORG_CD,WORK_GRP_CD,ORG_CD,INTERVAL_CD,DAY_GUBUN_CD,YMD,SDATE,EDATE,ORG_AUTH, COUNT(SABUN) AS EMP_CNT
+						  		    FROM TTIM811
+						  		   WHERE ENTER_CD = #{ssnEnterCd}
+						  		   GROUP BY ENTER_CD,APPL_SEQ,WORK_ORG_CD,WORK_GRP_CD,ORG_CD,INTERVAL_CD,DAY_GUBUN_CD,YMD,SDATE,EDATE,ORG_AUTH
+						      ) A, THRI103 B
+					    WHERE A.ENTER_CD   = B.ENTER_CD 
+					      AND A.APPL_SEQ   = B.APPL_SEQ
+					      AND B.APPL_STATUS_CD NOT IN ('11')
+						  AND B.APPL_CD    = '302'
+					      ]]>
+<if test='searchFrom != null and !searchFrom.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD >= REPLACE(#{searchFrom}, '-','')
+	]]>
+</if>
+<if test='searchTo != null and !searchTo.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD <= REPLACE(#{searchTo}, '-','')
+	]]>
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					      AND (B.APPL_SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR (SELECT F_COM_GET_NAMES(A.ENTER_CD, B.APPL_SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					      AND (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+<if test='searchSYmd != null and !searchSYmd.equals("")'>
+	<![CDATA[
+					      AND A.SDATE >= REPLACE(#{searchSYmd}, '-','')
+	]]>
+</if>
+<if test='searchEYmd != null and !searchEYmd.equals("")'>
+	<![CDATA[
+					      AND A.SDATE <= REPLACE(#{searchEYmd}, '-','')
+	]]>
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC 
+		</select>
+
+</mapper>

@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.payRateStd.tab2">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayRateTab2StdList">
+				<![CDATA[
+					SELECT A.PAY_CD 
+					     , A.GNT_CD 
+					     , A.SEQ 
+					     , A.SDATE 
+					     , A.EDATE 
+					     , A.APPLY_F_CNT 
+					     , A.APPLY_T_CNT 
+					     , A.GNT_APPLY_TYPE
+					     , A.MINUS_RATE 
+					     , A.RATE 
+					     , A.ELEMENT_SET_CD 
+					     , A.ELE_SET_EXC_YN 
+					     , A.SEARCH_SEQ  
+					     , B.SEARCH_DESC
+					     , A.ONE_DAYS
+					     , A.APPLY_DAYS
+					     , A.PERIOD_TYPE
+					     , A.REVERSE_PERIOD_YN					     
+					FROM  TCPN008  A       
+					    , THRI201 B   
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					  AND A.ENTER_CD = B.ENTER_CD(+)
+					  AND A.SEARCH_SEQ = B.SEARCH_SEQ(+)
+					          				]]>
+					  <if test='searchDate != null and !searchDate.equals("")'>
+					  AND REPLACE(#{searchDate}, '-', '') BETWEEN SDATE AND NVL (EDATE, '99991231')
+					  </if>
+					ORDER BY A.PAY_CD, A.GNT_CD, A.SDATE, A.SEQ
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePayRateTab2Std">
+					MERGE INTO TCPN008 T
+                    USING   (
+                            SELECT    A.SEQ
+									, A.PAY_CD
+                                    , A.GNT_CD
+                                    , A.SDATE
+                                    , A.EDATE
+									, A.APPLY_F_CNT
+									, A.APPLY_T_CNT
+									, A.GNT_APPLY_TYPE
+									, A.MINUS_RATE
+									, A.RATE
+									, A.ELEMENT_SET_CD
+									, A.ELE_SET_EXC_YN
+									, A.SEARCH_SEQ
+									, A.ONE_DAYS
+									, A.APPLY_DAYS
+									, A.PERIOD_TYPE
+									, A.REVERSE_PERIOD_YN									
+                            FROM    (
+                                    SELECT    NULL      AS SEQ
+                                            , NULL      AS PAY_CD                       
+                                            , NULL      AS GNT_CD                       
+                                            , NULL      AS SDATE                       
+                                            , NULL      AS EDATE                       
+                                            , NULL      AS APPLY_F_CNT                 
+                                            , NULL      AS APPLY_T_CNT                 
+                                            , NULL      AS GNT_APPLY_TYPE              
+                                            , NULL      AS MINUS_RATE                  
+                                            , NULL      AS RATE                        
+                                            , NULL      AS ELEMENT_SET_CD              
+                                            , NULL      AS ELE_SET_EXC_YN              
+                                            , NULL      AS SEARCH_SEQ                  
+                                            , NULL      AS ONE_DAYS                    
+                                            , NULL      AS APPLY_DAYS   
+                                            , NULL      AS PERIOD_TYPE                  
+                                            , NULL      AS REVERSE_PERIOD_YN
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT
+											<choose>
+                                            <when test='rm.seq != null and !rm.seq.equals("")'>
+												--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+                                                TRIM(#{rm.seq})             AS SEQ
+											</when>
+                                            <otherwise>
+												--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+                                                TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+                                                          FROM TCPN008
+                                                          WHERE ENTER_CD = #{ssnEnterCd}
+                                                          AND PAY_CD = #{rm.payCd}
+                                                          AND GNT_CD = #{rm.gntCd}
+                                                          AND SDATE  = #{rm.sdate}
+                                                          ) )   AS SEQ
+                                                --icnt 증가
+                                                <bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+                                                ,TRIM(#{rm.payCd})           AS PAY_CD
+                                                ,TRIM(#{rm.gntCd})           AS GNT_CD
+                                                ,TRIM(#{rm.sdate})           AS SDATE
+                                                ,TRIM(#{rm.edate})           AS EDATE
+												,TRIM(#{rm.applyFCnt})       AS APPLY_F_CNT
+												,TRIM(#{rm.applyTCnt})       AS APPLY_T_CNT
+												,TRIM(#{rm.gntApplyType})    AS GNT_APPLY_TYPE
+												,TRIM(#{rm.minusRate})       AS MINUS_RATE
+												,TRIM(#{rm.rate})            AS RATE
+												,TRIM(#{rm.elementSetCd})    AS ELEMENT_SET_CD
+												,TRIM(#{rm.eleSetExcYn})     AS ELE_SET_EXC_YN
+												,TRIM(#{rm.searchSeq})       AS SEARCH_SEQ
+												,TRIM(#{rm.oneDays})         AS ONE_DAYS
+												,TRIM(#{rm.applyDays})       AS APPLY_DAYS
+												,TRIM(#{rm.periodType})      AS PERIOD_TYPE
+												,TRIM(#{rm.reversePeriodYn})      AS REVERSE_PERIOD_YN
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.SEQ IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD     = #{ssnEnterCd}
+                    AND  T.PAY_CD = S.PAY_CD
+                    AND  T.GNT_CD = S.GNT_CD
+                    AND  T.SEQ    = S.SEQ   
+                    AND  T.SDATE  = S.SDATE 
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.EDATE           = S.EDATE          
+                                    , T.APPLY_F_CNT     = S.APPLY_F_CNT    
+                                    , T.APPLY_T_CNT     = S.APPLY_T_CNT    
+                                    , T.GNT_APPLY_TYPE  = S.GNT_APPLY_TYPE 
+                                    , T.MINUS_RATE      = S.MINUS_RATE     
+                                    , T.RATE            = S.RATE           
+                                    , T.ELEMENT_SET_CD  = S.ELEMENT_SET_CD 
+                                    , T.ELE_SET_EXC_YN  = S.ELE_SET_EXC_YN 
+                                    , T.SEARCH_SEQ      = S.SEARCH_SEQ     
+                                    , T.ONE_DAYS        = S.ONE_DAYS       
+                                    , T.APPLY_DAYS      = S.APPLY_DAYS   
+                                    , T.PERIOD_TYPE     = S.PERIOD_TYPE     
+                                    , T.REVERSE_PERIOD_YN     = S.REVERSE_PERIOD_YN 
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+							  T.ENTER_CD     -- KEY
+							, T.PAY_CD       -- KEY
+							, T.GNT_CD       -- KEY
+							, T.SEQ          -- KEY
+							, T.SDATE        -- KEY
+							, T.EDATE
+							, T.APPLY_F_CNT
+							, T.APPLY_T_CNT
+							, T.GNT_APPLY_TYPE
+							, T.MINUS_RATE
+							, T.RATE
+							, T.ELEMENT_SET_CD
+							, T.ELE_SET_EXC_YN
+							, T.SEARCH_SEQ
+							, T.ONE_DAYS
+							, T.APPLY_DAYS
+							, T.PERIOD_TYPE
+							, T.REVERSE_PERIOD_YN							
+							, T.CHKDATE
+							, T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd} -- KEY
+                            , S.PAY_CD       -- KEY
+                            , S.GNT_CD       -- KEY
+                            , S.SEQ          -- KEY
+                            , S.SDATE        -- KEY
+							, S.EDATE
+							, S.APPLY_F_CNT
+							, S.APPLY_T_CNT
+							, S.GNT_APPLY_TYPE
+							, S.MINUS_RATE
+							, S.RATE
+							, S.ELEMENT_SET_CD
+							, S.ELE_SET_EXC_YN
+							, S.SEARCH_SEQ
+							, S.ONE_DAYS
+							, S.APPLY_DAYS
+							, S.PERIOD_TYPE
+							, S.REVERSE_PERIOD_YN							
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayRateTab2Std">
+					DELETE FROM TCPN008 
+					WHERE 	(ENTER_CD, PAY_CD, GNT_CD, SEQ, SDATE) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.payCd != null and !rm.payCd.equals("")'>
+                                            <if test='rm.gntCd != null and !rm.gntCd.equals("")'>
+                                              <if test='rm.seq != null and !rm.seq.equals("")'>
+                                                <if test='rm.sdate != null and !rm.sdate.equals("")'>
+                                               (#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.gntCd} ), TRIM( #{rm.seq} ), TRIM( #{rm.sdate} ) )
+												</if>
+											  </if>
+											</if>
+										  </if>
+										</if>
+</foreach>
+
+										)
+		</delete>
+		
+<!-- 		생성 -->	
+		<insert parameterType="map" id="insertPayRateTab2Std">
+						INSERT INTO MainMnStdTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+		
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePayRateTab2Std">
+
+					UPDATE ZTST002 T SET 
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID 
+						) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT   
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+		
+	</mapper>

@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.mail">
+	
+	<select id="tsys700SelectMailCodeList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT BBS_SEQ AS CODE
+		     , REGEXP_REPLACE(TITLE , '<[^>]*>', '')  AS CODE_NM
+		     , REGEXP_REPLACE(REGEXP_SUBSTR(TAG , '[^,:]+',1,4),'[[:space:]\'']','') AS BIZ_CD
+		  FROM TSYS710 A
+		 WHERE BBS_CD   = F_COM_GET_STD_CD_VALUE(TRIM(#{ssnEnterCd}), 'MAIL_FORMAT')
+		   AND ENTER_CD = #{ssnEnterCd}
+		   AND TAG IS NOT NULL
+		   AND TAG LIKE  '%MAIL%'
+		 ORDER BY CHKDATE DESC
+	]]>
+	</select>
+	
+	<select id="mailContent" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT TEMPLATE_TITLE AS MAIL_TITLE
+		     , TEMPLATE_CONTENT AS MAIL_CONTENT
+		     , '"job":"MAIL", "bizCd":"'||BIZ_CD||'", "mailTo":"'||SEND_MAIL||';'||SENDER_NM||'","title":"'||TEMPLATE_TITLE||'"' AS TAG
+		     , TO_CHAR(CHKDATE,'YYYYMMDD') AS CHKDATE
+		     , BIZ_CD
+		     , NOTICE_TYPE_CD
+		     , SEND_MAIL
+		     , SENDER_NM
+		  FROM TSYS969
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND BIZ_CD = #{bizCd}
+		   AND NOTICE_TYPE_CD = 'MAIL'
+		   AND LANGUAGE_CD = SUBSTR(NVL(#{ssnLocaleCd}, 'KR'), INSTR(NVL(#{ssnLocaleCd}, 'KR'), '_') + 1, 2)
+	]]>
+	</select>
+	
+	<select id="getMailId" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_CONT_ADDRESS(#{ssnEnterCd}, #{ssnSabun}, 'IM') AS MAIL
+		  FROM DUAL
+	]]>
+	</select>
+	
+<!-- 20240718 jyp 사용안함
+<select id="mailContentOnlyOne" parameterType="map" resultType="cMap">-->
+<!--	<![CDATA[-->
+<!--		SELECT REGEXP_REPLACE(TITLE , '<[^>]*>', '')  AS MAIL_TITLE-->
+<!--		     , CONTENTS AS MAIL_CONTENT-->
+<!--		     , TO_CHAR(CHKDATE,'YYYYMMDD') AS CHKDATE-->
+<!--		     , TAG-->
+<!--		     , (SELECT ALIAS FROM TORG900 WHERE ENTER_CD = TRIM(#{enterCd})) AS ENTER_ALIAS-->
+<!--		  FROM TSYS710 A-->
+<!--		 WHERE BBS_CD = F_COM_GET_STD_CD_VALUE(TRIM(#{ssnEnterCd}), 'MAIL_FORMAT')-->
+<!--		   AND ENTER_CD = #{ssnEnterCd}-->
+<!--		   AND REPLACE(TAG,'''') LIKE '%bizCd:${bizCd}%'-->
+<!--		   AND REPLACE(TAG,'''') LIKE '%job:MAIL%'-->
+<!--		   AND ROWNUM = 1-->
+<!--	]]>-->
+<!--	</select>-->
+	
+	<select id="mailAppSendSabun" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT T.*
+		     , F_COM_GET_NAMES(#{ssnEnterCd}, T.SABUN) AS AGREE_SABUN_NM
+		     , CASE WHEN AGREE_SEQ = MAX_AGREE_SEQ THEN 'Y' ELSE 'N' END AS LAST_YN
+		  FROM (
+		        SELECT DISTINCT A.APPL_SABUN
+		             , A.APPL_CD
+		             , A.TITLE
+		             , D.APPL_NM
+		             , E.CODE_NM AS STATUS_NM, APPL_STATUS_CD
+		             , F_COM_GET_NAMES(A.ENTER_CD, A.APPL_SABUN) AS APPL_SABUN_NM
+		             , DECODE(APPL_STATUS_CD, '21', A.APPL_SABUN
+		                                    , '31', A.APPL_SABUN
+		                                    , '41', A.APPL_SABUN
+		                                    , '23', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '33', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '43', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '99', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN), NULL) AS SABUN
+		             , DECODE(APPL_STATUS_CD, '21', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '31', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '41', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '23', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '33', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '43', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN)
+		                                    , '99', DECODE(C.DEPUTY_SABUN, NULL,A.AGREE_SABUN,C.DEPUTY_SABUN), NULL) AS AGREE_SABUN
+		             , DECODE(APPL_STATUS_CD, '21', '결재요청'
+		                                    , '31', '결재요청'
+		                                    , '41', '결재요청'
+		                                    , '23', '결재반려'
+		                                    , '33', '결재반려'
+		                                    , '43', '결재반려'
+		                                    , '99', '결재완료', NULL) AS STATUS
+		             , DECODE(APPL_STATUS_CD, '21', '결재할 문서'
+		                                    , '31', '결재할 문서'
+		                                    , '41', '결재할 문서'
+		                                    , '23', '기안한 문서'
+		                                    , '33', '기안한 문서'
+		                                    , '43', '기안한 문서'
+		                                    , '99', '기안한 문서', NULL) AS MENU_NM
+		             , DECODE(APPL_STATUS_CD, '21', '/AppBeforeLst.do'||CHR(63)||'cmd=viewAppBeforeLst'
+		                                    , '31', '/AppBeforeLst.do'||CHR(63)||'cmd=viewAppBeforeLst'
+		                                    , '41', '/AppBeforeLst.do'||CHR(63)||'cmd=viewAppBeforeLst'
+		                                    , '23', '/AppBoxLst.do'||CHR(63)||'cmd=viewAppBoxLst'
+		                                    , '33', '/AppBoxLst.do'||CHR(63)||'cmd=viewAppBoxLst'
+		                                    , '43', '/AppBoxLst.do'||CHR(63)||'cmd=viewAppBoxLst'
+		                                    , '99', '/AppBoxLst.do'||CHR(63)||'cmd=viewAppBoxLst', NULL) AS APPL_LINK
+		             , F_COM_GET_CONT_ADDRESS(F.ENTER_CD,F.SABUN,'IM') AS MAIL_ID
+		             , D.APPL_SMS_YN
+		             , D.REFER_MAIL_YN
+		             , D.APPL_MAIL_YN
+		             , D.AGREE_MAIL_YN
+		             , A.APPL_YMD
+		             , B.AGREE_SEQ
+		             , (SELECT MAX(AGREE_SEQ) FROM THRI107 WHERE B.ENTER_CD = ENTER_CD AND B.APPL_SEQ = APPL_SEQ) MAX_AGREE_SEQ
+		          FROM THRI103 A, THRI107 B, THRI120 C, THRI101 D,TSYS005 E, THRM124 F
+		         WHERE A.ENTER_CD = B.ENTER_CD
+		           AND A.APPL_SEQ = B.APPL_SEQ
+		           AND B.ENTER_CD = C.ENTER_CD(+)
+		           AND B.AGREE_SABUN = C.AGREE_SABUN(+)
+		           AND A.ENTER_CD = D.ENTER_CD
+		           AND A.APPL_CD = D.APPL_CD
+		           AND A.ENTER_CD = E.ENTER_CD
+		           AND A.APPL_STATUS_CD = E.CODE
+		           AND A.ENTER_CD = F.ENTER_CD
+		           AND A.APPL_SABUN = F.SABUN
+		           AND A.APPL_STATUS_CD IN ('21', '31', '41','23', '33', '43', '99')
+		           AND E.GRCODE_CD = 'R10010' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.S_YMD AND E.E_YMD
+		           AND B.ENTER_CD = #{ssnEnterCd}
+		           AND B.AGREE_STATUS_CD = DECODE(A.APPL_STATUS_CD, '21', '10'
+		                                                          , '31', '10'
+		                                                          , '41', '10'
+		                                                          , '23', '30'
+		                                                          , '33', '30'
+		                                                          , '43', '30'
+		                                                          , '99', '20'
+		                                                          , '100')
+		           --AND B.AGREE_STATUS_CD = '10'
+		           --AND D.APPL_MAIL_YN ='Y'
+		           AND ( 
+		                 (
+		                      D.APPL_MAIL_YN  = 'Y' -- 신청(결재)시 메일발송여부(결재,참조자)
+		                  AND A.APPL_STATUS_CD IN ('21','31','41')
+		                 ) -- 결재시메일발송여부
+		                 OR
+		                 (
+		                      D.AGREE_MAIL_YN  = 'Y'  -- 처리완료시메일발송여부(신청자)
+		                  AND A.APPL_STATUS_CD NOT IN ('21','31','41')
+		                 )
+		                 OR
+		                 (
+		                      D.REFER_MAIL_YN  = 'Y'  -- 처리완료시메일발송여부(결재,참조자)
+		                  AND A.APPL_STATUS_CD NOT IN ('21','31','41')
+		                 )
+		               )
+		           AND B.AGREE_STATUS_CD IS NOT NULL
+		           AND B.APPL_SEQ=  #{applSeq}
+		           AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE(+) AND EDATE(+)
+		           AND ROWNUM = 1
+		       ) T
+	]]>
+	</select>
+	
+	<select id="mailSendSabunFromInfo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT NAME AS SEND_NAME
+		     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') || ';' || NAME AS SEND_MAIL
+		     , (CASE WHEN F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') IS NULL THEN 'Y' ELSE 'N' END) AS SEND_MAIL_YN
+		  FROM THRM100 A
+		     , THRM124 B
+		 WHERE A.ENTER_CD  = B.ENTER_CD
+		   AND A.SABUN     = B.SABUN
+		   AND A.ENTER_CD  = #{ssnEnterCd}
+		   AND A.SABUN     = #{sabun}
+		   AND B.CONT_TYPE = 'IM'
+	]]>
+	</select>
+	
+	<select id="mailSendSabunToInfo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') ||';' || NAME AS RECEVER_STR
+		     , (CASE WHEN F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') IS NULL THEN 'Y' ELSE 'N' END) AS RECEIVE_MAIL_YN
+		     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'HP') AS HAND_PHONE
+		     , A.NAME
+		     , A.SABUN
+		  FROM THRM100 A
+		     , THRM124 B
+		 WHERE A.ENTER_CD  = B.ENTER_CD
+		   AND A.SABUN     = B.SABUN
+		   AND A.ENTER_CD  = #{ssnEnterCd}
+		   AND A.SABUN     = #{sabun}
+		   AND B.CONT_TYPE = 'IM'
+	]]>
+	</select>
+	
+	<select id="smsSendSabunToInfo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') ||';' || NAME AS RECEVER_STR
+		  FROM THRM100 A
+		     , THRM124 B
+		 WHERE A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN    = B.SABUN
+		   AND A.ENTER_CD = #{enterCd}
+		   AND UPPER(A.SABUN)   = UPPER(TRIM(#{sabun}))
+	]]>
+	</select>
+	
+	<insert id="tsys996InsertMail" parameterType="map">
+	<![CDATA[
+		INSERT INTO TSYS996(
+		       ENTER_CD
+		     , SEQ
+		     , BIZ_CD
+		     , SEND_TYPE
+		     , SEND_CNT
+		     , RCV_NAME
+		     , TITLE
+		     , SEND_SABUN
+		     , SEND_ADDR
+		     , SEND_TIME
+		     , CONTENTS
+		     , SUCCESS_YN
+		     , LOG
+		     , CC_NAME
+		     , INSERT_DATE
+		) VALUES (
+		       TRIM(#{enterCd})
+		     , TRIM(#{mailSeq})
+		     , TRIM(#{bizCd})
+		     , '0'
+		     , TRIM(#{mailCnt})
+		     , TRIM(#{rcvName})
+		     , TRIM(#{title})
+		     , TRIM(#{sender})
+		     , TRIM(#{fromMail})
+		     , TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		     , EMPTY_CLOB()
+		     , TRIM(#{result})
+		     , TRIM(#{log})
+		     , TRIM(#{ccReceiverStr})
+		     , SYSDATE
+		)
+	]]>
+	</insert>
+	
+	<update id="tsys996UpdateMail" parameterType="map">
+	<![CDATA[
+		UPDATE TSYS996
+		   SET CONTENTS = #{content}
+		 WHERE ENTER_CD = #{enterCd}
+		   AND SEQ      = #{mailSeq}
+	]]>
+	</update>
+	
+	<insert id="tsys992InsertMail" parameterType="map">
+	<![CDATA[
+		INSERT INTO TSYS992(
+		       ENTER_CD
+		     , JOB_TYPE
+		     , JOB_YMD
+		     , SEQ
+		     , SENDER
+		     , RECEIVERS
+		     , DEPARTMENT_CODE
+		     , TITLE
+		     , CONTENT
+		     , RESULT_CD
+		     , RESULT_MSG
+		     , CHKDATE
+		     , CHKID
+		) VALUES (
+		       TRIM(#{enterCd})
+		     , TRIM(#{jobType})
+		     , TRIM(#{jobYmd})
+		     , TRIM(#{mailSeq})
+		     , TRIM(#{sender})
+		     , TRIM(#{receivers})
+		     , TRIM(#{departmentCode})
+		     , TRIM(#{title})
+		     , EMPTY_CLOB()
+		     , TRIM(#{resultCd})
+		     , TRIM(#{resultMsg})
+		     , TRIM(#{jobYmd})
+		     , TRIM(#{chkid})
+		)
+	]]>
+	</insert>
+	
+	<update id="tsys992UpdateMail" parameterType="map">
+	<![CDATA[
+		UPDATE TSYS992
+		   SET CONTENT  = #{content}
+		 WHERE ENTER_CD = #{enterCd}
+		   AND SEQ = #{mailSeq}
+	]]>
+	</update>
+
+	<select id="mailSendSabunWithCc" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT 'RCV' AS RECEIVER_DIV
+		     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') ||';' || NAME AS RECEIVER_STR
+		     , (CASE WHEN F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') IS NULL THEN 'Y' ELSE 'N' END) AS RECEIVE_MAIL_YN
+		  FROM THRM100 A
+		     , THRM124 B
+		 WHERE A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN    = B.SABUN
+		   AND A.ENTER_CD = #{ssnEnterCd}
+		   AND A.SABUN    = #{sabun}
+		   AND B.CONT_TYPE = 'IM'
+	]]>
+	<if test="withCC eq 'referMailYn' or withCC eq 'applReferMailYn'">
+	<![CDATA[
+		UNION ALL
+		SELECT 'CC' AS RECEIVER_DIV
+		     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.CC_SABUN, 'IM') || ';' || NAME AS RECEIVER_STR
+		     , (CASE WHEN F_COM_GET_CONT_ADDRESS(B.ENTER_CD, B.SABUN, 'IM') IS NULL THEN 'Y' ELSE 'N' END) AS RECEIVE_MAIL_YN
+		  FROM THRI125 A
+		     , THRM100 B
+		 WHERE A.ENTER_CD = B.ENTER_CD
+		   AND A.CC_SABUN = B.SABUN
+		   AND A.ENTER_CD = #{ssnEnterCd}
+		   AND A.APPL_SEQ = #{applSeq}
+	]]>
+	</if>
+	</select>
+	
+	<select id="getMailStdCdValue" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_STD_CD_VALUE(NVL(#{ssnEnterCd}, #{enterCd}), 'MAIL_SERVER'   ) AS MAIL_SERVER
+		     , F_COM_GET_STD_CD_VALUE(NVL(#{ssnEnterCd}, #{enterCd}), 'MAIL_PORT'     ) AS MAIL_PORT
+		     , F_COM_GET_STD_CD_VALUE(NVL(#{ssnEnterCd}, #{enterCd}), 'MAIL_USER'     ) AS MAIL_USER
+		     , F_COM_GET_STD_CD_VALUE(NVL(#{ssnEnterCd}, #{enterCd}), 'MAIL_PASSWORD' ) AS MAIL_PASSWORD
+		     , F_COM_GET_STD_CD_VALUE(NVL(#{ssnEnterCd}, #{enterCd}), 'MAIL_TESTER'   ) AS MAIL_TESTER
+		     , F_COM_GET_STD_CD_VALUE(NVL(#{ssnEnterCd}, #{enterCd}), 'MAIL_SEND_TYPE') AS MAIL_SEND_TYPE
+		  FROM DUAL
+	]]>
+	</select>
+	
+	
+</mapper>

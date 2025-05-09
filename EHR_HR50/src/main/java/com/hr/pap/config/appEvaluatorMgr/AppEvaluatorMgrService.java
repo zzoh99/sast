@@ -1,0 +1,62 @@
+package com.hr.pap.config.appEvaluatorMgr;
+
+import java.util.List;
+import java.util.Map;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+
+import org.springframework.stereotype.Service;
+
+import com.hr.common.dao.Dao;
+import com.hr.common.logger.Log;
+
+/**
+ * 평가대상자생성/관리 Service
+ *
+ * @author JSG
+ *
+ */
+@Service("AppEvaluatorMgrService")
+public class AppEvaluatorMgrService{
+
+	@Inject
+	@Named("Dao")
+	private Dao dao;
+
+	/**
+	 *  평가자관리 조회 Service(평가단계별 날짜조회)
+	 *
+	 * @param paramMap
+	 * @return List
+	 * @throws Exception
+	 */
+	public Map<?, ?> getAppEvaluatorMgrMap1(Map<?, ?> paramMap) throws Exception {
+		Log.Debug();
+		Map<?, ?> resultMap = dao.getMap("getAppEvaluatorMgrMap1", paramMap);
+		Log.Debug();
+		return resultMap;
+	}
+
+	/**
+	 * 평가자관리 저장 Service
+	 *
+	 * @param convertMap
+	 * @return int
+	 * @throws Exception
+	 */
+	public int saveAppEvaluatorMgr1(Map<?, ?> convertMap) throws Exception {
+		Log.Debug();
+		int cnt=0;
+		if( ((List<?>)convertMap.get("deleteRows")).size() > 0){
+			cnt += dao.delete("deleteAppEvaluatorMgr1", convertMap);
+			//cnt += dao.delete("deleteAppEvaluatorMgr1Sub", convertMap);
+		}
+		if( ((List<?>)convertMap.get("mergeRows")).size() > 0){
+			cnt += dao.update("saveAppEvaluatorMgr1", convertMap);
+		}
+
+		Log.Debug();
+		return cnt;
+	}
+}

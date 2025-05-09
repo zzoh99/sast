@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appCompetency.IDSCompetencyMng">
+<!-- 		리더십역량관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLDSCompetencyMngList1">
+
+				<![CDATA[
+					SELECT A.LDS_COMPETENCY_CD, A.LDS_COMPETENCY_NM, A.LDS_COMPETENCY_MEMO, A.LDS_GUBUN, A.SEQ, A.USE_YN, A.MAIN_APP_TYPE
+					FROM TPAP531  A                 
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					]]>
+						<if test='searchLdsCompetencyNm  != null and !searchLdsCompetencyNm.equals("") ' >
+							AND A.LDS_COMPETENCY_NM LIKE '%'|| #{searchLdsCompetencyNm} ||'%'
+						</if>
+						
+						<if test='searchLdsGubun  != null and !searchLdsGubun.equals("") ' >
+							AND A.LDS_GUBUN = #{searchLdsGubun}
+						</if>
+						
+						<if test='searchUseYn  != null and !searchUseYn.equals("") ' >
+							AND A.USE_YN = #{searchUseYn}
+						</if>
+					ORDER BY A.SEQ
+
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getLDSCompetencyMngList2">
+
+				<![CDATA[
+					SELECT A.LDS_COMPETENCY_CD, A.SEQ, A.LDS_COMP_BENM, A.ORDER_SEQ
+					FROM TPAP533 A                 
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+						AND A.LDS_COMPETENCY_CD = #{searchLdsCompetencyCd}
+					ORDER BY A.ORDER_SEQ 
+				]]>
+
+
+		</select>
+		
+<!-- 		리더십역량관리 저장 -->	
+		<update parameterType="map" id="saveLDSCompetencyMng1">
+
+				<![CDATA[
+					MERGE INTO TPAP531 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.LDS_COMPETENCY_CD
+									, A.LDS_COMPETENCY_NM
+									, A.LDS_COMPETENCY_MEMO
+									, A.LDS_GUBUN
+									, A.SEQ
+									, A.USE_YN
+									, A.MAIN_APP_TYPE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+										, NULL		AS LDS_COMPETENCY_CD
+										, NULL		AS LDS_COMPETENCY_NM
+										, NULL		AS LDS_COMPETENCY_MEMO
+										, NULL		AS LDS_GUBUN
+										, NULL		AS SEQ
+										, NULL		AS USE_YN
+										, NULL		AS MAIN_APP_TYPE
+									FROM	DUAL
+									]]>
+<bind name='icnt' value='1' />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )				AS ENTER_CD
+											, TRIM(  #{rm.ldsCompetencyCd} )		AS LDS_COMPETENCY_CD
+											, TRIM(  #{rm.ldsCompetencyNm} )		AS LDS_COMPETENCY_NM
+											, TRIM(  #{rm.ldsCompetencyMemo} )	AS LDS_COMPETENCY_MEMO
+											, TRIM(  #{rm.ldsGubun} )			AS LDS_GUBUN
+											, TRIM(  #{rm.seq} )					AS SEQ
+											, TRIM(  #{rm.useYn} )				AS USE_YN
+											, TRIM(  #{rm.mainAppType} )			AS MAIN_APP_TYPE
+									FROM   DUAL
+</foreach>
+								) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.LDS_COMPETENCY_CD = S.LDS_COMPETENCY_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.LDS_COMPETENCY_NM  	= S.LDS_COMPETENCY_NM     
+									, T.LDS_COMPETENCY_MEMO	= S.LDS_COMPETENCY_MEMO
+									, T.LDS_GUBUN          	= S.LDS_GUBUN            
+									, T.SEQ      			= S.SEQ      
+									, T.USE_YN      		= S.USE_YN      
+									, T.MAIN_APP_TYPE      	= S.MAIN_APP_TYPE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD        
+							, T.LDS_COMPETENCY_CD
+							, T.LDS_COMPETENCY_NM
+							, T.LDS_COMPETENCY_MEMO
+							, T.LDS_GUBUN
+							, T.SEQ
+							, T.USE_YN
+							, T.MAIN_APP_TYPE
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  S.ENTER_CD           
+							, S.LDS_COMPETENCY_CD
+							, S.LDS_COMPETENCY_NM
+							, S.LDS_COMPETENCY_MEMO
+							, S.LDS_GUBUN
+							, S.SEQ
+							, S.USE_YN    
+							, S.MAIN_APP_TYPE    
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		<update parameterType="map" id="saveLDSCompetencyMng2">
+
+				<![CDATA[
+					MERGE INTO TPAP533 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.LDS_COMPETENCY_CD
+									, A.SEQ
+									, A.LDS_COMP_BENM
+									, A.ORDER_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+										, NULL		AS LDS_COMPETENCY_CD
+										, NULL		AS SEQ
+										, NULL		AS LDS_COMP_BENM
+										, NULL		AS ORDER_SEQ        
+									FROM	DUAL
+									]]>
+<bind name='icnt' value='1' />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM(  #{rm.ldsCompetencyCd} )	AS LDS_COMPETENCY_CD
+											<choose>
+											<when test='rm.seq != null and !rm.seq.equals("") ' >
+												, TO_NUMBER(TRIM(  #{rm.seq} ))	AS SEQ
+											</when>
+									     	<otherwise>
+												, (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM TPAP533 WHERE ENTER_CD = #{ssnEnterCd})
+												<bind name='icnt' value='icnt + 1' />
+										 	</otherwise>
+											</choose>
+											
+											, TRIM(  #{rm.ldsCompBenm} )		AS LDS_COMP_BENM
+											, TRIM(  #{rm.orderSeq} )		AS ORDER_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.LDS_COMPETENCY_CD = S.LDS_COMPETENCY_CD AND T.SEQ = S.SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.LDS_COMP_BENM  	= S.LDS_COMP_BENM     
+									, T.ORDER_SEQ		= S.ORDER_SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD
+						    , T.LDS_COMPETENCY_CD
+						    , T.SEQ
+						    , T.LDS_COMP_BENM
+						    , T.ORDER_SEQ
+						    , T.CHKDATE
+						    , T.CHKID
+						) 
+						VALUES 
+						(
+						      S.ENTER_CD
+						    , S.LDS_COMPETENCY_CD
+						    , S.SEQ
+						    , S.LDS_COMP_BENM
+						    , S.ORDER_SEQ          
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		리더십역량관리 삭제 -->
+		<delete parameterType="map" id="deleteLDSCompetencyMng1">
+
+				<![CDATA[
+					DELETE FROM TPAP531 
+					WHERE (ENTER_CD, LDS_COMPETENCY_CD) IN 	(  (NULL, NULL)
+					                                               ]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{rm.ldsCompetencyCd})
+</foreach>
+						)
+		</delete>
+
+		<delete parameterType="map" id="deleteLDSCompetencyMng1_533">
+
+				<![CDATA[
+					DELETE FROM TPAP533 
+					WHERE (ENTER_CD, LDS_COMPETENCY_CD) IN 	(  (NULL, NULL)
+					                                               ]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{rm.ldsCompetencyCd})
+</foreach>
+						)
+		</delete>
+		
+		<delete parameterType="map" id="deleteLDSCompetencyMng2">
+
+				<![CDATA[
+					DELETE FROM TPAP533
+					WHERE (ENTER_CD, LDS_COMPETENCY_CD, SEQ) IN 	(  (NULL, NULL, NULL)
+					                                                    ]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{rm.ldsCompetencyCd},  #{rm.seq})
+</foreach>
+						)
+		</delete>
+</mapper>

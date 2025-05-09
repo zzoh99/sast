@@ -1,0 +1,590 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.vacationAppDet">
+
+<!-- 근태신청 세부내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetList">
+
+				<![CDATA[
+				    SELECT A.ENTER_CD
+					     , A.APPL_SEQ
+					     , A.SABUN
+					     , A.GNT_CD
+					     , A.GNT_GUBUN_CD
+					     , A.S_YMD
+					     , A.E_YMD
+					     , A.HOL_DAY
+					     , A.CLOSE_DAY
+					     , A.REQ_S_HM
+					     , A.REQ_E_HM
+					     , A.REQUEST_HOUR
+					     , A.OCC_CD ||'_'|| A.FAM_CD AS OCC_FAM_CD
+					     , A.OCC_CD
+					     , A.FAM_CD
+					     , A.OCC_HOLIDAY
+					     , A.UPDATE_YN
+					     , A.GNT_REQ_RESON
+					     , A.NOTE
+					     , A.SRC_YY
+					     , A.SRC_GNT_CD
+					     , A.SRC_USE_S_YMD
+					     , A.SRC_USE_E_YMD
+					     , A.SRC_YY || '_'  || A.SRC_GNT_CD || '_' || A.SRC_USE_S_YMD AS USE_TARGET_ANNUAL
+					     , A.OCC_YMD
+					  FROM TTIM301 A
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPL_SEQ = TRIM(#{searchApplSeq})
+				]]>
+
+
+		</select>
+
+
+<!-- 근태신청 근태종류 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetGntGubunList">
+
+				<![CDATA[
+					SELECT B.CODE
+					     , B.CODE_NM
+					     , DECODE(MAX(NVL(C.GNT_CD,'N')),'N','N','Y') AS GNT_USE
+					  FROM TTIM014 A
+					     , TSYS005 B
+					     , TTIM007 C
+					 WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					   AND A.APPL_YN      = 'Y'
+					   AND A.ENTER_CD     = B.ENTER_CD
+					   AND B.GRCODE_CD    = 'T10003'
+					   AND A.GNT_GUBUN_CD = B.CODE
+					   AND A.ENTER_CD = C.ENTER_CD(+)
+					   AND A.GNT_CD = C.GNT_CD(+)
+					 GROUP BY B.CODE, B.CODE_NM
+					 ORDER BY MAX(A.SEQ)
+				]]>
+
+
+		</select>
+
+<!-- 근태신청 근태코드 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetGntCdList">
+
+				<![CDATA[
+					SELECT A.GNT_CD AS CODE, A.GNT_NM AS CODE_NM
+					     , A.GNT_GUBUN_CD
+					     , A.HOL_INCL_YN
+					     , A.REQUEST_USE_TYPE
+					     , A.BASE_CNT
+					     , A.MAX_CNT
+					     , A.VACATION_YN
+					     , NVL(B.GNT_CD_DEL1, '') AS GNT_CD_DEL1
+					  FROM TTIM014 A
+					     , TTIM007 B
+					 WHERE A.ENTER_CD     = B.ENTER_CD(+)
+					   AND A.GNT_CD       = B.GNT_CD(+)
+					   AND A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					   AND A.APPL_YN      = 'Y'
+					           ]]>
+<if test='searchGntGubunCd != null and !searchGntGubunCd.equals("")'>
+					   AND A.GNT_GUBUN_CD = TRIM(#{searchGntGubunCd})
+</if>
+<if test='restCntYn != null and !restCntYn.equals("") and searchSabun != null and !searchSabun.equals("")'>
+					   <![CDATA[
+					   AND ( A.GNT_CD NOT IN ( '10', '11', '12' )
+					      OR EXISTS ( SELECT 1
+					                  FROM TTIM511 X
+					                 WHERE X.ENTER_Cd = A.ENTER_CD
+					                   AND X.GNT_CD   = A.GNT_CD
+					                   AND X.GNT_CD   = '10'
+					                   AND X.REST_CNT > 0 )
+					        )
+					           ]]>
+</if>
+					 ORDER BY A.SEQ
+
+		</select>
+
+
+<!-- 근태신청 경조구분 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetOccCd">
+
+				<![CDATA[
+					SELECT OCC_CD ||'_'|| FAM_CD AS CODE
+					     , F_COM_GET_GRCODE_NAME(ENTER_CD, 'B60020' , OCC_CD)||'-'|| F_COM_GET_GRCODE_NAME(ENTER_CD, 'B60030' , FAM_CD) AS CODE_NM
+					     , OCC_CD
+					     , FAM_CD
+					     , OCC_HOLIDAY
+					     , TIM_APP_DESC
+				 	  FROM TBEN470
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND WORK_TYPE = F_COM_GET_WORKTYPE(#{ssnEnterCd}, #{searchApplSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+					   AND OCC_HOLIDAY > 0
+					   AND OCC_CD NOT IN ( '50', '51' ) --출산 별도 신청
+					 ORDER BY F_COM_GET_GRCODE_SEQ( ENTER_CD, 'B60020', OCC_CD)
+					     , F_COM_GET_GRCODE_SEQ( ENTER_CD, 'B60030', FAM_CD)
+				]]>
+
+
+		</select>
+
+<!-- 근태신청 세부내역 잔여일수 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetRestCnt">
+
+				<![CDATA[
+					SELECT F_TIM_GET_REST_CNT( #{ssnEnterCd} , TRIM( #{sabun} ), TRIM( #{gntCd} ), TRIM( nvl(#{sYmd}, '99991231')), TRIM( nvl(#{eYmd}, '99991231') )) AS REST_CNT
+					  FROM TTIM005 A  /* 근태발생기준 */
+                     WHERE A.ENTER_CD =  #{ssnEnterCd}
+                       AND A.GNT_CD   = TRIM( #{gntCd} )
+				]]>
+
+
+		</select>
+
+<!-- 재직상태 체크 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetStatusCd">
+
+				<![CDATA[
+					SELECT F_COM_GET_STATUS_CD( #{ssnEnterCd} , TRIM( #{sabun} ), TRIM( #{sYmd} )) AS STATUS_CD1
+					     , F_COM_GET_STATUS_CD( #{ssnEnterCd} , TRIM( #{sabun} ), TRIM( #{eYmd} )) AS STATUS_CD2
+                         ,  (SELECT CASE WHEN A.SEARCH_SEQ IS NOT NULL THEN DECODE(F_COM_GET_SEARCH_YN(A.ENTER_CD, TRIM( #{sabun} ), A.SEARCH_SEQ, TRIM( #{sYmd} ) ), 0, 'N', 'Y') -- 대상자 체크
+								 	     ELSE 'Y' END AS AUTH_YN
+							   FROM TTIM014 A
+							  WHERE A.ENTER_CD = #{ssnEnterCd}
+							    AND A.GNT_CD   = TRIM( #{gntCd} )
+						   ) AS AUTH_YN -- 신청대상자 확인 2020.02.10
+						 , F_GNT_VACATION_STD_CHECK( #{ssnEnterCd}, #{sabun}, #{gntCd} ,REPLACE(#{sYmd},'-',''), REPLACE(#{eYmd},'-',''), #{occYmd}) AS MSG
+					  FROM DUAL
+				]]>
+
+
+		</select>
+
+<!-- 근태신청 휴일 체크  -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetHolidayCnt">
+
+				<![CDATA[
+					SELECT F_TIM_GET_HOLIDAY_CNT( #{ssnEnterCd} , TRIM( #{sabun} ), TRIM( #{gntCd} ), TRIM( nvl(#{sYmd}, '99991231') ), TRIM( nvl(#{eYmd}, '99991231') )) AS HOLIDAY_CNT
+					     , CASE WHEN A.SEARCH_SEQ IS NOT NULL THEN DECODE(F_COM_GET_SEARCH_YN(A.ENTER_CD, TRIM( #{sabun} ), A.SEARCH_SEQ, TRIM( #{sYmd} ) ), 0, 'N', 'Y') -- 대상자 체크
+						        ELSE 'Y' END AS AUTH_YN  -- 2020.02.10 추가
+					  FROM TTIM014 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.GNT_CD   = TRIM( #{gntCd} )
+				]]>
+
+
+		</select>
+
+<!-- 근태신청 시간 체크  -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetHour">
+
+				<![CDATA[
+					SELECT ROUND(F_COM_GET_HH24MI_GAP(TRIM( NVL(#{applYmd}, #{ymd}) )||TRIM( nvl(#{reqSHm}, '1212') ), TRIM( NVL(#{applYmd}, #{ymd}) )||TRIM( nvl(#{reqEHm}, '1212') ) )/ 60, 2 ) AS REST_TIME
+					  FROM DUAL
+				]]>
+
+
+		</select>
+
+
+<!-- 근태신청 세부내역(잔여일수,휴일일수,재직상태) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetDayCnt">
+				<![CDATA[
+					SELECT A.*
+					  FROM (
+							SELECT   F_TIM_GET_REST_CNT( #{ssnEnterCd} , TRIM( #{sabun} ), TRIM( #{gntCd} ), TRIM( #{sYmd} ), TRIM( #{eYmd} )) AS REST_CNT
+							       , F_GNT_VALID_CHECK( #{ssnEnterCd} , TRIM( #{sabun} ), TRIM( #{gntCd} ), TRIM( nvl(#{sYmd}, '99991231') ), TRIM( nvl(#{eYmd}, '99991231') )) AS VAL_CHK
+							       ,(
+			                         SELECT ALLOW_YN
+			                           FROM TTIM007 A
+			                          WHERE A.ENTER_CD =  #{ssnEnterCd}
+			                            AND A.GNT_CD = #{gntCd}
+			                       ) AS MINUS_YN -- 마이너스 연차 허용여부
+			                  FROM DUAL
+			             ) A
+				]]>
+		</select>
+
+
+<!-- 근태신청 세부내역 기 신청일 조회 2019.12.19 변경 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetApplDayCnt">
+
+				<![CDATA[
+                    SELECT NVL( SUM( CASE WHEN C.REQUEST_USE_TYPE = 'D' OR Y.REQUEST_USE_TYPE = 'D' THEN 1  /*종일단위 신청*/
+                                     WHEN C.REQUEST_USE_TYPE = Y.REQUEST_USE_TYPE AND X.YMD = A.S_YMD THEN 1  /*반차면서 동일날짜 신청 건이 있으면*/
+                                     ELSE 0 END ), 0) AS CNT
+                      FROM TTIM301 A,THRI103 B, TTIM014 C
+                          ,( SELECT TO_CHAR(TO_DATE(REPLACE(TRIM(#{sYmd}),'-',''), 'YYYYMMDD')+(LEVEL - 1), 'YYYYMMDD') YMD
+                               FROM DUAL
+                             CONNECT BY TO_DATE(REPLACE(TRIM(#{sYmd}),'-',''), 'YYYYMMDD')+(LEVEL-1) <= TO_DATE (REPLACE(TRIM(#{eYmd}),'-',''), 'YYYYMMDD')
+                           ) X
+                          ,( SELECT ENTER_CD, REQUEST_USE_TYPE
+                               FROM TTIM014
+                              WHERE ENTER_CD = #{ssnEnterCd}
+                                AND GNT_CD   = #{gntCd}
+                           ) Y
+                     WHERE A.ENTER_CD = #{ssnEnterCd}
+                       AND A.SABUN    = #{sabun}
+                       AND NVL(A.UPDATE_YN, 'N') = 'N'
+                       AND A.ENTER_CD = B.ENTER_CD
+                       AND A.APPL_SEQ = B.APPL_SEQ
+                       AND B.APPL_STATUS_CD NOT IN ('11','23','33')
+                       AND A.ENTER_CD = C.ENTER_CD
+                       AND A.GNT_CD   = C.GNT_CD
+                       AND C.REQUEST_USE_TYPE IN ( 'D', 'AM', 'PM' )
+                       AND A.APPL_SEQ <> TRIM( #{applSeq} )
+                       AND X.YMD BETWEEN A.S_YMD AND A.E_YMD
+                       AND C.ENTER_CD = B.ENTER_CD
+				]]>
+
+
+		</select>
+
+<!-- 근태신청 세부내역 저장 -->
+		<update parameterType="map" id="saveVacationAppDet">
+			<![CDATA[
+					 MERGE INTO TTIM301 T
+					 USING
+					(
+						SELECT  A.ENTER_CD
+					          , A.APPL_SEQ
+					          , A.SABUN
+					          , A.GNT_CD
+					          , A.GNT_GUBUN_CD
+					          , A.S_YMD
+					          , A.E_YMD
+					          , A.HOL_DAY
+					          , A.CLOSE_DAY
+					          , A.REQ_S_HM
+					          , A.REQ_E_HM
+					          , A.REQUEST_HOUR
+					          , A.OCC_CD
+					          , A.FAM_CD
+					          , A.OCC_HOLIDAY
+					          , A.GNT_REQ_RESON
+					          , A.SRC_YY
+					          , A.SRC_GNT_CD
+					          , A.SRC_USE_S_YMD
+					          , A.SRC_USE_E_YMD
+					          , A.OCC_YMD
+						  FROM ( 
+						       SELECT NULL AS  ENTER_CD
+						            , NULL AS  APPL_SEQ
+						            , NULL AS  SABUN
+						            , NULL AS  GNT_CD
+						            , NULL AS  GNT_GUBUN_CD
+						            , NULL AS  S_YMD
+						            , NULL AS  E_YMD
+						            , NULL AS  HOL_DAY
+						            , NULL AS  CLOSE_DAY
+						            , NULL AS  REQ_S_HM
+						            , NULL AS  REQ_E_HM
+						            , NULL AS  REQUEST_HOUR
+						            , NULL AS  OCC_CD
+						            , NULL AS  FAM_CD
+						            , NULL AS  OCC_HOLIDAY
+						            , NULL AS  GNT_REQ_RESON
+						            , NULL AS  SRC_YY
+						            , NULL AS  SRC_GNT_CD
+						            , NULL AS  SRC_USE_S_YMD
+						            , NULL AS  SRC_USE_E_YMD
+						            , NULL AS  OCC_YMD
+						         FROM DUAL
+								UNION ALL
+						       SELECT TRIM(#{ssnEnterCd})  					AS  ENTER_CD
+						            , TRIM(#{searchApplSeq})  				AS  APPL_SEQ
+						            , TRIM(#{searchApplSabun})				AS  SABUN
+						            , TRIM(#{gntCd})  						AS  GNT_CD
+						            , TRIM(#{gntGubunCd})  					AS  GNT_GUBUN_CD
+						            , REPLACE(TRIM(#{sYmd}),'-','')			AS  S_YMD
+						            , REPLACE(TRIM(#{eYmd}),'-','') 			AS  E_YMD
+						            , TRIM(#{holDay})  						AS  HOL_DAY
+						            , TRIM(#{closeDay})  						AS  CLOSE_DAY
+						            , REPLACE(TRIM(#{reqSHm}),':','')			AS  REQ_S_HM
+						            , REPLACE(TRIM(#{reqEHm}),':','')			AS  REQ_E_HM
+						            , TRIM(#{requestHour})  					AS  REQUEST_HOUR
+						            , TRIM(#{occCd})  						AS  OCC_CD
+						            , TRIM(#{famCd})  						AS  FAM_CD
+						            , TRIM(#{occHoliday})  					AS  OCC_HOLIDAY
+						            , TRIM(#{gntReqReson})  					AS  GNT_REQ_RESON
+						            , TRIM(#{srcYy})  						AS  SRC_YY
+						            , TRIM(#{srcGntCd})  						AS  SRC_GNT_CD
+						            , TRIM(#{srcUseSYmd})  					AS  SRC_USE_S_YMD
+						            , TRIM(#{srcUseEYmd})  					AS  SRC_USE_E_YMD
+						            , REPLACE(TRIM(#{occYmd}),'-','')			AS  OCC_YMD
+						        FROM DUAL
+						  ) A WHERE A.ENTER_CD IS NOT NULL
+							    AND A.SABUN IS NOT NULL
+							    AND A.APPL_SEQ IS NOT NULL
+							    AND A.S_YMD IS NOT NULL
+							    AND A.E_YMD IS NOT NULL
+					) S
+					ON (
+					          T.ENTER_CD = S.ENTER_CD
+					     AND  T.APPL_SEQ = S.APPL_SEQ
+					     AND  T.SABUN    = S.SABUN
+					)
+					WHEN MATCHED THEN
+					   UPDATE SET T.CHKDATE			= sysdate
+					            , T.CHKID			= #{ssnSabun}
+					            , T.GNT_CD 			= S.GNT_CD
+					            , T.GNT_GUBUN_CD 	= S.GNT_GUBUN_CD
+					            , T.S_YMD 			= S.S_YMD
+					            , T.E_YMD 			= S.E_YMD
+					            , T.HOL_DAY 		= S.HOL_DAY
+					            , T.CLOSE_DAY 		= S.CLOSE_DAY
+					            , T.REQ_S_HM 		= S.REQ_S_HM
+					            , T.REQ_E_HM 		= S.REQ_E_HM
+					            , T.REQUEST_HOUR 	= S.REQUEST_HOUR
+					            , T.OCC_CD 			= S.OCC_CD
+					            , T.FAM_CD 			= S.FAM_CD
+					            , T.OCC_HOLIDAY 	= S.OCC_HOLIDAY
+					            , T.GNT_REQ_RESON 	= S.GNT_REQ_RESON
+					            , T.SRC_YY 			= S.SRC_YY
+					            , T.SRC_GNT_CD 		= S.SRC_GNT_CD
+					            , T.SRC_USE_S_YMD 	= S.SRC_USE_S_YMD
+					            , T.SRC_USE_E_YMD 	= S.SRC_USE_E_YMD
+					            , T.OCC_YMD			= S.OCC_YMD
+					WHEN NOT MATCHED THEN
+					   INSERT
+					   (
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+					            , T.GNT_CD
+					            , T.GNT_GUBUN_CD
+					            , T.S_YMD
+					            , T.E_YMD
+					            , T.HOL_DAY
+					            , T.CLOSE_DAY
+					            , T.REQ_S_HM
+					            , T.REQ_E_HM
+					            , T.REQUEST_HOUR
+					            , T.OCC_CD
+					            , T.FAM_CD
+					            , T.OCC_HOLIDAY
+					            , T.GNT_REQ_RESON
+					            , T.SRC_YY
+					            , T.SRC_GNT_CD
+					            , T.SRC_USE_S_YMD
+					            , T.SRC_USE_E_YMD
+					            , T.CHKDATE
+					            , T.CHKID
+					            , T.OCC_YMD
+					   )
+					   VALUES
+					   (
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+					            , S.GNT_CD
+					            , S.GNT_GUBUN_CD
+					            , S.S_YMD
+					            , S.E_YMD
+					            , S.HOL_DAY
+					            , S.CLOSE_DAY
+					            , S.REQ_S_HM
+					            , S.REQ_E_HM
+					            , S.REQUEST_HOUR
+					            , S.OCC_CD
+					            , S.FAM_CD
+					            , S.OCC_HOLIDAY
+					            , S.GNT_REQ_RESON
+					            , S.SRC_YY
+					            , S.SRC_GNT_CD
+					            , S.SRC_USE_S_YMD
+					            , S.SRC_USE_E_YMD
+					            , sysdate
+					            , #{ssnSabun}
+					            , S.OCC_YMD
+					   )
+
+				]]>
+
+		</update>
+
+
+<!-- 근태신청 : 연차휴가계획선택 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetPlanPopupList_BK">
+
+				<![CDATA[
+	            WITH TEMP AS (
+					SELECT C.*
+                         , A.SABUN
+					  FROM TTIM561 A, THRI103 B, TTIM562 C
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+				       AND A.APPL_SEQ		= B.APPL_SEQ
+				       AND A.ENTER_CD		= C.ENTER_CD
+				       AND A.APPL_SEQ		= C.APPL_SEQ
+				       AND B.APPL_STATUS_CD	= '99'
+				       AND A.ENTER_CD		= #{ssnEnterCd}
+				       AND A.SABUN			= #{searchApplSabun}
+				               ]]>
+<if test='searchYear != null and !searchYear.equals("")'>
+				       AND ( C.S_YMD		    LIKE #{searchYear} || '%'
+				          OR C.E_YMD		    LIKE #{searchYear} || '%' )
+</if>
+				    MINUS
+					SELECT C.*
+                         , A.SABUN
+					  FROM TTIM561 A, THRI103 B, TTIM562 C
+					     , (SELECT X.YMD
+							  FROM TTIM405 X, THRI103 Y
+							 WHERE X.ENTER_CD		= Y.ENTER_CD
+						       AND X.APPL_SEQ		= Y.APPL_SEQ
+						       AND X.ENTER_CD		= #{ssnEnterCd}
+						       AND X.SABUN			= #{searchApplSabun}
+						       AND Y.APPL_STATUS_CD	NOT IN ('11','23','33') /*결재반려,승인반려*/
+					     ) D
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+				       AND A.APPL_SEQ		= B.APPL_SEQ
+				       AND A.ENTER_CD		= C.ENTER_CD
+				       AND A.APPL_SEQ		= C.APPL_SEQ
+				       AND B.APPL_STATUS_CD	= '99'
+				       AND A.ENTER_CD		= #{ssnEnterCd}
+				       AND A.SABUN			= #{searchApplSabun}
+<if test='searchYear != null and !searchYear.equals("")'>
+				       AND ( C.S_YMD		    LIKE #{searchYear} || '%'
+				          OR C.E_YMD		    LIKE #{searchYear} || '%' )
+</if>
+				       AND D.YMD			BETWEEN C.S_YMD AND C.E_YMD
+	            )
+	            SELECT UNIQUE A.ENTER_CD
+	                , A.APPL_SEQ
+	                , A.SABUN
+	                , A.S_YMD     AS SDATE
+	                , A.E_YMD     AS EDATE
+	                , A.HOL_DAY   AS TOTAL_DAYS
+	                , A.CLOSE_DAY AS DAYS
+	              FROM TEMP A
+	             ORDER BY A.S_YMD DESC
+		</select>
+
+<!-- 근태신청 : 연차휴가계획선택 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetPlanPopupList">
+
+				<![CDATA[
+					SELECT A.*
+						 , TRUNC(TO_DATE(A.EDATE,'yyyymmdd')) - TRUNC(TO_DATE(A.SDATE,'yyyymmdd')) + 1  TOTAL_DAYS
+					  FROM TTIM542 A, THRI103 B
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+				       AND A.APPL_SEQ		= B.APPL_SEQ
+				       AND B.APPL_STATUS_CD	= '99'
+				       AND A.ENTER_CD		= #{ssnEnterCd}
+				       AND A.SABUN			= #{searchApplSabun}
+				       AND A.SDATE			BETWEEN TO_CHAR(SYSDATE, 'YYYYMMDD') AND TO_CHAR(ADD_MONTHS(SYSDATE,3), 'YYYYMMDD')
+				    MINUS
+					SELECT A.*
+						 , TRUNC(TO_DATE(A.EDATE,'yyyymmdd')) - TRUNC(TO_DATE(A.SDATE,'yyyymmdd')) + 1  TOTAL_DAYS
+					  FROM TTIM542 A, THRI103 B
+					     , (SELECT X.YMD
+							  FROM TTIM405 X, THRI103 Y
+							 WHERE X.ENTER_CD		= Y.ENTER_CD
+						       AND X.APPL_SEQ		= Y.APPL_SEQ
+						       AND X.ENTER_CD		= #{ssnEnterCd}
+						       AND X.SABUN			= #{searchApplSabun}
+						       AND Y.APPL_STATUS_CD	NOT IN ('11','23','33') /*결재반려,승인반려*/
+					     ) C
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+				       AND A.APPL_SEQ		= B.APPL_SEQ
+				       AND B.APPL_STATUS_CD	= '99'
+				       AND A.ENTER_CD		= #{ssnEnterCd}
+				       AND A.SABUN			= #{searchApplSabun}
+				       AND A.SDATE			BETWEEN TO_CHAR(SYSDATE, 'YYYYMMDD') AND TO_CHAR(ADD_MONTHS(SYSDATE,3), 'YYYYMMDD')
+				       AND C.YMD			BETWEEN A.SDATE AND A.EDATE
+				]]>
+
+
+		</select>
+<!-- 근태신청 : 연차휴가계획선택 사번으로 기본정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppDetPlanPopupMap">
+
+				<![CDATA[
+					SELECT F_COM_GET_NAMES	(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_ORG_NM	(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					  FROM THRM151 A
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+				       AND A.SABUN			= #{searchApplSabun}
+				       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '29991231')
+				]]>
+
+
+		</select>
+				
+<!-- 사용가능 휴가 내역 코드 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppUseCdList">
+
+				<![CDATA[
+					SELECT YY || '_'  || GNT_CD || '_' || USE_S_YMD AS CODE 
+					     , YY || '년도 ' || GNT_NM || ' (사용기간 : '|| TO_CHAR(TO_DATE(USE_S_YMD, 'YYYYMMDD') ,'YYYY-MM-DD') || '~' || TO_CHAR(TO_DATE(USE_E_YMD, 'YYYYMMDD') ,'YYYY-MM-DD') || ' / 잔여일수 : ' || REST_CNT || ' 일)' AS CODE_NM
+					     , YY
+					     , GNT_CD
+					     , USE_S_YMD
+					     , USE_E_YMD
+					     , CRE_CNT
+					     , USE_CNT
+					     , USED_CNT
+					     , REST_CNT
+					     , MINUS_YN
+					  FROM (
+					          SELECT X.ENTER_CD
+					               , X.YY
+					               , X.SABUN
+					               , X.GNT_CD
+					               , Y.GNT_NM
+					               , X.CRE_CNT -- 총발생일수(당해년도발생일수)
+					               , X.USE_CNT   -- 사용가능일
+					               , X.USED_CNT  -- 사용일(당해년도사용일수)
+					               , X.REST_CNT  -- 현잔여일수
+					               , X.USE_S_YMD -- 시작일
+					               , X.USE_E_YMD -- 종료일
+					               , Y.SEQ 
+					               , Z.ALLOW_YN AS MINUS_YN -- 마이너스 연차 허용여부
+					            FROM TTIM511 X
+					               , TTIM014 Y
+					               , TTIM007 Z
+					                -- 신청중인 휴가사용내역
+					               , ( SELECT A.ENTER_CD, A.SABUN, A.GNT_CD--, B.USE_S_YMD, SUM(B.SELECT_CNT) AS CNT
+					                     FROM TTIM301 A, THRI103 C
+					                    WHERE A.ENTER_CD = C.ENTER_CD
+					                      AND A.APPL_SEQ = C.APPL_SEQ
+					                      AND C.APPL_STATUS_CD IN ('21' , '31')
+					                      AND A.ENTER_CD 	= #{ssnEnterCd}
+					                      AND A.SABUN 		= TRIM( #{searchSabun} )
+					                    GROUP BY A.ENTER_CD, A.SABUN, A.GNT_CD/*, B.USE_S_YMD*/) T
+					           WHERE X.ENTER_CD 	= Y.ENTER_CD
+					             AND X.GNT_CD 	= Y.GNT_CD
+					             AND X.ENTER_CD 	= Z.ENTER_CD
+					             AND X.GNT_CD 		= Z.GNT_CD
+					             AND X.ENTER_CD 	= #{ssnEnterCd}
+					             AND X.SABUN 		= TRIM( #{searchSabun} )
+					             AND X.GNT_CD		IN ( TRIM( #{searchGntCd1} ) , TRIM( #{searchGntCd2} ) )
+					                     ]]>
+<if test='sYmd.equals("") and eYmd.equals("")'>
+					             AND (TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.USE_S_YMD AND X.USE_E_YMD)
+</if>
+<if test='sYmd != null and !sYmd.equals("") and eYmd != null and !eYmd.equals("")'>
+							
+					             -- 신청일자가 동일한 사용기준에 있어야 신청 가능 !
+					             AND (TRIM( #{sYmd} ) BETWEEN X.USE_S_YMD AND X.USE_E_YMD AND TRIM( #{eYmd} ) BETWEEN X.USE_S_YMD AND X.USE_E_YMD )
+</if>
+<if test='sYmd != null and !sYmd.equals("")'>
+					             -- 신청일자가 동일한 사용기준에 있어야 신청 가능 !
+					             AND TRIM( #{sYmd} ) BETWEEN X.USE_S_YMD AND X.USE_E_YMD
+</if>
+<if test='eYmd != null and !eYmd.equals("")'>
+					             -- 신청일자가 동일한 사용기준에 있어야 신청 가능 !
+					             AND TRIM( #{eYmd} ) BETWEEN X.USE_S_YMD AND X.USE_E_YMD
+</if>
+					             <![CDATA[
+					             AND ((Z.ALLOW_YN = 'N' AND X.REST_CNT > 0) OR (Z.ALLOW_YN = 'Y'))   --잔여일수가 있는 것만 조회
+					             AND X.ENTER_CD  = T.ENTER_CD(+)
+					             AND X.SABUN     = T.SABUN(+)
+					             AND X.GNT_CD    = T.GNT_CD(+)
+					      ]]>
+					       )
+					 WHERE 1=1
+					 ORDER BY SEQ ASC, USE_S_YMD ASC
+
+		</select>
+
+</mapper>

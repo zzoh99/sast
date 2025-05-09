@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.empRcmd.aiEmpRcmd">
+
+	<!-- AI 인재 추천 구분 -->
+	<select parameterType="map" resultType="cMap" id="getAiEmpRcmdList">
+		SELECT
+			T.ENTER_CD
+			 , T.R_GUBUN
+			 , T.USE_YN
+			 , T.CHKDATE
+			 , T.CHKID
+			 , T.R_PROMPT
+			 , '0'		AS detail
+		FROM THRM881 T
+		WHERE T.ENTER_CD = #{ssnEnterCd}
+		  AND T.CHKID = #{ssnSabun}
+	</select>
+
+	<!-- AI 인재 추천 구분 -->
+	<select id="getAiEmpRcmdGubun" parameterType="map" resultType="cMap">
+		SELECT
+			R.ENTER_CD
+			 , R.R_GUBUN
+			 , R.R_PROMPT
+			 , I.I_GUBUN
+			 , I.I_RATIO
+			 , I.MEMO
+			 , I.SEARCH_SEQ
+			 , I.ICON
+			 , I.PREVIEW
+-- 			 , NVL(Q.SQL_SYNTAX, Q.ADMIN_SQL_SYNTAX)    AS SQL_SYNTAX
+		FROM THRM881 R,THRM882 I,
+			 (
+				 SELECT
+					    A.SEARCH_SEQ
+					  , A.SEARCH_TYPE
+					  , A.CONDITION_DESC
+					  , A.SQL_SYNTAX
+					  , A.ADMIN_SQL_SYNTAX
+					  , C.VIEW_NM
+				 FROM THRI201 A, THRI205 C
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.VIEW_CD= C.VIEW_CD(+)
+			 ) Q
+		WHERE R.R_GUBUN = I.R_GUBUN
+		  AND R.ENTER_CD = I.ENTER_CD
+		  AND I.SEARCH_SEQ = Q.SEARCH_SEQ
+		  AND R.ENTER_CD = #{ssnEnterCd}
+		  AND R.R_GUBUN = #{rGubun}
+	</select>
+
+	<!-- AI 인재 추천 구분 항목 -->
+	<select id="getAiEmpRcmdGubunList" parameterType="map" resultType="cMap">
+		SELECT
+			R.R_GUBUN		AS CODE
+			 , R.R_GUBUN		AS CODE_NM
+		FROM THRM881 R
+		WHERE R.ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<!-- AI 인재 추천 구분 항목 -->
+	<select id="getAiEmpRcmdPart" parameterType="map" resultType="cMap">
+		SELECT
+		 R_GUBUN
+		, R_TYPE
+		, RES
+		, SCORE
+		, DES
+		, DET
+		, PART
+		FROM THRM883
+		WHERE ENTER_CD = #{ssnEnterCd}
+		AND SABUN = #{sabun}
+		AND R_GUBUN = #{rGubun}
+		AND R_TYPE = #{rType}
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getAiEmpRcmdEmpList">
+		SELECT
+		  	  A.ENTER_CD
+		      , A.SABUN
+		      , A.R_GUBUN
+			  , A.R_TYPE
+			  , A.RES
+			  , A.SCORE
+			  , A.DES
+			  , A.DET
+			  , A.PART
+			  , A.CHKDATE
+			  , A.CHKID
+			  , A.STATUS
+			  ,	F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+			  , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+			  , F_COM_GET_JOB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JOB_NM
+		  FROM THRM883 A
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		<if test='empRcmdType != null and !"".equals(empRcmdType)'>
+			AND A.R_GUBUN = #{empRcmdType}
+		</if>
+		<if test='jobCd != null and !"".equals(jobCd)'>
+			AND A.R_TYPE = #{jobCd}
+		</if>
+
+        <!--		SELECT /* EmpList-mapping-query.getEmpListList */-->
+<!--		<foreach collection="colHeader" item="colHeaderItem" index="index" separator=",">-->
+<!--			${colHeaderItem} AS ${colName[index]}-->
+<!--		</foreach>-->
+<!--			, B.R_GUBUN-->
+<!--			, B.R_TYPE-->
+<!--			, B.RES-->
+<!--			, B.SCORE-->
+<!--			, B.DES-->
+<!--			, B.DET-->
+<!--			, B.PART-->
+<!--		    , B.SABUN-->
+<!--			, '0'	AS detail-->
+<!--		FROM ( ${selectViewQuery} ) A, THRM883 B-->
+<!--		WHERE A.SABUN = B.SABUN(+)-->
+<!--		AND A.ENTER_CD = TRIM(#{ssnEnterCd})-->
+<!--		AND A.SABUN NOT IN ( 'ISU0001' )-->
+<!--		<if test='empRcmdType != null and !"".equals(empRcmdType)'>-->
+<!--			AND B.R_GUBUN = #{empRcmdType}-->
+<!--		</if>-->
+	</select>
+
+	<!-- 사번으로 테이블 조회 정보 -->
+	<select id="getAiEmpRcmdEmpMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT
+				   A.EMP_YMD
+			     , A.SEX_TYPE
+				 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H00010', A.SEX_TYPE) AS SEX_TYPE_NM
+				 , A.BIR_YMD
+				 , B.JIKGUB_NM
+				 , B.JIKWEE_NM
+				 , B.JIKCHAK_NM
+			 FROM THRM100 A, THRM151 B
+			WHERE A.SABUN = B.SABUN
+			  AND A.ENTER_CD = B.ENTER_CD
+			  AND A.ENTER_CD = #{ssnEnterCd}
+			  AND A.SABUN = #{searchSabun}
+			  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+		]]>
+	</select>
+
+	<!-- 사번으로 근속년수 정보 -->
+	<select id="getAiEmpRcmdCareerMap" parameterType="map" resultType="cMap">
+		SELECT F_COM_GET_CAREER_CNT(#{ssnEnterCd}, #{searchSabun}) AS ALL_CAREER_YYMM_CNT FROM DUAL
+	</select>
+
+	<!-- 사번으로 ORG 정보 -->
+	<select id="getAiEmpRcmdOrgMap" parameterType="map" resultType="cMap">
+		SELECT F_COM_GET_ORG_NM2(#{ssnEnterCd}, #{searchSabun}, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM FROM DUAL
+	</select>
+
+	<!-- 사번으로 EnterNm 정보 -->
+	<select id="getAiEmpRcmdEnterMap" parameterType="map" resultType="cMap">
+		SELECT F_COM_GET_ENTER_NM(#{ssnEnterCd}) AS ENTER_NM FROM DUAL
+	</select>
+
+	<!-- 쿼리 조회 (자격증, 학력, 경력 등..) -->
+	<select id="getAiEmpRcmdGubunQueryMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_SQL_TMP(#{ssnEnterCd}, TRIM(#{searchSeq}), #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, '') AS query FROM DUAL
+		]]>
+	</select>
+
+	<!-- 쿼리 결과 조회 -->
+	<select id="getAiEmpRcmdGubunQueryResultList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		${resultQuery}
+	]]>
+	</select>
+
+	<update parameterType="map" id="saveAiEmpRcmd">
+		MERGE INTO THRM883 T
+		USING	(
+			SELECT
+				   A.R_GUBUN
+				 , A.R_TYPE
+				 , A.SABUN
+			   FROM (
+					SELECT
+						   NULL		AS R_GUBUN
+						 , NULL		AS R_TYPE
+						 , NULL		AS SABUN
+					  FROM DUAL
+					UNION ALL
+					SELECT
+					TRIM(#{rGubun})		AS R_GUBUN
+					, TRIM(#{rType})	AS R_TYPE
+					, TRIM(#{sabun})	AS SABUN
+					FROM DUAL
+				) A
+			WHERE A.R_GUBUN IS NOT NULL
+			  AND A.R_TYPE IS NOT NULL
+			  AND A.SABUN IS NOT NULL
+		) S
+		ON (
+		    T.ENTER_CD		= #{ssnEnterCd}
+			AND	T.R_GUBUN	= S.R_GUBUN
+			AND	T.R_TYPE	= S.R_TYPE
+			AND	T.SABUN		= S.SABUN
+		)
+		WHEN MATCHED THEN
+		UPDATE SET T.RES	= #{res}
+		, T.SCORE			= #{score}
+		, T.DES				= #{des}
+		, T.DET				= #{det}
+		, T.CHKDATE			= SYSDATE
+		, T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+		 	ENTER_CD
+			,SABUN
+			,R_GUBUN
+			,R_TYPE
+			,RES
+			,SCORE
+			,DES
+			,DET
+			,CHKDATE
+			,CHKID
+		)
+		VALUES
+		(
+			#{ssnEnterCd}
+			, S.SABUN
+			, S.R_GUBUN
+			, S.R_TYPE
+			, #{res}
+			, #{score}
+			, #{des}
+			, #{det}
+			, SYSDATE
+			, #{ssnSabun}
+		)
+	</update>
+
+	<update parameterType="map" id="updatePartData">
+		UPDATE THRM883
+		SET PART = #{part}
+			,STATUS = #{status}
+		WHERE ENTER_CD = #{ssnEnterCd}
+		AND R_GUBUN = #{rGubun}
+		AND R_TYPE = #{rType}
+		AND SABUN = #{sabun}
+	</update>
+
+	<update parameterType="map" id="updateAiEmpRcmdStatus">
+		UPDATE THRM883
+		SET STATUS = #{status}
+		WHERE ENTER_CD = #{ssnEnterCd}
+		  AND R_GUBUN = #{rGubun}
+		  AND R_TYPE = #{rType}
+		  AND SABUN IN
+			<foreach collection="sabuns" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+			</foreach>
+	</update>
+
+	<!-- 인재추천 대상자 삭제  -->
+	<delete parameterType="map" id="deleteAiEmpRcmd">
+		DELETE FROM THRM883
+		WHERE ENTER_CD = #{ssnEnterCd}
+		AND SABUN = #{searchSabun}
+		AND R_GUBUN = #{rGubun}
+		AND R_TYPE = #{rType}
+	</delete>
+</mapper>

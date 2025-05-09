@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.psnlWork.psnlTimeWorkSta">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlWorkStaPopList">
+
+				<![CDATA[
+					SELECT SUB1.SUN_DATE AS YMD
+					      ,SUB1.DAY_NM /* 요일 */
+					      ,SUB1.DAY_TYPE /* 구분 */
+					      ,SUB1.TIME_NM
+					      ,SUB2.IN_YMD ,SUB2.IN_HM  ,SUB2.OUT_YMD ,SUB2.OUT_HM
+					      ,DECODE(SUB2.HOUR1,0,'',SUB2.HOUR1) HOUR1  ,DECODE(SUB2.HOUR2,0,'',SUB2.HOUR2) HOUR2  ,DECODE(SUB2.HOUR3,0,'',SUB2.HOUR3) HOUR3   , DECODE(SUB2.HOUR4,0,'',SUB2.HOUR4) HOUR4  ,DECODE(SUB2.HOUR5,0,'',SUB2.HOUR5) HOUR5
+					      ,DECODE(SUB2.HOUR6,0,'',SUB2.HOUR6) HOUR6  ,DECODE(SUB2.HOUR7,0,'',SUB2.HOUR7) HOUR7  ,DECODE(SUB2.HOUR8,0,'',SUB2.HOUR8) HOUR8   , DECODE(SUB2.HOUR9,0,'',SUB2.HOUR9) HOUR9  ,DECODE(SUB2.HOUR10,0,'',SUB2.HOUR10) HOUR10
+					      ,DECODE(SUB2.HOUR11,0,'',SUB2.HOUR11) HOUR11 ,DECODE(SUB2.HOUR12,0,'',SUB2.HOUR12) HOUR12 ,DECODE(SUB2.HOUR13,0,'',SUB2.HOUR13) HOUR13  ,DECODE(SUB2.HOUR14,0,'',SUB2.HOUR14) HOUR14 ,DECODE(SUB2.HOUR15,0,'',SUB2.HOUR15) HOUR15
+					      ,DECODE(SUB2.HOUR16,0,'',SUB2.HOUR16) HOUR16 ,DECODE(SUB2.HOUR17,0,'',SUB2.HOUR17) HOUR17 ,DECODE(SUB2.HOUR18,0,'',SUB2.HOUR18) HOUR18  ,DECODE(SUB2.HOUR19,0,'',SUB2.HOUR19) HOUR19 ,DECODE(SUB2.HOUR20,0,'',SUB2.HOUR20) HOUR20
+					      ,DECODE(SUB2.HOUR21,0,'',SUB2.HOUR21) HOUR21 ,DECODE(SUB2.HOUR22,0,'',SUB2.HOUR22) HOUR22 ,DECODE(SUB2.HOUR23,0,'',SUB2.HOUR23) HOUR23  ,DECODE(SUB2.HOUR24,0,'',SUB2.HOUR24) HOUR24 ,DECODE(SUB2.HOUR25,0,'',SUB2.HOUR25) HOUR25
+					  FROM (SELECT A.SUN_DATE,A.DAY_NM
+					             , (SELECT F_COM_GET_GRCODE_NAME(X.ENTER_CD, 'T10015', Y.TYPE) FROM TTIM100 X, TTIM017 Y
+					                                   WHERE X.ENTER_CD = #{ssnEnterCd}
+					                                     AND X.WORKTEAM_CD = F_COM_GET_WORKTEAM_CD(X.ENTER_CD, #{searchSabun}, A.SUN_DATE)
+					                                     AND X.CARLENDER_YMD = A.SUN_DATE
+					                                     AND X.ENTER_CD = Y.ENTER_CD
+					                                     AND X.TIME_CD = Y.TIME_CD) AS DAY_TYPE
+					             , (SELECT F_COM_GET_WORKTIME(X.ENTER_CD, #{searchSabun}, A.SUN_DATE, Y.TIME_CD) FROM TTIM100 X, TTIM017 Y
+					                                   WHERE X.ENTER_CD = #{ssnEnterCd}
+					                                     AND X.WORKTEAM_CD = F_COM_GET_WORKTEAM_CD(X.ENTER_CD, #{searchSabun}, A.SUN_DATE)
+					                                     AND X.CARLENDER_YMD = A.SUN_DATE
+					                                     AND X.ENTER_CD = Y.ENTER_CD
+					                                     AND X.TIME_CD = Y.TIME_CD) AS TIME_NM
+					          FROM TSYS007 A
+					         WHERE A.SUN_DATE BETWEEN TRIM( REPLACE(#{searchSYm}, '-', '') || '01' ) AND TO_CHAR(LAST_DAY( TO_DATE(TRIM( REPLACE(#{searchEYm}, '-', '')) ,'YYYYMM' ) ), 'YYYYMMDD')
+					       ) SUB1 -- 만세력
+					       ,(SELECT K.YMD, M.IN_YMD, M.IN_HM, M.OUT_YMD, M.OUT_HM
+					         	   ,K.HOUR1 ,K.HOUR2 ,K.HOUR3 ,K.HOUR4 ,K.HOUR5
+					         	   ,K.HOUR6 ,K.HOUR7 ,K.HOUR8 ,K.HOUR9 ,K.HOUR10
+					         	   ,K.HOUR11 ,K.HOUR12 ,K.HOUR13 ,K.HOUR14 ,K.HOUR15
+					         	   ,K.HOUR16 ,K.HOUR17 ,K.HOUR18 ,K.HOUR19 ,K.HOUR20
+					         	   ,K.HOUR21 ,K.HOUR22 ,K.HOUR23 ,K.HOUR24 ,K.HOUR25
+					           FROM (
+					            	   SELECT Y.ENTER_CD, Y.SABUN, Y.YMD
+					            	         ,SUM(DECODE(X.NUM,1,Y.WORK_HOUR,0)) HOUR1,SUM(DECODE(X.NUM,2,Y.WORK_HOUR,0)) HOUR2
+					                        ,SUM(DECODE(X.NUM,3,Y.WORK_HOUR,0)) HOUR3,SUM(DECODE(X.NUM,4,Y.WORK_HOUR,0)) HOUR4
+					                        ,SUM(DECODE(X.NUM,5,Y.WORK_HOUR,0)) HOUR5,SUM(DECODE(X.NUM,6,Y.WORK_HOUR,0)) HOUR6
+					                        ,SUM(DECODE(X.NUM,7,Y.WORK_HOUR,0)) HOUR7,SUM(DECODE(X.NUM,8,Y.WORK_HOUR,0)) HOUR8
+					                        ,SUM(DECODE(X.NUM,9,Y.WORK_HOUR,0)) HOUR9,SUM(DECODE(X.NUM,10,Y.WORK_HOUR,0)) HOUR10
+					                        ,SUM(DECODE(X.NUM,11,Y.WORK_HOUR,0)) HOUR11,SUM(DECODE(X.NUM,12,Y.WORK_HOUR,0)) HOUR12
+					                        ,SUM(DECODE(X.NUM,13,Y.WORK_HOUR,0)) HOUR13,SUM(DECODE(X.NUM,14,Y.WORK_HOUR,0)) HOUR14
+					                        ,SUM(DECODE(X.NUM,15,Y.WORK_HOUR,0)) HOUR15,SUM(DECODE(X.NUM,16,Y.WORK_HOUR,0)) HOUR16
+					                        ,SUM(DECODE(X.NUM,17,Y.WORK_HOUR,0)) HOUR17,SUM(DECODE(X.NUM,18,Y.WORK_HOUR,0)) HOUR18
+					                        ,SUM(DECODE(X.NUM,19,Y.WORK_HOUR,0)) HOUR19,SUM(DECODE(X.NUM,21,Y.WORK_HOUR,0)) HOUR21
+					                        ,SUM(DECODE(X.NUM,20,Y.WORK_HOUR,0)) HOUR20,SUM(DECODE(X.NUM,22,Y.WORK_HOUR,0)) HOUR22
+					                        ,SUM(DECODE(X.NUM,23,Y.WORK_HOUR,0)) HOUR23,SUM(DECODE(X.NUM,24,Y.WORK_HOUR,0)) HOUR24
+					                        ,SUM(DECODE(X.NUM,25,Y.WORK_HOUR,0)) HOUR25
+					            		FROM (SELECT A.ENTER_CD, A.TIME_ELE_CD,DENSE_RANK() OVER (ORDER BY B.ENTER_CD,TO_NUMBER(B.SEQ) ) AS NUM
+					                          FROM TTIM994 A, TTIM993 B
+					                         WHERE A.ENTER_CD = B.ENTER_CD
+					                           AND A.TYPE     = B.TYPE
+					                           AND A.SEQ      = B.SEQ
+					                           AND B.ENTER_CD = #{ssnEnterCd}
+					                           AND B.TYPE     = 'T' -- 근태_근무구분(G:근태, T:근무)
+					                           AND A.USE_YN   = 'Y' -- 사용여부
+					                       ) X,
+					            		     (
+					            				SELECT B.ENTER_CD AS ENTER_CD, B.SABUN AS SABUN, B.S_YMD AS YMD, B.WORK_CD, SUM(B.APPLY_HOUR) WORK_HOUR
+					            				  FROM TTIM302 A, TTIM303 B
+					            				 WHERE B.ENTER_CD  = #{ssnEnterCd}
+					            				   AND B.SABUN     = #{searchSabun}
+					            				   AND B.S_YMD BETWEEN TRIM( REPLACE(#{searchSYm}, '-', '') || '01' ) AND TO_CHAR(LAST_DAY( TO_DATE(TRIM( REPLACE(#{searchEYm}, '-', '')) ,'YYYYMM' ) ), 'YYYYMMDD')
+					            				   AND B.APPLY_HOUR IS NOT NULL
+					            				   AND A.VALID_CHK = '1'
+					            				   AND A.ENTER_CD  = B.ENTER_CD
+					            				   AND A.SABUN     = B.SABUN
+					            				   AND A.S_YMD     = B.S_YMD
+					            				   AND A.SEQ       = B.SEQ
+					            				 GROUP BY B.ENTER_CD, B.SABUN, B.S_YMD, B.WORK_CD
+					            				 UNION
+					            				 SELECT ENTER_CD, SABUN, YMD, WORK_CD, SUM(WORK_HOUR) WORK_HOUR
+					            				  FROM TTIM407
+					            				 WHERE ENTER_CD = #{ssnEnterCd}
+					            				   AND SABUN    = #{searchSabun}
+					            				   AND YMD BETWEEN TRIM( REPLACE(#{searchSYm}, '-', '') || '01' ) AND TO_CHAR(LAST_DAY( TO_DATE(TRIM( REPLACE(#{searchEYm}, '-', '')) ,'YYYYMM' ) ), 'YYYYMMDD')
+					            				   AND WORK_HOUR IS NOT NULL
+					            				 GROUP BY ENTER_CD, SABUN, YMD, WORK_CD
+					            			   ) Y
+					            	    WHERE X.ENTER_CD    = Y.ENTER_CD
+					            	      AND X.TIME_ELE_CD = Y.WORK_CD
+					            		 GROUP BY Y.ENTER_CD, Y.SABUN, Y.YMD
+					         		  ) K
+					         		 ,TTIM302 M
+					           WHERE K.ENTER_CD = M.ENTER_CD(+)
+					             AND K.SABUN    = M.SABUN(+)
+					             AND K.YMD      = M.S_YMD(+)
+					       ) SUB2
+					 WHERE SUB1.SUN_DATE = SUB2.YMD(+)
+					order by SUB1.SUN_DATE
+
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPsnlWorkStaPopMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPsnlWorkStaPopHeaderList">
+
+				<![CDATA[
+				SELECT A.SEQ,DECODE(A.M_REPORT_NM,NULL,A.REPORT_NM,'',A.REPORT_NM,A.M_REPORT_NM) M_REPORT_NM,A.REPORT_NM
+				  FROM TTIM993 A
+				 WHERE A.ENTER_CD= #{ssnEnterCd}
+				   AND A.USE_YN ='Y'
+				   AND A.TYPE = 'T'
+				ORDER BY TO_NUMBER(A.SEQ)
+				]]>
+
+
+		</select>
+<!-- 		저장 -->
+		<update parameterType="map" id="savePsnlWorkStaPop">
+
+					MERGE INTO ZTST002 T
+					USING	(
+							SELECT	  A.COL1
+									, A.COL2
+									, A.COL3
+									, A.COL4
+									, A.COL5
+									, A.COL6
+							FROM	(
+									SELECT	  NULL		AS COL1
+											, NULL		AS COL2
+											, NULL		AS COL3
+											, NULL		AS COL4
+											, NULL		AS COL5
+											, NULL		AS COL6
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test=' rm.col1 != null and !rm.col1.equals("")'>
+												TRIM(#{rm.col1}) 			AS COL1
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+												TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(COL1)),0) + ${icnt}) FROM ZTST002) )	AS COL1
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+
+											, TRIM( #{rm.col2} )	AS COL2
+											, TRIM( #{rm.col3} )	AS COL3
+											, TRIM( #{rm.col4} )	AS COL4
+											, TRIM( #{rm.col5} )	AS COL5
+											, TRIM( #{rm.col6} )	AS COL6
+											FROM   DUAL
+</foreach>
+									) A WHERE A.COL1 IS NOT NULL
+							) S
+					ON ( T.COL1		= S.COL1 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.COL2	= S.COL2
+									, T.COL3	= S.COL3
+									, T.COL4	= S.COL4
+									, T.COL5	= S.COL5
+									, T.COL6	= S.COL6
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.COL1
+							, T.COL2
+							, T.COL3
+							, T.COL4
+							, T.COL5
+							, T.COL6
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.COL1
+							, S.COL2
+							, S.COL3
+							, S.COL4
+							, S.COL5
+							, S.COL6
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePsnlWorkStaPop">
+
+					DELETE FROM ZTST002
+					WHERE 	COL1 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' rm.col1 != null and !rm.col1.equals("")'>
+											TRIM( #{rm.col1} )
+										</if>
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertPsnlWorkStaPop">
+
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePsnlWorkStaPop">
+
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+
+		</update>
+
+</mapper>

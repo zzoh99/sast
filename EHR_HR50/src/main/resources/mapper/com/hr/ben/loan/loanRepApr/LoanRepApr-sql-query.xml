@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.loan.loanRepApr">
+	
+	<!-- 조회 -->
+	<select id="getLoanRepAprList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT A.ENTER_CD
+				, A.APPL_SEQ
+				, A.SABUN
+				, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+				, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+				, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+				, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+				, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+				, F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS WORKTYPE_NM
+			    , A.LOAN_CD
+			    , A.REP_YMD
+			    , A.REP_MON
+			    , A.INT_MON
+		        , C.LOAN_YMD
+		        , C.LOAN_MON
+				, B.APPL_YMD
+				, B.APPL_SABUN
+				, B.APPL_IN_SABUN
+				, B.APPL_STATUS_CD
+				, '0' AS DETAIL
+				, CASE WHEN B.APPL_STATUS_CD = '99' THEN '0' ELSE '1' END AS ROW_EDIT
+		     FROM TBEN627 A, THRI103 B, TBEN623 C
+		    WHERE A.ENTER_CD   = #{ssnEnterCd}
+		      AND A.ENTER_CD   = B.ENTER_CD
+		      AND A.APPL_SEQ   = B.APPL_SEQ
+		      AND B.APPL_STATUS_CD NOT IN ('11')
+			  AND A.ENTER_CD    = C.ENTER_CD
+			  AND A.AP_APPL_SEQ = C.APPL_SEQ ]]>
+		<if test="searchFrom != null and searchFrom neq '' and searchTo != null and searchTo neq ''">
+			  AND B.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+		</if>
+		<if test="searchApplStatusCd != null and searchApplStatusCd neq ''">
+			  AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+		</if>
+		<if test="searchRepYm != null and searchRepYm neq ''">
+			  AND A.REP_YMD LIKE REPLACE(#{searchRepYm}, '-','') || '%'
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+			  AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+		</if>
+		<if test="searchOrgNm != null and searchOrgNm neq ''">
+			  AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+		</if>
+		    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC
+	</select>
+
+	<!-- 저장 -->
+	<update id="saveLoanRepApr" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN623 T 
+		 USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			  SELECT TRIM(#{ssnEnterCd}) 							AS ENTER_CD 
+		           , TRIM(#{rm.applSeq}) 						AS APPL_SEQ
+		           , TRIM(#{rm.sabun}) 							AS SABUN
+		           , REPLACE(TRIM(#{rm.loanYmd}),'-','') 		AS LOAN_YMD
+		           , REPLACE(TRIM(#{rm.loanMon}),',','') 		AS LOAN_MON
+		           , REPLACE(TRIM(#{rm.repMon}),',','') 		AS REP_MON
+		        FROM DUAL
+		</foreach> 
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+		     AND  T.SABUN 		= S.SABUN 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE			= sysdate 
+		            , T.CHKID	    	= #{ssnSabun} 
+		            , T.LOAN_YMD 		= S.LOAN_YMD 
+		            , T.LOAN_MON 		= S.LOAN_MON 
+		            , T.REP_MON 		= S.REP_MON 
+	]]>
+	</update>
+</mapper>

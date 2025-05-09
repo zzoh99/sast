@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.yjungsan.yearEndItemMgr">
+    <!-- 		조회 -->
+    <select parameterType="map" resultType="cMap" id="getYearEndItemMgrProcess">
+			<![CDATA[
+        SELECT WORK_YY,
+               ADJ_PROCESS_CD,
+               ADJ_PROCESS_NM,
+               SEQ,
+               HELP_TEXT1,
+               HELP_TEXT2,
+               HELP_TEXT3,
+               '0' AS HELP_PIC
+        FROM TCPN801
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_YY = #{srchYear}
+        ORDER BY SEQ
+        ]]>
+		</select>
+
+    <select parameterType="map" resultType="cMap" id="getYearEndItemMgrPopup">
+			<![CDATA[
+        SELECT HELP_TEXT1, HELP_TEXT2, HELP_TEXT3
+        FROM TCPN801
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_YY = #{srchYear}
+          AND ADJ_PROCESS_CD = #{srchAdjProcessCd}
+        ORDER BY SEQ
+        ]]>
+		</select>
+
+    <select parameterType="map" resultType="cMap" id="getYearEndItemMgrProcessCnt">
+			<![CDATA[
+        SELECT COUNT(1) AS CNT
+        FROM TCPN801 A
+        WHERE A.ENTER_CD = #{ssnEnterCd}
+          AND A.WORK_YY = #{workYy}
+          AND A.ADJ_PROCESS_CD = #{adjProcessCd}
+        ]]>
+		</select>
+
+    <!-- 		저장 -->
+    <!-- 연말정산 프로세스 입력 -->
+	<update parameterType="map" id="saveYearEndItemMgrProcess">
+		MERGE INTO TCPN801 T
+		USING
+		(
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+			SELECT TRIM(#{ssnEnterCd})  	 AS  ENTER_CD
+			, TRIM(#{rm.workYy})  	 AS  WORK_YY
+			, TRIM(#{rm.adjProcessCd}) AS  ADJ_PROCESS_CD
+			, TRIM(#{rm.adjProcessNm}) AS  ADJ_PROCESS_NM
+			, TRIM(#{rm.seq}) 			AS  SEQ
+			, TRIM(#{rm.helpText1}) AS  HELP_TEXT1
+			, TRIM(#{rm.helpText2}) AS  HELP_TEXT2
+			, TRIM(#{rm.helpText3}) AS  HELP_TEXT3
+			FROM DUAL
+		</foreach>
+		) S
+		ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.WORK_YY = S.WORK_YY
+			AND T.ADJ_PROCESS_CD = S.ADJ_PROCESS_CD
+		)
+		WHEN MATCHED THEN
+			UPDATE SET T.ADJ_PROCESS_NM = S.ADJ_PROCESS_NM
+			, T.SEQ            = S.SEQ
+			, T.HELP_TEXT1     = S.HELP_TEXT1
+			, T.HELP_TEXT2     = S.HELP_TEXT2
+			, T.HELP_TEXT3     = S.HELP_TEXT3
+			, T.CHKDATE        = SYSDATE
+			, T.CHKID          = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			( T.ENTER_CD
+			, T.WORK_YY
+			, T.ADJ_PROCESS_CD
+			, T.ADJ_PROCESS_NM
+			, T.SEQ
+			, T.HELP_TEXT1
+			, T.HELP_TEXT2
+			, T.HELP_TEXT3
+			, T.CHKDATE
+			, T.CHKID
+			)
+			VALUES
+			(
+			S.ENTER_CD
+			, S.WORK_YY
+			, S.ADJ_PROCESS_CD
+			, S.ADJ_PROCESS_NM
+			, S.SEQ
+			, S.HELP_TEXT1
+			, S.HELP_TEXT2
+			, S.HELP_TEXT3
+			, SYSDATE
+			, #{ssnSabun}
+			)
+    </update>
+
+    <!-- 		삭제 -->
+    <!-- 연말정산 프로세스 삭제 -->
+    <delete parameterType="map" id="deleteYearEndItemMgrProcess1">
+        DELETE
+        FROM TCPN801
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_YY = #{srchYear}
+          AND ADJ_PROCESS_CD IN ( NULL
+		<foreach item="rm" collection="deleteRows" >
+    		<if test='rm.adjProcessCd != null and !rm.adjProcessCd.equals("") '>
+			, TRIM( #{rm.adjProcessCd} )
+			</if>
+		</foreach>
+		)
+    </delete>
+    <!-- 연말정산 항목 삭제 -->
+    <delete parameterType="map" id="deleteYearEndItemMgrProcess2">
+        DELETE
+        FROM TCPN803
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_YY = #{srchYear}
+		  AND ADJ_PROCESS_CD IN ( NULL
+		<foreach item="rm" collection="deleteRows" >
+    		<if test='rm.adjProcessCd != null and !rm.adjProcessCd.equals("") '>
+			, TRIM( #{rm.adjProcessCd} )
+			</if>
+		</foreach>
+		)
+    </delete>
+
+	<!-- 연말정산 항목 조회 -->
+	<select parameterType="map" resultType="cMap" id="getYearEndItemMgr">
+		<![CDATA[
+		SELECT WORK_YY, ADJ_PROCESS_CD, ADJ_ELEMENT_CD, ADJ_ELEMENT_NM, ELE_WORK_TYPE
+			 , DED_DATA_YN, ADJ_DATA_YN, INCOME_DATA_YN, SEQ, TAX_RATE_CD
+		FROM TCPN803
+		WHERE ENTER_CD       = #{ssnEnterCd}
+		  AND WORK_YY  	  = #{srchYear}
+		  AND ADJ_PROCESS_CD = #{srchAdjProcessCd}
+		ORDER BY SEQ
+		]]>
+	</select>
+
+	<!-- 연말정산 항목 중복 조회 -->
+	<select parameterType="map" resultType="cMap" id="selectYearEndItemMgrCnt">
+		<![CDATA[
+		SELECT COUNT(1) AS CNT
+		FROM TCPN803 A
+		WHERE A.ENTER_CD		= #{ssnEnterCd}
+		  AND A.WORK_YY  	    = #{workYy}
+		  AND A.ADJ_ELEMENT_CD = #{adjElementCd}
+		]]>
+	</select>
+
+	<!-- 연말정산 항목 merge -->
+	<update parameterType="map" id="saveYearEndItemMgr">
+		MERGE INTO TCPN803 T
+		USING (
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+			SELECT
+			#{ssnEnterCd} AS ENTER_CD,
+			#{rm.workYy} AS WORK_YY,
+			#{rm.adjElementCd} AS ADJ_ELEMENT_CD,
+			#{rm.adjElementNm} AS ADJ_ELEMENT_NM,
+			#{rm.adjProcessCd} AS ADJ_PROCESS_CD,
+			#{rm.taxRateCd} AS TAX_RATE_CD,
+			#{rm.eleWorkType} AS ELE_WORK_TYPE,
+			#{rm.dedDataYn} AS DED_DATA_YN,
+			#{rm.adjDataYn} AS ADJ_DATA_YN,
+			#{rm.incomeDataYn} AS INCOME_DATA_YN,
+			#{rm.seq} AS SEQ
+			FROM DUAL
+		</foreach>
+		) S
+		ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.WORK_YY = S.WORK_YY
+			AND T.ADJ_ELEMENT_CD = S.ADJ_ELEMENT_CD
+		)
+		WHEN MATCHED THEN
+		UPDATE SET
+			T.ADJ_ELEMENT_NM = S.ADJ_ELEMENT_NM,
+			T.ADJ_PROCESS_CD = S.ADJ_PROCESS_CD,
+			T.TAX_RATE_CD = S.TAX_RATE_CD,
+			T.ELE_WORK_TYPE = S.ELE_WORK_TYPE,
+			T.DED_DATA_YN = S.DED_DATA_YN,
+			T.ADJ_DATA_YN = S.ADJ_DATA_YN,
+			T.INCOME_DATA_YN = S.INCOME_DATA_YN,
+			T.SEQ = S.SEQ,
+			T.CHKDATE = SYSDATE,
+			T.CHKID = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT (
+			ENTER_CD,
+			WORK_YY,
+			ADJ_ELEMENT_CD,
+			ADJ_ELEMENT_NM,
+			ADJ_PROCESS_CD,
+			TAX_RATE_CD,
+			ELE_WORK_TYPE,
+			DED_DATA_YN,
+			ADJ_DATA_YN,
+			INCOME_DATA_YN,
+			SEQ,
+			CHKDATE,
+			CHKID
+		)
+		VALUES (
+			S.ENTER_CD,
+			S.WORK_YY,
+			S.ADJ_ELEMENT_CD,
+			S.ADJ_ELEMENT_NM,
+			S.ADJ_PROCESS_CD,
+			S.TAX_RATE_CD,
+			S.ELE_WORK_TYPE,
+			S.DED_DATA_YN,
+			S.ADJ_DATA_YN,
+			S.INCOME_DATA_YN,
+			S.SEQ,
+			SYSDATE,
+			#{ssnSabun}
+		)
+    </update>
+
+	<!-- 연말정산 항목 삭제 -->
+	<delete parameterType="map" id="deleteYearEndItemMgr">
+		DELETE FROM TCPN803 A
+		WHERE A.ENTER_CD			= #{ssnEnterCd}
+		  AND A.WORK_YY  	    	= #{srchYear}
+		  AND A.ADJ_ELEMENT_CD IN ( NULL
+		  <foreach item="rm" collection="deleteRows" >
+    		<if test='rm.adjElementCd != null and !rm.adjElementCd.equals("") '>
+			, TRIM( #{rm.adjElementCd} )
+			</if>
+		  </foreach>
+		  )
+    </delete>
+	<!-- 연말정산 프로세스 전년도복사 801 -->
+	<update parameterType="map" id="copyYearEndItemMgr1">
+		<![CDATA[
+		INSERT INTO TCPN801
+		(
+			ENTER_CD
+		, WORK_YY
+		, ADJ_PROCESS_CD
+		, ADJ_PROCESS_NM
+		, SEQ
+		, HELP_TEXT1
+		, HELP_TEXT2
+		, HELP_TEXT3
+		, CHKDATE
+		, CHKID
+		)
+			( SELECT ENTER_CD
+				   , TO_CHAR(TO_NUMBER(WORK_YY)+1)
+				   , ADJ_PROCESS_CD
+				   , ADJ_PROCESS_NM
+				   , SEQ
+				   , HELP_TEXT1
+				   , HELP_TEXT2
+				   , HELP_TEXT3
+				   , SYSDATE
+				   , CHKID
+			  FROM TCPN801
+			  WHERE ENTER_CD = #{ssnEnterCd}
+				AND WORK_YY  = TO_CHAR( TO_NUMBER(#{srchYear})-1 )
+			)
+		]]>
+    </update>
+
+	<!-- 연말정산 프로세스 전년도 복사 803 -->
+	<update parameterType="map" id="copyYearEndItemMgr2">
+		<![CDATA[
+		INSERT INTO TCPN803
+		(
+			ENTER_CD
+		, WORK_YY
+		, ADJ_ELEMENT_CD
+		, ADJ_ELEMENT_NM
+		, ADJ_PROCESS_CD
+		, TAX_RATE_CD
+		, ELE_WORK_TYPE
+		, DED_DATA_YN
+		, ADJ_DATA_YN
+		, INCOME_DATA_YN
+		, SEQ
+		, CHKDATE
+		, CHKID
+		)
+			( SELECT ENTER_CD
+				   , TO_CHAR(TO_NUMBER(WORK_YY)+1)
+				   , ADJ_ELEMENT_CD
+				   , ADJ_ELEMENT_NM
+				   , ADJ_PROCESS_CD
+				   , TAX_RATE_CD
+				   , ELE_WORK_TYPE
+				   , DED_DATA_YN
+				   , ADJ_DATA_YN
+				   , INCOME_DATA_YN
+				   , SEQ
+				   , SYSDATE
+				   , CHKID
+			  FROM TCPN803
+			  WHERE ENTER_CD = #{ssnEnterCd}
+				AND WORK_YY  = TO_CHAR( TO_NUMBER(#{srchYear})-1 )
+			)
+		]]>
+    </update>
+
+	<!-- 도움말(SUB) 조회 -->
+	<select parameterType="map" resultType="cMap" id="selectYearEndItemMgrPopupSub">
+		<![CDATA[
+		SELECT T1.*
+		FROM (
+				 SELECT A.GRCODE_CD,
+						A.CODE,
+						A.CODE_NM,
+						A.CODE_FULL_NM,
+						A.NOTE1,
+						A.NOTE2,
+						A.NOTE3,
+						A.MEMO,
+						A.SEQ,
+						CASE WHEN A.CODE = A.NOTE3 THEN A.SEQ
+							 ELSE ( SELECT MIN(Z.SEQ)
+									FROM TSYS005 Z
+									WHERE Z.ENTER_CD  = #{ssnEnterCd}
+									  AND Z.GRCODE_CD = 'YEA994'
+									  AND Z.CODE      = A.NOTE3 )
+							END AS MAIN_RN
+				 FROM TSYS005 A
+				 WHERE A.ENTER_CD  = #{ssnEnterCd}
+				   AND A.GRCODE_CD = #{srchGrcodeCd}     -- 공통코드(YEA994) = 연말정산도움말관리(SUB)
+				   AND A.NOTE1     = #{srchYear}         -- NOTE1 = 대상년도
+				   AND A.NOTE2     = #{srchAdjProcessCd} -- NOTE2 = 프로세스코드
+				 -- AND A.NOTE3     = '10'               -- NOTE3 = 도움말 그룹 (MEMO 4000 바이트가 모자를 경우 분리해서 저장)
+			 ) T1
+		ORDER BY T1.MAIN_RN, T1.SEQ, T1.CODE
+		]]>
+	</select>
+
+	<!-- 도움말(SUB) 중복 조회 -->
+	<select parameterType="map" resultType="cMap" id="selectYearEndItemMgrPopupSubCnt">
+		<![CDATA[
+		SELECT COUNT(1) AS CNT
+		FROM TSYS005 A
+		WHERE A.ENTER_CD  = #{ssnEnterCd}
+		  AND A.GRCODE_CD = #{grcodeCd}
+		  AND A.CODE      = #{code}
+		]]>
+	</select>
+
+	<!-- 도움말(SUB) 입력 -->
+	<update parameterType="map" id="insertYearEndItemMgrPopupSub">
+		<![CDATA[
+		INSERT INTO TSYS005
+		(
+			ENTER_CD
+		, GRCODE_CD
+		, CODE
+		, CODE_NM
+		, CODE_FULL_NM
+		, NOTE1
+		, NOTE2
+		, NOTE3
+		, MEMO
+		, SEQ
+		, CHKDATE
+		, CHKID
+		)
+		VALUES
+			(
+			  #{ssnEnterCd}
+			, #{grcodeCd}
+			, #{code}
+			, #{codeNm}
+			, #{codeFullNm}
+			, #{note1}
+			, #{note2}
+			, #{note3}
+			, #{memo}
+			, #{seq}
+			, SYSDATE
+			, #{ssnSabun}
+			)
+		]]>
+    </update>
+
+	<!-- 도움말(SUB) 수정 -->
+	<update parameterType="map" id="updateYearEndItemMgrPopupSub">
+		<![CDATA[
+		UPDATE TSYS005 A
+		SET CODE_NM	    = #{codeNm}
+		  , CODE_FULL_NM	= #{codeFullNm}
+		  , NOTE1		= #{note1}
+		  , NOTE2 		= #{note2}
+		  , NOTE3		= #{note3}
+		  , MEMO		    = #{memo}
+		  , SEQ		    = #{seq}
+		  , CHKDATE		= SYSDATE
+		  , CHKID		= #{ssnSabun}
+		WHERE A.ENTER_CD   = #{ssnEnterCd}
+		  AND A.GRCODE_CD  = #{grcodeCd}
+		  AND A.CODE       = #{code}
+		]]>
+    </update>
+
+	<!-- 도움말(SUB) 삭제 -->
+	<delete parameterType="map" id="deleteYearEndItemMgrPopupSub">
+		<![CDATA[
+		DELETE FROM TSYS005 A
+		WHERE A.ENTER_CD   = #{ssnEnterCd}
+		  AND A.GRCODE_CD  = #{grcodeCd}
+		  AND A.CODE       = #{code}
+		]]>
+    </delete>
+
+	<!-- 도움말(SUB) 조회 -->
+	<select parameterType="map" resultType="cMap" id="getYearEndItemMgrPopupSub">
+		<![CDATA[
+		SELECT T1.*
+		FROM (
+				 SELECT A.GRCODE_CD,
+						A.CODE,
+						A.CODE_NM,
+						A.CODE_FULL_NM,
+						A.NOTE1,
+						A.NOTE2,
+						A.NOTE3,
+						A.MEMO,
+						A.SEQ,
+						CASE WHEN A.CODE = A.NOTE3 THEN A.SEQ
+							 ELSE ( SELECT MIN(Z.SEQ)
+									FROM TSYS005 Z
+									WHERE Z.ENTER_CD  = #{ssnEnterCd}
+									  AND Z.GRCODE_CD = 'YEA994'
+									  AND Z.CODE      = A.NOTE3 )
+							END AS MAIN_RN
+				 FROM TSYS005 A
+				 WHERE A.ENTER_CD  = #{ssnEnterCd}
+				   AND A.GRCODE_CD = #{srchGrcodeCd}     -- 공통코드(YEA994) = 연말정산도움말관리(SUB)
+				   AND A.NOTE1     = #{srchYear}         -- NOTE1 = 대상년도
+				   AND A.NOTE2     = #{srchAdjProcessCd} -- NOTE2 = 프로세스코드
+				 -- AND A.NOTE3     = '10'               -- NOTE3 = 도움말 그룹 (MEMO 4000 바이트가 모자를 경우 분리해서 저장)
+			 ) T1
+		ORDER BY T1.MAIN_RN, T1.SEQ, T1.CODE
+		]]>
+	</select>
+</mapper>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.perPayYearStd">
+
+		<!--조회-->
+		<select parameterType="map" resultType="cMap" id="getPerPayYearStdList">
+	SELECT A.*
+	  FROM TCPN405 A, TCPN011 B
+	 WHERE 1=1
+	   AND A.ENTER_CD = #{ssnEnterCd}
+	   AND A.ENTER_CD = B.ENTER_CD
+	   AND A.ELEMENT_CD = B.ELEMENT_CD
+<if test='elementCd != null and !elementCd.equals("")'>
+	   AND A.ELEMENT_CD = #{elementCd}
+
+</if>
+<if test='searchWorkType != null and !searchWorkType.equals("")'>
+	   AND A.WORK_TYPE = #{searchWorkType}
+</if>
+	   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+	 ORDER BY B.PRIORITY
+		</select>
+		
+		<!--치환가능 텍스트-->
+		<select parameterType="map" resultType="cMap" id="getChangeElementList">
+
+				<![CDATA[
+SELECT A.ENTER_CD
+     , A.GLOBAL_VALUE_CD
+     , A.GLOBAL_VALUE_NM
+     , B.ELEMENT_SET_CD
+     , B.ELEMENT_CD
+     , B.INCLUDE_TYPE
+     , C.ELEMENT_TYPE
+     , C.ELEMENT_NM
+     , C.REPORT_NM
+     , C.PRIORITY
+     , C.UPDOWN_TYPE
+     , C.UPDOWN_UNIT
+     , C.CURRENCY_CD
+  FROM TCPN081 A, TCPN072 B, TCPN011 C
+ WHERE A.GLOBAL_VALUE_CD IN ('ELE_SET_MONTH_MON', 'ELE_SET_YEAR_MON') 
+   AND A.ENTER_CD = #{ssnEnterCd}
+   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+   AND A.ENTER_CD = B.ENTER_CD
+   AND A.GLOBAL_VALUE = B.ELEMENT_SET_CD
+   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+   AND B.ENTER_CD = C.ENTER_CD
+   AND B.ELEMENT_CD = C.ELEMENT_CD
+   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+ ORDER BY C.ELEMENT_CD
+				]]>
+
+
+		</select>
+		
+		<!--치환가능 텍스트-->
+		<update parameterType="map" id="savePerPayYearStd">
+	MERGE INTO TCPN405 T
+	USING (
+			<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+	<if test='icnt > 1'>
+	UNION ALL
+	</if>
+	            , TRIM(#{rm.elementCd}) AS ELEMENT_CD
+	            , TRIM(#{rm.workType}) AS WORK_TYPE
+	            , TRIM(#{rm.calcLogic}) AS CALC_LOGIC
+	            , NULL AS BIGO
+	            , TRIM(#{ssnSabun}) AS CHKID
+	        FROM DUAL
+<bind name="icnt" value="icnt + 1" />
+</foreach>
+
+	       ) S
+	ON (T.ENTER_CD = S.ENTER_CD AND T.ELEMENT_CD = S.ELEMENT_CD AND T.WORK_TYPE = S.WORK_TYPE)
+	WHEN MATCHED THEN
+	      UPDATE 
+	         SET CALC_LOGIC = S.CALC_LOGIC
+	           , BIGO       = S.BIGO
+	           , CHKDATE    = SYSDATE
+	           , CHKID      = S.CHKID
+	WHEN NOT MATCHED THEN
+	      INSERT (ENTER_CD,   ELEMENT_CD,   WORK_TYPE,   CALC_LOGIC,   BIGO,   CHKDATE, CHKID)
+	      VALUES (S.ENTER_CD, S.ELEMENT_CD, S.WORK_TYPE, S.CALC_LOGIC, S.BIGO, SYSDATE, S.CHKID)
+		</update>
+		
+		<!--치환가능 텍스트-->
+		<delete parameterType="map" id="deletePerPayYearStd">
+		DELETE FROM TCPN405
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND ENTER_CD || '_' || ELEMENT_CD || '_' || WORK_TYPE 
+		       IN (NULL
+<foreach item="rm" collection="deleteRows" >
+		       ,
+	<if test='rm.elementCd != null and !rm.elementCd.equals("") and rm.workType != null and !rm.workType.equals("")'>
+		       TRIM(#{ssnEnterCd}) || '_' || #{rm.elementCd} || '_' || #{rm.workType}
+    </if>
+		</foreach>
+		       )
+
+		</delete>
+
+	</mapper>

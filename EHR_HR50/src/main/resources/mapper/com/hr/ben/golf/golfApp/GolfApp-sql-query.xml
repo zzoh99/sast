@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  골프장 예약관리  -->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.golf.golfApp">
+	
+	<!-- 예약 리스트  -->	
+	<select id="getGolfAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , TO_CHAR(TO_DATE(A.YMD,'YYYYMMDD'),'YYYY-MM-DD') AS YMD
+		     , NVL2( A.REQ_TIME_ST, LPAD(SUBSTR(A.REQ_TIME_ST, 1,2), 2, '0') || NVL2( SUBSTR(A.REQ_TIME_ST, 3,2), ':' || LPAD(SUBSTR(A.REQ_TIME_ST, 3,2), 2, '0'), ':00' ) , '' )  AS REQ_TIME_ST
+		     , NVL2( A.REQ_TIME_ED, LPAD(SUBSTR(A.REQ_TIME_ED, 1,2), 2, '0') || NVL2( SUBSTR(A.REQ_TIME_ED, 3,2), ':' || LPAD(SUBSTR(A.REQ_TIME_ED, 3,2), 2, '0'), ':00' ) , '' )  AS REQ_TIME_ED
+		     , A.STATUS_CD
+		     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B51010' , A.GOLF_CD) 
+		       || ( CASE WHEN TRIM(#{ssnGrpCd}) = '10' OR  A.SABUN = TRIM( #{ssnSabun} )  OR A.APPL_SABUN = TRIM( #{ssnSabun} ) THEN
+		                        ' / ' ||  F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)
+                                    ELSE  ''  END ) 
+                        || ' / ' || F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B51020' , A.STATUS_CD) AS TITLE ]]>
+	<choose>
+		<when test="ssnGrpCd != null and ssnGrpCd eq '10'">
+			 , 'Y' AS VIEW_YN
+		</when>
+		<otherwise>
+			 , DECODE( TRIM( #{ssnSabun} ), A.SABUN, 'Y', A.APPL_SABUN, 'Y', 'N' ) AS VIEW_YN
+		</otherwise>
+	</choose>
+                   , ROW_NUMBER() OVER (ORDER BY A.YMD, A.APPL_SEQ) AS SEQ       
+		  FROM TBEN511 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+	<if test="searchGolfCd != null and searchGolfCd neq ''">
+		   AND A.GOLF_CD  = TRIM(#{searchGolfCd})
+	</if>
+		   AND SUBSTR( A.YMD, 1, 6) = TRIM(#{searchYm})
+	<if test="ssnGrpCd == null or ssnGrpCd neq '10'">
+		   AND ( A.SABUN = TRIM( #{ssnSabun} ) OR  A.APPL_SABUN = TRIM( #{ssnSabun} ) OR  A.STATUS_CD IN ('21', '31', '99') )
+	</if>
+	     ORDER BY A.YMD, A.APPL_SEQ
+	</select>
+		
+	<!-- 골프장 콤보 리스트 -->
+	<select id="getGolfAppGolfCdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.GOLF_CD AS CODE
+		     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B51010' , A.GOLF_CD) AS CODE_NM
+		     , GOLF_ADDR
+		     , GOLF_MON
+		     , NOTE
+		  FROM TBEN510 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+		   AND A.USE_YN = 'Y'
+	     ORDER BY A.SEQ
+	]]>
+	</select>
+		
+	<!-- 예약 상세 정보 조회 -->
+	<select id="getGolfAppMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.APPL_YMD
+		     , A.SABUN	 AS REQ_SABUN
+		     , A.GOLF_CD
+		     , A.YMD     AS REQ_YMD
+		     , A.STATUS_CD
+		     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B51020' , A.STATUS_CD) AS STATUS_NM
+		     , A.USER_TYPE_CD
+		     , A.USER_NM
+		     , A.REQ_TIME_ST
+		     , A.REQ_TIME_ED
+		     , A.PHONE_NO
+		     , A.MAIL_ID
+		     , A.NOTE
+		     , A.CANCEL_YMD
+		     , A.CANCEL_REASON
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) || ' / ' || F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.YMD) AS REQ_USER
+		     , A.CONF_TIME
+		  FROM TBEN511 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.APPL_SEQ = TRIM(#{searchApplSeq}) ]]>
+		<if test="ssnGrpCd != null and ssnGrpCd neq '10'">
+		   AND (  A.SABUN  = TRIM( #{ssnSabun} ) OR APPL_SABUN = TRIM( #{ssnSabun} ) )
+		</if>
+	</select>
+
+	<!-- 세션 사용자 연락처 정보 -->		
+	<select id="getGolfAppUserMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_CONT_ADDRESS(#{ssnEnterCd}, TRIM(#{ssnSabun}), 'HP') AS PHONE_NO 
+			  ,F_COM_GET_CONT_ADDRESS(#{ssnEnterCd}, TRIM(#{ssnSabun}), 'IM') AS MAIL_ID -- 메일주소 
+		FROM DUAL
+	]]>
+	</select>
+		
+	<!-- 예약 중복 체크 -->		
+	<select id="getGolfAppUserDupCheck" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT (SELECT COUNT(1) AS CNT
+				  FROM TBEN511 A 
+				 WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd})
+				   AND A.GOLF_CD   = TRIM(#{golfCd})
+				   AND A.YMD       = REPLACE(TRIM(#{reqYmd}), '-', '')
+				   AND A.STATUS_CD IN ('21','31','99')
+			   ) AS DUP_CNT
+		  FROM DUAL		    
+	]]>
+	</select>
+		
+	<!-- 골프장 예약저장 -->
+	<update id="saveGolfApp" parameterType="map">
+	<![CDATA[		 
+		 MERGE INTO TBEN511 T 
+		 USING ( ]]>
+		 	<bind name="idx" value="1" />
+			<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD
+				<choose>
+					<when test="rm.applSeq != null and rm.applSeq neq ''">
+					 , TRIM(#{rm.applSeq})     	AS APPL_SEQ
+					</when>
+					<otherwise>
+					 , TO_CHAR( (SELECT (NVL(MAX(APPL_SEQ),0) + #{idx}) FROM TBEN511 WHERE ENTER_CD = #{ssnEnterCd} ))  AS APPL_SEQ
+					 <bind name="idx" value="idx + 1" />
+					</otherwise>
+				</choose>
+					 , TRIM(#{rm.reqSabun})  	AS  SABUN
+		             , TRIM(#{rm.golfCd})  		AS  GOLF_CD
+		             , REPLACE(TRIM(#{rm.reqYmd}),'-','') AS  YMD
+		             , DECODE( TRIM(#{rm.sStatus}), 'I', '21', '31' ) AS  STATUS_CD
+		             , TRIM(#{rm.userTypeCd})  	AS  USER_TYPE_CD
+		             , TRIM(#{rm.userNm})  		AS  USER_NM
+		             , REPLACE(TRIM(#{rm.reqTimeSt}),':','')  	AS  REQ_TIME_ST
+		             , REPLACE(TRIM(#{rm.reqTimeEd}),':','')  	AS  REQ_TIME_ED
+		             , TRIM(#{rm.phoneNo})  		AS  PHONE_NO
+		             , TRIM(#{rm.mailId})  		AS  MAIL_ID
+		             , TRIM(#{rm.note})  		AS  NOTE
+		             , DECODE( TRIM(#{rm.sStatus}), 'U', TO_CHAR(SYSDATE,'YYYYMMDD'), '' ) AS  CANCEL_YMD
+		             , TRIM(#{rm.cancelReason})  AS  CANCEL_REASON
+		             , TRIM( #{ssnSabun} )  		AS  APPL_SABUN  
+		          FROM DUAL
+			</foreach>
+		<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE			= sysdate 
+		            , T.CHKID			= #{ssnSabun} 
+		            , T.STATUS_CD 		= S.STATUS_CD
+		            , T.CANCEL_YMD      = S.CANCEL_YMD
+		            , T.CANCEL_REASON   = S.CANCEL_REASON
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.APPL_SEQ
+		            , T.SABUN
+		            , T.APPL_YMD
+		            , T.APPL_SABUN
+		            , T.GOLF_CD
+		            , T.YMD
+		            , T.USER_TYPE_CD
+		            , T.USER_NM
+		            , T.REQ_TIME_ST
+		            , T.REQ_TIME_ED
+		            , T.STATUS_CD
+		            , T.PHONE_NO
+		            , T.MAIL_ID
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.APPL_SEQ
+		            , S.SABUN
+		            , TO_CHAR(SYSDATE, 'YYYYMMDD')
+		            , S.APPL_SABUN
+		            , S.GOLF_CD
+		            , S.YMD
+		            , S.USER_TYPE_CD
+		            , S.USER_NM
+		            , S.REQ_TIME_ST
+		            , S.REQ_TIME_ED
+		            , S.STATUS_CD
+		            , S.PHONE_NO
+		            , S.MAIL_ID
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+
+
+	<!-- 골프장 예약 삭제 -->		
+	<delete id="deleteGolfApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN511
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( APPL_SEQ ) IN ( ( NULL) ]]>
+		 <foreach item="rm" collection="deleteRows">
+		 	<if test="rm.applSeq != null and rm.applSeq neq ''">
+		 		, ( TRIM( #{rm.applSeq} ) ) 
+		 	</if>
+		 </foreach>
+		    )
+	</delete>
+	
+</mapper>

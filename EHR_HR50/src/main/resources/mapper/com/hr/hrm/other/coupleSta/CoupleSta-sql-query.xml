@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.coupleSta">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getCoupleStaList">
+
+				<![CDATA[
+					SELECT F_COM_GET_ENTER_NM(C.H_ENTER_CD) AS H_ENTER_NM
+							 , F_COM_GET_ORG_NM(C.H_ENTER_CD, F_COM_GET_ORG_CD(C.H_ENTER_CD, C.H_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), TO_CHAR(SYSDATE, 'YYYYMMDD')) AS H_ORG_NM
+					     , F_COM_GET_JIKWEE_NM(C.H_ENTER_CD, C.H_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))  AS H_JIKWEE_NM
+					     , F_COM_GET_JIKCHAK_NM(C.H_ENTER_CD, C.H_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS H_JIKCHAK_NM
+					     , F_COM_GET_JIKGUB_NM(C.H_ENTER_CD, C.H_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))  AS H_JIKGUB_NM
+					     , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || C.H_ENTER_CD || chr(38) || 'searchKeyword=' || C.H_SABUN || chr(38) || 'type=1' AS PHOTO_H
+					     , C.H_SABUN
+					     , C.H_NAME
+					     , C.WED_YMD
+					     , DECODE(C.H_JAEJIK_YN, 'Y', '재직', '퇴직') AS H_JAEJIK_NM
+					     , F_COM_GET_ENTER_NM(C.W_ENTER_CD) AS W_ENTER_NM
+							 , F_COM_GET_ORG_NM(C.W_ENTER_CD, F_COM_GET_ORG_CD(C.W_ENTER_CD, C.W_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), TO_CHAR(SYSDATE, 'YYYYMMDD')) AS W_ORG_NM
+					     , F_COM_GET_JIKWEE_NM(C.W_ENTER_CD, C.W_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))  AS W_JIKWEE_NM
+					     , F_COM_GET_JIKCHAK_NM(C.W_ENTER_CD, C.W_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS W_JIKCHAK_NM
+					     , F_COM_GET_JIKGUB_NM(C.W_ENTER_CD, C.W_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))  AS W_JIKGUB_NM
+					     , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || C.W_ENTER_CD || chr(38) || 'searchKeyword=' || C.W_SABUN || chr(38) || 'type=1' AS PHOTO_W
+					     , C.W_SABUN
+					     , C.W_NAME
+					     , DECODE(C.W_JAEJIK_YN, 'Y', '재직', '퇴직') AS W_JAEJIK_NM
+					     , F_SYS_GET_ENDOW_AUTH_YN( C.H_ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  C.H_SABUN ) AS AUTH_YN_W
+					     , F_SYS_GET_ENDOW_AUTH_YN( C.W_ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  C.W_SABUN ) AS AUTH_YN_H
+					  FROM ( SELECT B.*
+					              , A.ENTER_CD	AS W_ENTER_CD
+					              , A.SABUN			AS W_SABUN
+					              , A.NAME			AS W_NAME
+					              , A.EMP_YMD		AS W_EMP_YMD
+					              , A.RET_YMD		AS W_RET_YMD
+					              , DECODE(A.RET_YMD, NULL, 'Y', 'N') AS W_JAEJIK_YN
+					           		, ROW_NUMBER () OVER (PARTITION BY A.RES_NO ORDER BY A.EMP_YMD DESC, A.RET_YMD DESC) AS ROW_NUM		--여러회사에 있을 수 있어서 입사일가 퇴사일이 MAX인 회사정보를 읽어오기 위하여
+					        	 FROM THRM100 A,
+					           		( SELECT A.ENTER_CD 	AS H_ENTER_CD
+					                     , A.SABUN			AS H_SABUN
+					                     , A.NAME			  AS H_NAME
+					                     , A.EMP_YMD		AS H_EMP_YMD
+					                     , A.RET_YMD		AS H_RET_YMD
+					                     , DECODE(A.RET_YMD, NULL, 'Y', 'N') AS H_JAEJIK_YN
+					                     , A.WED_YMD
+					                     , B.FAMRES 		AS W_RES_NO
+					                  FROM THRM100 A, THRM111 B
+					                 WHERE 1=1
+					                   AND A.ENTER_CD  = B.ENTER_CD(+)
+					                   AND A.SABUN		 = B.SABUN(+)
+					                   AND B.FAM_CD(+) = '002'
+					                   AND A.SEX_TYPE  = '1'
+					                   AND B.SABUN IS NOT NULL
+					                   AND A.ENTER_CD  =  #{ssnEnterCd}		--회사코드 Parm
+					              ) B
+						        WHERE A.RES_NO = B.W_RES_NO
+					       ) C
+					 WHERE C.ROW_NUM = 1 ]]>
+					 <if test='searchSabunName !=null and !searchSabunName.equals("")'>
+					   AND (C.H_SABUN LIKE  '%'|| #{searchSabunName} ||'%' OR C.H_NAME LIKE '%'|| #{searchSabunName} ||'%' OR C.W_SABUN LIKE  '%'|| #{searchSabunName} ||'%' OR C.W_NAME LIKE '%'|| #{searchSabunName} ||'%' )
+					 </if>
+					 <if test='searchJaejikGubun != null and !searchJaejikGubun.equals("")'>
+					   AND C.H_JAEJIK_YN LIKE CASE #{searchJaejikGubun} WHEN 'A' THEN 'Y'				--전체재직:A, 남편재직:H, 부인재직:W, Parm
+					   														   WHEN 'H' THEN 'Y'
+											                                   WHEN 'W' THEN '%' END
+					   AND C.W_JAEJIK_YN LIKE CASE #{searchJaejikGubun} WHEN 'A' THEN 'Y'
+					   													   	   WHEN 'H' THEN '%'
+					 						                                   WHEN 'W' THEN 'Y' END
+					 </if>
+
+
+		</select>
+		
+
+</mapper>

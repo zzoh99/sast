@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	
+ -->
+<root>	
+	<!--  조회 -->
+	<query id="selectYeaDataWooriList">
+		<![CDATA[
+			SELECT A.ENTER_CD
+				 , A.WORK_YY
+				 , A.ADJUST_TYPE
+				 , A.SABUN
+				 , A.NAME
+				 , F_COM_DECRYPT(A.RES_NO, A.ENTER_CD) AS RES_NO
+				 , F_COM_DECRYPT(A.B9_NO, A.ENTER_CD) AS B9_NO
+				 , A.B10_ENTER_NM
+				 , A.B11_YMD
+				 , A.B12_YMD
+				 , A.B13_YMD
+				 , A.B14_YMD
+				 , A.B15_MON
+				 , A.B16_MON
+				 , A.B17_GUBUN
+				 , A.B18_MON
+				 , A.B19_MON
+				 , A.SEQ
+			  FROM TYEA401 A
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.WORK_YY = #searchYear#
+			   AND A.ADJUST_TYPE LIKE '%'||  #searchAdjustType# ||'%'
+			   AND A.ADJUST_TYPE IN (SELECT CODE
+					                   FROM TSYS005
+					                  WHERE ENTER_CD = #ssnEnterCd#
+					                    AND GRCODE_CD = 'C00303'
+					                    AND USE_YN = 'Y'
+					                    AND #searchYear#||'1231' BETWEEN S_YMD AND E_YMD)
+			   AND (A.NAME LIKE '%' || TRIM(#searchSbNm#) || '%' OR A.SABUN LIKE '%' || TRIM(#searchSbNm#) || '%')
+			ORDER BY A.SABUN DESC
+		]]>
+	</query>
+	
+	<!-- 종전근무지관리 입력 -->
+	<query id="insertWooriMgr">
+		<![CDATA[
+				INSERT INTO TYEA401
+	         (
+	            ENTER_CD      -- 회사코드
+			   ,WORK_YY       -- 대상년도
+			   ,ADJUST_TYPE   -- 정산구분(C00303)
+			   ,SABUN         -- 사원번호
+			   ,NAME          -- 이름
+			   ,RES_NO        -- 주민번호
+			   ,B9_NO         -- 유가증권코드/발행법인사업자번호
+			   ,B10_ENTER_NM  -- 발행법인의 법인명
+			   ,B11_YMD  	   -- 우리사주취득일
+			   ,B12_YMD       -- 배당금지급기준일
+			   ,B13_YMD       -- 증권금융회사예탁일
+			   ,B14_YMD   	   -- 우리사주인출일
+			   ,B15_MON       -- 액면가액합계액
+			   ,B16_MON       -- 배당소득금액
+			   ,B17_GUBUN     -- 구분(납부세액:1/환급세엑:2)
+			   ,B18_MON       -- 납부세액
+			   ,B19_MON       -- 환급세액
+			   ,CHKDATE
+			   ,CHKID
+			   ,SEQ
+	         )
+	         VALUES
+			(
+				#ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #name#
+				, CRYPTIT.ENCRYPT(#res_no#,  #ssnEnterCd#)
+				, CRYPTIT.ENCRYPT (#b9_no# ,  #ssnEnterCd#)   
+				, #b10_enter_nm#
+				, #b11_ymd#
+				, #b12_ymd#
+				, #b13_ymd#
+				, #b14_ymd#
+				, #b15_mon#
+				, #b16_mon#
+				, #b17_gubun#
+				, #b18_mon#
+				, #b19_mon#
+				, SYSDATE
+				, #ssnSabun#
+				, #seq#
+			)
+		]]>
+	</query>
+
+	<!-- 종전근무지관리 수정 -->
+	<query id="updateWooriMgr">
+		<![CDATA[
+			UPDATE TYEA401
+			   SET ENTER_CD      = #ssnEnterCd#
+				 , WORK_YY       = #work_yy#     
+				 , ADJUST_TYPE   = #adjust_type# 
+				 , SABUN         = #sabun#       
+				 , NAME          = #name#        
+				 , RES_NO        = CRYPTIT.ENCRYPT(#res_no#,  #ssnEnterCd#)   
+				 , B9_NO         = CRYPTIT.ENCRYPT (#b9_no# ,  #ssnEnterCd#)      
+				 , B10_ENTER_NM  = #b10_enter_nm#
+				 , B11_YMD  	 = #b11_ymd#     
+				 , B12_YMD       = #b12_ymd#     
+				 , B13_YMD       = #b13_ymd#     
+				 , B14_YMD   	 = #b14_ymd#     
+				 , B15_MON       = #b15_mon#     
+				 , B16_MON       = #b16_mon#     
+				 , B17_GUBUN     = #b17_gubun#   
+				 , B18_MON       = #b18_mon#     
+				 , B19_MON       = #b19_mon#
+				 , CHKDATE		 = SYSDATE
+				 , CHKID		 = #ssnSabun#
+				 , SEQ			 = #seq#
+			 WHERE ENTER_CD		 = #ssnEnterCd#
+			   AND WORK_YY  	 = #work_yy#
+			   AND ADJUST_TYPE   = #adjust_type#
+			   AND SABUN   		 = #sabun#
+		]]>
+	</query>
+
+	<!-- 종전근무지관리 삭제 -->
+	<query id="deleteWooriMgr">
+		<![CDATA[
+			DELETE FROM TYEA401
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND WORK_YY  	    	= #work_yy#
+			   AND ADJUST_TYPE   		= #adjust_type#
+			   AND SABUN   				= #sabun#
+		]]>
+	</query>
+	
+	<!-- pdf 파일 저장 (미반영 위한 용도) -->
+	<query id="updateYeaDataPdf_WOORI_TEST">
+		<![CDATA[
+			UPDATE TCPN851
+			SET STATUS_CD = DECODE(#sDelete#,'1','D','')
+			  , EXCEPT_GUBUN = DECODE(#sDelete#,'1',#exceptCheck#,'')
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND SABUN = #sabun#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND WORK_YY = #work_yy#
+			  AND DOC_SEQ = #doc_seq#
+			  AND SEQ = #doc_seq_detail#
+		]]>
+	</query>
+</root>

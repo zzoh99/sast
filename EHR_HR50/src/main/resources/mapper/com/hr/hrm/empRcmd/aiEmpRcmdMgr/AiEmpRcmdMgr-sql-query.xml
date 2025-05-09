@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.empRcmd.aiEmpRcmdMgr">
+
+	<!-- AI 인재 추천 구분 -->
+	<select parameterType="map" resultType="cMap" id="getAiEmpRcmdMgrType">
+		SELECT
+			T.ENTER_CD
+			 , T.R_GUBUN
+			 , T.USE_YN
+			 , T.CHKDATE
+			 , T.CHKID
+		     , T.R_PROMPT
+			 , '0'		AS detail
+		FROM THRM881 T
+		WHERE T.ENTER_CD = #{ssnEnterCd}
+		  AND T.CHKID = #{ssnSabun}
+		  <if test="rGubun != null and !''.equals(rGubun)">
+			  AND T.R_GUBUN = #{rGubun}
+		  </if>
+
+	</select>
+	<select parameterType="map" resultType="cMap" id="getAiEmpRcmdMgrTypeMap">
+		SELECT
+			T.ENTER_CD
+			 , T.R_GUBUN
+			 , T.USE_YN
+			 , T.CHKDATE
+			 , T.CHKID
+			 , T.R_PROMPT
+		FROM THRM881 T
+		WHERE T.ENTER_CD = #{ssnEnterCd}
+		  AND T.CHKID = #{ssnSabun}
+		  AND T.R_GUBUN = #{rGubun}
+	</select>
+
+	<!-- 점수화정보 -->
+	<select parameterType="map" resultType="cMap" id="getAiEmpRcmdMgrScoreInfo">
+		SELECT
+			T.ENTER_CD
+			 , T.R_GUBUN
+			 , T.I_GUBUN
+			 , T.I_RATIO
+			 , T.MEMO
+			 , T.SEARCH_SEQ
+			 , T.ICON
+			 , T.PREVIEW
+			 , T.CHKDATE
+			 , T.CHKID
+			 , S.SEARCH_DESC
+		FROM THRM882 T, THRI201 S
+		WHERE T.SEARCH_SEQ = S.SEARCH_SEQ
+		  AND S.ENTER_CD = #{ssnEnterCd}
+		  AND T.ENTER_CD = #{ssnEnterCd}
+		  AND T.CHKID = #{ssnSabun}
+		  AND T.R_GUBUN = #{rGubun}
+	</select>
+
+	<update id="saveAiEmpRcmdMgrPrompt" parameterType="map">
+		<![CDATA[
+		MERGE INTO THRM881 T
+		USING	(
+				SELECT A.R_GUBUN
+					 , A.R_PROMPT
+					 , A.USE_YN
+				   FROM (
+						SELECT NULL		AS R_GUBUN
+							 , NULL		AS R_PROMPT
+							 , NULL		AS USE_YN
+						  FROM DUAL ]]>
+			UNION ALL
+			SELECT TRIM(#{rGubun})	AS R_GUBUN
+			, TRIM(#{rPrompt})		AS R_PROMPT
+			, TRIM(#{useYn})			AS USE_YN
+			FROM DUAL
+		) A
+		WHERE A.R_GUBUN IS NOT NULL
+		) S
+		ON (	T.ENTER_CD		= #{ssnEnterCd}
+		AND	T.R_GUBUN			= S.R_GUBUN
+		)
+		WHEN MATCHED THEN
+		UPDATE SET T.R_PROMPT			= S.R_PROMPT
+		, T.USE_YN		= S.USE_YN
+		, T.CHKDATE		= SYSDATE
+		, T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+		T.ENTER_CD
+		, T.R_GUBUN
+		, T.R_PROMPT
+		, T.USE_YN
+		, T.CHKDATE
+		, T.CHKID
+		)
+		VALUES
+		(
+		#{ssnEnterCd}
+		, S.R_GUBUN
+		, S.R_PROMPT
+		, S.USE_YN
+		, SYSDATE
+		, #{ssnSabun}
+		)
+	</update>
+
+	<update id="saveAiEmpRcmdMgrType" parameterType="map">
+		<![CDATA[
+		MERGE INTO THRM881 T
+		USING	(
+				SELECT A.R_GUBUN
+					 , A.R_PROMPT
+					 , A.USE_YN
+				   FROM (
+						SELECT NULL		AS R_GUBUN
+							 , NULL		AS R_PROMPT
+							 , NULL		AS USE_YN
+						  FROM DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+			UNION ALL
+			SELECT TRIM(#{rm.rGubun})	AS R_GUBUN
+			, TRIM(#{rm.rPrompt})		AS R_PROMPT
+			, TRIM(#{rm.useYn})			AS USE_YN
+			FROM DUAL
+		</foreach>
+		) A
+		WHERE A.R_GUBUN IS NOT NULL
+		) S
+		ON (	T.ENTER_CD		= #{ssnEnterCd}
+		AND	T.R_GUBUN			= S.R_GUBUN
+		)
+		WHEN MATCHED THEN
+		UPDATE SET T.USE_YN		= S.USE_YN
+		, T.CHKDATE		= SYSDATE
+		, T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+		T.ENTER_CD
+		, T.R_GUBUN
+		, T.R_PROMPT
+		, T.USE_YN
+		, T.CHKDATE
+		, T.CHKID
+		)
+		VALUES
+		(
+		#{ssnEnterCd}
+		, S.R_GUBUN
+		, S.R_PROMPT
+		, S.USE_YN
+		, SYSDATE
+		, #{ssnSabun}
+		)
+	</update>
+
+	<delete id="deleteAiEmpRcmdMgrType" parameterType="map">
+		<![CDATA[
+		DELETE FROM THRM881
+		 WHERE ENTER_CD||'_'||R_GUBUN||'_'||USE_YN IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.rGubun != null and rm.rGubun neq '' and rm.useYn != null and rm.useYn neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.rGubun})||'_'||TRIM(#{rm.useYn})
+			</if>
+		</foreach>
+		)
+	</delete>
+
+	<update id="saveAiEmpRcmdMgrScoreInfo" parameterType="map">
+		<![CDATA[
+		MERGE INTO THRM882 T
+		USING	(
+				SELECT
+					   A.I_GUBUN
+					 , A.I_RATIO
+					 , A.MEMO
+					 , A.SEARCH_SEQ
+					 , A.ICON
+					 , A.PREVIEW
+				   FROM (
+						SELECT
+							   NULL		AS I_GUBUN
+							 , NULL		AS I_RATIO
+							 , NULL		AS MEMO
+							 , NULL		AS SEARCH_SEQ
+							 , NULL		AS ICON
+							 , NULL		AS PREVIEW
+						  FROM DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+			UNION ALL
+			SELECT
+			  TRIM(#{rm.iGubun})		AS I_GUBUN
+			, TRIM(#{rm.iRatio})		AS I_RATIO
+			, TRIM(#{rm.memo})			AS MEMO
+			, TRIM(#{rm.searchSeq})		AS SEARCH_SEQ
+			, TRIM(#{rm.icon})			AS ICON
+			, TRIM(#{rm.preview})		AS PREVIEW
+			FROM DUAL
+		</foreach>
+		) A
+		WHERE A.I_GUBUN IS NOT NULL
+		AND A.I_RATIO IS NOT NULL
+		AND A.SEARCH_SEQ IS NOT NULL
+		) S
+		ON (	T.ENTER_CD		= #{ssnEnterCd}
+		AND	T.R_GUBUN			= #{rGubun}
+		AND	T.I_GUBUN			= S.I_GUBUN
+		)
+		WHEN MATCHED THEN
+		UPDATE SET T.MEMO			= S.MEMO
+		, T.I_RATIO			= S.I_RATIO
+		, T.SEARCH_SEQ		= S.SEARCH_SEQ
+		, T.ICON			= S.ICON
+		, T.PREVIEW			= S.PREVIEW
+		, T.CHKDATE		= SYSDATE
+		, T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+		T.ENTER_CD
+		, T.R_GUBUN
+		, T.I_GUBUN
+		, T.I_RATIO
+		, T.MEMO
+		, T.SEARCH_SEQ
+		, T.ICON
+		, T.PREVIEW
+		, T.CHKDATE
+		, T.CHKID
+		)
+		VALUES
+		(
+		#{ssnEnterCd}
+		, #{rGubun}
+		, S.I_GUBUN
+		, S.I_RATIO
+		, S.MEMO
+		, S.SEARCH_SEQ
+		, S.ICON
+		, S.PREVIEW
+		, SYSDATE
+		, #{ssnSabun}
+		)
+	</update>
+
+	<delete id="deleteAiEmpRcmdMgrScoreInfo" parameterType="map">
+		<![CDATA[
+		DELETE FROM THRM882
+		 WHERE ENTER_CD||'_'||R_GUBUN||'_'||I_GUBUN||'_'||I_RATIO||'_'||SEARCH_SEQ IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+		 	,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rGubun != null and rGubun neq '' and rm.iGubun != null and rm.iGubun neq '' and rm.iRatio != null and rm.iRatio neq '' and rm.searchSeq != null and rm.searchSeq neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rGubun})||'_'||TRIM(#{rm.iGubun})||'_'||TRIM(#{rm.iRatio})||'_'||TRIM(#{rm.searchSeq})
+			</if>
+		</foreach>
+		)
+	</delete>
+</mapper>

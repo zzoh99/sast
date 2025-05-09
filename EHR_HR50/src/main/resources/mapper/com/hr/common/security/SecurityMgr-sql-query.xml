@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common.security">
+
+	<update id="PrcCall_P_SEC_SET_OBSERVER" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_SEC_SET_OBSERVER(
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{job,mode=IN,jdbcType=VARCHAR},
+			#{ip,mode=IN,jdbcType=VARCHAR},
+			#{refererUrl,mode=IN,jdbcType=VARCHAR},
+			#{requestUrl,mode=IN,jdbcType=VARCHAR},
+			#{controller,mode=IN,jdbcType=VARCHAR},
+			#{queryId,mode=IN,jdbcType=VARCHAR},
+			#{menuId,mode=IN,jdbcType=VARCHAR},
+			#{ssnGrpCd,mode=IN,jdbcType=VARCHAR},
+			#{memo,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+
+	<insert id="saveTSEC007" parameterType="map">
+		<![CDATA[
+				INSERT INTO TSEC007
+				(
+					  ENTER_CD
+					, SABUN
+					, IP
+					, JSESSIONID
+					, LOGIN_AGENT
+					, LOGIN_DUP
+					, CHKDATE
+					, CHKID
+				)
+				VALUES
+				(
+					  #{loginEnterCd}
+					, #{loginSabun}
+					, #{loginIp}
+					, #{loginJsessionid}
+					, #{loginAgent}
+					, NVL(TRIM(#{loginDup}), 'N')
+					, SYSDATE
+					, #{loginSabun}
+				)
+		]]>
+	</insert>
+
+	<select id="getCheckSabunName" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT LISTAGG(CODE_NM, ',') WITHIN GROUP (ORDER BY CODE) AS SABUNS
+			FROM TSYS005
+			WHERE ENTER_CD = #{ssnEnterCd}
+			AND GRCODE_CD = 'Z99990'
+			AND USE_YN = 'Y'
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+			GROUP BY GRCODE_CD
+		]]>
+	</select>
+	
+	<select id="getLogoutDup" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT A.LOGOUT_DUP
+			  FROM TSEC007 A
+			 WHERE A.JSESSIONID = #{jsessionid}
+			   AND A.IP = #{ip}
+			   AND A.CHKDATE = (SELECT MAX(CHKDATE) FROM TSEC007 WHERE JSESSIONID = A.JSESSIONID)
+		]]>
+	</select>
+
+	<update id="updateLogoutDup" parameterType="map">
+		<![CDATA[
+			UPDATE TSEC007
+			   SET LOGOUT_DUP = 'Y'
+			 WHERE JSESSIONID = #{jsessionid}
+		]]>
+	</update>
+
+	<update id="updateLoginToken" parameterType="map">
+		<![CDATA[
+		UPDATE TSEC007
+		SET SESSION_TOKEN = #{sessionToken}
+		WHERE JSESSIONID = #{jsessionid}
+		]]>
+	</update>
+
+	<select id="selectTSEC007" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT SABUN, IP, JSESSIONID
+			  FROM (	SELECT SABUN, IP, JSESSIONID
+						FROM TSEC007
+						WHERE ENTER_CD = #{ssnEnterCd}
+						  AND SABUN = #{ssnSabun}
+						ORDER BY CHKDATE DESC  )
+			 WHERE ROWNUM = 1
+		]]>
+	</select>
+
+	<select id="getMobileToken" parameterType="map" resultType="cMap">
+		SELECT SABUN, IP, JSESSIONID
+		FROM TSEC007
+		WHERE ENTER_CD = #{ssnEnterCd}
+		  AND SABUN = #{ssnSabun}
+		  AND JSESSIONID = #{jsessionid}
+	</select>
+
+	<select id="PrcCall_F_SEC_GET_AUTH_CHK" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_SEC_GET_AUTH_CHK(
+						#{ssnSecurityDetail}, 
+						#{ssnEnterCd},
+						#{ssnSabun},
+						#{ssnGrpCd},
+						#{cmd},
+						#{ssnAdmin},
+						#{clientIp},
+						#{sessionId},
+						#{relUrl},
+						#{mrd},
+						#{rdParam}, 
+						#{searchApplSeq}) AS RESULT
+			FROM DUAL
+		]]>
+	</select>
+	
+	<select id="PrcCall_F_SEC_MRD_CHK_SET" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_SEC_MRD_CHK_SET(
+						#{ssnEnterCd},
+						#{ssnSabun},
+						#{ssnGrpCd},
+						#{ssnAdmin},
+						#{mrd},
+						#{rdParam}) AS RESULT
+			FROM DUAL
+		]]>
+	</select>
+	
+	<select id="getToken" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_SEC_GET_TOKEN2(#{prgCd}) AS TOKEN
+			  FROM DUAL
+		]]>
+	</select>
+	
+	<select id="chkToken" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT A.TOKEN
+			 FROM TSEC001 A,
+                        (SELECT sysdate-(STD_CD_VALUE/24/60/60) AS STIME
+                           FROM TSYS955
+                          WHERE ENTER_CD = #{ssnEnterCd}
+                            AND STD_CD = 'SEC_TOKEN_CHK_TIME') B
+                  WHERE A.TOKEN = #{token}
+                    AND A.PRG_CD = #{relUrl}
+                    AND A.CHKDATE BETWEEN B.STIME AND sysdate
+		]]>
+	</select>
+	
+	<select id="getAuthPg" parameterType="map" resultType="cMap">
+		<![CDATA[
+            SELECT DATA_RW_TYPE
+                 , DATA_PRG_TYPE
+              FROM (
+                     SELECT B.DATA_RW_TYPE
+                          , B.DATA_PRG_TYPE
+                       FROM TSYS301 A
+                          , ( SELECT *
+                                FROM TSYS311
+                               WHERE ENTER_CD = #{ssnEnterCd}
+                                 AND GRP_CD = #{ssnGrpCd}
+                                 AND USE_YN = 'Y'
+                                 AND PRG_CD IS NOT NULL
+                            ) B
+                      WHERE DECODE(SUBSTR(A.PRG_CD, 1,1), '/', A.PRG_CD, '/'||A.PRG_CD) = #{relUrl}
+                        AND A.USE = 'Y'
+                        AND A.PRG_CD = B.PRG_CD(+)
+              ) WHERE ROWNUM = 1
+		]]>
+	</select>
+	
+	<select id="getDecryptUrl" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT ISU_BLOCK_DECRYPT(#{url}, #{ssnEncodedKey}) AS SJSON FROM DUAL
+		]]>
+	</select>
+	
+	<select id="getEncryptPwConfirm" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT REPLACE( ISU_BLOCK_ENCRYPT('{"url":"'||FW_URL||'","pwConfirmYn":"'||PW_CONFiRM_YN||'"}', #{ssnEncodedKey}), CHR(13)||CHR(10), '') AS SURL
+			FROM ( SELECT #{fwUrl} as FW_URL , #{pwConfirmYn} as PW_CONFiRM_YN FROM DUAL )
+		]]>
+	</select>
+	
+	<select id="getLogoutMsg" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT LOGOUT_MSG AS MSG
+			  FROM TSEC007 A
+			 WHERE A.JSESSIONID = #{jsessionid}
+			   AND A.CHKDATE = (SELECT MAX(CHKDATE) FROM TSEC007 WHERE JSESSIONID = A.JSESSIONID)
+		]]>
+	</select>
+	
+	<update id="updateLogoutMsg" parameterType="map">
+		<![CDATA[
+			UPDATE TSEC007 A
+			   SET A.LOGOUT_MSG = #{msg}
+			 WHERE A.JSESSIONID = #{jsessionid}
+			   AND A.CHKDATE = (SELECT MAX(CHKDATE) FROM TSEC007 WHERE JSESSIONID = A.JSESSIONID)
+		]]>
+	</update>
+	
+	<select id="getEncryptKeyForWrapper" parameterType="map" resultType="string">
+		<![CDATA[
+			SELECT KEY_VALUE AS "KEY" FROM TSYS300 WHERE ENTER_CD = #{enterCd} AND "TYPE" = 'B'
+		]]>
+	</select>
+
+	<select id="getReqUrlAuthCheck" parameterType="map" resultType="cMap">
+		SELECT MAX(CASE B.USE_YN WHEN '1' THEN 'Y' ELSE 'N' END) AS "AUTH_YN"
+			 , MAX(NVL(B.DATA_RW_TYPE, A.DATA_RW_TYPE)) AS "DATA_RW_TYPE"
+		FROM TSYS303 A
+				 JOIN TSYS311 B
+					  ON A.ENTER_CD = B.ENTER_CD
+						  AND A.MAIN_MENU_CD = B.MAIN_MENU_CD
+						  AND A.MENU_CD = B.MENU_CD
+						  AND A.MENU_SEQ = B.MENU_SEQ
+				 JOIN TSYS307 G
+					  ON G.ENTER_CD = B.ENTER_CD
+						  AND G.GRP_CD = B.GRP_CD
+				 LEFT OUTER JOIN TSYS313 E
+								 ON G.ENTER_CD = E.ENTER_CD
+									 AND G.GRP_CD = E.GRP_CD
+		WHERE B.ENTER_CD = #{ssnEnterCd}
+		  AND B.GRP_CD = #{authGrpCd}
+		  AND (G.COMMON_YN = 'Y' OR E.SABUN = #{ssnSabun})
+		  -- AND B.TYPE = 'P'
+		  AND B.PRG_CD IS NOT NULL
+		  AND B.USE_YN = 1
+		  AND B.PRG_CD LIKE '%' || #{reqUrl}  || '%'
+	</select>
+
+	<select id="getApplPrgCd" parameterType="map" resultType="cMap">
+		SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE 'N' END AS AUTH_YN
+		  FROM THRI101
+		WHERE ENTER_CD = #{ssnEnterCd}
+		  AND DETAIL_PRG_CD LIKE '%'||#{prgCd}||'%'
+	</select>
+
+	<select id="getBoardSearchYn" parameterType="map" resultType="cMap">
+		SELECT NVL2(B.VALUE, 'Y', 'N') AS ADMIN_YN
+			 ,  CASE NVL(A.SEARCH_ALL_YN, 'N') WHEN 'Y' THEN 'Y'
+											   WHEN 'N' THEN NVL(F_COM_GET_SEARCH_SEQ_YN(A.ENTER_CD, TRIM(#{ssnSabun}), A.SEARCH_ALL_SEQ, TO_CHAR(SYSDATE, 'YYYYMMDD')), 'N')
+				END AS SEARCH_YN
+			 , A.BBS_NM
+		  FROM TSYS700 A
+		  LEFT OUTER JOIN TSYS701 B
+		 	ON A.ENTER_CD = B.ENTER_CD
+		   AND A.BBS_CD = B.BBS_CD
+		   AND B.GB_CD = 'A001'
+		   AND B.VALUE = #{ssnSabun}
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN NVL(B.SDATE, TO_CHAR(SYSDATE, 'YYYYMMDD')) AND NVL(B.EDATE, '99991231')
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.BBS_CD = #{bbsCd}
+		   AND A.TYPE = 'B'
+	</select>
+</mapper>

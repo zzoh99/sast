@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.recruitment">
+		
+	<!-- 채용시스템_임직원 조회 -->
+	<select id="getRemEmployeeList" parameterType="map" resultType="cMap" >
+	<![CDATA[
+			SELECT A.ENTER_CD
+			     , F_COM_GET_ENTER_NM2(A.ENTER_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS COMPANY_NM
+			     , A.EMP_NAME AS EMP_NM
+			     , A.SABUN AS EMP_SABUN
+			     , A.ENTER_CD || '@' || A.SABUN AS USER_KEY
+			     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, DECODE(C.STATUS_CD, 'RA', TO_CHAR(TO_DATE(C.SDATE,'YYYYMMDD')-1, 'YYYYMMDD'), C.SDATE), #{ssnLocaleCd}) AS ORG_NM
+			     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') AS EMAIL
+			     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'HP') AS PHONE_NO
+			     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030', C.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+			     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020', C.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+			     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010', C.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+			     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10010', C.STATUS_CD, #{ssnLocaleCd}) AS STATUS_NM
+			     , F_COM_GET_JOB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JOB_NM
+			  FROM (
+			        SELECT X.ENTER_CD
+			             , X.SABUN
+			             , F_COM_GET_NAMES(X.ENTER_CD, X.SABUN, #{ssnLocaleCd}) AS EMP_NAME
+			             , X.EMP_YMD
+			          FROM THRM100 X
+			         WHERE X.ENTER_CD = #{ssnEnterCd}
+			     ) A
+			 INNER JOIN THRM151 C
+			    ON A.ENTER_CD = C.ENTER_CD
+			   AND A.SABUN = C.SABUN
+			   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+			   AND C.STATUS_CD IN ( 'AA' ) ]]>
+		<if test="('O' eq ssnSearchType or 'P' eq ssnSearchType) and 'T' neq searchEmpType">
+				INNER JOIN ${query} AUTH
+					    ON AUTH.ENTER_CD = A.ENTER_CD
+					   AND AUTH.SABUN = A.SABUN
+		</if>
+			 WHERE 1=1
+		<if test="searchWord != null and searchWord neq ''">
+			   AND ( UPPER(TRIM( A.SABUN )) LIKE '%' || UPPER(TRIM( #{searchWord} )) || '%' OR  UPPER(TRIM( A.EMP_NAME )) LIKE '%' || UPPER(TRIM( #{searchWord} )) || '%' )
+		</if>
+		<if test="targetUserKey != null and targetUserKey neq ''">
+			   AND A.ENTER_CD || '@' || A.SABUN IN
+			       <foreach collection="targetUserKey" item="item" open="(" close=")" separator=",">
+					   #{item}
+				   </foreach>
+		</if>
+		ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+	</select>
+		
+	<!-- 채용시스템_채용데이터 seq 조회 -->
+	<select id="getRemRecruitSeq" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT NVL(MAX(SEQ) + 1, 1) AS SEQ
+		  FROM TSTF897
+		 WHERE ENTER_CD = #{enterCd}
+	]]>
+	</select>
+		
+	<!-- 채용시스템_채용데이터 저장 -->
+	<insert id="saveRecEmployee" parameterType="map">
+	<![CDATA[
+		INSERT INTO TSTF897 (
+			  ENTER_CD
+			, SEQ
+			, PERSON
+			, CHKID
+			, CHKDATE
+		)
+		VALUES (
+			  TRIM( #{enterCd} )
+			, #{seq}
+			, EMPTY_CLOB()
+			, TRIM( #{ssnSabun} )
+			, SYSDATE
+		)
+	]]>
+	</insert>
+		
+	<!-- 채용시스템_채용데이터 저장_CLOB컨텐츠 -->
+	<update id="saveRecEmployeePerson" parameterType="map">
+	<![CDATA[
+		UPDATE TSTF897
+		   SET PERSON = #{person}
+		 WHERE ENTER_CD = TRIM(#{enterCd})
+		   AND SEQ = #{seq}
+	]]>
+	</update>
+	
+</mapper>

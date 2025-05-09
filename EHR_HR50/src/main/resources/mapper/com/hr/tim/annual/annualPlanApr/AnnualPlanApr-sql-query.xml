@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanAppDet">
+
+<!-- 연차휴가계획승인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAprList">
+
+				<![CDATA[
+				SELECT
+					'0' IBS_IMAGE
+					,B.ENTER_CD
+				   	,B.APPL_YMD
+				   	,B.APPL_STATUS_CD
+				   	,B.APPL_SEQ
+		     		,A.VAC_PLAN_NM
+		     		,A.VAC_STD_SYMD
+		     		,A.VAC_STD_EYMD
+		     		,C.DAYS
+		     		,B.APPL_SABUN
+		     		, (SELECT F_COM_GET_NAMES(B.ENTER_CD, B.APPL_SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME
+		     		,F_COM_GET_NAMES(B.ENTER_CD, B.APPL_SABUN,'ALIAS') ALIAS
+		     		, (SELECT F_COM_GET_ORG_NM2(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+		     		,F_COM_GET_JIKCHAK_NM(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) JIKCHAK_NM
+		     		,F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) JIKGUB_NM
+		     		,F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) JIKWEE_NM
+		     		,F_COM_GET_MANAGE_NM(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS MANAGE_NM
+				FROM
+					 TTIM541 A
+					,THRI103 B
+					,(
+					SELECT
+						ENTER_CD,SEQ,SABUN,APPL_SEQ,SUM(DAYS) DAYS
+					FROM
+						TTIM542
+					GROUP BY
+						ENTER_CD,SEQ,SABUN,APPL_SEQ
+					 )C
+					 ]]>
+<if test='ssnSearchType.equals("O")'>
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = C.ENTER_CD
+  AND AUTH.SABUN = C.SABUN
+</if>
+				WHERE
+					A.ENTER_CD = C.ENTER_CD
+				AND A.SEQ = C.SEQ
+				AND	B.ENTER_CD = C.ENTER_CD
+				AND B.APPL_SEQ = C.APPL_SEQ
+				AND B.APPL_SABUN=C.SABUN
+				AND A.ENTER_CD = C.ENTER_CD
+				AND A.ENTER_CD = #{ssnEnterCd}
+				AND B.APPL_YMD BETWEEN TRIM( #{sYmd} ) AND TRIM( #{eYmd} )
+				AND B.APPL_STATUS_CD != '11'
+				<if test='applStatusCd != null and !applStatusCd.equals("")'>
+					AND B.APPL_STATUS_CD = #{applStatusCd}
+				</if>
+				<if test='name != null and !name.equals("")'>
+					AND (UPPER((SELECT F_COM_GET_NAMES(B.ENTER_CD, B.APPL_SABUN, #{ssnLocaleCd}) FROM DUAL)) LIKE '%' || UPPER(TRIM(#{name})) || '%' OR UPPER(B.APPL_SABUN) LIKE '%' || UPPER(TRIM(#{name})) || '%')
+				</if>
+				<if test='orgNm != null and !orgNm.equals("")'>
+					AND (SELECT F_COM_GET_ORG_NM2(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) LIKE '%' || TRIM(#{orgNm}) || '%'
+				</if>
+				<if test='seq != null and !seq.equals("")'>
+					AND A.SEQ = #{seq}
+				</if>
+				<if test='multiManageCd != null and !multiManageCd.equals("")'>
+				    AND F_COM_GET_MANAGE_CD(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD) IN
+		<foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				ORDER BY B.APPL_STATUS_CD,B.CHKDATE DESC
+
+
+
+		</select>
+
+
+</mapper>

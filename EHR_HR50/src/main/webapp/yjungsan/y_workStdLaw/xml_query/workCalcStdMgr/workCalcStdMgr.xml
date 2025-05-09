@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	공통 코드 쿼리 
+ -->
+<root>
+
+	<!-- 근태/근무산정기준관리 list 조회  -->
+	<query id="selectWorkCalcStdMgrList">
+	   	<![CDATA[
+			SELECT T1.ENTER_CD
+			     , T1.TYPE_CD
+			     , T2.GRCODE_NM AS TYPE_NM
+			     , T1.TYPE_DETAIL_CD
+			     , T3.CODE_NM AS TYPE_DETAIL_NM
+			     , T1.SCOPE_GUBUN
+			     , DECODE(T1.SCOPE_GUBUN, 'A', '전체', 'O', '범위항목', 'J', '해당직무') AS SCOPE_GUBUN_NM
+			     , T1.S_YM
+			     , T1.E_YM
+			     , T1.MEMO
+			     , T1.COL_VALUE
+			     , (SELECT LISTAGG(B. AUTH_SCOPE_NM, ', ') WITHIN GROUP (ORDER BY B.AUTH_SCOPE_NM)
+				      FROM (SELECT ENTER_CD
+			                     , SCOPE_CD
+			                     , ITEM_VALUE1
+			                     , ITEM_VALUE2
+			                     , ITEM_VALUE3
+						      FROM TSYS991
+						     WHERE ENTER_CD = TRIM(#ssnEnterCd#)
+						       AND USE_GUBUN = 'T01'
+						 	 GROUP BY ENTER_CD
+			                        , SCOPE_CD
+			                        , ITEM_VALUE1
+			                        , ITEM_VALUE2
+			                        , ITEM_VALUE3) A
+			             , TSYS315 B
+							 WHERE A.ENTER_CD = B.ENTER_CD
+							   AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+							   AND A.ITEM_VALUE1 = T1.TYPE_CD
+							   AND A.ITEM_VALUE2 = T1.TYPE_DETAIL_CD
+			           		   AND A.ITEM_VALUE3 = T1.S_YM) AS NOTE
+			     , '0' AS SCOPE
+			  FROM TCPN237 T1
+			     , TSYS001 T2
+			     , TSYS005 T3
+			 WHERE T1.ENTER_CD = T3.ENTER_CD
+			   AND T2.GRCODE_CD = T3.GRCODE_CD
+			   AND T1.TYPE_DETAIL_CD = T3.CODE
+			   AND T1.TYPE_CD = T2.GRCODE_CD
+			   AND T1.ENTER_CD = #ssnEnterCd#
+			   AND T1.SCOPE_GUBUN LIKE '%' || #searchScopeGubun# || '%'
+			   AND TO_CHAR(SYSDATE,'YYYYMM')||'10' BETWEEN T3.S_YMD AND T3.E_YMD
+			   $query$
+ 			 ORDER BY T1.S_YM DESC
+ 			        , T1.TYPE_CD
+ 			        , T1.TYPE_DETAIL_CD			   
+	   	]]> 
+	</query>
+	
+	<!-- 근태/근무산정기준관리 INSERT -->
+	<query id="insertWorkCalcStdMgr">
+	   	<![CDATA[
+	   		INSERT INTO TCPN237 ( ENTER_CD
+						   		, TYPE_CD
+						   		, TYPE_DETAIL_CD
+						   		, SCOPE_GUBUN
+						   		, S_YM
+						   		, E_YM
+						   		, MEMO
+						   		, COL_VALUE
+						   		, CHKDATE
+						   		, CHKID 
+						   		) VALUES (
+						   		  #ssnEnterCd#
+						   		, #type_cd#
+						   		, #type_detail_cd#
+						   		, #scope_gubun#
+						   		, #s_ym#
+						   		, #e_ym#
+						   		, #memo#
+						   		, #col_value#
+						   		, SYSDATE
+						   		, #ssnSabun#
+						   		)    	
+	   	]]> 
+	</query>
+	
+	<!-- 근태/근무산정기준관리 INSERT -->
+	<query id="updateWorkCalcStdMgr">
+	   	<![CDATA[
+	   		UPDATE TCPN237
+	   		   SET SCOPE_GUBUN = #scope_gubun#
+	   		     , E_YM = #e_ym#
+	   		     , MEMO = #memo#
+	   		     , COL_VALUE = #col_value#
+	   		     , CHKDATE = SYSDATE
+	   		     , CHKID = #ssnSabun#
+	   		 WHERE ENTER_CD = #ssnEnterCd#
+	   		   AND TYPE_CD = #type_cd#
+	   		   AND TYPE_DETAIL_CD = #type_detail_cd#
+	   		   AND S_YM = #s_ym#  
+	   	]]> 
+	</query>
+	
+	<!-- 근태/근무산정기준관리 DELETE -->
+	<query id="deleteWorkCalcStdMgr">
+	   	<![CDATA[
+	   		DELETE
+	   		  FROM TCPN237
+	   		 WHERE ENTER_CD = #ssnEnterCd#
+	   		   AND TYPE_CD = #type_cd#
+	   		   AND TYPE_DETAIL_CD = #type_detail_cd#
+	   		   AND S_YM = #s_ym#  
+	   	]]> 
+	</query>
+	
+	<!-- 범위항목 조회 -->
+	<query id="selectWorkCalcStdMgrRngPopRstList">
+		<![CDATA[
+		   	SELECT AUTH_SCOPE_CD
+				 , AUTH_SCOPE_NM
+				 , SCOPE_TYPE
+				 , PRG_URL
+				 , SQL_SYNTAX
+				 , TABLE_NM
+			  FROM TSYS315 C
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   
+			 ORDER BY  AUTH_SCOPE_NM
+	   	]]> 
+	</query>
+	
+	<!-- 범위항목 조회 detail -->
+	<query id="selectWorkCalcStdMgrRngPopRstList2">
+		<![CDATA[
+			SELECT B.SCOPE_VALUE
+				 , B.SCOPE_VALUE_NM
+				 , DECODE(A.ENTER_CD, '', '0', '1') AS CHK
+			  FROM TSYS991 A
+			     , $query$ B
+		     WHERE A.ENTER_CD(+) = #ssnEnterCd#
+			   AND A.SCOPE_CD(+) = #searchAuthScopeCd#
+			   AND A.USE_GUBUN(+) = #searchUseGubun#
+			   AND A.ITEM_VALUE1(+) = #searchItemValue1#
+			   AND A.ITEM_VALUE2(+) = #searchItemValue2#
+			   AND A.ITEM_VALUE3(+) = #searchItemValue3#
+			   AND A.SCOPE_VALUE(+) = B.SCOPE_VALUE
+			 ORDER BY B.SEQ   
+	   	]]> 
+	</query>
+	
+	<!-- 성명 범위항목 조직도 조회 -->
+	<query id="selectWorkCalcStdMgrRngPopRstList3">
+		<![CDATA[
+			SELECT LVL AS "_level"
+			     , ORG_CHART_NM
+			     , SDATE
+			     , PRIOR_ORG_CD
+			     , ORG_CD
+			     , ORG_NM
+			     , DIRECT_YN
+			     , SEQ
+			     , ORG_CHIEF_SABUN
+			     , ORG_CHIEF_NAME
+			     , '0' AS EMP_CNT1
+			     , '0' AS EMP_CNT2
+			  FROM (SELECT LEVEL AS LVL
+				   	   	 , A.ORG_CHART_NM
+				  		 , A.SDATE
+				  		 , A.PRIOR_ORG_CD
+				  		 , A.ORG_CD
+				  		 , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, REPLACE(#searchBaseDate#, '-', '')) AS ORG_NM
+				  		 , A.DIRECT_YN
+				  		 , A.SEQ
+				  		 , F_ORG_GET_CHIEF_SABUN(A.ENTER_CD, A.ORG_CD, REPLACE(#searchBaseDate#, '-', '')) AS ORG_CHIEF_SABUN
+				  		 , F_ORG_GET_CHIEF_NAME(A.ENTER_CD, A.ORG_CD, REPLACE(#searchBaseDate#, '-', '')) AS ORG_CHIEF_NAME
+				  	  FROM TORG105 A
+				  		 , (SELECT *
+				    	   	  FROM TORG103
+				    		 WHERE ENTER_CD = #ssnEnterCd#
+				          	   AND REPLACE(#searchSDate#, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')) B
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.SDATE = REPLACE(#searchSDate#, '-', '')
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.SDATE = B.SDATE
+			 START WITH A.PRIOR_ORG_CD = '0'
+			 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+			   AND PRIOR A.SDATE = A.SDATE
+			   AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+			 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ )  
+	   	]]> 
+	</query>
+	
+	<!-- 성명 범위항목 조직원 조회 -->
+	<query id="selectWorkCalcStdMgrRngPopRstList4">
+		<![CDATA[
+			SELECT A.NAME AS SCOPE_VALUE_NM
+			     , A.SABUN AS SCOPE_VALUE
+			     , B.JIKWEE_NM
+			     , B.JIKCHAK_NM
+			     , B.JIKGUB_NM
+			     , F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN, REPLACE(#searchBaseDate#, '-', '')) AS ORG_NM
+			     , B.MANAGE_NM
+			     , CASE WHEN A.NAME = F_ORG_GET_CHIEF_NAME(B.ENTER_CD,B.ORG_CD,TO_CHAR(SYSDATE,'YYYYMMDD')) 
+			     		THEN 0 
+			     		ELSE 1 
+			     		 END HEAD_YN
+			     , DECODE((SELECT COUNT(*)
+			        		 FROM TSYS991
+					        WHERE ENTER_CD = A.ENTER_CD
+					          AND SCOPE_VALUE = A.SABUN
+					          AND USE_GUBUN = #searchUseGubun#
+					          AND ITEM_VALUE1 = #searchItemValue1#
+					          AND ITEM_VALUE2 = #searchItemValue2#
+					          AND ITEM_VALUE3 = #searchItemValue3#
+					          AND SCOPE_CD = 'W20' ), 0, 0, 1) AS CHK
+			  FROM THRM100 A
+			     , (SELECT *
+			          FROM THRM151
+			         WHERE ENTER_CD = #ssnEnterCd#
+			           AND REPLACE(#searchBaseDate#, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')) B
+			     , TSYS005 C
+			 WHERE A.ENTER_CD 	= #ssnEnterCd#
+			   AND B.ORG_CD 	= TRIM(#searchOrgCd#)
+			   AND A.ENTER_CD 	= B.ENTER_CD
+			   AND A.SABUN 		=	B.SABUN
+			   AND B.STATUS_CD NOT IN ('RA','RAA')
+			   AND B.ENTER_CD 	= C.ENTER_CD(+)
+			   AND B.MANAGE_CD 	= C.CODE(+)
+			   AND C.GRCODE_CD(+) ='H10030'  
+			   AND TO_CHAR(SYSDATE,'YYYYMM')||'10' BETWEEN C.S_YMD AND C.E_YMD
+			 ORDER BY B.JIKCHAK_CD, F_COM_GET_GRCODE_SEQ(B.ENTER_CD, 'H20010',B.JIKGUB_CD, REPLACE(#searchBaseDate#, '-', '')), C.SEQ
+		]]>
+	</query>
+	<!-- 성명 범위항목 조직원 조회 (하위부서포함)-->
+	<query id="selectWorkCalcStdMgrRngPopRstList5">
+		<![CDATA[
+			SELECT A.NAME AS SCOPE_VALUE_NM
+				 , A.SABUN AS SCOPE_VALUE
+				 , B.JIKWEE_NM
+				 , B.JIKCHAK_NM
+				 , B.JIKGUB_NM
+				 , F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN, REPLACE(#searchBaseDate#, '-', '')) AS ORG_NM
+				 , B.MANAGE_NM
+				 , DECODE((SELECT COUNT(*)
+					         FROM TSYS991
+					        WHERE ENTER_CD = A.ENTER_CD
+					          AND SCOPE_VALUE = A.SABUN
+					          AND USE_GUBUN = #searchUseGubun#
+					          AND ITEM_VALUE1 = #searchItemValue1#
+					          AND ITEM_VALUE2 = #searchItemValue2#
+					          AND ITEM_VALUE3 = #searchItemValue3#
+					          AND SCOPE_CD = 'W20' ), 0, 0, 1) AS CHK
+			  FROM THRM100 A
+			     , (SELECT *
+					  FROM THRM151
+					 WHERE ENTER_CD = #ssnEnterCd#
+					   AND REPLACE(#searchBaseDate#, '-','') BETWEEN SDATE AND NVL(EDATE, '99991231')) B
+				 , TSYS005 C
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND B.ORG_CD IN (SELECT TRIM(#searchOrgCd#)
+								  FROM DUAL
+								 UNION
+								SELECT ORG_CD
+								  FROM TORG105
+								 WHERE ENTER_CD = #ssnEnterCd#
+								   AND ORG_CHART_NM = #searchOrgChartNm#
+								   AND SDATE = REPLACE(#searchSDate#, '-', '')
+								 START WITH PRIOR_ORG_CD = TRIM(#searchOrgCd#)
+								 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+								   AND PRIOR ORG_CHART_NM = ORG_CHART_NM
+								   AND PRIOR SDATE = SDATE
+								   AND PRIOR ORG_CD = PRIOR_ORG_CD )
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.SABUN =B.SABUN
+			   AND B.STATUS_CD NOT IN ('RA','RAA')
+			   AND B.ENTER_CD = C.ENTER_CD(+)
+			   AND B.MANAGE_CD = C.CODE(+)
+			   AND C.GRCODE_CD(+)='H10030'
+			   AND TO_CHAR(SYSDATE,'YYYYMM')||'10' BETWEEN C.S_YMD AND C.E_YMD
+			 ORDER BY B.JIKCHAK_CD, F_COM_GET_GRCODE_SEQ(B.ENTER_CD, 'H20010',B.JIKGUB_CD, REPLACE(#searchSDate#, '-', '')), C.SEQ
+		]]>
+	</query>
+	
+	
+	<!-- 범위항목 SQL -->
+	<query id="selectWorkCalcStdMgrRngPopTempQueryMap">
+		<![CDATA[
+			SELECT F_COM_GET_SQL_AUTH_SCOPE(#ssnEnterCd#, #searchAuthScopeCd#) AS query FROM DUAL 
+	   	]]> 
+	</query>
+	
+	<!--근태/근무산정기준관리 범위항목 DELETE-->
+	<query id="deleteWorkCalcStdMgrRngPop">
+		<![CDATA[
+			DELETE 
+			  FROM TSYS991
+			 WHERE ENTER_CD || '_' || USE_GUBUN || '_' || ITEM_VALUE1 || '_' || ITEM_VALUE2 || '_' || ITEM_VALUE3 || '_' || SCOPE_CD || '_' || SCOPE_VALUE =
+			       #ssnEnterCd# || '_' || 
+			       #searchUseGubun# || '_' || 
+			       #searchItemValue1# || '_' || 
+			       #searchItemValue2# || '_' || 
+			       #searchItemValue3# || '_' || 
+			       #searchAuthScopeCd# || '_' || 
+			       NVL(#scope_value#, '')
+			     
+		]]>
+	</query>
+	
+	<!--근태/근무산정기준관리 범위항목 INSERT-->
+	<query id="insertWorkCalcStdMgrRngPop">
+		<![CDATA[
+			MERGE INTO TSYS991 T
+			USING (SELECT A.ENTER_CD
+			            , A.USE_GUBUN
+			            , A.ITEM_VALUE1
+			            , A.ITEM_VALUE2
+			            , A.ITEM_VALUE3
+			            , A.SCOPE_CD
+			            , A.SCOPE_VALUE
+			            , A.SCOPE_VALUE_NM
+			         FROM (SELECT NULL AS ENTER_CD
+			                    , NULL AS USE_GUBUN
+			                    , NULL AS ITEM_VALUE1
+			                    , NULL AS ITEM_VALUE2
+			                    , NULL AS ITEM_VALUE3
+			                    , NULL AS SCOPE_CD
+			                    , NULL AS SCOPE_VALUE
+			                    , NULL AS SCOPE_VALUE_NM
+			                 FROM DUAL
+			                UNION ALL
+			               SELECT TRIM(#ssnEnterCd#) AS ENTER_CD
+			                    , TRIM(#searchUseGubun#) AS USE_GUBUN
+			                    , TRIM(#searchItemValue1#) AS ITEM_VALUE1
+			                    , TRIM(#searchItemValue2#) AS ITEM_VALUE2
+			                    , TRIM(#searchItemValue3#) AS ITEM_VALUE3
+			                    , TRIM(#searchAuthScopeCd#) AS SCOPE_CD
+			                    , TRIM(#scope_value#) AS SCOPE_VALUE
+			                    , TRIM(#scope_value_nm#) AS SCOPE_VALUE_NM
+			                 FROM DUAL
+			              ) A
+			        WHERE A.ENTER_CD IS NOT NULL
+				   ) S
+			   ON (T.ENTER_CD		= S.ENTER_CD
+			   AND T.USE_GUBUN		= S.USE_GUBUN
+			   AND T.ITEM_VALUE1	= S.ITEM_VALUE1
+			   AND T.ITEM_VALUE2	= S.ITEM_VALUE2
+			   AND T.ITEM_VALUE3	= S.ITEM_VALUE3
+			   AND T.SCOPE_CD		= S.SCOPE_CD
+			   AND T.SCOPE_VALUE	= S.SCOPE_VALUE
+			   ) 			        
+			 WHEN NOT MATCHED THEN
+		   INSERT  
+		        ( T.ENTER_CD
+				, T.USE_GUBUN
+				, T.ITEM_VALUE1
+				, T.ITEM_VALUE2
+				, T.ITEM_VALUE3
+				, T.SCOPE_CD
+				, T.SCOPE_VALUE
+				, T.CHKDATE
+				, T.CHKID
+				, T.SCOPE_VALUE_NM) VALUES (
+				  S.ENTER_CD
+				, S.USE_GUBUN
+				, S.ITEM_VALUE1
+				, S.ITEM_VALUE2
+				, S.ITEM_VALUE3
+				, S.SCOPE_CD
+				, S.SCOPE_VALUE
+				, SYSDATE
+				, #ssnSabun#
+				, S.SCOPE_VALUE_NM
+				)
+		]]>
+	</query>
+	
+	<!-- 근태/근무산정기준관리 범위항목(조직) 조회 -->
+	<query id="selectWorkCalcStdMgrRngOrgPopList">
+		<![CDATA[
+			SELECT LEVEL AS "_level"
+			     , PRIOR_ORG_CD AS SCOPE_VALUE_TOP
+			     , ORG_CD AS SCOPE_VALUE
+			     , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS SCOPE_VALUE_NM
+			     , DECODE((SELECT COUNT(1)
+			     			 FROM TSYS991
+			     			WHERE ENTER_CD = A.ENTER_CD
+			     			  AND SCOPE_VALUE = A.ORG_CD
+			     			  AND USE_GUBUN = #searchUseGubun#
+			     			  AND ITEM_VALUE1 = #searchItemValue1#
+			     			  AND ITEM_VALUE2 = #searchItemValue2#
+			     			  AND ITEM_VALUE3 = #searchItemValue3#
+			     			  AND SCOPE_CD = #searchAuthScopeCd#
+			              ), 0, 0, 1) AS CHK
+			  FROM TORG105 A
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.SDATE = (SELECT MAX(SDATE)
+			   					FROM TORG103
+			   				   WHERE ENTER_CD = A.ENTER_CD
+			   				     AND SDATE <= REPLACE(NVL(#stdDate#, TO_CHAR(SYSDATE, 'YYYYMMDD')), '-', '') 	 			              
+							 )
+        	 START WITH A.PRIOR_ORG_CD = '0'
+        	 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+        	        AND PRIOR A.SDATE = A.SDATE
+        	        AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+			 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+		]]>
+	</query>
+</root>

@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 국민연금 소득총액산정
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.system.map">
+
+		<select parameterType="map" resultType="cMap" id="getMapPrintAddr">
+
+                <![CDATA[
+
+                  	SELECT A.SABUN
+				       , A.ADDR1 || ' ' ||A.ADDR2 AS ADDR1
+				       , B.NAME
+				       , F_COM_GET_ORG_NM( A.ENTER_CD , C.ORG_CD , TO_CHAR( SYSDATE , 'yyyymmdd')) AS ORG_NM
+				       , ROW_NUMBER() OVER( ORDER BY F_COM_JIKJE_SORT ( A.ENTER_CD , A.SABUN , TO_CHAR(SYSDATE , 'yyyymmdd')) ) AS SEQ
+				    FROM THRM123 A
+				         INNER JOIN THRM100 B ON ( A.SABUN = B.SABUN AND A.ENTER_CD = B.ENTER_CD )
+				         INNER JOIN THRM151 C ON ( B.ENTER_CD = C.ENTER_CD
+                                       AND B.SABUN = C.SABUN
+                                       AND C.SDATE = (
+                                          SELECT MAX(SDATE)
+                                            FROM THRM151
+                                           WHERE ENTER_CD = C.ENTER_CD
+                                             AND SABUN = C.SABUN
+                                       ))
+				   WHERE A.ENTER_CD = #{ssnEnterCd}
+				     AND A.ADD_TYPE = '2'
+				     AND C.STATUS_CD NOT LIKE '%RA%'
+				   ORDER BY F_COM_JIKJE_SORT ( A.ENTER_CD , A.SABUN , TO_CHAR(SYSDATE , 'yyyymmdd'))
+
+                 ]]>
+
+
+        </select>
+
+
+        <select parameterType="map" resultType="cMap" id="getMapPrintAddr2">
+
+                <![CDATA[
+
+                   SELECT SABUN
+						, TITLE
+						, MARKER_TYPE
+						, NAME
+						, ADDR1
+						, ORG_NM
+						, SEQ
+						, PK_SEQ
+				     FROM THRI300 A
+				    WHERE A.ENTER_CD = #{ssnEnterCd}
+				      AND A.SABUN = #{ssnSabun}
+				      AND A.TITLE = #{title1}
+				    ORDER BY SEQ
+
+                 ]]>
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getMapPrintCombo">
+
+                <![CDATA[
+
+                  	SELECT TITLE AS CODE
+                  	     , TITLE AS CODE_NM
+				     FROM THRI300 A
+				    WHERE A.ENTER_CD = #{ssnEnterCd}
+				      AND A.SABUN = #{ssnSabun}
+				    GROUP BY TITLE
+				    ORDER BY MAX(CHKDATE) DESC
+
+                 ]]>
+
+
+        </select>
+
+		<select parameterType="map" resultType="cMap" id="getMapPrintAddrDupCheck">
+
+                <![CDATA[
+
+                    SELECT CASE WHEN EXISTS (
+                               SELECT 1
+                                 FROM THRI300
+                                WHERE ENTER_CD = #{ssnEnterCd}
+                                  AND SABUN = #{ssnSabun}
+                                  AND TITLE = #{title}
+                           ) THEN 'Y' ELSE 'N' END AS IS_DUP
+                      FROM DUAL
+
+                 ]]>
+
+
+        </select>
+
+        <insert parameterType="map" id="saveMapAddrByRecord">
+
+                <![CDATA[
+
+                    INSERT INTO THRI300 (
+		                      ENTER_CD
+							, SABUN
+							, TITLE
+							, MARKER_TYPE
+							, NAME
+							, ADDR1
+							, CHKDATE
+							, CHKID
+							, ORG_NM
+							, SEQ
+							, PK_SEQ
+                    )
+                       SELECT ENTER_CD
+							, SABUN
+							, TITLE
+							, MARKER_TYPE
+							, NAME
+							, ADDR1
+							, CHKDATE
+							, CHKID
+							, ORG_NM
+							, ROW_NUMBER() OVER( ORDER BY F_COM_JIKJE_SORT ( ENTER_CD , TSABUN , TO_CHAR(SYSDATE , 'yyyymmdd')) ) AS SEQ
+							, ROWNUM
+					     FROM (
+		                      SELECT ENTER_CD
+									, SABUN
+									, TITLE
+									, MARKER_TYPE
+									, NAME
+									, ADDR1
+									, CHKDATE
+									, CHKID
+									, ORG_NM
+									, TSABUN
+									, ROW_NUMBER() OVER( PARTITION BY TSABUN ORDER BY CASE WHEN ADD_TYPE IS NULL THEN 4 ELSE LFLAG END ) AS RK
+							    FROM (
+				                     SELECT   B.ENTER_CD
+											, #{ssnSabun} AS SABUN
+											, #{title} AS TITLE
+											, 1 AS MARKER_TYPE
+											, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, '') AS NAME
+											, A.ADDR1 || ' ' ||A.ADDR2 AS ADDR1
+											, SYSDATE AS CHKDATE
+											, #{ssnSabun} AS CHKID
+											, F_COM_GET_ORG_NM( B.ENTER_CD , C.ORG_CD , TO_CHAR( SYSDATE , 'yyyymmdd')) AS ORG_NM
+											, 1 AS LFLAG
+											, A.ADD_TYPE
+											, B.SABUN AS TSABUN
+				                       FROM THRM100 B
+								            INNER JOIN THRM151 C ON ( B.ENTER_CD = C.ENTER_CD
+				                                       AND B.SABUN = C.SABUN
+				                                       AND C.SDATE = (
+				                                          SELECT MAX(SDATE)
+				                                            FROM THRM151
+				                                           WHERE ENTER_CD = C.ENTER_CD
+				                                             AND SABUN = C.SABUN
+				                                       ))
+				                            LEFT OUTER JOIN THRM123 A ON ( A.SABUN = B.SABUN
+				                            						   AND A.ENTER_CD = B.ENTER_CD
+				                            						   AND A.ADD_TYPE = #{addType}
+				                            						   )
+								      WHERE B.ENTER_CD = #{ssnEnterCd}
+								        AND C.STATUS_CD NOT LIKE '%RA%'
+]]>
+								   <if test='addType2 != null and !addType2.equals("")'>
+
+								    UNION ALL
+								     SELECT   B.ENTER_CD
+											, #{ssnSabun} AS SABUN
+											, #{title} AS TITLE
+											, 1 AS MARKER_TYPE
+											, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, '') AS NAME
+											, A.ADDR1 || ' ' ||A.ADDR2 AS ADDR1
+											, SYSDATE AS CHKDATE
+											, #{ssnSabun} AS CHKID
+											, F_COM_GET_ORG_NM( B.ENTER_CD , C.ORG_CD , TO_CHAR( SYSDATE , 'yyyymmdd')) AS ORG_NM
+											, 2 AS LFLAG
+											, A.ADD_TYPE
+											, B.SABUN AS TSABUN
+				                       FROM THRM100 B
+								            INNER JOIN THRM151 C ON ( B.ENTER_CD = C.ENTER_CD
+				                                       AND B.SABUN = C.SABUN
+				                                       AND C.SDATE = (
+				                                          SELECT MAX(SDATE)
+				                                            FROM THRM151
+				                                           WHERE ENTER_CD = C.ENTER_CD
+				                                             AND SABUN = C.SABUN
+				                                       ))
+				                            LEFT OUTER JOIN THRM123 A ON ( A.SABUN = B.SABUN
+				                            						   AND A.ENTER_CD = B.ENTER_CD
+				                            						   AND A.ADD_TYPE = #{addType2}
+				                            						   )
+								      WHERE B.ENTER_CD = #{ssnEnterCd}
+								        AND C.STATUS_CD NOT LIKE '%RA%'
+
+                                   </if>
+
+								   <if test='addType3 and !addType3.equals("")'>
+
+								    UNION ALL
+								     SELECT   B.ENTER_CD
+											, #{ssnSabun} AS SABUN
+											, #{title} AS TITLE
+											, 1 AS MARKER_TYPE
+											, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, '') AS NAME
+											, A.ADDR1 || ' ' ||A.ADDR2 AS ADDR1
+											, SYSDATE AS CHKDATE
+											, #{ssnSabun} AS CHKID
+											, F_COM_GET_ORG_NM( B.ENTER_CD , C.ORG_CD , TO_CHAR( SYSDATE , 'yyyymmdd')) AS ORG_NM
+											, 3 AS LFLAG
+											, A.ADD_TYPE
+											, B.SABUN AS TSABUN
+				                       FROM THRM100 B
+								            INNER JOIN THRM151 C ON ( B.ENTER_CD = C.ENTER_CD
+				                                       AND B.SABUN = C.SABUN
+				                                       AND C.SDATE = (
+				                                          SELECT MAX(SDATE)
+				                                            FROM THRM151
+				                                           WHERE ENTER_CD = C.ENTER_CD
+				                                             AND SABUN = C.SABUN
+				                                       ))
+				                            LEFT OUTER JOIN THRM123 A ON ( A.SABUN = B.SABUN
+				                            						   AND A.ENTER_CD = B.ENTER_CD
+				                            						   AND A.ADD_TYPE = #{addType3}
+				                            						   )
+								      WHERE B.ENTER_CD = #{ssnEnterCd}
+								        AND C.STATUS_CD NOT LIKE '%RA%'
+
+								   </if>
+								   )
+						      )
+						   WHERE RK = 1
+
+
+
+
+		</insert>
+
+        <delete parameterType="map" id="deleteMapPrintAddr">
+
+				<![CDATA[
+
+   					DELETE THRI300
+                  	WHERE SABUN = #{ssnSabun}
+                  	  AND ENTER_CD = #{ssnEnterCd}
+                  	  AND TITLE = #{title}
+
+				]]>
+
+
+		</delete>
+
+        <update parameterType="map" id="updateMapPrintAddr">
+
+
+
+   					MERGE INTO THRI300 T
+					USING (
+					    SELECT
+					          A.ENTER_CD
+					        , A.SABUN
+					        , A.TITLE
+					        , A.MARKER_TYPE
+					        , A.NAME
+					        , A.ADDR1
+					        , A.ORG_NM
+					        , A.SEQ
+					        , A.PK_SEQ
+					        FROM (
+					            SELECT
+					              NULL AS ENTER_CD
+					            , NULL AS SABUN
+					            , NULL AS TITLE
+					            , NULL AS MARKER_TYPE
+					            , NULL AS NAME
+					            , NULL AS ADDR1
+					            , NULL AS ORG_NM
+					            , NULL AS SEQ
+					            , NULL AS PK_SEQ
+					                FROM DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="mergeRows" >
+					            UNION ALL
+					            SELECT               TRIM(#{ssnEnterCd}) AS ENTER_CD
+					            , TRIM(#{ssnSabun}) AS SABUN
+					            , TRIM(#{rm.title}) AS TITLE
+					            , TRIM(#{rm.markerType}) AS MARKER_TYPE
+					            , TRIM(#{rm.name}) AS NAME
+					            , TRIM(#{rm.addr1}) AS ADDR1
+					            , TRIM(#{rm.orgNm}) AS ORG_NM
+					            , TRIM(#{rm.seq}) AS SEQ
+
+					            , TO_CHAR(${icnt}) AS PK_SEQ
+								<bind name="icnt" value="icnt + 1" />
+
+					                FROM DUAL
+					</foreach>
+					 ) A WHERE 1 = 1
+					        AND A.ENTER_CD IS NOT NULL
+					        AND A.SABUN IS NOT NULL
+					        AND A.TITLE IS NOT NULL
+                            AND A.PK_SEQ IS NOT NULL
+
+					        ) S     ON (
+					          1 = 0
+					)
+					        WHEN NOT MATCHED THEN
+					        INSERT (
+					              T.ENTER_CD
+					            , T.SABUN
+					            , T.TITLE
+					            , T.MARKER_TYPE
+					            , T.NAME
+					            , T.ADDR1
+					            , T.ORG_NM
+					            , T.SEQ
+					            , T.PK_SEQ
+					            , T.CHKDATE
+					            , T.CHKID
+					           ) VALUES (
+					              S.ENTER_CD
+					            , S.SABUN
+					            , S.TITLE
+					            , S.MARKER_TYPE
+					            , S.NAME
+					            , S.ADDR1
+					            , S.ORG_NM
+					            , S.SEQ
+					            , S.PK_SEQ
+					            , SYSDATE
+					            , #{ssnSabun}
+					              )
+
+		</update>
+
+
+</mapper>

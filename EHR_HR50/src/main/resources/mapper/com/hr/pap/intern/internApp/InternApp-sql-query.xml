@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.intern.internApp">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getInternAppList">
+
+				<![CDATA[
+					SELECT  APPRAISAL_CD
+					       ,SABUN	
+					       ,SEQ 
+					       ,INTERN_ITEM_TYPE
+					       ,INTERN_ITEM_NM
+					       ,INTERN_ITEM_MEMO
+					       ,APP_BASIS_POINT
+					       ,APP_CLASS_CD
+					FROM   TPAP601
+					WHERE  ENTER_CD     = #{ssnEnterCd}
+					AND    APPRAISAL_CD = #{searchAppraisalCd}
+					AND    SABUN        = #{searchSabun}
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getInternAppStatusMap">
+
+				<![CDATA[
+					SELECT (CASE WHEN T1.STATUS_CD = '1' THEN '미평가'
+					       		 WHEN T1.STATUS_CD = '3' THEN '작성중'
+					             WHEN T1.STATUS_CD = '5' THEN '평가완료' END) AS STATUS
+					       ,T1.STATUS_CD
+					  FROM (SELECT F_PAPN_STATUS_CD(B.ENTER_CD, B.APPRAISAL_CD, '5', 'D', B.SABUN, '' , '0', '') AS STATUS_CD
+					          FROM TPAP201 B
+					         WHERE B.ENTER_CD     = #{ssnEnterCd}
+					           AND B.APPRAISAL_CD = #{searchAppraisalCd}
+					           AND B.SABUN        = #{searchSabun}
+					           AND B.APP_YN       = 'Y' /* 평가포함여부 */ ) T1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveInternApp">
+
+					MERGE INTO TPAP601 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.SABUN
+									, A.SEQ
+									, A.APP_CLASS_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD     
+											, NULL		AS APPRAISAL_CD 
+											, NULL		AS SABUN        
+											, NULL		AS SEQ          
+											, NULL		AS APP_CLASS_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}                 AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	AS APPRAISAL_CD
+											, TRIM( #{rm.sabun} )	    AS SABUN
+											, TRIM( #{rm.seq} )	        AS SEQ
+											, TRIM( #{rm.appClassCd} )	AS APP_CLASS_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD    		= S.ENTER_CD     
+					AND  T.APPRAISAL_CD		= S.APPRAISAL_CD
+					AND  T.SABUN       		= S.SABUN       
+					AND  T.SEQ         		= S.SEQ         
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APP_CLASS_CD	= S.APP_CLASS_CD
+									, T.CHKDATE	        = SYSDATE
+									, T.CHKID	        = #{ssnSabun}
+		</update>
+		
+		
+		<!-- 		저장 -->
+		<update parameterType="map" id="saevInternAppRequest">
+
+					MERGE INTO TPAP600 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.SABUN
+									, A.APP_POINT
+									, A.APP_CLASS_CD
+									, A.APPRAISAL_YN
+							FROM	(
+									SELECT
+											#{ssnEnterCd}                  AS ENTER_CD
+											, #{searchAppraisalCd}	     AS APPRAISAL_CD
+											, #{searchSabun}	             AS SABUN
+											, #{searchAppPoint}       	 AS APP_POINT
+											, #{searchAppClassCd}          AS APP_CLASS_CD
+											, 'Y'						 AS APPRAISAL_YN
+											FROM   DUAL
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD     		= S.ENTER_CD
+					AND  T.APPRAISAL_CD         = S.APPRAISAL_CD
+					AND  T.SABUN                = S.SABUN
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APP_POINT	  = S.APP_POINT
+									, T.APP_CLASS_CD  = S.APP_CLASS_CD
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.SABUN
+							, T.APP_POINT
+							, T.APP_CLASS_CD
+							, T.APPRAISAL_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.SABUN
+							, S.APP_POINT
+							, S.APP_CLASS_CD
+							, S.APPRAISAL_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		
+		
+		
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteInternApp">
+
+					DELETE FROM ZTST002
+					WHERE 	COL1 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.col1 != null and !rm.col1.equals("")'>
+											TRIM( #{rm.col1} )
+										</if>
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertInternApp">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateInternApp">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+</mapper>

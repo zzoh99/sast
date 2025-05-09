@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sys.project.hmnrsMgr">
+
+    <select parameterType="map" resultType="cMap" id="getHmnrsMgr">
+        SELECT  A.ENTER_CD
+                , A.NAME
+                , WORK_CD
+                , RSPNS_MODULE
+                , PART_SDATE
+                , PART_EDATE
+                , 0 AS ANALYZE_ALL_CNT
+                , 0 AS ANALYZE_CNT
+                , 0 AS ANALYZE_DONE_CNT
+                , NVL(B.USE_CNT, 0) AS USE_CNT
+                , NVL(C.PLAN_ALL_CNT, 0) AS PLAN_ALL_CNT
+                , NVL(C.PLAN_CNT, 0) AS PLAN_CNT
+                , NVL(C.PLAN_DONE_CNT, 0) AS PLAN_DONE_CNT
+                , NVL(D.DESIGN_ALL_CNT, 0) AS DESIGN_ALL_CNT
+                , NVL(D.DESIGN_CNT, 0) AS DESIGN_CNT
+                , NVL(D.DESIGN_DONE_CNT, 0) AS DESIGN_DONE_CNT
+        FROM TSYS830 A,
+                    (
+                        SELECT ENTER_CD,
+                               NAME,
+                               SUM(
+                                    CASE
+                                        WHEN VACATION_CD IN (10, 20) THEN TO_DATE(VACATION_EDATE) - TO_DATE(VACATION_SDATE) + 0.5
+                                        ELSE TO_DATE(VACATION_EDATE) - TO_DATE(VACATION_SDATE) + 1
+                                    END
+                                ) AS USE_CNT
+                            FROM TSYS831
+                            GROUP BY ENTER_CD, NAME
+                    ) B,
+                    (
+                        SELECT ENTER_CD,
+                               DEV_NAME,
+                               COUNT(PLAN_SDATE) AS PLAN_ALL_CNT,
+                               COUNT(CASE WHEN SYSDATE BETWEEN PLAN_SDATE AND PLAN_EDATE THEN 1 END) AS PLAN_CNT,
+                               <![CDATA[
+                                    COUNT(CASE WHEN PLAN_EDATE < SYSDATE THEN 1 END) AS PLAN_DONE_CNT
+                               ]]>
+                        FROM TSYS800
+                        GROUP BY ENTER_CD, DEV_NAME
+                    )C,
+                    (
+                        SELECT ENTER_CD,
+                               PER_IN_CHAR,
+                               COUNT(DESIGN_SDATE) AS DESIGN_ALL_CNT,
+                               COUNT(CASE WHEN SYSDATE BETWEEN DESIGN_SDATE AND DESIGN_EDATE THEN 1 END) AS DESIGN_CNT,
+                               <![CDATA[
+                                   COUNT(CASE WHEN DESIGN_EDATE <= SYSDATE THEN 1 END) AS DESIGN_DONE_CNT
+                               ]]>
+                        FROM TSYS800
+                        GROUP BY ENTER_CD, PER_IN_CHAR
+                    )D
+        WHERE A.ENTER_CD = B.ENTER_CD(+)
+        AND A.NAME = B.NAME(+)
+        AND A.NAME = C.DEV_NAME(+)
+        AND A.NAME = D.PER_IN_CHAR(+)
+        AND A.ENTER_CD = #{ssnEnterCd}
+        <if test="searchWorkCd != null and searchWorkCd neq ''">
+            AND A.WORK_CD = #{searchWorkCd}
+        </if>
+        <if test="searchName != null and searchName neq ''">
+            AND A.NAME LIKE '%'||#{searchName}||'%'
+        </if>
+        ORDER BY WORK_CD, A.NAME
+    </select>
+
+    <update id="saveHmnrsMgr" parameterType="map">
+            MERGE INTO TSYS830 T
+            USING   (
+                SELECT A.ENTER_CD
+                     , A.NAME
+                     , A.WORK_CD
+                     , A.RSPNS_MODULE
+                     , A.PART_SDATE
+                     , A.PART_EDATE
+                FROM (
+                         SELECT NULL      AS ENTER_CD
+                              , NULL      AS NAME
+                              , NULL      AS WORK_CD
+                              , NULL      AS RSPNS_MODULE
+                              , NULL      AS PART_SDATE
+                              , NULL      AS PART_EDATE
+                         FROM DUAL
+                        <bind name="icnt" value="1" />
+                        <foreach item="rm" collection="mergeRows" >
+                                                            UNION ALL
+                                SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+                                     , TRIM( #{rm.name} )  AS NAME
+                                     , TRIM( #{rm.workCd} )  AS WORK_CD
+                                     , TRIM( #{rm.rspnsModule} )  AS RSPNS_MODULE
+                                     , TRIM( #{rm.partSdate} )  AS PART_SDATE
+                                     , TRIM( #{rm.partEdate} ) AS PART_EDATE
+                                FROM DUAL
+                        </foreach>
+                                       ) A WHERE A.NAME IS NOT NULL
+                                ) S
+                        ON (     T.ENTER_CD    = S.ENTER_CD
+                            AND  T.NAME   	   = S.NAME
+                        )
+                        WHEN MATCHED THEN
+                            UPDATE SET
+                                  T.WORK_CD = S.WORK_CD
+                                , T.RSPNS_MODULE = S.RSPNS_MODULE
+                                , T.PART_SDATE = S.PART_SDATE
+                                , T.PART_EDATE = S.PART_EDATE
+                                , T.CHKDATE  = SYSDATE
+                                , T.CHKID    = #{ssnSabun}
+                                WHEN NOT MATCHED THEN
+                            INSERT
+                                (     T.ENTER_CD
+                                    , T.NAME
+                                    , T.WORK_CD
+                                    , T.RSPNS_MODULE
+                                    , T.PART_SDATE
+                                    , T.PART_EDATE
+                                    , T.CHKDATE
+                                    , T.CHKID
+                                )
+                                VALUES
+                            (     S.ENTER_CD
+                                , S.NAME
+                                , S.WORK_CD
+                                , S.RSPNS_MODULE
+                                , S.PART_SDATE
+                                , S.PART_EDATE
+                                , SYSDATE
+                                , #{ssnSabun}
+                            )
+    </update>
+
+    <delete parameterType="map" id="deleteHmnrsMgr">
+        DELETE FROM TSYS830
+        <where>
+            AND (ENTER_CD, NAME) IN
+            <foreach item="rm" collection="deleteRows" separator="," open="(" close=")">
+                (#{ssnEnterCd}, #{rm.name})
+            </foreach>
+        </where>
+    </delete>
+</mapper>

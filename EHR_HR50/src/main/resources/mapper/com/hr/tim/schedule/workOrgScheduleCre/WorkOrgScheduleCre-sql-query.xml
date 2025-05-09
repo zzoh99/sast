@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.workOrgScheduleCre">
+
+<!-- 근무스케줄 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkOrgScheduleCre">
+
+				<![CDATA[
+					SELECT CASE WHEN COUNT(1) > 0 THEN 'Y' ELSE 'N' END CRE_YN
+					  FROM TTIM125
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					           ]]>
+				<if test='searchWorkteamCd != null and !searchWorkteamCd.equals("")'>
+					   AND WORK_ORG_CD  = #{searchWorkteamCd}
+				</if>
+					   AND YMD BETWEEN REPLACE(#{searchSym},'-','')||'01' And TO_CHAR(LAST_DAY(TO_DATE(REPLACE(#{searchEym},'-','')||'01','YYYYMMDD')),'YYYYMMDD')
+
+
+		</select>
+
+
+<!-- 근무스케줄 생성 프로시저 -->
+		<update parameterType="map" id="prcWorkOrgScheduleCre" statementType="CALLABLE">
+
+			<![CDATA[
+					CALL P_TIM_SCHEDULE_CREATE(
+					    #{sqlCode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					    REPLACE(#{searchSym,mode=IN,jdbcType=VARCHAR},'-',''),
+					    REPLACE(#{searchEym,mode=IN,jdbcType=VARCHAR},'-',''),
+					    #{searchWorkteamCd,mode=IN,jdbcType=VARCHAR},
+					    #{searchSabun,mode=IN,jdbcType=VARCHAR},
+					    #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+		</update>
+
+		<update parameterType="map" id="prcWorkOrgScheduleCre2" statementType="CALLABLE">
+
+			<![CDATA[
+					CALL P_TIM_SCHEDULE_CREATE2(
+					    #{sqlCode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					    REPLACE(#{searchSym,mode=IN,jdbcType=VARCHAR},'-',''),
+					    REPLACE(#{searchEym,mode=IN,jdbcType=VARCHAR},'-',''),
+					    #{searchWorkteamCd,mode=IN,jdbcType=VARCHAR},
+					    #{searchSabun,mode=IN,jdbcType=VARCHAR},
+					    #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+		</update>
+
+
+<!-- 진행상태 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkOrgScheduleProgress">
+
+					 SELECT MAX(ERR_LOCATION) KEEP(DENSE_RANK FIRST ORDER BY SEQ DESC) AS PER
+					      , MAX(ERR_LOG) KEEP(DENSE_RANK FIRST ORDER BY SEQ DESC) AS LOG
+					   FROM TSYS903		
+			          WHERE ENTER_CD  = #{ssnEnterCd}
+			            AND BIZ_CD    = 'PROGRESS'
+<choose><when test='flag and flag.equals("1")'>
+					    AND OBJECT_NM = 'P_TIM_SCHEDULE_CREATE'
+		</when><otherwise>
+			            AND OBJECT_NM = 'P_TIM_SCHEDULE_CREATE2'
+</otherwise>
+</choose>
+			            AND CHKID = #{ssnSabun}
+
+		</select>
+
+</mapper>

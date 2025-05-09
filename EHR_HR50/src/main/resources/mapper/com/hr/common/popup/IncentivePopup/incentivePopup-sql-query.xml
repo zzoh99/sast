@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.incentivePopup">
+	<select id="getIncentivePopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ENTER_CD
+			, INCENTIVE_DATE
+			, INCENTIVE_CD
+			, INCENTIVE_NM
+			, INCENTIVE_YY
+			, BIGO
+		FROM TCPN471
+		WHERE 1=1
+		AND ENTER_CD = #{ssnEnterCd} ]]>
+	<if test="searchDate != null and searchDate neq ''">
+		AND INCENTIVE_YY = TRIM(#{searchDate})
+	</if>
+	</select>
+	
+	<select id="getIncentivePopupMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT RUN_TYPE, PAYMENT_DD
+		FROM TCPN051
+		WHERE ENTER_CD = #{ssnEnterCd}       
+		AND PAY_CD = #{selectPayCd}
+	]]>
+	</select>
+	
+	<update id="saveIncentivePopup" parameterType="map">
+	<![CDATA[
+		MERGE INTO TCPN201 T
+		USING	(
+				SELECT	  PAY_ACTION_CD
+						, PAY_ACTION_NM
+						, PAY_YM
+						, PAY_CD
+						, PAYMENT_YMD
+						, ORD_SYMD
+						, ORD_EYMD
+						, TIME_YM
+						, CAL_TAX_METHOD
+						, CAL_TAX_SYM
+						, CAL_TAX_EYM
+						, ADD_TAX_RATE
+						, BON_SYMD
+						, BON_EYMD
+						, GNT_SYMD
+						, GNT_EYMD
+						, BON_CAL_TYPE
+						, BON_APPLY_TYPE
+						, BON_MON_RATE
+						, PAYMENT_METHOD
+				FROM	(
+						SELECT	  NULL		AS PAY_ACTION_CD      
+								, NULL		AS PAY_ACTION_NM      
+								, NULL		AS PAY_YM             
+								, NULL		AS PAY_CD             
+								, NULL		AS PAYMENT_YMD        
+								, NULL		AS ORD_SYMD           
+								, NULL		AS ORD_EYMD           
+								, NULL		AS TIME_YM            
+								, NULL		AS CAL_TAX_METHOD     
+								, NULL		AS CAL_TAX_SYM        
+								, NULL		AS CAL_TAX_EYM        
+								, NULL		AS ADD_TAX_RATE       
+								, NULL		AS BON_SYMD           
+								, NULL		AS BON_EYMD           
+								, NULL		AS GNT_SYMD           
+								, NULL		AS GNT_EYMD           
+								, NULL		AS BON_CAL_TYPE       
+								, NULL		AS BON_APPLY_TYPE     
+								, NULL		AS BON_MON_RATE       
+								, NULL		AS PAYMENT_METHOD     
+						FROM	DUAL ]]>
+		<bind name="idx" value="1" />
+		<foreach item="rm" collection="mergeRows">
+			UNION ALL
+			SELECT
+			<choose>
+				<when test="rm.payActionCd != null and rm.payActionCd neq ''">
+					TRIM(#{rm.payActionCd}) 			AS PAY_ACTION_CD
+				</when>
+				<otherwise>
+					TO_CHAR( (SELECT LPAD((NVL(MAX(TO_NUMBER(PAY_ACTION_CD)),0) + (#{idx})), 3, '0') 
+					          FROM TCPN201
+					          WHERE SUBSTR (PAY_ACTION_CD, 1, 6) = REPLACE(#{rm.payYm}, '-', '') 
+					          AND ENTER_CD = #{ssnEnterCd}
+					          ) 
+					       ) AS PAY_ACTION_CD
+					 <bind name="idx" value="idx + 1" />
+				</otherwise>
+			</choose>   
+					, TRIM(#{rm.payActionNm}) AS PAY_ACTION_NM            
+					, TRIM(#{rm.payYm}) AS PAY_YM                   
+					, TRIM(#{rm.payCd}) AS PAY_CD                   
+					, TRIM(#{rm.paymentYmd}) AS PAYMENT_YMD              
+					, TRIM(#{rm.ordSymd}) AS ORD_SYMD                 
+					, TRIM(#{rm.ordEymd}) AS ORD_EYMD                 
+					, TRIM(#{rm.timeYm}) AS TIME_YM                  
+					, TRIM(#{rm.calTaxMethod}) AS CAL_TAX_METHOD           
+					, TRIM(#{rm.calTaxSym}) AS CAL_TAX_SYM              
+					, TRIM(#{rm.calTaxEym}) AS CAL_TAX_EYM              
+					, TRIM(#{rm.addTaxRate}) AS ADD_TAX_RATE             
+					, TRIM(#{rm.bonSymd}) AS BON_SYMD                 
+					, TRIM(#{rm.bonEymd}) AS BON_EYMD                 
+					, TRIM(#{rm.gntSymd}) AS GNT_SYMD                 
+					, TRIM(#{rm.gntEymd}) AS GNT_EYMD                 
+					, TRIM(#{rm.bonCalType}) AS BON_CAL_TYPE             
+					, TRIM(#{rm.bonApplyType}) AS BON_APPLY_TYPE           
+					, TRIM(#{rm.bonMonRate}) AS BON_MON_RATE             
+					, TRIM(#{rm.paymentMethod}) AS PAYMENT_METHOD           
+					FROM   DUAL
+		</foreach>
+		<![CDATA[
+									)  WHERE PAY_ACTION_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = #{ssnEnterCd}
+					AND  T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAY_ACTION_NM  	= S.PAY_ACTION_NM  
+									, T.PAY_YM         	= S.PAY_YM         
+									, T.PAY_CD         	= S.PAY_CD         
+									, T.PAYMENT_YMD    	= S.PAYMENT_YMD    
+									, T.ORD_SYMD       	= S.ORD_SYMD       
+									, T.ORD_EYMD       	= S.ORD_EYMD       
+									, T.TIME_YM        	= S.TIME_YM        
+									, T.CAL_TAX_METHOD 	= S.CAL_TAX_METHOD 
+									, T.CAL_TAX_SYM    	= S.CAL_TAX_SYM    
+									, T.CAL_TAX_EYM    	= S.CAL_TAX_EYM    
+									, T.ADD_TAX_RATE   	= S.ADD_TAX_RATE   
+									, T.BON_SYMD       	= S.BON_SYMD       
+									, T.BON_EYMD       	= S.BON_EYMD       
+									, T.GNT_SYMD       	= S.GNT_SYMD       
+									, T.GNT_EYMD       	= S.GNT_EYMD       
+									, T.BON_CAL_TYPE   	= S.BON_CAL_TYPE   
+									, T.BON_APPLY_TYPE 	= S.BON_APPLY_TYPE 
+									, T.BON_MON_RATE   	= S.BON_MON_RATE   
+									, T.PAYMENT_METHOD 	= S.PAYMENT_METHOD 
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.PAY_ACTION_NM
+							, T.PAY_YM
+							, T.PAY_CD
+							, T.PAYMENT_YMD
+							, T.ORD_SYMD
+							, T.ORD_EYMD
+							, T.TIME_YM
+							, T.CAL_TAX_METHOD
+							, T.CAL_TAX_SYM
+							, T.CAL_TAX_EYM
+							, T.ADD_TAX_RATE
+							, T.BON_SYMD
+							, T.BON_EYMD
+							, T.GNT_SYMD
+							, T.GNT_EYMD
+							, T.BON_CAL_TYPE
+							, T.BON_APPLY_TYPE
+							, T.BON_MON_RATE
+							, T.PAYMENT_METHOD
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+							, S.PAY_YM || S.PAY_ACTION_CD
+							, S.PAY_ACTION_NM
+							, S.PAY_YM
+							, S.PAY_CD
+							, S.PAYMENT_YMD
+							, S.ORD_SYMD
+							, S.ORD_EYMD
+							, S.TIME_YM
+							, S.CAL_TAX_METHOD
+							, S.CAL_TAX_SYM
+							, S.CAL_TAX_EYM
+							, S.ADD_TAX_RATE
+							, S.BON_SYMD
+							, S.BON_EYMD
+							, S.GNT_SYMD
+							, S.GNT_EYMD
+							, S.BON_CAL_TYPE
+							, S.BON_APPLY_TYPE
+							, S.BON_MON_RATE
+							, S.PAYMENT_METHOD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+	]]>
+	</update>
+	
+	<delete id="deleteIncentivePopup" parameterType="map">
+	<![CDATA[
+		DELETE FROM TCPN201 
+		 WHERE 	(ENTER_CD, PAY_ACTION_CD) IN 	(  (NULL, NULL) ]]>
+	<foreach item="rm" collection="deleteRows">
+		, 
+		<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.payActionCd != null and rm.payActionCd neq ''">
+			(#{ssnEnterCd}, TRIM(#{rm.payActionCd}))
+		</if>
+		)
+	</foreach>
+	</delete>
+	
+</mapper>

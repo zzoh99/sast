@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.mltsrcAppItemMgr">
+	
+<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMltsrcAppItemMgnrList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					     , APPRAISAL_CD
+					     , APP_SEQ_CD
+					     , SEQ
+					     , APP_ITEM
+					     , REMARK
+					  FROM TPAP407
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPRAISAL_CD = #{searchAppraisalCd}
+					           ]]>
+					<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+					   AND APP_SEQ_CD = #{searchAppSeqCd}
+					</if>
+					 ORDER BY APPRAISAL_CD, APP_SEQ_CD, SEQ
+
+
+
+		</select>
+
+<!-- 저장 -->
+		<update parameterType="map" id="saveMltsrcAppItemMgnr">
+
+				<![CDATA[
+					MERGE INTO TPAP407 T
+					USING (
+					           SELECT A.ENTER_CD
+					                , A.APPRAISAL_CD
+					                , A.APP_SEQ_CD
+					                , A.SEQ
+					                , A.APP_ITEM
+					                , A.REMARK
+					             FROM (
+					                       SELECT NULL AS ENTER_CD
+					                            , NULL AS APPRAISAL_CD
+					                            , NULL AS APP_SEQ_CD
+					                            , NULL AS SEQ
+					                            , NULL AS APP_ITEM
+					                            , NULL AS REMARK
+					                         FROM DUAL
+					                         ]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					                        UNION ALL
+					                       SELECT #{ssnEnterCd} AS ENTER_CD
+					                            , TRIM( #{rm.appraisalCd} ) AS APPRAISAL_CD
+					                            , TRIM( #{rm.appSeqCd} ) AS APP_SEQ_CD
+					                            , TRIM( #{rm.seq} ) AS SEQ
+					                            , TRIM( #{rm.appItem}) AS APP_ITEM
+					                            , TRIM( #{rm.remark}) AS REMARK
+					                         FROM   DUAL
+</foreach>
+					                  ) A WHERE A.ENTER_CD IS NOT NULL
+					      ) S
+					   ON (
+					                T.ENTER_CD     = S.ENTER_CD
+					           AND  T.APPRAISAL_CD = S.APPRAISAL_CD
+					           AND  T.APP_SEQ_CD   = S.APP_SEQ_CD
+					           AND  T.SEQ          = S.SEQ
+					      )
+					WHEN MATCHED THEN
+					     UPDATE SET
+					          T.CHKDATE  = SYSDATE
+					        , T.CHKID    = #{ssnSabun}
+					        , T.APP_ITEM = S.APP_ITEM
+					        , T.REMARK   = S.REMARK
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					          T.ENTER_CD
+					        , T.APPRAISAL_CD
+					        , T.APP_SEQ_CD
+					        , T.SEQ
+					        , T.APP_ITEM
+					        , T.REMARK
+					        , T.CHKDATE
+					        , T.CHKID
+					     ) VALUES (
+					          S.ENTER_CD
+					        , S.APPRAISAL_CD
+					        , S.APP_SEQ_CD
+					        , S.SEQ
+					        , S.APP_ITEM
+					        , S.REMARK
+					        , SYSDATE
+					        , #{ssnSabun}
+					     )
+		</update>
+<!-- 삭제 -->
+		<delete parameterType="map" id="deleteMltsrcAppItemMgnr">
+
+					DELETE FROM TPAP407
+					 WHERE (ENTER_CD, APPRAISAL_CD, APP_SEQ_CD, SEQ) IN (
+					           (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("") != null and rm.appSeqCd != null and !rm.appSeqCd.equals("") != null and rm.seq != null and !rm.seq.equals("")'>
+						       , (#{ssnEnterCd}, TRIM( #{rm.appraisalCd} ), TRIM( #{rm.appSeqCd} ), TRIM( #{rm.seq} ))
+	</if>
+</foreach>
+					       )
+		</delete>
+
+
+</mapper>

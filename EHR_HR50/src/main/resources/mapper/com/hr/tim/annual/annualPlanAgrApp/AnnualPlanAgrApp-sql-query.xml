@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanAgrApp">
+
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAgrAppList">
+
+				<![CDATA[
+					WITH TEMP AS (
+					   SELECT 0 AS DETAIL
+					        , A.ENTER_CD
+							, A.APPL_SEQ
+							, A.SABUN
+							, A.PLAN_CD
+							, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'T56120', A.PLAN_CD)	AS PLAN_NM
+							, A.PLAN_SEQ
+
+							, A.PLAN_STD_YMD
+							, A.USE_S_YMD
+							, A.USE_E_YMD
+							, A.USE_CNT
+							, A.USED_CNT
+							, A.REST_CNT
+							, A.AGREE_YN
+							, TO_CHAR(A.AGREE_TIME, 'YYYYMMDDHH24MISS') AS AGREE_TIME
+
+							, B.APPL_SEQ					AS APPL_SEQ_AP
+							, B.APPL_YMD
+							, B.APPL_STATUS_CD
+							, B.AGREE_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+
+                            , (SELECT MAX(PLAN_DAY) FROM TTIM560 WHERE ENTER_CD = A.ENTER_CD AND PLAN_CD = A.PLAN_CD AND PLAN_SEQ = A.PLAN_SEQ) AS PLAN_DAY
+							, CASE WHEN NVL(B.APPL_STATUS_CD,'11') IN ('23', '33') THEN '<a class="sbasic">반려삭제</a>' ELSE NULL END AS BTN_DEL
+						 FROM TTIM561 A, THRI103 B
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						  AND A.SABUN    = #{searchSabun}
+						  AND A.PLAN_SEQ = 1
+						  AND A.ENTER_CD = B.ENTER_CD (+)
+						  AND A.APPL_SEQ = B.APPL_SEQ (+)
+					)
+					SELECT A.*
+					     , TO_CHAR(TO_DATE(A.PLAN_STD_YMD,'YYYYMMDD')  + A.PLAN_DAY, 'YYYYMMDD') AS PLAN_END_YMD
+					     , CASE WHEN NVL(A.APPL_STATUS_CD,'11') = '11' AND A.PLAN_STD_YMD IS NOT NULL THEN
+					            CASE WHEN ( A.PLAN_DAY IS NULL AND TO_CHAR(SYSDATE, 'YYYYMMDD') >= A.PLAN_STD_YMD)
+					                   OR (    A.PLAN_DAY IS NOT NULL
+					                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.PLAN_STD_YMD AND TO_CHAR(TO_DATE(A.PLAN_STD_YMD,'YYYYMMDD')  + A.PLAN_DAY, 'YYYYMMDD'))
+-- 계획기간이 null 이면 시작일자만 체크
+-- 계획기준일자부터 TTIM560의 계획기간내에만 신청가능
+					                 THEN '<a class="sbasic">신청</a>'
+					                 ELSE NULL END
+					       ELSE
+					            NULL
+					       END AS BTN_APP
+
+
+					     , CASE WHEN A.PLAN_DAY IS NULL THEN
+					                 CASE WHEN NVL(A.APPL_STATUS_CD,'11') = '11' THEN '<a class="sbasic">신청</a>' ELSE NULL END
+					            ELSE
+					                 CASE WHEN NVL(A.APPL_STATUS_CD,'11') = '11' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.PLAN_STD_YMD
+							                  AND TO_CHAR(TO_DATE(A.PLAN_STD_YMD,'YYYYMMDD')  + A.PLAN_DAY, 'YYYYMMDD') THEN
+					                           '<a class="sbasic">신청</a>'
+					                      ELSE NULL END
+					            END AS BTN_APP_AAA
+					  FROM TEMP A
+					 ORDER BY A.PLAN_STD_YMD DESC, A.APPL_YMD DESC, A.APPL_SEQ_AP DESC
+				]]>
+
+
+		</select>
+
+<!-- 반려삭제시, 동의여부 clear -->
+		<update parameterType="map" id="saveAnnualPlanAgrApp">
+
+				   UPDATE TTIM561
+				      SET AGREE_YN = NULL
+				        , AGREE_TIME = NULL
+					WHERE ( ENTER_CD,APPL_SEQ  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{rm.applSeq})  )
+</foreach>
+							)
+		</update>
+
+
+</mapper>

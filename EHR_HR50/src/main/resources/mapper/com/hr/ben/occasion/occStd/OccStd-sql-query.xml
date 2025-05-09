@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.occasion.occStd">
+
+	<select id="getOccStdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.OCC_CD
+		     , A.FAM_CD
+		     , A.OCC_SDATE
+		     , A.OCC_EDATE
+		     , A.OCC_MON
+		     , A.OCC_HOLIDAY
+		     , A.WORK_MONTH
+		     , A.WREATH_YN
+		     , A.OUTFIT_YN
+		     , A.GIFT_YN
+		     , A.DUP_CHK_YN
+		     , A.USE_YN
+		     , A.NOTE
+		     , A.WORK_TYPE
+		     , A.FLOWER_BASKET_YN
+		     , A.EVIDENCE_DOC
+		     , A.TIM_APP_DESC
+		  FROM TBEN470 A, TSYS005 B   
+		 WHERE A.ENTER_CD =	#{ssnEnterCd}
+		   AND A.ENTER_CD = B.ENTER_CD
+		   AND B.GRCODE_CD = 'B60020'
+		   AND A.OCC_CD    = B.CODE ]]>
+	<choose>
+		<when test="ssnGrpCd != null and ssnGrpCd eq '99'">
+		   AND B.NOTE1 = 'AA'
+		   AND A.WORK_TYPE = F_COM_GET_WORKTYPE(#{ssnEnterCd}, #{ssnSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+		</when>
+		<otherwise>
+			<if test="searchWorkType != null and searchWorkType neq ''">
+		   AND TRIM( #{searchWorkType} ) = A.WORK_TYPE
+			</if>
+		</otherwise>
+	</choose>
+	<if test="searchYmd != null and searchYmd neq ''">
+		   AND REPLACE( #{searchYmd},'-','') BETWEEN A.OCC_SDATE AND NVL(A.OCC_EDATE, '29991231')
+	
+	</if>
+		 ORDER BY B.SEQ, F_COM_GET_GRCODE_SEQ( A.ENTER_CD, 'B60030', A.FAM_CD)
+	</select>
+
+	<update id="saveOccStd" parameterType="map">
+	<![CDATA[			
+		MERGE INTO TBEN470	T
+		USING ( ]]>
+			<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+					SELECT TRIM(#{ssnEnterCd})			AS	ENTER_CD
+						 , TRIM(#{rm.occCd})			AS	OCC_CD
+						 , TRIM(#{rm.famCd})			AS	FAM_CD
+						 , TRIM(#{rm.occSdate})			AS	OCC_SDATE
+						 , TRIM(#{rm.occEdate})			AS	OCC_EDATE
+						 , TRIM(#{rm.occMon})			AS	OCC_MON
+						 , TRIM(#{rm.occHoliday})		AS	OCC_HOLIDAY
+						 , TRIM(#{rm.workMonth})		AS	WORK_MONTH
+						 , TRIM(#{rm.wreathYn})			AS	WREATH_YN
+						 , TRIM(#{rm.outfitYn})			AS	OUTFIT_YN
+						 , TRIM(#{rm.giftYn})			AS	GIFT_YN
+						 , TRIM(#{rm.dupChkYn})			AS	DUP_CHK_YN
+						 , TRIM(#{rm.useYn})			AS	USE_YN
+						 , TRIM(#{rm.note})				AS	NOTE
+						 , TRIM(#{rm.workType})			AS	WORK_TYPE
+						 , TRIM(#{rm.flowerBasketYn})	AS	FLOWER_BASKET_YN
+						 , TRIM(#{rm.evidenceDoc})		AS	EVIDENCE_DOC
+						 , TRIM(#{rm.timAppDesc})		AS	TIM_APP_DESC
+				      FROM DUAL
+			</foreach>
+	<![CDATA[
+		) S
+		ON	(
+				T.ENTER_CD		=	S.ENTER_CD
+			AND	T.WORK_TYPE		=	S.WORK_TYPE
+			AND	T.OCC_CD		=	S.OCC_CD
+			AND	T.FAM_CD		=	S.FAM_CD
+			AND	T.OCC_SDATE		=	S.OCC_SDATE
+		)
+		
+		WHEN MATCHED THEN
+			UPDATE SET
+					T.OCC_EDATE			=	S.OCC_EDATE
+				,	T.OCC_MON			=	S.OCC_MON
+				,	T.OCC_HOLIDAY		=	S.OCC_HOLIDAY
+				,	T.WORK_MONTH		=	S.WORK_MONTH
+				,	T.WREATH_YN			=	S.WREATH_YN
+				,	T.OUTFIT_YN			=	S.OUTFIT_YN
+				,	T.GIFT_YN			=	S.GIFT_YN
+				,	T.DUP_CHK_YN		=	S.DUP_CHK_YN
+				,	T.USE_YN			=	S.USE_YN
+				,	T.NOTE				=	S.NOTE
+				,	T.FLOWER_BASKET_YN	=	S.FLOWER_BASKET_YN
+				,	T.EVIDENCE_DOC		=	S.EVIDENCE_DOC
+				,	T.TIM_APP_DESC		=	S.TIM_APP_DESC
+				,	T.CHKDATE			=	sysdate
+				,	T.CHKID				=	#{ssnSabun}
+			
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				T.ENTER_CD
+			  , T.WORK_TYPE
+			  , T.OCC_CD
+			  , T.FAM_CD
+			  , T.OCC_SDATE
+			  , T.OCC_EDATE
+			  , T.OCC_MON
+			  , T.OCC_HOLIDAY
+			  , T.WORK_MONTH
+			  , T.WREATH_YN
+			  , T.OUTFIT_YN
+			  , T.GIFT_YN
+			  , T.DUP_CHK_YN
+			  , T.USE_YN
+			  , T.NOTE
+			  , T.FLOWER_BASKET_YN
+			  , T.EVIDENCE_DOC
+			  , T.TIM_APP_DESC
+			  , T.CHKDATE
+			  , T.CHKID
+		)
+		VALUES
+		(
+				S.ENTER_CD
+			  , S.WORK_TYPE
+			  , S.OCC_CD
+			  , S.FAM_CD
+			  , S.OCC_SDATE
+			  , S.OCC_EDATE
+			  , S.OCC_MON
+			  , S.OCC_HOLIDAY
+			  , S.WORK_MONTH
+			  , S.WREATH_YN
+			  , S.OUTFIT_YN
+			  , S.GIFT_YN
+			  , S.DUP_CHK_YN
+			  , S.USE_YN
+			  , S.NOTE
+			  , S.FLOWER_BASKET_YN
+			  , S.EVIDENCE_DOC
+			  , S.TIM_APP_DESC
+			  , sysdate
+			  , #{ssnSabun}
+		)
+	]]>
+	</update>
+
+	<delete id="deleteOccStd" parameterType="map">
+	<![CDATA[
+		DELETE FROM	 TBEN470
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND (OCC_CD, FAM_CD, OCC_SDATE, WORK_TYPE ) IN (  (NULL, NULL, NULL, NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.occCd != null and rm.occCd neq '' and rm.famCd != null and rm.famCd neq ''
+				  and rm.occSdate != null and rm.occSdate neq '' and rm.workType != null and rm.workType neq ''">
+				, ( TRIM( #{rm.occCd} ) , TRIM( #{rm.famCd} ) , TRIM( #{rm.occSdate} ) , TRIM( #{rm.workType} ) )
+			</if>
+		</foreach>
+				)
+	</delete>
+</mapper>

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appAddingControl">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppAddingControlMap1">
+
+			<![CDATA[
+                SELECT APPRAISAL_CD
+                     , APPRAISAL_NM
+                     , APP_TYPE_CD -- 평가종류코드(A:성과,B:역량,C:종합)
+                     , CON_YN     -- 평가합산여부
+                     , CONTROL_YN  -- 조정계산여부
+                     , GRADE_YN   -- 순위/등급계산여부
+                     , CLOSE_YN   -- 마감여부
+                     , MOVE_YN	  -- 부서이동평가자반영여부
+                     , FINAL_KPI_YN -- KPI 최종결과반영여부
+                     , TOTAL_YN
+                     , STD_YN
+                     /* 전체 인원수 */
+                     , ( SELECT COUNT(DISTINCT B.SABUN) AS TOT_CNT
+                           FROM TPAP201 B
+                          WHERE B.ENTER_CD = TRIM(#{ssnEnterCd})
+                            AND B.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+                            AND B.APP_STEP_CD = '5'
+                       ) AS TOT_CNT
+                     /* 평가대상 인원수 */
+                     , ( SELECT COUNT(DISTINCT B.SABUN) AS APP_CNT
+                           FROM TPAP201 B
+                          WHERE B.ENTER_CD = TRIM(#{ssnEnterCd})
+                            AND B.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+                            AND B.APP_STEP_CD = '5'
+                            AND B.APP_YN = 'Y'
+                       ) AS APP_CNT
+                        /* 평가제외 인원수 */
+                     , ( SELECT COUNT(SABUN) AS EX_APP_CNT
+                           FROM ( SELECT B.SABUN
+                                    FROM TPAP201 B
+                                   WHERE B.ENTER_CD = TRIM(#{ssnEnterCd})
+                                     AND B.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+                                     AND B.APP_STEP_CD = '5'
+                                   GROUP BY B.SABUN
+                                  HAVING COUNT(*) = SUM(CASE WHEN B.APP_YN = 'N' THEN 1 ELSE 0 END)
+                                )
+                        ) AS EX_APP_CNT
+                        /* 2개이상부서평가대상 인원수 */
+                     , ( SELECT COUNT(SABUN) AS CHK_APP_CNT1
+                           FROM ( SELECT B.SABUN
+                                    FROM TPAP201 B
+                                   WHERE B.ENTER_CD = TRIM(#{ssnEnterCd})
+                                     AND B.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+                                     AND B.APP_STEP_CD = '5'
+                                   GROUP BY B.SABUN
+                                  HAVING SUM(CASE WHEN B.APP_YN = 'Y' THEN 1 ELSE 0 END) >= 2
+                                )
+                        ) AS CHK_APP_CNT1
+                        /* 2개이상주관부서 인원수 */
+                     , (SELECT COUNT(SABUN) AS CHK_APP_CNT2
+                          FROM ( SELECT B.SABUN
+                                   FROM TPAP201 B
+                                  WHERE B.ENTER_CD = TRIM(#{ssnEnterCd})
+                                    AND B.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+                                    AND B.APP_STEP_CD = '5'
+                                  GROUP BY B.SABUN
+                                 HAVING (SUM(CASE WHEN B.APP_YN = 'Y' AND NVL(B.MAIN_ORG_YN,'N') = 'Y' THEN 1 ELSE 0 END) >= 2 /* 2개이상주관부서 인원수 */
+                                        OR (SUM(CASE WHEN B.APP_YN = 'Y' THEN 1 ELSE 0 END) >= 1 AND SUM(CASE WHEN NVL(B.MAIN_ORG_YN,'N') = 'Y' THEN 1 ELSE 0 END) = 0) /* 주관부서가 없는 인원수 */
+                                        )
+                                )
+                        ) AS CHK_APP_CNT2
+                  FROM TPAP101
+                 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+                   AND APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+			]]>
+
+
+		</select>
+		
+<!-- 1차평가 후 표준화 작업 -->
+		<update parameterType="map" id="prcAppAddingControl8" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_STANDARDIZE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchCancelYn,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+<!-- 평가집계 프로시저 -->
+		<update parameterType="map" id="prcAppAddingControl1" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_ADDING_SUM(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchCancelYn,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+<!-- 조정등급반영 프로시저 -->
+		<update parameterType="map" id="prcAppAddingControl4" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_ADJUST_GRADE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchCancelYn,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+<!-- 평가마감(취소) 프로시저 -->
+		<update parameterType="map" id="prcAppAddingControl5" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_CLOSING(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchGubun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+
+<!-- 평가조정계산 프로시저 -->
+<!-- 		<update parameterType="map" id="prcAppAddingControl2">
+
+				<![CDATA[
+					CALL P_PAPN_APP_ADJUST(#{},#{},#{},#{},#{})
+				]]>
+
+			<param type="VARCHAR" binding="OUT" name="sqlcode" />
+			<param type="VARCHAR" binding="OUT" name="sqlerrm" />
+			<param type="VARCHAR"  binding="IN" name="ssnEnterCd" />
+			<param type="VARCHAR"  binding="IN" name="searchAppraisalCd" />
+			<param type="VARCHAR"  binding="IN" name="ssnSabun" />
+
+		</select>
+ -->
+<!-- 부서이동평가자반영 프로시저 -->
+		<update parameterType="map" id="prcAppAddingControl3" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_MOVE_RATEING(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+
+<!-- KPI최종평가결과 반영 프로시저 -->
+<!-- 		<update parameterType="map" id="prcAppAddingControl6">
+
+				<![CDATA[
+					CALL P_PAPN_APP_KPI_TOTAL_SUM(#{},#{},#{},#{},#{})
+				]]>
+
+			<param type="VARCHAR" binding="OUT" name="sqlcode" />
+			<param type="VARCHAR" binding="OUT" name="sqlerrm" />
+			<param type="VARCHAR"  binding="IN" name="ssnEnterCd" />
+			<param type="VARCHAR"  binding="IN" name="searchAppraisalCd" />
+			<param type="VARCHAR"  binding="IN" name="ssnSabun" />
+
+		</select>
+ -->
+
+		<!-- 종합평가등급계산 프로시저 -->
+		<update parameterType="map" id="prcAppAddingControl7" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_TOTAL_GRADING(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+
+</mapper>

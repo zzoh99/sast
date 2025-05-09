@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 퇴직항목링크(계산식)
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepEleLinkCalcMgr">
+		<select parameterType="map" resultType="cMap" id="getSepEleLinkCalcMgrList">
+
+				<![CDATA[
+					SELECT A.ELEMENT_CD
+						 , B.ELEMENT_NM
+						 , A.SEARCH_SEQ
+						 , C.SEARCH_DESC
+						 , F_CPN_GET_C_RULE_NEW(A.ENTER_CD,A.ELEMENT_CD, A.SEARCH_SEQ) AS C_RULE
+					  FROM TCPN745 A
+						 , TCPN741 B
+						 , THRI201 C
+					 WHERE A.ENTER_CD 	= B.ENTER_CD
+					   AND A.ELEMENT_CD	= B.ELEMENT_CD
+					   AND A.ENTER_CD	= C.ENTER_CD
+					   AND A.SEARCH_SEQ	= C.SEARCH_SEQ
+					   AND A.ENTER_CD	= #{ssnEnterCd}
+					           	]]>
+
+			<if test='elementNm != null and !elementNm.equals("")'>
+					   AND B.ELEMENT_NM LIKE '%'||trim(#{elementNm})||'%'
+			</if>
+					 ORDER BY B.PRIORITY, B.ELEMENT_NM DESC
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getSepEleLinkCalcMgrFormulaList">
+
+				<![CDATA[
+					SELECT A.ELEMENT_CD
+						 , A.SEARCH_SEQ
+						 , A.SEQ
+						 , A.ELE_CAL_TYPE
+						 , A.CAL_VALUE
+						 , (CASE WHEN A.ELE_CAL_TYPE = 'I' THEN (SELECT X.DB_ITEM_NM FROM TSYS807 X
+																  WHERE X.ENTER_CD = A.ENTER_CD
+																	AND X.DB_ITEM_CD = A.CAL_VALUE
+																	)
+								 WHEN A.ELE_CAL_TYPE = 'ES' THEN (SELECT X.ELEMENT_SET_NM FROM TCPN071 X
+																   WHERE X.ENTER_CD = A.ENTER_CD
+																	 AND X.ELEMENT_SET_CD = A.CAL_VALUE)
+								 WHEN A.ELE_CAL_TYPE = 'F' THEN (SELECT X.UDF_NAME FROM TSYS801 X
+																  WHERE X.ENTER_CD = A.ENTER_CD
+																	AND X.UDF_CD   = A.CAL_VALUE)
+								 ELSE A.CAL_VALUE END) AS CAL_VALUE_NM
+						 , A.CAL_SEQ
+					  FROM TCPN747 A
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					   AND A.ELEMENT_CD	= #{elementCd}
+					   AND A.SEARCH_SEQ	= TO_NUMBER(TRIM(#{searchSeq}))
+					ORDER BY A.CAL_SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getSepEleLinkCalcMgrDbItemList">
+
+				<![CDATA[
+					SELECT '1' AS DB_ITEM_DESC
+						 , DB_ITEM_CD
+						 , DB_ITEM_NM
+						 , DESCRIPTION
+						 , DATA_TYPE
+						 , SQL_SYNTAX
+						 , BIZ_CD
+						 , SYS_YN
+					  FROM TSYS807
+					 WHERE ENTER_CD	= #{ssnEnterCd}
+					           	]]>
+					<if test='bizCd != null and !bizCd.equals("")'>
+					   AND BIZ_CD	= #{bizCd}
+					</if>
+					<if test='dbItemNm != null and !dbItemNm.equals("")'>
+					   AND DB_ITEM_NM LIKE '%'||trim(#{dbItemNm})||'%'
+					</if>
+					ORDER BY BIZ_CD, DB_ITEM_CD
+
+
+
+		</select>
+		<update parameterType="map" id="saveSepEleLinkCalcMgr">
+
+
+					MERGE INTO TCPN745 T
+					USING	(
+							SELECT A.ELEMENT_CD
+								 , A.SEARCH_SEQ
+								 , A.C_RULE
+							  FROM (
+									SELECT NULL	AS ELEMENT_CD
+										 , NULL	AS SEARCH_SEQ
+										 , NULL	AS C_RULE
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.elementCd})			AS ELEMENT_CD
+										 , TO_NUMBER(TRIM(#{rm.searchSeq}))	AS SEARCH_SEQ
+										 , TRIM(#{rm.cRule})				AS C_RULE
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.ELEMENT_CD	IS NOT NULL
+							  AND A.SEARCH_SEQ	IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.ELEMENT_CD		= S.ELEMENT_CD
+						AND	T.SEARCH_SEQ		= S.SEARCH_SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.C_RULE		= S.C_RULE
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.ELEMENT_CD
+						  , T.SEARCH_SEQ
+						  , T.C_RULE
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.ELEMENT_CD
+						  , S.SEARCH_SEQ
+						  , S.C_RULE
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" id="saveSepEleLinkCalcMgrFormula">
+
+
+					MERGE INTO TCPN747 T
+					USING	(
+							SELECT A.ELEMENT_CD
+								 , A.SEARCH_SEQ
+								 , A.SEQ
+								 , A.ELE_CAL_TYPE
+								 , A.CAL_SEQ
+								 , A.CAL_VALUE
+							  FROM (
+									SELECT NULL	AS ELEMENT_CD
+										 , NULL	AS SEARCH_SEQ
+										 , NULL	AS SEQ
+										 , NULL	AS ELE_CAL_TYPE
+										 , NULL	AS CAL_SEQ
+										 , NULL	AS CAL_VALUE
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.elementCd})			AS ELEMENT_CD
+										 , TO_NUMBER(TRIM(#{rm.searchSeq}))	AS SEARCH_SEQ
+										 , TO_NUMBER(TRIM(#{rm.seq}))		AS SEQ
+										 , TRIM(#{rm.eleCalType})			AS ELE_CAL_TYPE
+										 , TO_NUMBER(TRIM(#{rm.calSeq}))	AS CAL_SEQ
+										 , TRIM(#{rm.calValue})				AS CAL_VALUE
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.ELEMENT_CD	IS NOT NULL
+							  AND A.SEARCH_SEQ	IS NOT NULL
+							  AND A.SEQ			IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.ELEMENT_CD		= S.ELEMENT_CD
+						AND	T.SEARCH_SEQ		= S.SEARCH_SEQ
+						AND	T.SEQ				= S.SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.ELE_CAL_TYPE	= S.ELE_CAL_TYPE
+								 , T.CAL_SEQ		= S.CAL_SEQ
+								 , T.CAL_VALUE		= S.CAL_VALUE
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.ELEMENT_CD
+						  , T.SEARCH_SEQ
+						  , T.SEQ
+						  , T.ELE_CAL_TYPE
+						  , T.CAL_SEQ
+						  , T.CAL_VALUE
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.ELEMENT_CD
+						  , S.SEARCH_SEQ
+						  , S.SEQ
+						  , S.ELE_CAL_TYPE
+						  , S.CAL_SEQ
+						  , S.CAL_VALUE
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" id="updateSepEleLinkCalcMgrCRule">
+
+				<![CDATA[
+					UPDATE TCPN745
+					   SET C_RULE		= #{updateCRule}
+						 , CHKDATE		= SYSDATE
+						 , CHKID		= #{ssnSabun}
+					 WHERE ENTER_CD		= #{ssnEnterCd}
+					   AND ELEMENT_CD	= #{updateElementCd}
+					   AND SEARCH_SEQ	= TO_NUMBER(TRIM(#{updateSearchSeq}))
+				]]>
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepEleLinkCalcMgr">
+
+
+					DELETE FROM TCPN745
+					 WHERE ENTER_CD||'_'||ELEMENT_CD||'_'||TO_CHAR(SEARCH_SEQ) IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.elementCd != null and !rm.elementCd.equals("") and rm.searchSeq != null and !rm.searchSeq.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.elementCd})||'_'||TRIM(#{rm.searchSeq})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteSepEleLinkCalcMgrFormula">
+
+
+					DELETE FROM TCPN747
+					 WHERE ENTER_CD||'_'||ELEMENT_CD||'_'||TO_CHAR(SEARCH_SEQ)||'_'||TO_CHAR(SEQ) IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.elementCd != null and !rm.elementCd.equals("") and rm.searchSeq != null and !rm.searchSeq.equals("") and rm.seq != null and !rm.seq.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.elementCd})||'_'||TRIM(#{rm.searchSeq})||'_'||TRIM(#{rm.seq})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteAllSepEleLinkCalcMgrFormula">
+
+
+					DELETE FROM TCPN747
+					 WHERE ENTER_CD||'_'||ELEMENT_CD||'_'||TO_CHAR(SEARCH_SEQ) IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.elementCd != null and !rm.elementCd.equals("") and rm.searchSeq != null and !rm.searchSeq.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.elementCd})||'_'||TRIM(#{rm.searchSeq})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

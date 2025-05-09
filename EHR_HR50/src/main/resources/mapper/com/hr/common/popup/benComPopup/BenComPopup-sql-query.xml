@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ 
+<mapper namespace="common.popup.benComPopup">
+	
+	<select id="getBenMapComPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT MAP_TYPE_CD
+			 , MAP_CD
+			 , MAP_NM
+			 , ERP_EMP_CD
+			 , NOTE
+		  FROM TORG109 A
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+	<if test="mapTypeCd != null and mapTypeCd neq ''">
+		   AND MAP_TYPE_CD = #{mapTypeCd}
+	</if>
+	<if test="mapNm != null and mapNm neq ''">
+		   AND UPPER(MAP_NM) LIKE '%'||UPPER(TRIM(#{mapNm}))||'%'
+	</if>
+	<![CDATA[
+	     AND A.SDATE = (SELECT MAX (SDATE) FROM TORG109
+	                   WHERE ENTER_CD = A.ENTER_CD
+	                     AND MAP_TYPE_CD = A.MAP_TYPE_CD
+	                     AND MAP_CD = A.MAP_CD
+	                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))					
+		ORDER BY MAP_TYPE_CD,MAP_CD
+	]]>
+	</select>
+	
+	<select id="getBenDongSilComPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.DONG_CD
+			 , TRIM(C.CODE_NM) AS DONG_NM
+			 , A.SIL
+			 , A.INWON
+             , CASE WHEN B.EMPTY_INWON IS NULL THEN NVL(A.INWON,0)
+             		WHEN B.EMPTY_INWON > NVL(A.INWON,0) THEN 0
+             		ELSE (NVL(A.INWON,0) - B.EMPTY_INWON) END EMPTY_INWON
+		  FROM TBEN531 A
+                      , (
+                         SELECT TRIM(A.ENTER_CD)	AS ENTER_CD
+                              , TRIM(A.DONG_CD)	AS DONG_CD
+                              , TRIM(A.SIL)		AS SIL
+                              , COUNT(C.SDATE)	AS EMPTY_INWON
+                           FROM TBEN531 A
+                              , TBEN537 B
+                              , TBEN535 C
+				 WHERE A.ENTER_CD	= #{ssnEnterCd}
+                            AND A.ENTER_CD	= B.ENTER_CD
+                            AND A.DONG_CD	= B.DONG_CD
+                            AND A.SIL		= B.SIL
+                            AND A.ENTER_CD	= C.ENTER_CD
+                            AND B.SABUN		= C.SABUN
+                            AND B.SDATE		= C.SDATE
+                            AND C.EDATE IS NULL
+                         GROUP BY A.ENTER_CD,A.DONG_CD,A.SIL
+                      	) B
+			 , TSYS005 C
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+		   AND C.GRCODE_CD	= 'B80020' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.S_YMD AND C.E_YMD ]]>
+		<if test="sil != null and sil neq ''">
+		   AND A.SIL LIKE '%'|| TRIM(#{sil}) ||'%'
+		</if>
+		<if test="dongNm != null and dongNm neq ''">
+		   AND UPPER(C.CODE_NM) LIKE '%' || UPPER(TRIM(#{dongNm})) || '%'
+		</if>
+	<![CDATA[
+		   AND A.ENTER_CD	= C.ENTER_CD
+		   AND A.DONG_CD	= C.CODE
+		   AND A.ENTER_CD	= B.ENTER_CD(+)
+		   AND A.DONG_CD	= B.DONG_CD(+)
+		   AND A.SIL		= B.SIL(+)
+		ORDER BY A.DONG_CD,A.SIL
+	]]>
+	</select>
+	
+	<select id="getBenEmployeeComPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT SABUN
+			 , NAME
+			 , COMPANY_GUBUN
+			 , ORG_NM
+			 , JIKWEE_NM
+			 , EMP_YMD
+			 , RET_YMD
+		  FROM (
+				SELECT A.SABUN
+					 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)	AS NAME
+					 , A.COMPANY_GUBUN
+					 , TRIM(A.ORG_NM)		AS ORG_NM
+					 , TRIM(A.JIKWEE_NM)	AS JIKWEE_NM
+					 , A.EMP_YMD
+					 , A.RET_YMD
+				  FROM TBEN533 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+	<if test="sabunName != null and sabunName neq ''">
+				   AND A.SABUN||F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) LIKE '%'||trim(#{sabunName})||'%'
+	</if>
+	<if test="companyGubun != null and companyGubun neq  ''">
+				   AND A.COMPANY_GUBUN = #{companyGubun}
+	</if>
+	<if test="orgNm != null and orgNm neq ''">
+				   AND UPPER(A.ORG_NM) LIKE '%'||UPPER(trim(#{orgNm}))||'%'
+	</if>
+	<if test="fromEmpYmd != null and fromEmpYmd neq '' and toEmpYmd != null and toEmpYmd neq ''">
+				   AND A.EMP_YMD BETWEEN REPLACE(#{fromEmpYmd},'-','') AND REPLACE(#{toEmpYmd},'-','')
+	</if>
+	<![CDATA[
+				UNION ALL
+				SELECT A.SABUN
+					 , TRIM(A.NAME) AS NAME
+					 , A.COMPANY_GUBUN
+					 , A.ORG_NM
+					 , A.JIKWEE_NM
+					 , A.EMP_YMD
+					 , A.RET_YMD
+				  FROM (
+						SELECT X.ENTER_CD
+							 , X.SABUN
+							 , F_COM_GET_NAMES(X.ENTER_CD,X.SABUN) AS NAME
+							 , C.COMPANY_GUBUN
+							 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+							 , TRIM(F_COM_GET_GRCODE_NAME(X.ENTER_CD,'H20030',Y.JIKWEE_CD)) AS JIKWEE_NM
+							 , X.EMP_YMD
+							 , X.RET_YMD
+						  FROM THRM100 X
+							 , THRM151 Y
+							 , TBEN533 C
+						 WHERE X.ENTER_CD	= Y.ENTER_CD
+						   AND X.SABUN		= Y.SABUN
+						   AND X.ENTER_CD	= C.ENTER_CD(+)
+						   AND X.SABUN		= C.SABUN(+)
+						   AND X.ENTER_CD	= #{ssnEnterCd} ]]>
+			<if test="sabunName != null and sabunName neq ''">
+						   AND X.SABUN||F_COM_GET_NAMES(X.ENTER_CD,X.SABUN) LIKE '%'||trim(#{sabunName})||'%'
+			</if>
+			<if test="companyGubun != null and companyGubun neq ''">
+						   AND C.COMPANY_GUBUN = #{companyGubun}
+			</if>
+			<if test="fromEmpYmd != null and fromEmpYmd neq '' and toEmpYmd != null and toEmpYmd neq ''">
+						   AND X.EMP_YMD BETWEEN REPLACE(#{fromEmpYmd},'-','') AND REPLACE(#{toEmpYmd},'-','')
+			</if>
+						   AND Y.SDATE	= (	SELECT MAX(SDATE)
+												  FROM THRM151
+												 WHERE ENTER_CD	= Y.ENTER_CD
+												   AND SABUN	= Y.SABUN
+												   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+						) A
+				 WHERE A.ENTER_CD	= #{ssnEnterCd} 
+		<if test="orgNm != null and orgNm neq ''">
+				   AND UPPER(A.ORG_NM) LIKE '%'||UPPER(trim(#{orgNm}))||'%'
+		</if>
+				   AND NOT EXISTS (	SELECT SABUN
+									  FROM TBEN533
+									 WHERE ENTER_CD		= #{ssnEnterCd}
+								<if test="companyGubun != null and companyGubun neq ''">
+									   AND COMPANY_GUBUN= #{companyGubun}
+								</if>
+								<if test="fromEmpYmd != null and fromEmpYmd neq '' and toEmpYmd != null and toEmpYmd neq ''">
+									   AND EMP_YMD BETWEEN REPLACE(#{fromEmpYmd},'-','') AND REPLACE(#{toEmpYmd},'-','')
+								</if>
+	<![CDATA[
+									   AND SABUN = A.SABUN)
+		)
+		ORDER BY COMPANY_GUBUN,ORG_NM,JIKWEE_NM,SABUN
+	]]>
+	</select>
+	
+</mapper>

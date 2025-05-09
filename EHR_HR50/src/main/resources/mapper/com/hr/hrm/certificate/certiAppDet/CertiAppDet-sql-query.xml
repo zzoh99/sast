@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.certificate.certiAppDet">
+
+<!-- 증명서신청 세부내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiAppDetList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.GEMP_YMD
+					     , NVL(A.GEMP_YMD,A.EMP_YMD) AS EMP_YMD
+					     , CASE WHEN #{applCd} IN ('13', '14') THEN A.RET_YMD ELSE TO_CHAR(SYSDATE,'YYYYMMDD') END AS CURR_YMD
+					     , TRUNC(MONTHS_BETWEEN(CASE WHEN #{applCd} IN ('13', '14') THEN TO_DATE(A.RET_YMD,'YYYYMMDD') ELSE TO_DATE(TO_CHAR(SYSDATE,'YYYYMMDD'),'YYYYMMDD') END,TO_DATE(A.EMP_YMD,'YYYYMMDD'))/12) AS YEAR
+					     , TRUNC(MOD(MONTHS_BETWEEN(CASE WHEN #{applCd} IN ('13', '14') THEN TO_DATE(A.RET_YMD,'YYYYMMDD') ELSE TO_DATE(TO_CHAR(SYSDATE,'YYYYMMDD'),'YYYYMMDD') END,TO_DATE(A.EMP_YMD,'YYYYMMDD')),12)) AS MONTH
+					     , DECODE(NVL(B.ADDRESS,''),NULL, A.ADDR, B.ADDRESS) AS ADDRESS
+					     , A.MANAGE_CD
+					     , B.APPL_YMD
+					     , B.APPL_SEQ
+					     , B.APPL_CD
+					     , (SELECT APPL_TITLE FROM THRI101 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND APPL_CD = B.APPL_CD) AS APPL_TITLE
+					     , B.REQ_SABUN
+					     , DECODE(NVL(B.REQ_YY,''),NULL,F_COM_GET_STD_CD_VALUE(A.ENTER_CD,'CPN_YEAREND_YY'),B.REQ_YY) AS REQ_YY
+					     , B.S_YMD
+					     , B.E_YMD
+					     , B.PURPOSE
+					     , B.ETC
+					     , B.SUBMIT_OFFICE
+					     , (SELECT C.PRT_RSC FROM THRI101 C WHERE C.ENTER_CD = B.ENTER_CD AND C.APPL_CD = B.APPL_CD) AS PRT_RSC
+					     , B.APPL_SABUN
+					     , B.APPL_IN_SABUN
+					     , B.PM_TIME
+					     , B.NIGHT_PM_TIME
+					     , B.RES_NO_YN
+					     , B.ORG_YN
+					     , B.APPL_STATUS_CD
+					     , NVL(B.PRT_CNT,0) AS PRT_CNT
+					     , NVL(B.PRT_YN,'N') AS PRT_YN
+					     , NVL(B.LOCATION_CD, A.LOCATION_CD) AS LOCATION_CD		-- 근무지는 먼저 신청내역에서 가져오고 데이터가 없을 경우에는 조직에서 확인한다.
+					     , NVL(B.LOCATION_NM, A.LOCATION_NM) AS LOCATION_NM
+					     , B.SELF_PRT_LIMIT_CNT
+					  FROM
+					  (
+					    SELECT A.ENTER_CD
+					         , A.SABUN
+					         , A.GEMP_YMD
+					         , A.EMP_YMD --입사일
+					         , A.RET_YMD --퇴사일
+					         , DECODE(F_COM_GET_GRCODE_NOTE_VAL( A.ENTER_CD, 'H20185', NVL(B.APPLY_ADDRESS_CD, '3'), 1 )
+					                  , 'KOR'
+					                  , (SELECT D.ZIP||' '||D.ADDR1||' '||D.ADDR2 FROM THRM123 D WHERE D.ENTER_CD = A.ENTER_CD
+					                      AND D.SABUN = A.SABUN AND D.ADD_TYPE = NVL(B.APPLY_ADDRESS_CD, '3')) -- 한글주소인 경우, 주소||상세주소
+					                  , (SELECT D.ADDR2||', '||D.ADDR1||' '||D.ZIP FROM THRM123 D WHERE D.ENTER_CD = A.ENTER_CD
+					                      AND D.SABUN = A.SABUN AND D.ADD_TYPE = NVL(B.APPLY_ADDRESS_CD, '3')) -- 그외주소인 경우, 상세주소||주소
+					           ) AS ADDR
+					         , C.MANAGE_CD --고용형태
+					         , D.LOCATION_CD		-- 근무지코드
+					         , (SELECT E.ADDR || E.DETAIL_ADDR
+					            FROM TSYS015 E WHERE 1=1
+					            AND E.ENTER_CD = A.ENTER_CD
+					            AND E.LOCATION_CD = D.LOCATION_CD) AS LOCATION_NM -- 근무지주소
+					      FROM THRM100 A,
+					           THRM151 C,
+					           THRI101 B,
+					           TORG101 D
+					     WHERE A.ENTER_CD = C.ENTER_CD
+					       AND A.SABUN    = C.SABUN
+					       AND B.ENTER_CD = C.ENTER_CD
+					       AND A.ENTER_CD = D.ENTER_CD(+)
+					       AND C.ORG_CD   = D.ORG_CD
+					       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+					       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+					       AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+					       AND A.SABUN    = TRIM( #{sabun} )
+					       AND B.APPL_CD  = TRIM( #{applCd} )
+					  ) A,
+					  (
+					    SELECT A.ENTER_CD
+					         , A.SABUN
+					         , A.APPL_YMD
+					         , A.APPL_SEQ
+					         , A.APPL_CD
+					         , A.REQ_SABUN
+					         , A.REQ_YY
+					         , A.S_YMD
+					         , A.E_YMD
+					         , A.ADDRESS
+					         , A.PURPOSE
+					         , A.ETC
+					         , A.SUBMIT_OFFICE
+					         , A.PM_TIME
+					         , A.NIGHT_PM_TIME
+					         , A.RES_NO_YN
+					         , A.PRT_CNT
+					         , A.PRT_YN
+					         , A.ORG_YN
+					         , B.APPL_SABUN
+					         , B.APPL_IN_SABUN
+					         , B.APPL_STATUS_CD
+					         , C.SELF_PRT_LIMIT_CNT
+					         , A.LOCATION_CD
+					         , A.LOCATION_NM
+					      FROM TBEN401 A
+					         , THRI103 B
+					         , TBEN405 C
+					     WHERE A.ENTER_CD = B.ENTER_CD
+					       AND A.APPL_SEQ = B.APPL_SEQ
+					       AND A.APPL_CD = B.APPL_CD
+					       AND A.ENTER_CD = C.ENTER_CD
+					       AND A.APPL_CD = C.APPL_CD
+					       AND A.ENTER_CD = #{ssnEnterCd}
+					       AND A.SABUN = TRIM( #{sabun} )
+					  ) B
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.SABUN = B.SABUN(+)
+					   AND B.APPL_SEQ(+) = TRIM( #{applSeq} )
+					   AND B.APPL_CD(+) = TRIM( #{applCd} )
+				]]>
+
+
+		</select>
+
+<!-- 증명서신청(급여여부 체크) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiAppDetCheck">
+
+				<![CDATA[
+					SELECT DECODE(SUM(DECODE(B.CLOSE_YN, 'Y', 0, 1)), 0, 'Y', 'N') AS SEARCH_YN
+					  FROM TCPN201 A, TCPN981 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.PAY_CD =  DECODE ( TRIM( #{payCd} ), 'Y1', 'Y1', DECODE ( F_COM_GET_MAP_CD ( #{ssnEnterCd}, '900', #{searchApplSabun}), 'B02', '017', 'B04', '001') )
+					           ]]>
+					<choose><when test=' payCd != null and payCd.equals("Y1") '>
+					   AND SUBSTR(A.PAY_YM,1,4) =  TRIM( #{payYm} ) --원천징수의 경우 해당년도를 던진다.
+					</when><otherwise>
+					   AND A.PAY_YM BETWEEN TRIM( #{paysYm} ) AND TRIM( #{payYm} )  --갑근세/급여지급의 경우 해당월을 던진다.
+					</otherwise>
+					</choose>
+
+
+		</select>
+
+<!-- 증명서신청 세부내역 저장 -->
+		<update parameterType="map" id="saveCertiAppDet">
+
+					MERGE INTO TBEN401 T
+					USING  (
+							SELECT A.ENTER_CD
+							     , A.APPL_SEQ
+							     , A.SABUN
+							     , A.APPL_YMD
+							     , A.APPL_CD
+							     , A.REQ_SABUN
+							     , A.REQ_YY
+							     , A.S_YMD
+							     , A.E_YMD
+							     , A.PM_TIME
+							     , A.NIGHT_PM_TIME
+							     , A.ADDRESS
+							     , A.PURPOSE
+							     , A.ETC
+							     , A.SUBMIT_OFFICE
+							     , A.RES_NO_YN
+							     , A.ORG_YN
+							     , A.PRT_CNT
+							     , A.LOCATION_CD
+							     , A.LOCATION_NM
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS APPL_SEQ
+										 , NULL AS SABUN
+										 , NULL AS APPL_YMD
+										 , NULL AS APPL_CD
+										 , NULL AS REQ_SABUN
+										 , NULL AS REQ_YY
+										 , NULL AS S_YMD
+										 , NULL AS E_YMD
+										 , NULL AS PM_TIME
+										 , NULL AS NIGHT_PM_TIME
+										 , NULL AS ADDRESS
+										 , NULL AS PURPOSE
+										 , NULL AS ETC
+										 , NULL AS SUBMIT_OFFICE
+										 , NULL AS RES_NO_YN
+										 , NULL AS ORG_YN
+										 , NULL AS PRT_CNT
+										 , NULL AS LOCATION_CD
+										 , NULL AS LOCATION_NM
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.applSeq} )		AS  APPL_SEQ
+										 , TRIM( #{rm.sabun} )			AS  SABUN
+										 , TRIM( #{rm.applYmd})		AS  APPL_YMD
+										 , TRIM( #{rm.applCd} )			AS  APPL_CD
+										 , TRIM( #{rm.reqSabun})		AS  REQ_SABUN
+										 , TRIM( #{rm.reqYy})			AS  REQ_YY
+										 , TRIM( #{rm.sYmd})			AS  S_YMD
+										 , TRIM( #{rm.eYmd})			AS  E_YMD
+										 , TRIM( #{rm.pmTime})			AS 	PM_TIME
+										 , TRIM( #{rm.nightPmTime})	AS 	NIGHT_PM_TIME
+										 , TRIM( #{rm.address})		AS  ADDRESS
+										 , TRIM( #{rm.purpose})		AS  PURPOSE
+										 , TRIM( #{rm.etc})			AS  ETC
+										 , TRIM( #{rm.submitOffice})   AS  SUBMIT_OFFICE
+										 , TRIM( #{rm.resNoYn})		AS  RES_NO_YN
+										 , TRIM( #{rm.orgYn})		AS  ORG_YN
+										 , CASE WHEN TRIM( #{rm.prtCnt}) IS NULL OR TRIM( #{rm.prtCnt}) = '0' THEN
+										 			(SELECT NVL(PRT_CNT,1) FROM THRI101 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_CD = #{rm.applCd})
+										 		ELSE TO_NUMBER( #{rm.prtCnt}) END AS PRT_CNT
+										 , TRIM( #{rm.locationCd})		AS	LOCATION_CD
+										 , TRIM( #{rm.locationNm})		AS 	LOCATION_NM
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.APPL_SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.APPL_SEQ = S.APPL_SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SABUN           = S.SABUN
+									, T.APPL_YMD        = S.APPL_YMD
+									, T.APPL_CD         = S.APPL_CD
+									, T.REQ_SABUN       = S.REQ_SABUN
+									, T.REQ_YY          = S.REQ_YY
+									, T.S_YMD           = S.S_YMD
+									, T.E_YMD           = S.E_YMD
+									, T.PM_TIME         = S.PM_TIME
+									, T.NIGHT_PM_TIME   = S.NIGHT_PM_TIME
+									, T.ADDRESS         = S.ADDRESS
+									, T.PURPOSE         = S.PURPOSE
+									, T.ETC             = S.ETC
+									, T.SUBMIT_OFFICE   = S.SUBMIT_OFFICE
+									, T.RES_NO_YN      	= S.RES_NO_YN
+									, T.ORG_YN          = S.ORG_YN
+									, T.LOCATION_CD     = S.LOCATION_CD
+									, T.LOCATION_NM     = S.LOCATION_NM
+									, T.CHKDATE         = SYSDATE
+									, T.CHKID           = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPL_SEQ
+							, T.SABUN
+							, T.APPL_YMD
+							, T.APPL_CD
+							, T.REQ_SABUN
+							, T.REQ_YY
+							, T.S_YMD
+							, T.E_YMD
+							, T.PM_TIME
+							, T.NIGHT_PM_TIME
+							, T.ADDRESS
+							, T.PURPOSE
+							, T.ETC
+							, T.SUBMIT_OFFICE
+							, T.RES_NO_YN
+							, T.ORG_YN
+							, T.PRT_CNT
+							, T.LOCATION_CD
+							, T.LOCATION_NM
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPL_SEQ
+							, S.SABUN
+							, S.APPL_YMD
+							, S.APPL_CD
+							, S.REQ_SABUN
+							, S.REQ_YY
+							, S.S_YMD
+							, S.E_YMD
+							, S.PM_TIME
+							, S.NIGHT_PM_TIME
+							, S.ADDRESS
+							, S.PURPOSE
+							, S.ETC
+							, S.SUBMIT_OFFICE
+							, S.RES_NO_YN
+							, S.ORG_YN
+							, S.PRT_CNT
+							, S.LOCATION_CD
+							, S.LOCATION_NM
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<delete parameterType="map" id="deleteCertiAppDet">
+
+					DELETE FROM TBEN401
+					 WHERE ENTER_CD||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 증명서신청 출력 저장 -->
+		<update parameterType="map" id="updateCertiAppDetPrint">
+
+				<![CDATA[
+					UPDATE TBEN401
+					SET PRT_YN = TRIM( #{prtYn} )
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND APPL_SEQ = TRIM( #{applSeq} )
+				]]>
+		</update>
+
+		<update parameterType="map" id="prcP_BEN_REGNO_UPD" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_BEN_REGNO_UPD(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{applSeq,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+		<!-- 공통코드 영문코드명 가져오기 영문신청서용도  -->
+		<select parameterType="map" resultType="cMap" id="getCertiAppDetEngCode">
+
+				<![CDATA[
+				SELECT CODE
+					 , CODE_ENG_NM AS CODE_NM
+					 , NOTE1
+					 , NOTE2
+					 , NOTE3
+				FROM TSYS005
+				WHERE ENTER_CD = #{ssnEnterCd}
+				AND GRCODE_CD  = #{searchGrcodeCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+				        ]]>
+				<if test='searchNote1 != null and !searchNote1.equals("")'>
+					AND NOTE1       = #{searchNote1}
+				</if>
+				<if test='searchNote2 != null and !searchNote2.equals("")'>
+					AND NOTE2       = #{searchNote2}
+				</if>
+				<if test='searchNote3 != null and !searchNote3.equals("")'>
+					AND NOTE3       = #{searchNote3}
+				</if>
+				<if test='searchNote4 != null and !searchNote4.equals("")'>
+					AND NOTE4       = #{searchNote4}
+				</if>
+				ORDER  BY SEQ ASC
+
+
+		</select>
+
+		<!-- 근무처 코드로 근무처 주소 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLocAddrByCd">
+
+				<![CDATA[
+					SELECT ADDR || ' ' || DETAIL_ADDR AS ADDR
+					  FROM TSYS015
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					           ]]>
+					<if test='locationCd != null and !locationCd.equals("")'>
+					   AND LOCATION_CD = #{locationCd}
+					</if>
+
+
+		</select>
+
+<!-- 원천징수영수증 PDF 존재 유무 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiAppDetCheckPdfExist">
+
+				<![CDATA[
+					SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE 'N' END AS SEARCH_YN
+					  FROM TYEA105 A /* 연말정산_증빙자료관리 */
+					     , THRM100 B /* 인사마스타 */
+					 WHERE A.ENTER_CD    = B.ENTER_CD
+					   AND A.SABUN       = B.SABUN
+					   AND A.ENTER_CD    = #{ssnEnterCd}
+					   AND A.WORK_YY     = #{payYm}
+					   AND A.ADJUST_TYPE = '1'
+					   AND A.FILE_TYPE   = '1' /*원천징수영수중PDF만*/
+					   AND A.SABUN       = #{searchApplSabun}
+				]]>
+
+
+		</select>
+
+<!-- 원천징수영수증 PDF 파일 정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiAppDetPdfDownloadFileMap">
+
+				<![CDATA[
+					SELECT F.FILE_PATH
+					     , F.FILE_NAME
+					     , F.ATTR1
+					  FROM TBEN401 A
+					     , THRI103 B
+					     , TYEA105 F
+					 WHERE A.ENTER_CD    = B.ENTER_CD
+					   AND A.APPL_SEQ    = B.APPL_SEQ
+					   AND A.ENTER_CD    = F.ENTER_CD
+					   AND A.SABUN       = F.SABUN
+					   AND F.WORK_YY     = A.REQ_YY
+					   AND F.ENTER_CD    = #{ssnEnterCd}
+					   AND F.ADJUST_TYPE = '1'
+					   AND F.FILE_TYPE   = '1' /*원천징수영수중PDF만*/
+					   AND A.APPL_SEQ    = #{applSeq}
+				]]>
+
+
+		</select>
+
+</mapper>

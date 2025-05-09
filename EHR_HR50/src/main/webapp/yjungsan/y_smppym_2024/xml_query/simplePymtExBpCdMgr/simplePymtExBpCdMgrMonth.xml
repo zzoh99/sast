@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	근로소득관리 
+ -->
+<root>
+
+
+<!-- 		중복 사번 체크  -->
+		<query id="getSabunChk">
+			<![CDATA[
+					SELECT  COUNT(*) AS CNT 
+						  , WM_CONCAT(SABUN) AS SABUNS
+					  FROM TYEA823
+					 WHERE ENTER_CD = #ssnEnterCd#
+				   	   $query$
+				]]>
+		</query>	
+		
+
+
+<!-- 		조회 -->
+		<query id="getSimplePymtExBpCdMgr">
+			<![CDATA[
+					SELECT   A.ENTER_CD
+						   , A.WORK_YY
+						   , A.WORK_MM
+						   , A.SEND_TYPE
+						   , A.HALF_TYPE
+						   , A.INCOME_TYPE
+					       , A.SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+					       , B.EMP_YMD
+					       , B.RET_YMD
+					       , A.ADJ_S_YMD
+					       , A.ADJ_E_YMD
+					       , A.STD_BP_CD		
+					       , A.CHG_BP_CD
+					       , A.CHG_CHK
+					       , A.BIGO
+					       , A.ATTR1
+					       , A.ATTR2
+					       , A.ATTR3
+					       , A.ATTR4
+					       , A.CANCEL_CHK
+       					   , A.STATUS_CD
+					       , CASE WHEN A.STATUS_CD = '0' THEN '적용전'
+					              WHEN A.STATUS_CD = '1' THEN '변경완료'
+					              WHEN A.STATUS_CD = '2' THEN '취소완료'
+					              ELSE ''
+					         END AS STATUS_CDNM       					   
+					  FROM TYEA823 A,
+					       THRM100 B
+				     WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.SABUN = B.SABUN(+)
+					   AND A.ENTER_CD = #ssnEnterCd#
+				   	   $query$
+					 ORDER BY A.CHG_CHK, A.SABUN
+				]]>
+		</query>
+		
+		
+<!-- 		저장 -->	
+		<query id="saveSimplePymtExBpCdMgr">
+				<![CDATA[
+					MERGE INTO TYEA823 T
+					USING	(
+							SELECT	  WORK_YY
+									, WORK_MM
+									, SEND_TYPE
+									, HALF_TYPE
+									, INCOME_TYPE
+									, SABUN
+									, ADJ_S_YMD
+									, ADJ_E_YMD
+									, STD_BP_CD
+									, CHG_BP_CD
+									, CHG_CHK
+									, BIGO
+									, ATTR1
+									, ATTR2
+									, ATTR3
+									, ATTR4
+					       			, CANCEL_CHK
+       					   			, STATUS_CD									
+							FROM	(
+									SELECT    TRIM(#ssnEnterCd#)  								AS ENTER_CD			      
+											, TRIM(#searchWorkYy#)  								AS WORK_YY			 
+											, TRIM(#searchWorkMm#)  								AS WORK_MM			 
+											, TRIM(#searchSendType#)							AS SEND_TYPE     
+											, TRIM(#searchHalfType#)							AS HALF_TYPE			      
+											, TRIM(#searchIncomeType#)							AS INCOME_TYPE		      
+											, TRIM(#sabun#)     								AS SABUN				      
+											, NVL(NVL(TRIM(#adj_s_ymd#),(SELECT MAX(ADJ_S_YMD)
+																	   FROM TYEA821
+																	  WHERE ENTER_CD = TRIM(#ssnEnterCd#)
+																	    AND WORK_YY = TRIM(#searchWorkYy#)
+																	    AND WORK_MM = TRIM(#searchWorkMm#)
+																	    AND SEND_TYPE = TRIM(#searchSendType#)
+																	    AND HALF_TYPE = TRIM(#searchHalfType#)
+																	    AND INCOME_TYPE = TRIM(#searchIncomeType#)
+																	    AND SABUN = TRIM(#sabun#)
+																	    AND NVL(ADJ_S_YMD,'-') = NVL(TRIM(#adj_s_ymd#),'-')) ),
+											 F_YEA_GET_SMPPYM_ADJ_YMD(TRIM(#ssnEnterCd#),TRIM(#searchWorkYy#),TRIM(#searchHalfType#),'S',TRIM(#sabun#))) AS ADJ_S_YMD
+											, NVL(NVL(TRIM(#adj_e_ymd#),(SELECT MAX(ADJ_E_YMD)
+																	   FROM TYEA821
+																	  WHERE ENTER_CD = TRIM(#ssnEnterCd#)
+																	    AND WORK_YY = TRIM(#searchWorkYy#)
+																	    AND WORK_MM = TRIM(#searchWorkMm#)
+																	    AND SEND_TYPE = TRIM(#searchSendType#)
+																	    AND HALF_TYPE = TRIM(#searchHalfType#)
+																	    AND INCOME_TYPE = TRIM(#searchIncomeType#)
+																	    AND SABUN = TRIM(#sabun#)
+																	    AND NVL(ADJ_S_YMD,'-') = NVL(TRIM(#adj_s_ymd#),'-')) ),
+											 F_YEA_GET_SMPPYM_ADJ_YMD(TRIM(#ssnEnterCd#),TRIM(#searchWorkYy#),TRIM(#searchHalfType#),'E',TRIM(#sabun#))) AS ADJ_E_YMD
+											, NVL(TRIM(#std_bp_cd#),
+											  F_COM_GET_BP_CD(TRIM(#ssnEnterCd#),TRIM(#sabun#),F_YEA_GET_SMPPYM_ADJ_YMD(TRIM(#ssnEnterCd#),TRIM(#searchWorkYy#),TRIM(#searchHalfType#),'E',TRIM(#sabun#)))) AS STD_BP_CD	      
+											, TRIM(#chg_bp_cd#) 								AS CHG_BP_CD
+											, TRIM(#chg_chk#)									AS CHG_CHK	
+											, TRIM(#bigo#)										AS BIGO
+											, TRIM(#attr1#)										AS ATTR1
+											, TRIM(#attr2#)										AS ATTR2
+											, TRIM(#attr3#)										AS ATTR3
+											, TRIM(#attr4#)										AS ATTR4
+											, TRIM(#cancel_chk#)								AS CANCEL_CHK
+											, TRIM(#status_cd#)									AS STATUS_CD
+											FROM   DUAL
+									)  WHERE ENTER_CD 		IS NOT NULL 
+										 AND WORK_YY 		IS NOT NULL 
+										 AND WORK_MM 		IS NOT NULL 
+										 AND SEND_TYPE 		IS NOT NULL
+										 AND HALF_TYPE 		IS NOT NULL
+										 AND INCOME_TYPE 	IS NOT NULL
+										 AND ADJ_S_YMD 		IS NOT NULL
+										 AND SABUN 			IS NOT NULL
+							) S
+					ON ( T.ENTER_CD        	= #ssnEnterCd#
+					 AND T.WORK_YY  		= S.WORK_YY
+					 AND T.WORK_MM  		= S.WORK_MM
+					 AND T.SEND_TYPE		= S.SEND_TYPE
+					 AND T.HALF_TYPE  		= S.HALF_TYPE
+					 AND T.INCOME_TYPE		= S.INCOME_TYPE
+					 AND T.SABUN			= S.SABUN
+					 AND T.ADJ_S_YMD  		= S.ADJ_S_YMD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET				
+                                      T.ADJ_E_YMD			= S.ADJ_E_YMD
+                                    , T.STD_BP_CD			= S.STD_BP_CD	
+                                    , T.CHG_BP_CD			= S.CHG_BP_CD			
+                                    , T.CHG_CHK				= S.CHG_CHK		
+                                    , T.BIGO				= S.BIGO	
+                                    , T.ATTR1				= S.ATTR1		
+                                    , T.ATTR2				= S.ATTR2
+                                    , T.ATTR3				= S.ATTR3
+                                    , T.ATTR4				= S.ATTR4
+									, T.CHKDATE	    		= SYSDATE
+									, T.CHKID    			= #ssnSabun#
+									, T.CANCEL_CHK			= S.CANCEL_CHK
+									, T.STATUS_CD			= S.STATUS_CD
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.WORK_YY
+							, T.WORK_MM
+							, T.SEND_TYPE
+                            , T.HALF_TYPE
+                            , T.INCOME_TYPE
+                            , T.SABUN
+                            , T.ADJ_S_YMD
+                            , T.ADJ_E_YMD
+                            , T.STD_BP_CD
+                            , T.CHG_BP_CD
+                            , T.CHG_CHK
+                            , T.BIGO
+                            , T.ATTR1
+                            , T.ATTR2
+                            , T.ATTR3
+                            , T.ATTR4
+                            , T.CANCEL_CHK
+                            , T.STATUS_CD
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #ssnEnterCd#
+							, S.WORK_YY
+							, S.WORK_MM
+                            , S.SEND_TYPE
+                            , S.HALF_TYPE
+                            , S.INCOME_TYPE
+                            , S.SABUN
+                            , S.ADJ_S_YMD
+                            , S.ADJ_E_YMD
+                            , S.STD_BP_CD
+                            , S.CHG_BP_CD
+                            , S.CHG_CHK
+                            , S.BIGO
+                            , S.ATTR1
+                            , S.ATTR2
+                            , S.ATTR3
+                            , S.ATTR4
+                            , S.CANCEL_CHK
+                            , S.STATUS_CD
+							, SYSDATE
+							, #ssnSabun#
+						)
+				]]>
+		</query>
+		
+		<!-- 		삭제 -->	
+		<query id="deleteSimplePymtExBpCdMgr">
+				<![CDATA[
+					DELETE FROM TYEA823
+					 WHERE ENTER_CD||'_'||WORK_YY||'_'||WORK_MM||'_'||SEND_TYPE||'_'||HALF_TYPE||'_'||INCOME_TYPE||'_'||SABUN||'_'||ADJ_S_YMD IN 	
+					 	(
+							TRIM( #ssnEnterCd# )||'_'||
+							TRIM( #work_yy# )||'_'||
+							TRIM( #work_mm# )||'_'||
+							TRIM( #send_type# )||'_'||
+							TRIM( #half_type# )||'_'||
+							TRIM( #income_type# )||'_'||
+							TRIM( #sabun# )||'_'||
+							TRIM( #adj_s_ymd# )
+						)
+				]]>
+		</query>
+
+</root>

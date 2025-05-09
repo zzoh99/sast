@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.ftestmon.ftestmonAppDet">
+
+	<!-- 신청내역 조회 -->
+	<select id="getFtestmonAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT A.ENTER_CD
+			     , A.APPL_SEQ
+			     , A.SABUN
+			     , A.TEST_CD
+			     , A.TEST_YMD
+			     , A.TEST_MON
+			     , A.NOTE
+			     , A.PAY_MON
+			     , A.PAY_YM
+			     , A.PAY_NOTE
+			     , NVL(A.CLOSE_YN, 'N') AS CLOSE_YN
+			  FROM TBEN763 A 
+			 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+			 AND A.APPL_SEQ   = TRIM( #{searchApplSeq} )
+	]]>
+	</select>
+
+	<!-- 중복신청 조회 -->
+	<select id="getFtestmonAppDupChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT COUNT(1) AS CNT
+		     FROM TBEN763 A
+		    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+		      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+		      AND A.SABUN   	= TRIM( #{searchApplSabun} )           
+              AND A.TEST_CD     = TRIM( #{testCd} )                         
+              AND A.TEST_YMD	= REPLACE(TRIM( #{testYmd} ),'-','')    
+              AND EXISTS ( SELECT 1
+                             FROM THRI103 X
+                            WHERE X.ENTER_CD = A.ENTER_Cd
+                              AND X.APPL_SEQ = A.APPL_SEQ
+                              AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+                          )                                             
+	]]>
+	</select>
+	
+	<!-- 세부내역 저장 -->
+	<update id="saveFtestmonAppDet" parameterType="map">
+	<![CDATA[
+			MERGE INTO TBEN763 T
+			USING  ( ]]>
+			<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				SELECT   TRIM( #{ssnEnterCd} )					AS ENTER_CD
+				   	 	, TRIM( #{rm.searchApplSeq} )			AS APPL_SEQ
+						, TRIM( #{rm.searchApplSabun} )			AS SABUN
+						, TRIM( #{rm.testCd} ) 					AS TEST_CD
+						, REPLACE(TRIM(#{rm.testYmd}),'-','') AS TEST_YMD
+						, REPLACE(TRIM(#{rm.testMon}),',','')	AS TEST_MON				
+						, TRIM( #{rm.note} ) 					AS NOTE
+						, REPLACE(TRIM( #{rm.testMon} ),',','') AS PAY_MON
+					FROM DUAL
+			</foreach>
+		<![CDATA[		
+					) S
+			ON (      T.ENTER_CD = S.ENTER_CD
+			      AND T.APPL_SEQ = S.APPL_SEQ
+			   )
+			WHEN MATCHED THEN
+				UPDATE SET	  T.TEST_CD     	= S.TEST_CD
+							, T.TEST_YMD     	= S.TEST_YMD
+							, T.TEST_MON     	= S.TEST_MON
+							, T.NOTE     		= S.NOTE
+							, T.PAY_MON			= S.PAY_MON
+							, T.CHKDATE			= SYSDATE
+							, T.CHKID			= #{ssnSabun}
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					  T.ENTER_CD
+					, T.APPL_SEQ
+					, T.SABUN
+					, T.TEST_CD
+					, T.TEST_YMD
+					, T.TEST_MON							
+					, T.NOTE
+					, T.PAY_MON
+					, T.CHKDATE
+					, T.CHKID
+				)
+				VALUES
+				(
+					  S.ENTER_CD
+					, S.APPL_SEQ
+					, S.SABUN
+					, S.TEST_CD
+					, S.TEST_YMD
+					, S.TEST_MON						
+					, S.NOTE
+					, S.TEST_MON
+					, SYSDATE
+					, #{ssnSabun}
+				)
+	]]>
+	</update>
+	
+	<!--  세부내역 저장(관리자) -->
+	<update id="saveFtestmonAppDetAdmin" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN763 T
+		USING  ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT   TRIM( #{ssnEnterCd} )					AS ENTER_CD
+			   	 	, TRIM( #{rm.searchApplSeq} )			AS APPL_SEQ
+					, TRIM( #{rm.searchApplSabun} )			AS SABUN
+					, REPLACE(TRIM(#{rm.payYm}),'-','') 	AS PAY_YM
+					, REPLACE(TRIM(#{rm.payMon}),',','')	AS PAY_MON
+					, TRIM( #{rm.payNote} ) 				AS PAY_NOTE
+				FROM DUAL
+		</foreach>
+	<![CDATA[					
+				) S
+		ON (      T.ENTER_CD = S.ENTER_CD
+		      AND T.APPL_SEQ = S.APPL_SEQ
+		   )
+		WHEN MATCHED THEN
+			UPDATE SET	  T.PAY_YM     		= S.PAY_YM
+						, T.PAY_MON     	= S.PAY_MON
+						, T.PAY_NOTE     	= S.PAY_NOTE
+						, T.CHKDATE			= SYSDATE
+						, T.CHKID			= #{ssnSabun}
+	]]>
+	</update>
+</mapper>

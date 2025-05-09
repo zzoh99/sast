@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.orgSchemeMgr">
+<!-- 		조직도관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgSchemeMgrSheet1List">
+
+				<![CDATA[
+						SELECT A.ORG_CHART_NM, A.VERSION, A.ORG_KIND_TYPE, A.MEMO, A.SDATE, A.EDATE,
+						       ( SELECT COUNT(*) FROM TORG105 WHERE ENTER_CD = A.ENTER_CD AND SDATE = A.SDATE )AS DEL_YN
+						     , A.LANGUAGE_CD
+							 , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'torg103', LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM
+							 , A.FILE_SEQ
+						  FROM TORG103 A
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						 ORDER BY A.SDATE DESC
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getOrgSchemeMgrSheet2List">
+
+				<![CDATA[
+						SELECT LEVEL AS "_level"
+						     , A.ENTER_CD
+						     , A.SDATE
+						     , A.PRIOR_ORG_CD
+						     , A.ORG_CD
+						     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TRIM(#{searchSdate})) AS ORG_NM
+						     , A.DIRECT_YN
+						     , A.SEQ
+						     , A.ORDER_SEQ
+						     , NVL(A.ORG_LEVEL, LEVEL) AS ORG_LEVEL
+						     , A.LOC_TYPE
+						     , A.X_POS
+						     , A.Y_POS
+						     , A.ORG_DISP_YN
+						     , A.VRTCL_ORDER_YN
+						  FROM (
+						      	SELECT *
+						      	  FROM TORG105 A
+								 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+								   AND A.SDATE = TRIM(#{searchSdate})
+							   ) A
+						 START WITH A.PRIOR_ORG_CD = '0'
+						 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+						    AND PRIOR A.SDATE = A.SDATE
+						    AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+						 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+				]]>
+
+
+		</select>
+
+<!-- 		조직도관리 sheet1 저장 -->
+		<update parameterType="map" id="saveOrgSchemeMgrSheet1">
+
+					MERGE INTO TORG103 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SDATE
+									, A.EDATE
+									, A.ORG_CHART_NM
+									, A.VERSION
+									, A.ORG_KIND_TYPE
+									, A.MEMO
+									, A.LANGUAGE_CD
+									, A.FILE_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS ORG_CHART_NM
+											, NULL		AS VERSION
+											, NULL		AS ORG_KIND_TYPE
+											, NULL		AS MEMO
+											, NULL		AS LANGUAGE_CD
+											, NULL		AS FILE_SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT   #{ssnEnterCd}			AS ENTER_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.orgChartNm})	AS ORG_CHART_NM
+											, TRIM( #{rm.version})	AS VERSION
+											, TRIM( #{rm.orgKindType})	AS ORG_KIND_TYPE
+											, TRIM( #{rm.memo} )	AS MEMO
+											, TRIM( #{rm.languageCd})	AS LANGUAGE_CD
+											, TRIM( #{rm.fileSeq}) AS FILE_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.ORG_CHART_NM	= S.ORG_CHART_NM
+									, T.VERSION	= S.VERSION
+									, T.ORG_KIND_TYPE	= S.ORG_KIND_TYPE
+									, T.MEMO	= S.MEMO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+									, T.LANGUAGE_CD = S.LANGUAGE_CD
+									, T.FILE_SEQ = S.FILE_SEQ
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SDATE
+							, T.EDATE
+							, T.ORG_CHART_NM
+							, T.VERSION
+							, T.ORG_KIND_TYPE
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+							, T.LANGUAGE_CD
+							, T.FILE_SEQ
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SDATE
+							, S.EDATE
+							, S.ORG_CHART_NM
+							, S.VERSION
+							, S.ORG_KIND_TYPE
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+							, S.LANGUAGE_CD
+							, S.FILE_SEQ
+						)
+		</update>
+<!-- 		조직도관리 sheet1 삭제 -->
+		<delete parameterType="map" id="deleteOrgSchemeMgrSheet1">
+
+					DELETE FROM TORG103
+					WHERE 	ENTER_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.sdate != null and !rm.sdate.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		조직도관리 sheet2 저장 -->
+		<update parameterType="map" id="saveOrgSchemeMgrSheet2">
+
+					MERGE INTO TORG105 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SDATE
+									, A.ORG_CD
+									, A.PRIOR_ORG_CD
+									, A.DIRECT_YN
+									, A.SEQ
+									, A.ORG_LEVEL
+									, A.ORG_CHART_NM
+									, A.LOC_TYPE
+									, A.X_POS
+									, A.Y_POS
+									, A.ORDER_SEQ
+									, A.ORG_DISP_YN
+									, A.VRTCL_ORDER_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SDATE
+											, NULL		AS ORG_CD
+											, NULL		AS PRIOR_ORG_CD
+											, NULL		AS DIRECT_YN
+											, NULL		AS SEQ
+											, NULL		AS ORG_LEVEL
+											, NULL		AS ORG_CHART_NM
+											, NULL		AS LOC_TYPE
+											, NULL		AS X_POS
+											, NULL		AS Y_POS
+											, NULL		AS ORDER_SEQ
+											, NULL		AS ORG_DISP_YN
+											, NULL		AS VRTCL_ORDER_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT   #{ssnEnterCd}			AS ENTER_CD
+											, TRIM(#{rm.sdate})	AS SDATE
+											, TRIM(#{rm.orgCd})	AS ORG_CD
+											, NVL(TRIM(#{rm.priorOrgCdChange}),TRIM(#{rm.priorOrgCd})) AS PRIOR_ORG_CD -- 상위부서변경이 있으면 상위부서코드에 변경코드를 셋팅한다.
+											, TRIM(#{rm.directYn})	AS DIRECT_YN
+											, TRIM(#{rm.seq})	AS SEQ
+											, TRIM(#{rm.orgLevel})	AS ORG_LEVEL
+											, (SELECT ORG_CHART_NM FROM TORG103 WHERE ENTER_CD = #{ssnEnterCd} AND SDATE = TRIM(#{rm.sdate}) ) AS ORG_CHART_NM
+											, TRIM(#{rm.locType})	AS LOC_TYPE
+											, TRIM(#{rm.xPos})	AS X_POS
+											, TRIM(#{rm.yPos})	AS Y_POS
+											, TRIM(#{rm.orderSeq})	AS ORDER_SEQ
+											, TRIM(#{rm.orgDispYn})	AS ORG_DISP_YN
+											, TRIM(#{rm.vrtclOrderYn})	AS VRTCL_ORDER_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SDATE = S.SDATE AND T.ORG_CD = S.ORG_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PRIOR_ORG_CD	= S.PRIOR_ORG_CD
+									, T.DIRECT_YN	= S.DIRECT_YN
+									, T.SEQ	= S.SEQ
+									, T.ORG_LEVEL	= S.ORG_LEVEL
+									, T.ORG_CHART_NM = S.ORG_CHART_NM
+									, T.LOC_TYPE = S.LOC_TYPE
+									, T.X_POS    = S.X_POS
+									, T.Y_POS    = S.Y_POS
+									, T.ORDER_SEQ    = S.ORDER_SEQ
+									, T.ORG_DISP_YN  = S.ORG_DISP_YN
+									, T.VRTCL_ORDER_YN  = S.VRTCL_ORDER_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SDATE
+							, T.ORG_CD
+							, T.PRIOR_ORG_CD
+							, T.DIRECT_YN
+							, T.SEQ
+							, T.ORG_LEVEL
+							, T.ORG_CHART_NM
+							, T.LOC_TYPE
+							, T.X_POS
+							, T.Y_POS
+							, T.ORDER_SEQ
+							, T.ORG_DISP_YN
+							, T.VRTCL_ORDER_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SDATE
+							, S.ORG_CD
+							, S.PRIOR_ORG_CD
+							, S.DIRECT_YN
+							, S.SEQ
+							, S.ORG_LEVEL
+							, S.ORG_CHART_NM
+							, S.LOC_TYPE
+							, S.X_POS
+							, S.Y_POS
+							, S.ORDER_SEQ
+							, S.ORG_DISP_YN
+							, S.VRTCL_ORDER_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		조직도관리 sheet2 삭제 -->
+		<delete parameterType="map" id="deleteOrgSchemeMgrSheet2">
+
+					DELETE FROM TORG105
+					WHERE 	(ENTER_CD, SDATE, ORG_CD) IN 	(  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.orgCd != null and !rm.orgCd.equals("")'>
+											(TRIM(#{ssnEnterCd}) , TRIM(#{rm.sdate}) , TRIM(#{rm.orgCd}))
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!--  직제 소팅을 위한 정렬 순서 생성, F_ORG_ORG_CHART_SORT 함수에서 SORT_SEQ 필드 참조 -->
+		<update parameterType="map" id="prcOrgSchemeSortCreateCall" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_ORG_SCHEME_SORT_CREATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sdate,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

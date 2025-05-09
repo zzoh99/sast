@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.retirementMidAdj">
+<!-- 		 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetirementMidAdjList">
+
+				<![CDATA[
+					SELECT SABUN
+						 , NAME
+						 , RMID_YMD
+						 , PAY_ACTION_CD
+						 , PAY_ACTION_NM
+						 , PAYMENT_YMD
+						 , WKP_YM
+						 , AVG_MON
+						 , EARNING_MON
+						 , T_ITAX_MON
+						 , T_RTAX_MON
+						 , T_STAX_MON
+						 , TO_CHAR(CHKDATE, 'YYYYMMDDHH24MI') AS CHKDATE
+						 , CHKID
+					  FROM (
+						SELECT A.ENTER_CD
+							 , A.SABUN
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+						     , A.RMID_YMD
+						     , A.PAY_ACTION_CD
+						     , B.PAY_ACTION_NM
+						     , A.PAYMENT_YMD
+						     , A.WKP_YM
+						     , A.AVG_MON
+						     , A.EARNING_MON
+						     , A.T_ITAX_MON
+						     , A.T_RTAX_MON
+						     , A.T_STAX_MON
+						     , A.CHKDATE
+						     , A.CHKID
+						  FROM TCPN769 A, TCPN201 B
+						 WHERE A.ENTER_CD = B.ENTER_CD(+)
+						   AND A.PAY_ACTION_CD = B.PAY_ACTION_CD(+)
+						   AND A.ENTER_CD = #{ssnEnterCd}
+					  )
+					  WHERE 1 = 1
+					  		]]>
+					 <if test='searchSabunName != null and !searchSabunName.equals("")'>
+					 	AND SABUN LIKE '%' || #{searchSabunName} || '%' OR NAME LIKE '%' || #{searchSabunName} || '%'
+					 </if>
+					<if test='searchDateFrom != null and searchDateFrom neq ""'>
+						<![CDATA[
+					 	AND RMID_YMD >= REPLACE(TRIM(#{searchDateFrom}), '-', '')
+					 	]]>
+					</if>
+					<if test='searchDateTo != null and searchDateTo neq ""'>
+						<![CDATA[
+						AND RMID_YMD <= REPLACE(TRIM(#{searchDateTo}), '-', '')
+					 	]]>
+					</if>
+					 ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+
+		</select>
+		
+<!-- 		 저장 -->
+		<update parameterType="map" id="saveRetirementMidAdj">
+
+
+					MERGE INTO TCPN769 T
+					USING (
+					    SELECT #{ssnEnterCd} AS ENTER_CD
+					         , A.SABUN
+					         , A.RMID_YMD
+					         , A.PAY_ACTION_CD
+					         , A.PAYMENT_YMD
+					         , A.WKP_YM
+				 		 	 , A.AVG_MON
+					 		 , A.EARNING_MON
+							 , A.T_ITAX_MON
+							 , A.T_RTAX_MON
+							 , A.T_STAX_MON
+							 , #{ssnSabun} AS CHKID
+					     FROM ( 
+							SELECT NULL AS SABUN
+								 , NULL AS RMID_YMD
+								 , NULL AS PAY_ACTION_CD
+								 , NULL AS PAYMENT_YMD
+								 , NULL AS WKP_YM
+								 , NULL AS AVG_MON
+								 , NULL AS EARNING_MON
+								 , NULL AS T_ITAX_MON
+								 , NULL AS T_RTAX_MON
+								 , NULL AS T_STAX_MON
+							FROM DUAL 
+<foreach item="rm" collection="mergeRows" >
+					        UNION ALL
+					        SELECT TRIM(#{rm.sabun}) AS SABUN
+					             , TRIM(#{rm.rmidYmd}) AS RMID_YMD
+					             , TRIM(#{rm.payActionCd}) AS PAY_ACTION_CD
+					             , TRIM(#{rm.paymentYmd}) AS PAYMENT_YMD
+					             , TRIM(#{rm.wkpYm}) AS WKP_YM
+					             , TRIM(#{rm.avgMon}) AS AVG_MON
+					             , TRIM(#{rm.earningMon}) AS EARNING_MON
+					             , TRIM(#{rm.tItaxMon}) AS T_ITAX_MON
+					             , TRIM(#{rm.tRtaxMon}) AS T_RTAX_MON
+					             , TRIM(#{rm.tStaxMon}) AS T_STAX_MON
+					        FROM DUAL 
+</foreach>
+						) A WHERE A.SABUN IS NOT NULL 
+							AND A.RMID_YMD IS NOT NULL 
+					) S     ON ( T.ENTER_CD = S.ENTER_CD
+					AND T.SABUN = S.SABUN
+					AND T.RMID_YMD = S.RMID_YMD
+							)
+					WHEN MATCHED THEN
+					    UPDATE SET
+							T.PAY_ACTION_CD = S.PAY_ACTION_CD
+						  , T.PAYMENT_YMD = S.PAYMENT_YMD
+						  , T.WKP_YM = S.WKP_YM
+						  , T.AVG_MON = S.AVG_MON
+						  , T.EARNING_MON = S.EARNING_MON
+						  , T.T_ITAX_MON = S.T_ITAX_MON
+						  , T.T_RTAX_MON = S.T_RTAX_MON
+						  , T.T_STAX_MON = S.T_STAX_MON
+						  , T.CHKDATE = SYSDATE
+						  , T.CHKID = S.CHKID
+					WHEN NOT MATCHED THEN
+						INSERT ( T.ENTER_CD
+							, T.SABUN
+							, T.RMID_YMD
+							, T.PAY_ACTION_CD
+							, T.PAYMENT_YMD
+							, T.WKP_YM
+							, T.AVG_MON
+							, T.EARNING_MON
+							, T.T_ITAX_MON
+							, T.T_RTAX_MON
+							, T.T_STAX_MON
+							, T.CHKDATE
+							, T.CHKID
+					    ) VALUES ( 
+							  S.ENTER_CD
+							, S.SABUN
+							, S.RMID_YMD
+							, S.PAY_ACTION_CD
+							, S.PAYMENT_YMD
+							, S.WKP_YM
+							, S.AVG_MON
+							, S.EARNING_MON
+							, S.T_ITAX_MON
+							, S.T_RTAX_MON
+							, S.T_STAX_MON
+							, SYSDATE
+							, S.CHKID
+					    )
+
+
+
+
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteRetirementMidAdj">
+
+
+					DELETE FROM TCPN769
+					WHERE 	(ENTER_CD,SABUN,RMID_YMD) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+										, TRIM( #{rm.sabun} )
+										</if>
+										<if test='rm.rmidYmd != null and !rm.rmidYmd.equals("")'>
+										, TRIM( #{rm.rmidYmd} )
+										</if>
+										)
+</foreach>
+										)
+
+
+
+		</delete>
+	
+	</mapper>

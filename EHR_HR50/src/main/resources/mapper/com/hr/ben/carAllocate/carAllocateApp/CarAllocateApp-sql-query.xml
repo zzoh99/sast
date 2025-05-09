@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.carAllocate.carAllocateApp">
+	
+	<!-- 업무차량배차 코드리스트 조회 -->
+	<select id="getCarAllocateCdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT CAR_NO AS CODE
+		     , CAR_NM||' ('||CAR_NO||')' AS CODE_NM
+		  FROM TBEN896
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+		<if test="useYn != null and useYn neq ''">
+		   AND USE_YN = #{useYn}
+		</if>
+		<if test="searchBusinessPlaceCd != null and searchBusinessPlaceCd neq ''">
+		   AND BUSINESS_PLACE_CD IN
+		<foreach collection="searchBusinessPlaceCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		ORDER BY BUSINESS_PLACE_CD
+	</select>
+
+	<!-- 업무차량배차 신청 조회 -->
+	<select id="getCarAllocateAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT '0' AS DETAIL
+		     , A.ENTER_CD
+		     , A.SABUN
+		     , A.APPL_SEQ
+		     , A.CAR_NO
+		     , C.CAR_NM
+		     , A.FROM_YMD
+		     , A.FROM_TIME
+		     , TO_CHAR(TO_DATE(A.FROM_YMD, 'YYYYMMDD'), 'YYYY.MM.DD')||' '||TO_CHAR(TO_DATE(A.FROM_TIME, 'HH24MI'), 'HH24:MI') AS FROM_FULL_TIME
+		     , A.TO_YMD
+		     , A.TO_TIME
+		     , TO_CHAR(TO_DATE(A.TO_YMD, 'YYYYMMDD'), 'YYYY.MM.DD')||' '||TO_CHAR(TO_DATE(A.TO_TIME, 'HH24MI'), 'HH24:MI') AS TO_FULL_TIME
+		     , B.APPL_YMD
+		     , B.APPL_IN_SABUN
+		     , B.APPL_STATUS_CD
+		     , B.AGREE_SABUN
+		     , B.AGREE_YMD
+		  FROM TBEN897 A
+		       LEFT OUTER JOIN THRI103 B ON A.ENTER_CD = B.ENTER_CD AND A.APPL_SEQ = B.APPL_SEQ
+		     , TBEN896 C
+		 WHERE A.ENTER_CD = C.ENTER_CD
+		   AND A.ENTER_CD = #{ssnEnterCd} ]]>
+		<if test="searchApplSabun != null and searchApplSabun neq ''">
+		   AND A.SABUN = #{searchApplSabun}
+		</if>
+		   AND A.CAR_NO = C.CAR_NO
+		ORDER BY APPL_YMD DESC, CAR_NM
+	</select>
+
+	<!-- 업무차량 배차신청 스케쥴 조회 -->
+	<select id="getCarAllocateSchedule" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT TO_CHAR(YMD, 'DD') AS DAY
+		  FROM (
+		  		SELECT TO_DATE(X.FROM_YMD, 'YYYYMMDD') + (LEVEL - 1) AS YMD
+		  		  FROM (
+		  		  		SELECT A.FROM_YMD
+		  		  		     , A.TO_YMD
+		  		  		  FROM TBEN897 A
+		  		  		       LEFT OUTER JOIN THRI103 B
+		  		  		            ON A.ENTER_CD = B.ENTER_CD
+		  		  		            AND A.APPL_SEQ = B.APPL_SEQ
+		  		  		 WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+				<if test="searchApplSabun != null and searchApplSabun neq ''">
+							AND A.SABUN = #{searchApplSabun}
+				</if>
+	<![CDATA[
+						   AND SUBSTR(A.FROM_YMD, 1, 6) <= TO_CHAR(TO_DATE(#{mainDate}, 'YYYYMMDD'), 'YYYYMM')
+						   AND SUBSTR(A.TO_YMD, 1, 6) >= TO_CHAR(TO_DATE(#{mainDate}, 'YYYYMMDD'), 'YYYYMM')
+						   AND B.APPL_STATUS_CD IN ( '21', '31', '99' )
+				) X
+				CONNECT BY TO_DATE(X.FROM_YMD, 'YYYYMMDD') + (LEVEL - 1) <= TO_DATE(X.TO_YMD, 'YYYYMMDD')
+		) Y
+		 WHERE TO_CHAR(TO_DATE(#{mainDate}, 'YYYYMMDD'), 'MM') = TO_CHAR(Y.YMD, 'MM')
+		 GROUP BY YMD
+		 ORDER BY YMD
+	]]>
+	</select>
+
+	<!-- 업무차량 배차신청 스케쥴 상세 조회 -->
+	<select id="getCarAllocateScheduleDetail" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT X.CAR_NO AS TYPE
+		     , X.CAR_NM||' ('||X.CAR_NO||')' AS TYPE_NM
+		     , X.CAR_NO AS TMP1
+		     , X.CAR_NM AS TMP2
+		     , X.ORG_NM||' '||X.NAME AS TMP3
+		     , X.DURATION AS TMP4
+		     , X.APPL_STATUS_NM AS TMP5
+		     , X.DURATION_2 AS TITLE
+		  FROM (
+			SELECT A.ENTER_CD
+			     , A.SABUN
+			     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+			     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN) AS ORG_NM
+			     , A.CAR_NO
+			     , C.CAR_NM
+			     , A.FROM_YMD
+			     , TO_CHAR(TO_DATE(A.FROM_YMD, 'YYYYMMDD'), 'YYYY.MM.DD')||' '||TO_CHAR(TO_DATE(A.FROM_TIME, 'HH24MI'), 'HH24:MI')||'~'||
+			       TO_CHAR(TO_DATE(A.TO_YMD, 'YYYYMMDD'), 'YYYY.MM.DD')||' '||TO_CHAR(TO_DATE(A.TO_TIME, 'HH24MI'), 'HH24:MI') AS DURATION
+			     , TO_CHAR(TO_DATE(A.FROM_YMD, 'YYYYMMDD'), 'YYYY.MM.DD')||' <b>'||TO_CHAR(TO_DATE(A.FROM_TIME, 'HH24MI'), 'HH24:MI')||'</b>~'||
+			       TO_CHAR(TO_DATE(A.TO_YMD, 'YYYYMMDD'), 'YYYY.MM.DD')||' <b>'||TO_CHAR(TO_DATE(A.TO_TIME, 'HH24MI'), 'HH24:MI')||'</b>' AS DURATION_2
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+			  FROM TBEN897 A
+			       LEFT OUTER JOIN THRI103 B
+			            ON A.ENTER_CD = B.ENTER_CD
+			            AND A.APPL_SEQ = B.APPL_SEQ
+			     , TBEN896 C
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.ENTER_CD = C.ENTER_CD
+			   AND A.CAR_NO = C.CAR_NO ]]>
+		<if test="searchApplSabun != null and searchApplSabun neq ''">
+			   AND A.SABUN = #{searchApplSabun}
+		</if>
+			   AND #{mainDate} BETWEEN A.FROM_YMD AND A.TO_YMD
+			   AND B.APPL_STATUS_CD IN ( '21', '31', '99' )
+			 ORDER BY FROM_YMD
+		) X
+	</select>
+
+	<!-- 업무차량 배차신청 삭제 -->
+	<delete id="deleteCarAllocateApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN897
+		WHERE 	(ENTER_CD, APPL_SEQ) IN 	(  (NULL,NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.applSeq != null and rm.applSeq neq ''">
+				(#{ssnEnterCd}, TRIM( #{rm.applSeq} ))
+			</if>
+		</foreach>
+		)
+	</delete>
+</mapper>

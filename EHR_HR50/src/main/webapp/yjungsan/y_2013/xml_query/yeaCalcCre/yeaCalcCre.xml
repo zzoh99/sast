@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산계산
+ -->
+<root>
+
+	<!-- 연말정산 급여코드 조회 -->
+	<query id="selectYeaPayActionInfo">
+		<![CDATA[
+			SELECT PAY_ACTION_CD
+				 , PAY_ACTION_NM
+			  FROM tcpn201
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_YM  LIKE #searchYear# || '%'
+			   AND PAY_CD = 'Y1'
+		]]>
+	</query>
+	
+	<query id="selectYeaCalcCreSheet1List">
+		<![CDATA[
+			SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0,'Y','N') FINAL_CLOSE_YN
+			  FROM TCPN811
+			 WHERE ENTER_CD       = #ssnEnterCd#
+			   AND WORK_YY  	  = #searchWorkYy#
+			   AND ADJUST_TYPE    = #searchAdjustType#
+			   AND PAY_ACTION_CD  = #searchPayActionCd#
+		]]>
+	</query>
+
+	<query id="selectYeaCalcCreSheet2List">
+		<![CDATA[
+			SELECT 
+				(SELECT COUNT(*) 
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#) AS T_CNT,
+				(SELECT COUNT(*) 
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#) AS ALL_811_CNT,
+				(SELECT COUNT(PAY_PEOPLE_STATUS) 
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   AND UPPER(PAY_PEOPLE_STATUS) = 'C') AS C_CNT,
+				(SELECT COUNT(PAY_PEOPLE_STATUS) 
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   AND (UPPER(PAY_PEOPLE_STATUS) = 'P' OR UPPER(PAY_PEOPLE_STATUS) = 'M') OR UPPER(PAY_PEOPLE_STATUS) = 'PM') AS P_CNT,
+				(SELECT COUNT(PAY_PEOPLE_STATUS) 
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   AND UPPER(PAY_PEOPLE_STATUS) = 'J') AS J_CNT,
+				(SELECT COUNT(FINAL_CLOSE_YN)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   AND UPPER(FINAL_CLOSE_YN) = 'Y') AS FINAL_Y_CNT,
+				(SELECT COUNT(FINAL_CLOSE_YN)
+				  FROM TCPN811
+				 WHERE ENTER_CD      		= #ssnEnterCd#
+				   AND WORK_YY				= #searchWorkYy#
+				   AND ADJUST_TYPE			= #searchAdjustType#
+				   AND PAY_ACTION_CD  		= #searchPayActionCd#
+				   AND UPPER(FINAL_CLOSE_YN) = 'N') AS FINAL_N_CNT
+			FROM DUAL
+		]]>
+	</query>
+	
+	<!-- 대상인원전체 상태 저장 -->
+	<query id="savePayPeopleStatus">
+		<![CDATA[
+			UPDATE TCPN811 
+			   SET PAY_PEOPLE_STATUS  = #searchPayPeopleStatus#
+				 , CHKDATE	  = SYSDATE
+				 , CHKID     = #ssnSabun#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]>
+	</query>
+	
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="saveFinalCloseTCPN811">
+		<![CDATA[
+			UPDATE TCPN811 
+			   SET FINAL_CLOSE_YN  = #searchFinalCloseYN#
+				 , CHKDATE	  = SYSDATE
+				 , CHKID     = #ssnSabun#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #searchWorkYy#
+			   AND ADJUST_TYPE = #searchAdjustType#
+		]]>
+	</query>
+	
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="deleteFinalCloseTCPN981">
+		<![CDATA[
+			DELETE FROM TCPN981
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="insertFinalCloseTCPN981">
+		<![CDATA[
+			INSERT INTO TCPN981
+			(
+				ENTER_CD
+				, PAY_ACTION_CD
+				, CLOSE_YN
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #searchPayActionCd#
+				, #closeYn#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+	
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="saveFinalCloseTCPN983">
+		<![CDATA[
+			UPDATE TCPN983 
+			   SET CLOSE_ST  = '10005'
+				 , CHKDATE	  = SYSDATE
+				 , CHKID     = #ssnSabun#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #searchPayActionCd#
+		]]>
+	</query>	
+
+</root>

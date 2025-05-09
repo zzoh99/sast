@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 항목별계산내역
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payEleCalcSta">
+		<select parameterType="map" resultType="cMap" id="getPayEleCalcStaList">
+
+				<![CDATA[
+					SELECT A.ELEMENT_CD
+						 --, E.ELEMENT_NM
+						 , ELEMENT_NM2 AS ELEMENT_NM
+						 , A.SABUN
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+						 , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+						 , D.ORG_NM
+						 , C.JIKGUB_CD
+						 , SUM(A.RESULT_MON) AS RESULT_MON
+						 , A.PAY_ACTION_CD
+						 , A.BUSINESS_PLACE_CD
+						 , A.BASIC_MON
+					  FROM TCPN205 A
+						 , THRM100 B
+						 , (
+							SELECT SUB1.*
+							  FROM THRM151 SUB1
+							 WHERE SUB1.ENTER_CD	= #{ssnEnterCd}
+							   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+							) C
+						 , (
+							SELECT SUB1.*
+							  FROM TORG101 SUB1
+								 , (
+									SELECT MAX(SDATE) AS SDATE
+										 , ENTER_CD
+										 , ORG_CD
+									  FROM TORG101
+									 WHERE ENTER_CD	= #{ssnEnterCd}
+									   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+									GROUP BY ENTER_CD, ORG_CD
+									) SUB2
+							 WHERE SUB1.ENTER_CD	= SUB2.ENTER_CD
+							   AND SUB1.ORG_CD		= SUB2.ORG_CD
+							   AND SUB1.SDATE		= SUB2.SDATE
+							) D
+						 , (
+							SELECT SUB1.*
+							     , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), SUB1.ELEMENT_NM) AS ELEMENT_NM2
+							  FROM TCPN011 SUB1
+								 , (
+									SELECT MAX(SDATE) AS SDATE
+										 , ELEMENT_CD
+									  FROM TCPN011
+									 WHERE ENTER_CD	= #{ssnEnterCd}
+									   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+									GROUP BY ELEMENT_CD
+									) SUB2
+							 WHERE SUB1.ENTER_CD	= #{ssnEnterCd}
+							   AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+							   AND SUB1.SDATE		= SUB2.SDATE
+							) E
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					           	]]>
+					<if test='elementCd != null and !elementCd.equals("")'>
+					   AND A.ELEMENT_CD = #{elementCd}
+					</if>
+					   AND A.RESULT_MON IS NOT NULL
+					   AND A.RESULT_MON		!= 0
+					   AND A.ENTER_CD		= B.ENTER_CD
+					   AND A.SABUN			= B.SABUN
+					   AND B.ENTER_CD		= C.ENTER_CD(+)
+					   AND B.SABUN			= C.SABUN(+)
+					   AND C.ENTER_CD		= D.ENTER_CD(+)
+					   AND C.ORG_CD			= D.ORG_CD(+)
+					   AND A.ENTER_CD		= E.ENTER_CD(+)
+					   AND A.ELEMENT_CD		= E.ELEMENT_CD(+)
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND B.SABUN||F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) LIKE '%'||trim(#{sabunName})||'%'
+					</if>
+					GROUP BY A.ENTER_CD, A.ELEMENT_CD, E.ELEMENT_NM2, A.SABUN, D.ORG_NM, C.JIKGUB_CD, E.REPORT_NM, E.ELEMENT_TYPE, A.PAY_ACTION_CD, A.BUSINESS_PLACE_CD, A.BASIC_MON
+					ORDER BY A.ELEMENT_CD, A.SABUN
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayEleCalcStaByReportNmList">
+
+				<![CDATA[
+					SELECT E.REPORT_NM2 AS ELEMENT_NM
+						 , A.SABUN
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+						 , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+						 , D.ORG_NM
+						 , C.JIKGUB_CD
+						 , E.ELEMENT_TYPE
+						 , SUM(A.RESULT_MON) AS RESULT_MON
+						 , A.PAY_ACTION_CD
+						 , A.BUSINESS_PLACE_CD
+						 , A.BASIC_MON
+					  FROM TCPN205 A
+						 , THRM100 B
+						 , (
+							SELECT SUB1.*
+							  FROM THRM151 SUB1
+							 WHERE SUB1.ENTER_CD	= #{ssnEnterCd}
+							   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+							) C
+						 , (
+							SELECT SUB1.*
+							  FROM TORG101 SUB1
+								 , (
+									SELECT MAX(SDATE) AS SDATE
+										 , ENTER_CD
+										 , ORG_CD
+									  FROM TORG101
+									 WHERE ENTER_CD	= #{ssnEnterCd}
+									   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+									GROUP BY ENTER_CD, ORG_CD
+									) SUB2
+							 WHERE SUB1.ENTER_CD	= SUB2.ENTER_CD
+							   AND SUB1.ORG_CD		= SUB2.ORG_CD
+							   AND SUB1.SDATE		= SUB2.SDATE
+							) D
+						 , (
+							SELECT SUB1.*
+							     , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM)  AS ELEMENT_NM2
+							     , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), REPORT_NM)  AS REPORT_NM2
+							  FROM TCPN011 SUB1
+								 , (
+									SELECT MAX(SDATE) AS SDATE
+										 , ELEMENT_CD
+									  FROM TCPN011
+									 WHERE ENTER_CD	= #{ssnEnterCd}
+									   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+									GROUP BY ELEMENT_CD
+									) SUB2
+							 WHERE SUB1.ENTER_CD	= #{ssnEnterCd}
+							   AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+							   AND SUB1.SDATE		= SUB2.SDATE
+							) E
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					           ]]>
+					<if test='elementCd != null and !elementCd.equals("")'>
+					   AND A.ELEMENT_CD = #{elementCd}
+					</if>
+					   AND A.RESULT_MON IS NOT NULL
+					   AND A.RESULT_MON		!= 0
+					   AND A.ENTER_CD		= B.ENTER_CD
+					   AND A.SABUN			= B.SABUN
+					   AND B.ENTER_CD		= C.ENTER_CD(+)
+					   AND B.SABUN			= C.SABUN(+)
+					   AND C.ENTER_CD		= D.ENTER_CD(+)
+					   AND C.ORG_CD			= D.ORG_CD(+)
+					   AND A.ENTER_CD		= E.ENTER_CD(+)
+					   AND A.ELEMENT_CD		= E.ELEMENT_CD(+)
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND B.SABUN||F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) LIKE '%'||trim(#{sabunName})||'%'
+
+					</if>
+					GROUP BY A.ENTER_CD,A.ELEMENT_CD, E.ELEMENT_NM2, A.SABUN, D.ORG_NM, C.JIKGUB_CD, E.REPORT_NM2, E.ELEMENT_TYPE, A.PAY_ACTION_CD, A.BUSINESS_PLACE_CD, A.BASIC_MON
+					ORDER BY E.ELEMENT_TYPE ASC, E.ELEMENT_NM2, A.SABUN
+
+
+
+		</select>
+	</mapper>

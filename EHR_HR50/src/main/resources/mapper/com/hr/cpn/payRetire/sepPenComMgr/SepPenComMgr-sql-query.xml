@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 퇴직연금기관관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepPenComMgr">
+		<select parameterType="map" resultType="cMap" id="getSepPenComMgrList">
+
+				<![CDATA[
+					SELECT RET_INS_CORP
+						 , SDATE
+						 , EDATE
+						 , RET_INS_RATE
+						 , RET_INS_PERSON
+						 , RET_INS_TEL
+						 , RET_INS_MAIL
+					  FROM TCPN707
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					 ORDER BY RET_INS_CORP, SDATE DESC
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveSepPenComMgr">
+
+
+					MERGE INTO TCPN707 T
+					USING	(
+							SELECT A.RET_INS_CORP
+								 , A.SDATE
+								 , A.EDATE
+								 , A.RET_INS_RATE
+								 , A.RET_INS_PERSON
+								 , A.RET_INS_TEL
+								 , A.RET_INS_MAIL
+							  FROM (
+									SELECT NULL	AS RET_INS_CORP
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+										 , NULL AS RET_INS_RATE
+										 , NULL AS RET_INS_PERSON
+										 , NULL AS RET_INS_TEL
+										 , NULL AS RET_INS_MAIL
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.retInsCorp})						AS RET_INS_CORP
+										 , TRIM(#{rm.sdate})							AS SDATE
+										 , TRIM(#{rm.edate})							AS EDATE
+										 , TO_NUMBER(NVL(TRIM(#{rm.retInsRate}),'0'))	AS RET_INS_RATE
+										 , TRIM(#{rm.retInsPerson})						AS RET_INS_PERSON
+										 , TRIM(#{rm.retInsTel})						AS RET_INS_TEL
+										 , TRIM(#{rm.retInsMail})						AS RET_INS_MAIL
+										 
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.RET_INS_CORP	IS NOT NULL
+							  AND A.SDATE			IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.RET_INS_CORP		= S.RET_INS_CORP
+						AND	T.SDATE				= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE			= S.EDATE
+								 , T.RET_INS_RATE	= S.RET_INS_RATE
+								 , T.RET_INS_PERSON	= S.RET_INS_PERSON
+								 , T.RET_INS_TEL	= S.RET_INS_TEL
+								 , T.RET_INS_MAIL	= S.RET_INS_MAIL
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.RET_INS_CORP
+						  , T.SDATE
+						  , T.EDATE
+						  , T.RET_INS_RATE
+						  , T.RET_INS_PERSON
+						  , T.RET_INS_TEL
+						  , T.RET_INS_MAIL
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.RET_INS_CORP
+						  , S.SDATE
+						  , S.EDATE
+						  , S.RET_INS_RATE
+						  , S.RET_INS_PERSON
+						  , S.RET_INS_TEL
+						  , S.RET_INS_MAIL
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" id="updateSepPenComMgrEdate">
+
+
+					MERGE INTO TCPN707 T
+					USING	(
+							SELECT A.RET_INS_CORP
+								 , A.SDATE
+								 , A.EDATE
+							  FROM (
+									SELECT NULL	AS RET_INS_CORP
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+									  FROM DUAL
+<foreach item="rm" collection="insertRows" >
+	<![CDATA[
+									UNION ALL
+									SELECT A.RET_INS_CORP
+										 , A.SDATE
+										 , TO_CHAR(TO_DATE(TRIM(#{rm.sdate}),'YYYYMMDD')-1,'YYYYMMDD')	AS EDATE
+									  FROM TCPN707 A
+									 WHERE A.ENTER_CD = #{ssnEnterCd}
+									   AND A.RET_INS_CORP = TRIM(#{rm.retInsCorp})
+									   AND A.EDATE IS NULL
+									   AND A.SDATE = (SELECT MAX(SDATE)
+													  FROM TCPN707
+													 WHERE ENTER_CD = A.ENTER_CD
+													   AND RET_INS_CORP = A.RET_INS_CORP
+													   AND SDATE < TRIM(#{rm.sdate})
+									   				)
+									   				]]>
+</foreach>
+									) A
+							WHERE A.RET_INS_CORP	IS NOT NULL
+							  AND A.SDATE			IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.RET_INS_CORP	= S.RET_INS_CORP
+						AND	T.SDATE			= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE		= S.EDATE
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepPenComMgr">
+					DELETE FROM TCPN707
+					 WHERE ENTER_CD||'_'||RET_INS_CORP||'_'||SDATE IN ( NULL
+			<foreach item="rm" collection="deleteRows" >
+									,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.retInsCorp != null and !rm.retInsCorp.equals("") and #{rm.sdate} != null and !rm.sdate.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.retInsCorp})||'_'||TRIM(#{rm.sdate})
+										</if>
+			</foreach>
+							)
+		</delete>
+	</mapper>

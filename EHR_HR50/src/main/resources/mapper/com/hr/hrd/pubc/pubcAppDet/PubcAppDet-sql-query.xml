@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.pubc.pubcAppDet">
+<!-- 신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPubcAppDetMap">
+
+				<![CDATA[
+				   SELECT A.PUBC_ID
+				   		, B.PUBC_NM
+ 						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'CD1026', B.PUBC_DIV_CD) AS PUBC_DIV_NM
+          				, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'CD1027', B.PUBC_STAT_CD) AS PUBC_STAT_NM
+          				, F_PAP_GETJOBNAME(B.ENTER_CD, B.JOB_CD) AS JOB_NM
+			            , B.APPL_STA_YMD
+			            , B.APPL_END_YMD
+			            , B.PUBC_CONTENT
+						, A.APPL_RSN
+						, A.PLAN_TXT
+						, A.CHOICE_YN
+						, A.CHOICE_RSN
+						, A.NOTE
+						, A.CHKDATE
+						, A.CHKID
+				     FROM TCDP701 A
+				     	, TCDP700 B
+				    WHERE A.ENTER_CD   	= #{ssnEnterCd}
+                   	  AND A.APPL_SEQ   	= TRIM( #{searchApplSeq} )
+                   	  AND A.ENTER_CD 	= B.ENTER_CD
+					  AND A.PUBC_ID 	= B.PUBC_ID
+				]]>
+
+
+		</select>
+			
+<!-- 신청자정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPubcAppDetUseInfo">
+
+				<![CDATA[
+					SELECT F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN,'HP') AS PHONE_NO
+					     , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN,'7') AS WORK_MONTH
+                         , CASE WHEN B.ACC_NAME IS NULL THEN F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})
+                                ELSE B.ACC_NAME END AS ACC_NM
+                         , A.EMP_YMD
+                         , B.BANK_CD
+                         , B.ACCOUNT_NO AS ACC_NO
+                         , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS APPL_NAME
+                      FROM THRM100 A
+                      LEFT OUTER JOIN
+					     ( SELECT ENTER_CD
+					            , SABUN
+					            , BANK_CD
+							    , CRYPTIT.DECRYPT(ACCOUNT_NO,ENTER_CD) AS ACCOUNT_NO
+							    , ACC_NAME
+							 FROM TCPN180      
+							WHERE ENTER_CD     = #{ssnEnterCd}
+			                  AND ACCOUNT_TYPE = '01'
+			                  AND SABUN        = TRIM( #{searchApplSabun} )
+			                  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'29991231')
+			              ) B  /*은행계좌*/
+                        ON A.ENTER_CD = B.ENTER_CD
+						  AND A.SABUN    = B.SABUN
+                     WHERE A.ENTER_CD =	#{ssnEnterCd}
+                       AND A.SABUN    = TRIM( #{searchApplSabun} )
+				]]>
+
+
+		</select>
+		
+<!--  공모팝업 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPubcAppDetPopupList">
+
+				<![CDATA[
+			   SELECT    A.PUBC_ID
+						,A.PUBC_NM
+						,A.PUBC_DIV_CD
+						,A.PUBC_CONTENT
+						,A.JOB_CD
+						,F_PAP_GETJOBNAME(A.ENTER_CD, A.JOB_CD) AS JOB_NM 
+						,A.PUBC_STAT_CD
+						,A.APPL_STA_YMD
+						,A.APPL_END_YMD
+						,A.NOTE
+						,A.CHKDATE
+						,A.CHKID
+						,A.FILE_SEQ
+		  		  FROM TCDP700 A
+	  		  	 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+	  		  	   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.APPL_STA_YMD AND NVL(A.APPL_END_YMD, '99991231')
+	  		  	   AND A.PUBC_STAT_CD = '20' -- 접수중
+	  		  	   ]]>
+<if test='searchPubcNm != null and !searchPubcNm.equals("")' >
+		 		   AND A.PUBC_NM LIKE '%' || TRIM(#{searchPubcNm}) || '%'
+</if>
+		 		 ORDER BY A.PUBC_NM
+
+		</select>
+
+	<!--  공모팝업 단건 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPubcAppDetPubcInfoMap">
+
+		<![CDATA[
+			   SELECT    A.PUBC_ID
+						,A.PUBC_NM
+						,A.PUBC_DIV_CD
+			            ,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'CD1026', A.PUBC_DIV_CD) AS PUBC_DIV_NM
+						,A.PUBC_CONTENT
+						,A.JOB_CD
+						,F_PAP_GETJOBNAME(A.ENTER_CD, A.JOB_CD) AS JOB_NM
+						,A.PUBC_STAT_CD
+			       		,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'CD1027', A.PUBC_STAT_CD) AS PUBC_STAT_NM
+						,A.APPL_STA_YMD
+						,A.APPL_END_YMD
+						,A.NOTE
+						,A.CHKDATE
+						,A.CHKID
+						,A.FILE_SEQ
+		  		  FROM TCDP700 A
+	  		  	 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+	  		  	   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.APPL_STA_YMD AND NVL(A.APPL_END_YMD, '99991231')
+	  		  	   AND A.PUBC_STAT_CD = '20' -- 접수중
+	  		  	   ]]>
+		<if test='searchPubcId != null and !searchPubcId.equals("")' >
+			AND A.PUBC_ID LIKE '%' || TRIM(#{searchPubcId}) || '%'
+		</if>
+		ORDER BY A.PUBC_NM
+
+	</select>
+<!-- 신청서 중복 체크 -->
+		<select parameterType="map" resultType="cMap" id="getPubcAppDetDupCnt">
+
+				<![CDATA[
+				   SELECT COUNT(1) AS DUP_CNT
+					 FROM TCDP701 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					  AND A.SABUN    = #{searchApplSabun}
+					  AND A.PUBC_ID = #{pubcId}
+					  AND EXISTS ( SELECT 1
+					                 FROM THRI103 X
+					                WHERE X.ENTER_CD = A.ENTER_Cd
+					                  AND X.APPL_SEQ = A.APPL_SEQ
+					                  AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+					              )
+				]]>
+
+
+		</select>
+		
+<!--  세부내역 저장 -->
+		<update parameterType="map" id="savePubcAppDet">
+
+				<![CDATA[
+					MERGE INTO TCDP701 T
+					USING  (							
+							 SELECT   TRIM( #{ssnEnterCd} )				AS ENTER_CD
+							   	 	, TRIM( #{searchApplSeq} )			AS APPL_SEQ
+									, TRIM( #{searchApplSabun} )			AS SABUN
+									, TRIM( #{applRsn} )				 	AS APPL_RSN
+									, TRIM( #{planTxt} ) 					AS PLAN_TXT
+									, TRIM( #{note} )						AS NOTE
+									, TRIM( #{pubcId} ) 					AS PUBC_ID
+								FROM DUAL
+									
+							) S
+					ON (      T.ENTER_CD = S.ENTER_CD
+					      AND T.APPL_SEQ = S.APPL_SEQ
+					   )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APPL_RSN  		= S.APPL_RSN  
+									, T.PLAN_TXT   		= S.PLAN_TXT  
+									, T.NOTE      		= S.NOTE      
+									, T.PUBC_ID       	= S.PUBC_ID   
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPL_SEQ
+							, T.SABUN
+							, T.APPL_RSN  
+							, T.PLAN_TXT  
+							, T.NOTE      
+							, T.PUBC_ID   
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD  
+							, S.APPL_SEQ  
+							, S.SABUN     
+							, S.APPL_RSN  
+							, S.PLAN_TXT  
+							, S.NOTE      
+							, S.PUBC_ID   
+							, SYSDATE
+							, #{ssnSabun}
+						)
+				]]>
+
+		</update>
+
+<!--  세부내역 저장 (관리자용) -->
+		<update parameterType="map" id="savePubcAppDetAdmin">
+
+				<![CDATA[
+					MERGE INTO TCDP701 T
+					USING  (							
+							 SELECT   TRIM( #{ssnEnterCd} )				AS ENTER_CD
+							   	 	, TRIM( #{searchApplSeq} )			AS APPL_SEQ
+									, TRIM( #{searchApplSabun} )			AS SABUN
+									, NVL(TRIM( #{choiceYn} ), 'N')		AS CHOICE_YN
+									, TRIM( #{choiceRsn} )				AS CHOICE_RSN
+								FROM DUAL
+									
+							) S
+					ON (      T.ENTER_CD = S.ENTER_CD
+					      AND T.APPL_SEQ = S.APPL_SEQ
+					   )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CHOICE_YN 		= S.CHOICE_YN 
+									, T.CHOICE_RSN		= S.CHOICE_RSN
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+				]]>
+		</update>
+				
+
+</mapper>

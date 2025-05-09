@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.calc.wtmCalcWorkTime">
+
+	<!-- 기간별 근무유형 조회 -->
+	<select id="getWtmCalcWorkTimeWorkClassList" resultType="cMap">
+		<![CDATA[
+			SELECT Y.*
+				 , X.PSNL_SDATE
+				 , X.PSNL_EDATE
+				 , Z.NOTE2 AS APPL_UNIT
+				 , Z.NOTE3 AS APPL_MIN_UNIT
+			     , Z1.NUM_NOTE AS WORK_ENABLE_RANGE_NUM
+			  FROM (
+					SELECT A.ENTER_CD
+						 , A.SABUN
+						 , NVL(B.WORK_CLASS_CD, C.WORK_CLASS_CD) AS WORK_CLASS_CD
+						 , TO_CHAR(A.SDATE, 'YYYYMMDD') AS PSNL_SDATE
+						 , TO_CHAR(A.EDATE, 'YYYYMMDD') AS PSNL_EDATE
+					  FROM (
+							SELECT ENTER_CD
+								 , SABUN
+								 , DT AS SDATE
+								 , LEAD(DT) OVER (PARTITION BY ENTER_CD, SABUN ORDER BY DT) - 1 AS EDATE
+							  FROM (
+									SELECT ENTER_CD, SABUN, TO_DATE(EMP_YMD, 'YYYYMMDD') AS DT FROM THRM100
+									 UNION
+									SELECT ENTER_CD, SABUN, NVL(TO_DATE(RET_YMD, 'YYYYMMDD'), TO_DATE('99991231', 'YYYYMMDD')) FROM THRM100
+									 UNION
+									SELECT ENTER_CD, SABUN, TO_DATE(SDATE, 'YYYYMMDD') FROM TWTM022
+									 UNION
+									SELECT ENTER_CD, SABUN, TO_DATE(EDATE, 'YYYYMMDD') FROM TWTM022
+								   )
+						   ) A
+					 LEFT JOIN TWTM022 B
+					   ON B.ENTER_CD = A.ENTER_CD
+					  AND B.SABUN = A.SABUN
+					  AND TO_DATE(B.SDATE, 'YYYYMMDD') <= A.SDATE
+					  AND TO_DATE(B.EDATE, 'YYYYMMDD') >= A.EDATE
+					 LEFT JOIN TWTM021 C
+					   ON A.ENTER_CD = C.ENTER_CD
+					  AND C.WORK_CLASS_DEF_YN = 'Y'
+					WHERE A.EDATE IS NOT NULL
+					  AND A.ENTER_CD = #{enterCd}
+					  AND A.SABUN = #{sabun}
+					ORDER BY A.ENTER_CD, A.SABUN, A.EDATE
+				   ) X
+			  JOIN TWTM021 Y
+				ON X.ENTER_CD = Y.ENTER_CD
+			   AND X.WORK_CLASS_CD = Y.WORK_CLASS_CD
+			  LEFT JOIN TSYS005 Z
+				ON Y.ENTER_CD = Z.ENTER_CD
+			   AND Y.INTERVAL_CD = Z.CODE
+			   AND Z.GRCODE_CD = 'T90200'
+			  LEFT JOIN TSYS005 Z1
+				ON Y.ENTER_CD = Z1.ENTER_CD
+			   AND Y.WORK_ENABLE_RANGE = Z1.CODE
+			   AND Z1.GRCODE_CD = 'TW0211'
+			 WHERE X.ENTER_CD = #{enterCd}
+			   AND X.SABUN = #{sabun}
+			   AND X.PSNL_SDATE <= REPLACE(#{edate}, '-', '')
+			   AND X.PSNL_EDATE >= REPLACE(#{sdate}, '-', '')
+	   	]]>
+	</select>
+
+	<!-- 일마감 대상자 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmCalcWorkTimeDailyCountTargetList">
+		<![CDATA[
+		WITH DATES AS (
+			SELECT TO_CHAR(TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + LEVEL - 1, 'YYYYMMDD') AS YMD
+			  FROM DUAL
+		   CONNECT BY LEVEL <= TO_DATE(TRIM( REPLACE(#{edate}, '-', '') ), 'YYYYMMDD') - TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + 1
+		)
+		]]>
+		SELECT A.ENTER_CD, A.SABUN, BP.BUSINESS_PLACE_CD AS BP_CD
+		     , NVL(C.WORK_CLASS_CD, B.WORK_CLASS_CD) AS WORK_CLASS_CD
+			 , DT.YMD, D.IN_YMD AS REAL_IN_YMD, D.IN_HM AS REAL_IN_HM, D.OUT_YMD AS REAL_OUT_YMD, D.OUT_HM AS REAL_OUT_HM
+			 , E.IN_YMD, E.IN_HM, E.OUT_YMD, E.OUT_HM
+		  FROM DATES DT
+		  JOIN THRM151 A
+			ON A.ENTER_CD = #{enterCd}
+		   AND DT.YMD BETWEEN A.SDATE AND A.EDATE
+		  JOIN BP_V BP
+			ON A.ENTER_CD = BP.ENTER_CD
+		   AND A.SABUN = BP.SABUN
+		   AND A.SDATE = BP.SDATE
+		  LEFT JOIN TWTM021 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND B.WORK_CLASS_DEF_YN = 'Y'
+		  LEFT JOIN TWTM022 C
+			ON A.ENTER_CD = C.ENTER_CD
+		   AND A.SABUN = C.SABUN
+		   AND DT.YMD BETWEEN C.SDATE AND C.EDATE
+		  LEFT JOIN TWTM101 D
+			ON A.ENTER_CD = D.ENTER_CD
+		   AND A.SABUN = D.SABUN
+		   AND D.YMD = DT.YMD
+		  LEFT JOIN (
+		        SELECT ENTER_CD, SABUN, YMD, MIN(IN_YMD) AS IN_YMD, MIN(IN_HM) AS IN_HM, MAX(OUT_YMD) AS OUT_YMD, MAX(OUT_HM) AS OUT_HM
+		          FROM TWTM110
+		         WHERE AWAY_YN = 'N'
+		         GROUP BY ENTER_CD, SABUN, YMD
+               ) E
+		    ON A.ENTER_CD = E.ENTER_CD
+		   AND A.SABUN = E.SABUN
+		   AND DT.YMD = E.YMD
+		 WHERE A.ENTER_CD = #{enterCd}
+		   AND A.STATUS_CD NOT IN ('RA', 'RAA')
+		<if test=' searchBpCd != null and searchBpCd neq "" '>
+		   AND BP.BUSINESS_PLACE_CD = #{searchBpCd}
+		</if>
+		<if test=' sabun != null and sabun neq "" '>
+		   AND A.SABUN = #{sabun}
+		</if>
+		<if test=' workClassCd != null and workClassCd neq "" '>
+		   AND NVL(C.WORK_CLASS_CD, B.WORK_CLASS_CD) = #{workClassCd}
+		</if>
+		 ORDER BY A.SABUN, DT.YMD
+	</select>
+
+	<!-- 일마감 대상자 출퇴근 타각 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmCalcWorkTimeDailyCountInOutList">
+		<![CDATA[
+		WITH DATES AS (
+			SELECT TO_CHAR(TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + LEVEL - 1, 'YYYYMMDD') AS YMD
+			  FROM DUAL
+		   CONNECT BY LEVEL <= TO_DATE(TRIM( REPLACE(#{edate}, '-', '') ), 'YYYYMMDD') - TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + 1
+		)
+		]]>
+		SELECT A.ENTER_CD, A.YMD, A.SABUN
+			 , A.IN_YMD, A.IN_HM, A.OUT_YMD, A.OUT_HM
+			 , A.AWAY_YN
+		  FROM DATES DT
+		  JOIN TWTM110 A
+			ON A.ENTER_CD = #{enterCd}
+		   AND A.YMD = DT.YMD
+		  JOIN THRM151 C
+		    ON A.ENTER_CD = C.ENTER_CD
+		   AND DT.YMD BETWEEN C.SDATE AND C.EDATE
+		   AND A.SABUN = C.SABUN
+		   AND C.STATUS_CD NOT IN ('RA', 'RAA')
+		  JOIN BP_V BP
+		    ON C.ENTER_CD = BP.ENTER_CD
+		   AND C.SABUN = BP.SABUN
+		   AND C.SDATE = BP.SDATE
+		 WHERE A.ENTER_CD = #{enterCd}
+		<if test=' searchBpCd != null and !searchBpCd.equals("") '>
+		   AND BP.BUSINESS_PLACE_CD = #{searchBpCd}
+		</if>
+		<if test=' sabun != null and !sabun.equals("") '>
+		   AND A.SABUN = #{sabun}
+		</if>
+		 ORDER BY A.SABUN, A.YMD
+	</select>
+
+	<!-- 일마감 대상자 근무 상세 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmCalcWorkTimeDailyCountWrkDtlList">
+		<![CDATA[
+		WITH DATES AS (
+			SELECT TO_CHAR(TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + LEVEL - 1, 'YYYYMMDD') AS YMD
+			  FROM DUAL
+		   CONNECT BY LEVEL <= TO_DATE(TRIM( REPLACE(#{edate}, '-', '') ), 'YYYYMMDD') - TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + 1
+		)
+		]]>
+		SELECT A.ENTER_CD, A.WRK_DTL_ID, A.YMD, A.SABUN
+		     , A.WORK_CD, A.PLAN_SYMD, A.PLAN_SHM, A.PLAN_EYMD, A.PLAN_EHM, NVL(A.PLAN_MM, 0) AS PLAN_MM
+			 , A.REAL_SYMD, A.REAL_SHM, A.REAL_EYMD, A.REAL_EHM, NVL(A.REAL_MM, 0) AS REAL_MM, A.AUTO_CRE_YN
+		     , B.WORK_TIME_TYPE, B.DEEMED_YN, NVL(C.NOTE1, NVL(B.DEEMED_YN, 'N')) AS ADD_WORK_TIME_YN
+		  FROM DATES DT
+		  JOIN TWTM102 A
+			ON A.YMD = DT.YMD
+		  JOIN TWTM051 B
+		    ON A.ENTER_CD = B.ENTER_CD
+		   AND A.WORK_CD = B.WORK_CD
+		  LEFT JOIN TSYS005 C
+		    ON A.ENTER_CD = C.ENTER_CD
+		   AND B.WORK_TIME_TYPE = C.CODE
+		   AND C.GRCODE_CD = 'WT0511'
+		  JOIN THRM151 D
+		    ON A.ENTER_CD = D.ENTER_CD
+		   AND A.SABUN = D.SABUN
+		   AND DT.YMD BETWEEN D.SDATE AND D.EDATE
+		   AND D.STATUS_CD NOT IN ('RA', 'RAA')
+		  JOIN BP_V BP
+		    ON D.ENTER_CD = BP.ENTER_CD
+		   AND D.SABUN = BP.SABUN
+		   AND D.SDATE = BP.SDATE
+		 WHERE A.ENTER_CD = #{enterCd}
+		<if test=' searchBpCd != null and !searchBpCd.equals("") '>
+		   AND BP.BUSINESS_PLACE_CD = #{searchBpCd}
+		</if>
+		<if test=' sabun != null and !sabun.equals("") '>
+		   AND A.SABUN = #{sabun}
+		</if>
+		 ORDER BY A.SABUN, A.YMD
+	</select>
+
+	<!-- 일마감 대상자 근태 상세 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmCalcWorkTimeDailyCountGntDtlList">
+		<![CDATA[
+		WITH DATES AS (
+			SELECT TO_CHAR(TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + LEVEL - 1, 'YYYYMMDD') AS YMD
+			  FROM DUAL
+		   CONNECT BY LEVEL <= TO_DATE(TRIM( REPLACE(#{edate}, '-', '') ), 'YYYYMMDD') - TO_DATE(TRIM( REPLACE(#{sdate}, '-', '') ) , 'YYYYMMDD') + 1
+		)
+		]]>
+		SELECT A.ENTER_CD, A.GNT_DTL_ID, A.YMD, A.SABUN
+			 , A.GNT_CD, A.SYMD, A.SHM, A.EYMD, A.EHM, A.MM
+			 , B.REQUEST_USE_TYPE
+		  FROM DATES DT
+		  JOIN TWTM103 A
+			ON A.ENTER_CD = #{enterCd}
+		   AND A.YMD = DT.YMD
+		  JOIN TWTM041 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.GNT_CD = B.GNT_CD
+		  JOIN THRM151 C
+		    ON A.ENTER_CD = C.ENTER_CD
+		   AND DT.YMD BETWEEN C.SDATE AND C.EDATE
+		   AND A.SABUN = C.SABUN
+		   AND C.STATUS_CD NOT IN ('RA', 'RAA')
+		  JOIN BP_V BP
+		    ON C.ENTER_CD = BP.ENTER_CD
+		   AND C.SABUN = BP.SABUN
+		   AND C.SDATE = BP.SDATE
+		 WHERE A.ENTER_CD = #{enterCd}
+		<if test=' searchBpCd != null and !searchBpCd.equals("") '>
+		   AND BP.BUSINESS_PLACE_CD = #{searchBpCd}
+		</if>
+		<if test=' sabun != null and !sabun.equals("") '>
+		   AND A.SABUN = #{sabun}
+		</if>
+		 ORDER BY A.SABUN, A.YMD
+	</select>
+
+	<!-- 공휴일 정보 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmCalcWorkTimeDailyCountHolidayList">
+		<![CDATA[
+        SELECT A.YY||A.MM||A.DD AS YMD
+             , A.RP_YY||A.RP_MM||A.RP_DD AS RP_YMD
+             , BUSINESS_PLACE_CD AS BP_CD
+          FROM TWTM001 A
+         WHERE A.ENTER_CD = #{enterCd}
+           AND (A.YY||A.MM = #{sdate} OR  A.RP_YY||A.RP_MM = #{edate})
+	   ]]>
+		<if test=' searchBpCd != null and !searchBpCd.equals("") '>
+		   AND A.BUSINESS_PLACE_CD = #{searchBpCd}
+		</if>
+    </select>
+
+	<!-- 근무 유형 정보 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmCalcWorkTimeDailyCountWorkClassList">
+		<![CDATA[
+        SELECT A.*
+             , B.NUM_NOTE AS WORK_ENABLE_RANGE_NUM
+		  FROM TWTM021 A
+		  LEFT JOIN TSYS005 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.WORK_ENABLE_RANGE = B.CODE
+		   AND B.GRCODE_CD = 'WT0211'
+         WHERE A.ENTER_CD = #{enterCd}
+           AND A.SDATE <= #{sdate}
+           AND A.EDATE >= #{edate}
+	   ]]>
+		<if test=' workClassCd != null and !workClassCd.equals("") '>
+		   AND A.WORK_CLASS_CD = #{workClassCd}
+		</if>
+    </select>
+
+	<!-- 교대조근무자 휴일,휴무일 정보 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmCalcWorkTimeDailyCountShiftHolList">
+		<![CDATA[
+		SELECT A.ENTER_CD
+			 , B.YMD
+			 , B.SABUN
+			 , B.WORK_SCH_CD
+			 , DECODE(B.WORK_SCH_CD, 'A', 'NH', 'B', 'H') AS WORK_DAY_TYPE
+		  FROM TWTM021 A
+		  JOIN TWTM035 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+		 WHERE A.ENTER_CD = #{enterCd}
+		   AND B.YMD BETWEEN #{sdate} AND #{edate}
+		   AND B.WORK_SCH_CD IN ('A', 'B')
+	   ]]>
+		<if test=' sabun != null and !sabun.equals("") '>
+		   AND B.SABUN = #{sabun}
+		</if>
+    </select>
+</mapper>

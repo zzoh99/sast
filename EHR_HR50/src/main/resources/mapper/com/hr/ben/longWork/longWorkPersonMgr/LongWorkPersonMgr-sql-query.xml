@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.longWork.longWorkPersonMgr">
+		
+	<!-- 근속포상대상자관리 조회 -->
+	<select id="getLongWorkPersonMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT '0' AS DETAIL
+			     , A.ENTER_CD
+			     , A.BASIC_YYYY
+			     , A.PRIZE_CD
+			     , A.SABUN
+			     , A.NAME
+			     , A.PRIZE_REASON
+			     , A.ORG_CD
+			     , A.ORG_NM
+              	 , A.JIKCHAK_CD
+			     , A.JIKCHAK_NM
+			     , A.JIKWEE_CD
+			     , A.JIKWEE_NM
+			     , A.JIKGUB_CD
+          	     , A.JIKGUB_NM
+          	     , A.STATUS_CD
+          	     , B.GEMP_YMD
+          	     , B.EMP_YMD
+          	     , A.CONT_YEAR
+          	     , F_COM_GET_WORK_YEAR(A.ENTER_CD, A.SABUN, A.PRIZE_YMD, 'YYMM', '1') AS CONT_YEAR_NM
+          	     , A.PRIZE_YMD
+          	     , A.PRIZE_NO      
+          	     , A.PRIZE_OFFICE_NM             	     
+          	     , A.CONFIRM_YN
+          	     , A.WKP_GIFT 
+          	     , A.WKP_MON
+			     , A.WKP_DAY 
+			     , A.WKP_DAY_YN 
+              	 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO
+			  FROM (
+					SELECT X.*
+					     , F_COM_GET_NAMES(X.ENTER_CD, X.SABUN) AS NAME
+					     , F_COM_GET_ORG_NM(X.ENTER_CD, X.ORG_CD, X.PRIZE_YMD) AS ORG_NM
+					     , F_COM_GET_JIKCHAK_NM(X.ENTER_CD, X.SABUN, X.PRIZE_YMD) AS JIKCHAK_NM
+					     , F_COM_GET_JIKWEE_NM(X.ENTER_CD, X.SABUN, X.PRIZE_YMD) AS JIKWEE_NM
+					     , F_COM_GET_JIKGUB_NM(X.ENTER_CD, X.SABUN, X.PRIZE_YMD) AS JIKGUB_NM
+					     , F_COM_GET_JIKGUB_CD(X.ENTER_CD, X.SABUN, X.PRIZE_YMD) AS JIKGUB_CD
+					     , F_COM_GET_STATUS_CD(X.ENTER_CD, X.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_CD
+					  FROM TBEN412 X
+					 WHERE X.ENTER_CD = #{ssnEnterCd}
+					   AND SUBSTR(X.PRIZE_YMD,0,6) BETWEEN NVL(REPLACE(#{searchFrom},'-'), '000000') AND NVL(REPLACE(#{searchTo},'-'), '999912')
+			  ) A, THRM100 B
+		   WHERE 1=1
+			 AND A.ENTER_CD = B.ENTER_CD
+			 AND A.SABUN = B.SABUN ]]>
+		<if test="businessPlaceCd != null and businessPlaceCd neq ''">
+			 AND F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, A.PRIZE_YMD) IN <foreach collection="businessPlaceCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="searchOrgNm != null and searchOrgNm neq ''">
+			 AND LOWER(A.ORG_NM) LIKE '%'|| LOWER(#{searchOrgNm}) ||'%'
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+			 AND ( LOWER(A.SABUN) LIKE '%'||LOWER(TRIM(#{searchSabunName}))||'%' OR LOWER(A.NAME) LIKE '%'||LOWER(TRIM(#{searchSabunName}))||'%' )
+		</if>
+		<choose>
+			<when test='searchConfirmYn != null and searchConfirmYn eq "Y"'>
+			 AND A.CONFIRM_YN = 'Y'
+			</when>
+			<when test='searchConfirmYn != null and searchConfirmYn eq "N"'>
+			 AND ( A.CONFIRM_YN = 'N' OR A.CONFIRM_YN IS NULL )
+			</when>
+		</choose>
+		<if test="searchYear != null and searchYear neq ''">
+			 AND A.BASIC_YYYY = #{searchYear}
+		</if>
+		<if test="searchJikchakCd != null and searchJikchakCd neq ''">
+			 AND A.JIKCHAK_CD = #{searchJikchakCd}
+		</if>
+		<if test="searchJikweeCd != null and searchJikweeCd neq ''">
+			 AND A.JIKWEE_CD = #{searchJikweeCd}
+		</if>
+		<if test="searchJikgubCd != null and searchJikgubCd neq ''">
+			 AND A.JIKGUB_CD = #{searchJikgubCd}
+		</if>
+		<choose>
+			<when test="gempEmp != null and gempEmp eq 'Gemp'">
+				<if test="sdate != null and sdate neq ''">
+			AND B.GEMP_YMD >= REPLACE(#{sdate}, '-', '')
+				</if>
+				<if test="edate != null and edate neq ''">
+			<![CDATA[
+			AND B.GEMP_YMD <= REPLACE(#{edate}, '-', '')
+			]]>
+				</if>
+			</when>
+			<when test="gempEmp != null and gempEmp eq 'Emp'">
+				<if test="sdate != null and sdate neq ''">
+			AND B.EMP_YMD >= REPLACE(#{sdate}, '-', '')
+				</if>
+				<if test="edate != null and edate neq ''">
+			<![CDATA[
+			AND B.EMP_YMD <= REPLACE(#{edate}, '-', '')
+			]]>
+				</if>
+			</when>
+		</choose>
+		<if test="searchContYear != null and searchContYear neq ''">
+			AND A.CONT_YEAR = #{searchContYear}
+		</if>
+		  ORDER BY CONT_YEAR DESC, F_COM_JIKJE_SORT(ENTER_CD, SABUN, A.PRIZE_YMD)
+	</select>
+
+	<!-- 근속포상대상자관리 저장 -->
+	<update id="saveLongWorkPersonMgr" parameterType="map">
+	<![CDATA[
+     	MERGE INTO TBEN412 T
+		USING (
+			SELECT *
+			  FROM (
+					SELECT NULL AS ENTER_CD
+					     , NULL AS BASIC_YYYY
+					     , NULL AS PRIZE_CD
+					     , NULL AS SABUN
+					     , NULL AS PRIZE_REASON
+					     , NULL AS ORG_CD
+					     , NULL AS JIKWEE_CD
+					     , NULL AS JIKCHAK_CD
+					     , NULL AS EMP_YMD
+					     , NULL AS CONT_YEAR
+					     , NULL AS PRIZE_YMD
+					     , NULL AS PRIZE_NO      
+						 , NULL AS PRIZE_OFFICE_NM     
+					     , NULL AS CHKDATE
+					     , NULL AS CHKID
+					     , NULL AS WKP_GIFT
+					     , NULL AS WKP_MON         
+					     , NULL AS WKP_DAY         
+					     , NULL AS WKP_DAY_YN      
+					  FROM DUAL ]]>
+			<foreach item="rm" collection="mergeRows">
+					  UNION ALL
+					SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+					     , TRIM( #{rm.basicYyyy} ) AS BASIC_YYYY
+					     , TRIM( #{rm.prizeCd} ) AS PRIZE_CD
+					     , TRIM( #{rm.sabun} ) AS SABUN
+					     , TRIM( #{rm.prizeReason} ) AS PRIZE_REASON
+					     , TRIM( #{rm.orgCd} ) AS ORG_CD
+					     , TRIM( #{rm.jikweeCd} ) AS JIKWEE_CD
+					     , TRIM( #{rm.jikchakCd} ) AS JIKCHAK_CD
+					     , TRIM( #{rm.empYmd} ) AS EMP_YMD
+					     , TRIM( #{rm.contYear} ) AS CONT_YEAR
+					     , TRIM( #{rm.prizeYmd} ) AS PRIZE_YMD
+					     , TRIM( #{rm.prizeNo} ) AS PRIZE_NO      
+             	     	 , TRIM( #{rm.prizeOfficeNm} ) AS PRIZE_OFFICE_NM     
+					     , SYSDATE AS CHKDATE
+					     , TRIM(#{ssnSabun}) AS CHKID
+					     , TRIM( #{rm.wkpGift} ) AS WKP_GIFT
+					     , TRIM( #{rm.wkpMon} ) 	AS WKP_MON         
+					     , TRIM( #{rm.wkpDay} ) 	AS WKP_DAY         
+					     , TRIM( #{rm.wkpDayYn} ) 	AS WKP_DAY_YN      
+					  FROM DUAL 
+			</foreach>
+	<![CDATA[
+			)
+			 WHERE ENTER_CD IS NOT NULL
+			   AND BASIC_YYYY IS NOT NULL
+			   AND PRIZE_CD IS NOT NULL
+			   AND SABUN IS NOT NULL
+		) S
+		ON ( T.ENTER_CD = S.ENTER_CD
+		 AND T.BASIC_YYYY = S.BASIC_YYYY
+		 AND T.PRIZE_CD = S.PRIZE_CD
+		 AND T.SABUN = S.SABUN
+		)
+		WHEN MATCHED THEN
+		   UPDATE SET T.PRIZE_REASON = S.PRIZE_REASON
+		            , T.ORG_CD = S.ORG_CD
+		            , T.JIKWEE_CD = S.JIKWEE_CD
+		            , T.JIKCHAK_CD = S.JIKCHAK_CD
+		            , T.EMP_YMD = S.EMP_YMD
+		            , T.CONT_YEAR = S.CONT_YEAR
+		            , T.PRIZE_YMD = S.PRIZE_YMD
+		            , T.PRIZE_NO = S.PRIZE_NO
+		            , T.PRIZE_OFFICE_NM = S.PRIZE_OFFICE_NM
+		            , T.CHKDATE = S.CHKDATE
+		            , T.CHKID = S.CHKID
+		            , T.WKP_GIFT = S.WKP_GIFT
+		            , T.WKP_MON     = S.WKP_MON    
+		            , T.WKP_DAY     = S.WKP_DAY    
+		            , T.WKP_DAY_YN  = S.WKP_DAY_YN 
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				T.ENTER_CD
+			  , T.BASIC_YYYY
+			  , T.PRIZE_CD
+			  , T.SABUN
+			  , T.PRIZE_REASON
+			  , T.ORG_CD
+			  , T.JIKWEE_CD
+			  , T.JIKCHAK_CD
+			  , T.EMP_YMD
+			  , T.CONT_YEAR
+			  , T.PRIZE_YMD
+			  , T.PRIZE_NO 
+		      , T.PRIZE_OFFICE_NM
+			  , T.CHKDATE
+			  , T.CHKID
+			  , T.WKP_GIFT
+			  , T.WKP_MON    
+			  , T.WKP_DAY    
+			  , T.WKP_DAY_YN 
+			)
+			VALUES
+			(
+				S.ENTER_CD
+			  , S.BASIC_YYYY
+			  , S.PRIZE_CD
+			  , S.SABUN
+			  , S.PRIZE_REASON
+			  , S.ORG_CD
+			  , S.JIKWEE_CD
+			  , S.JIKCHAK_CD
+			  , S.EMP_YMD
+			  , S.CONT_YEAR
+			  , S.PRIZE_YMD
+			  , S.PRIZE_NO 
+		      , S.PRIZE_OFFICE_NM
+			  , S.CHKDATE
+			  , S.CHKID
+			  , S.WKP_GIFT
+			  , S.WKP_MON    
+			  , S.WKP_DAY    
+			  , S.WKP_DAY_YN 
+			)
+	]]>
+	</update>
+		
+	<!-- 근속포상대상자관리 삭제 -->
+	<delete id="deleteLongWorkPersonMgr" parameterType="map">
+	<![CDATA[
+   			DELETE FROM TBEN412
+   			 WHERE ( ENTER_CD, BASIC_YYYY, PRIZE_CD, SABUN ) IN ( (NULL, NULL, NULL, NULL) ]]>
+   		<foreach item="rm" collection="deleteRows">
+   			,
+   			<if test="rm.basicYyyy != null and rm.basicYyyy neq '' and rm.prizeCd != null and rm.prizeCd neq ''
+   				 and rm.sabun != null and rm.sabun neq ''">
+   				 ( TRIM( #{ssnEnterCd} ), TRIM( #{rm.basicYyyy} ), TRIM( #{rm.prizeCd} ), TRIM( #{rm.sabun} ))
+   			</if>
+   		</foreach>
+   			)
+	</delete>
+        
+	<!-- 근속년수 계산 -->
+	<select id="getLongWorkPersonMgrWorkYear" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_WORK_YEAR(#{ssnEnterCd}, #{searchSabun}, #{searchYmd}, 'YY', '0', #{ssnLocaleCd}) AS WORK_YEAR
+		  FROM DUAL
+	]]>
+    </select>
+
+	<!-- 근속포상대상자 자료생성 -->
+	<update id="prcP_HRM_LONG_WORK_PERSON_CREATE" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_HRM_LONG_WORK_PERSON_CREATE(
+			#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{calType,mode=IN,jdbcType=VARCHAR},
+			#{searchYmd,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+
+	<!-- 근속포상대상자 자료 확정처리 -->
+	<update id="prcP_HRM_LONG_WORK_PERSON_CONFIRM" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_HRM_LONG_WORK_PERSON_CONFIRM(
+			#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBasicYyyy,mode=IN,jdbcType=VARCHAR},
+			#{searchPrizeCd,mode=IN,jdbcType=VARCHAR},
+			#{searchSabun,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+
+    <!-- 근속포상대상자 자료 확정취소 -->
+	<update id="prcP_HRM_LONG_WORK_PERSON_CANCEL" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_HRM_LONG_WORK_PERSON_CANCEL(
+			#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBasicYyyy,mode=IN,jdbcType=VARCHAR},
+			#{searchPrizeCd,mode=IN,jdbcType=VARCHAR},
+			#{searchSabun,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+	
+	<!-- 근속포상대상자관리 조회 -->
+    <select id="getLongWorkCdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT WKP_CNT AS CODE
+             , WKP_CNT || '년'  AS CODE_NM
+		  FROM TBEN411
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		ORDER BY GUBUN, WKP_CNT ASC
+    ]]>
+    </select>
+    
+</mapper>

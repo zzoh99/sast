@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.certificate.certiApr">
+
+<!-- 제증명승인관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiAprList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+							 , A.APPL_SEQ
+						     , A.SABUN
+						     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,#{ssnLocaleCd}) AS NAME
+						     , F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN,A.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+							 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+						     
+						     , A.APPL_CD
+						     , A.REQ_SABUN
+						     , A.REG_NO
+						     , A.S_YMD
+						     , A.E_YMD
+						     , A.PERIOD_YY_CNT
+						     , A.PERIOD_MM_CNT
+						     , A.PURPOSE
+						     , A.PRT_CNT
+						     , A.BASE_YN
+						     , A.PRT_YN
+						     , A.ADDRESS
+						     , A.ETC
+						     
+							 , B.APPL_YMD
+							 , B.APPL_SABUN
+							 , B.APPL_IN_SABUN
+							 , B.APPL_STATUS_CD
+							 , '0' AS DETAIL
+							 
+						  FROM TBEN401 A, THRI103 B
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND A.APPL_YMD BETWEEN TRIM( REPLACE(#{searchApplYmdFrom}, '-','') ) AND TRIM( REPLACE(#{searchApplYmdTo}, '-','') )
+						   AND B.APPL_STATUS_CD != '11'
+						   AND A.ENTER_CD = B.ENTER_CD
+						   AND A.APPL_SEQ = B.APPL_SEQ
+			]]>
+<if test='searchApplCd != null and !searchApplCd.equals("")'>
+					       AND A.APPL_CD = TRIM( #{searchApplCd} )
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					       AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchName != null and !searchName.equals("")'>
+					       AND (A.SABUN LIKE '%'||TRIM( #{searchName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchName} )||'%')
+</if>
+					
+<if test='ssnAdminYn != null and !ssnAdminYn.equals("Y")'>
+						   AND EXISTS ( SELECT 1
+						                  FROM TBEN407 C    -- 증명서 담당자
+									     WHERE A.ENTER_CD = C.ENTER_CD
+									       AND A.APPL_CD  = C.APPL_CD
+									       AND C.CHARGE_SABUN = #{ssnSabun}
+									       AND A.APPL_YMD BETWEEN C.SDATE AND NVL (C.EDATE, '99991231')
+									  )      
+</if>
+<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+						  AND EXISTS ( SELECT 1
+						                 FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD'))) X
+						                WHERE X.SABUN =  A.SABUN )
+						             )
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC
+
+
+
+		</select>
+
+<!-- 제증명승인관리(THRM401) 저장 -->
+		<update parameterType="map" id="updateCertiApr">
+
+				<![CDATA[
+					UPDATE TBEN401 A
+					SET A.PRT_YN			= TRIM( #{prtYn} )
+					    , A.ETC             = #{etc}
+					    , A.PRT_CNT         = #{prtCnt}
+						, A.CHKDATE			= SYSDATE
+						, A.CHKID			= #{ssnSabun}
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					  AND A.APPL_SEQ = TRIM( #{applSeq} )
+				]]>
+
+		</update>
+
+<!-- 신청서마스터(THRI103) 저장 -->
+		<update parameterType="map" id="updateCertiAprMaster">
+
+				<![CDATA[
+					UPDATE THRI103 A
+					SET A.APPL_STATUS_CD	= TRIM( #{applStatusCd} )
+						, A.CHKDATE			= SYSDATE
+						, A.CHKID			= #{ssnSabun}
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					  AND A.APPL_SEQ = TRIM( #{applSeq} )
+				]]>
+
+		</update>
+
+<!-- 제증명승인관리(TBEN401) 삭제 -->
+		<delete parameterType="map" id="deleteCertiApr">
+
+				<![CDATA[
+					DELETE FROM TBEN401
+					 WHERE ENTER_CD||'_'||SABUN||'_'||APPL_YMD||'_'||APPL_SEQ||'_'||APPL_CD IN
+					 ( TRIM( #{ssnEnterCd} )||'_'||TRIM( #{sabun} )||'_'||TRIM( #{applYmd} )||'_'||TRIM( #{applSeq} )||'_'||TRIM( #{applCd} ) )
+				]]>
+		</delete>
+
+</mapper>

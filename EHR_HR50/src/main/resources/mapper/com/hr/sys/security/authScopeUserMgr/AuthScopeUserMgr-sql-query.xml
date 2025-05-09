@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="sys.security.authScopeUserMgr">
+<!-- 권한그룹 콤보 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrGrpList">
+
+                <![CDATA[
+                    SELECT GRP_CD AS CODE
+                         , NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys307', LANGUAGE_CD, #{ssnLocaleCd}), GRP_NM) AS CODE_NM
+                      FROM TSYS307
+                     WHERE ENTER_CD = #{ssnEnterCd}
+                     ORDER BY SEQ
+                ]]>
+
+
+        </select>
+
+<!-- 사용자 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrList">
+
+                <![CDATA[
+                        SELECT A.SABUN
+                             , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+                             , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) ORG_NM
+                             , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+                             , A.GRP_CD
+                             , A.DATA_RW_TYPE
+                             , A.SEARCH_TYPE
+                             , 0 AS BTN_SET
+                             , 1 AS BTN_VIEW
+                        FROM TSYS313 A
+                       WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                         AND A.GRP_CD   = TRIM(#{searchGrpCd}) ]]>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+                         AND (F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%'
+                              OR A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' )
+</if>
+                        ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+
+        </select>
+
+<!-- 권한범위 대상자 쿼리 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrPopupList1">
+
+                <![CDATA[
+                    SELECT '('|| F_COM_GET_SQL_AUTH(#{ssnEnterCd},'THRM151',#{searchType}, #{searchSabun}, #{searchGrpCd},'') ||')' AS query FROM dual
+                ]]>
+
+
+        </select>
+<!-- 권한범위 대상자 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrPopupList2">
+
+                        SELECT A.SABUN
+                             , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+                             , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) ORG_NM
+                             , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+                        FROM THRM100 A
+                <if test='searchType != null and searchType neq "A"'>
+                         JOIN ${query} AUTH
+                           ON A.ENTER_CD = AUTH.ENTER_CD
+                          AND A.SABUN    = AUTH.SABUN
+                </if>
+                       WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                       ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+        </select>
+
+<!--        범위 구분 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrScopeList">
+
+                <![CDATA[
+                    SELECT A.GRP_CD
+                         , A.AUTH_SCOPE_CD
+                         , B.AUTH_SCOPE_NM
+                         , B.SCOPE_TYPE
+                         , B.PRG_URL
+                         , B.SQL_SYNTAX
+                         , B.TABLE_NM
+                     FROM TSYS317 A, TSYS315 B
+                    WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+                      AND A.GRP_CD        = TRIM(#{searchGrpCd})
+                      AND A.ENTER_CD      = B.ENTER_CD
+                      AND A.AUTH_SCOPE_CD = B.AUTH_SCOPE_CD
+                    ORDER BY DECODE(A.AUTH_SCOPE_CD, 'W20',9,1), B.AUTH_SCOPE_NM
+                ]]>
+
+
+        </select>
+    
+<!--        권한범위(조직) 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrOrgList">
+
+                <![CDATA[
+                        SELECT LEVEL        AS "_level"
+                             , PRIOR_ORG_CD AS SCOPE_VALUE_TOP
+                             , ORG_CD       AS SCOPE_VALUE
+                             , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS SCOPE_VALUE_NM
+                             , DECODE( (SELECT COUNT(*) 
+                                          FROM TSYS319 
+                                         WHERE ENTER_CD      = A.ENTER_CD 
+                                           AND SCOPE_VALUE   = A.ORG_CD 
+                                           AND AUTH_SCOPE_CD = TRIM('W10') 
+                                           AND SABUN         = TRIM(#{searchSabun})
+                                           AND GRP_CD        = TRIM(#{searchGrpCd})
+                                        ), 0, 0, 1) AS CHK
+                         FROM TORG105 A
+                        WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                          AND A.SDATE = ( SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) )
+                        START WITH A.PRIOR_ORG_CD = '0'
+                      CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+                         AND PRIOR A.SDATE  = A.SDATE
+                         AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+                       ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+                ]]>
+
+
+        </select>
+        
+    
+<!--        권한범위(사람) 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrScopeEmpList">
+
+                <![CDATA[
+                    SELECT SCOPE_VALUE
+                         , F_COM_GET_NAMES(ENTER_CD, SCOPE_VALUE, #{ssnLocaleCd}) AS SCOPE_VALUE_NM
+                         , '1' AS CHK
+                     FROM TSYS319
+                    WHERE ENTER_CD      = TRIM( #{ssnEnterCd} )
+                      AND AUTH_SCOPE_CD = TRIM( #{searchAuthScopeCd} )
+                      AND SABUN         = TRIM(#{searchSabun})
+                      AND GRP_CD        = TRIM(#{searchGrpCd})
+                      
+                ]]>
+
+
+        </select>
+        
+<!--        권한범위(사람,조직 외) 쿼리 조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrScopeList1">
+
+                <![CDATA[
+                    SELECT F_COM_GET_SQL_AUTH_SCOPE(TRIM( #{ssnEnterCd} ), TRIM( #{searchAuthScopeCd} )) as query
+                      FROM DUAL
+                ]]>
+
+
+        </select>
+
+<!--        권한범위(사람,조직 외)  조회 -->
+        <select parameterType="map" resultType="cMap" id="getAuthScopeUserMgrScopeList2">
+
+                <![CDATA[
+                    SELECT B.SCOPE_VALUE, B.SCOPE_VALUE_NM
+                         , DECODE((SELECT ENTER_CD 
+                                     FROM TSYS319
+                                    WHERE ENTER_CD      = TRIM( #{ssnEnterCd} )
+                                      AND AUTH_SCOPE_CD = TRIM( #{searchAuthScopeCd} )
+                                      AND SABUN         = TRIM(#{searchSabun})
+                                      AND GRP_CD        = TRIM(#{searchGrpCd})
+                                      AND SCOPE_VALUE   = B.SCOPE_VALUE), '', '0', '1') AS CHK
+                      FROM ${query} B
+                    ORDER BY B.SEQ
+                ]]>
+
+
+        </select>
+        
+<!-- 사용자 저장 -->
+        <update parameterType="map" id="saveAuthScopeUserMgrUser">
+
+                    MERGE INTO TSYS313 T
+                    USING   (
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                            SELECT TRIM( #{ssnEnterCd} )        AS ENTER_CD
+                                 , TRIM( #{searchGrpCd} )       AS GRP_CD
+                                 , TRIM( #{rm.sabun} )        AS SABUN
+                                 , TRIM( #{rm.dataRwType} )   AS DATA_RW_TYPE
+                                 , TRIM( #{rm.searchType} )   AS SEARCH_TYPE
+                             FROM   DUAL
+</foreach>
+                            ) S
+                    ON (         T.ENTER_CD      = S.ENTER_CD
+                            AND  T.GRP_CD        = S.GRP_CD
+                            AND  T.SABUN         = S.SABUN
+                     )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.DATA_RW_TYPE = S.DATA_RW_TYPE
+                                    , T.SEARCH_TYPE  = S.SEARCH_TYPE
+                                    , T.CHKDATE      = SYSDATE
+                                    , T.CHKID        = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.GRP_CD
+                            , T.SABUN
+                            , T.DATA_RW_TYPE
+                            , T.SEARCH_TYPE
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.GRP_CD
+                            , S.SABUN
+                            , S.DATA_RW_TYPE
+                            , S.SEARCH_TYPE
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+<!-- 범위 항목 저장 -->
+        <update parameterType="map" id="saveAuthScopeUserMgr">
+
+                    MERGE INTO TSYS319 T
+                    USING   (
+                            SELECT A.ENTER_CD
+                                 , A.GRP_CD
+                                 , A.SABUN
+                                 , A.AUTH_SCOPE_CD
+                                 , A.SCOPE_VALUE
+                             FROM (
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                                SELECT TRIM( #{ssnEnterCd} )        AS ENTER_CD
+                                     , TRIM( #{searchGrpCd} )       AS GRP_CD
+                                     , TRIM( #{searchSabun} )       AS SABUN
+                                     , TRIM( #{searchAuthScopeCd} ) AS AUTH_SCOPE_CD
+                                     , TRIM( #{rm.scopeValue} )   AS SCOPE_VALUE
+                                     , TRIM( #{rm.chk} )          AS CHK
+                                  FROM DUAL
+</foreach>
+                                  ) A
+                             WHERE A.CHK = '1'
+
+                            ) S
+                    ON (         T.ENTER_CD      = S.ENTER_CD
+                            AND  T.GRP_CD        = S.GRP_CD
+                            AND  T.SABUN         = S.SABUN
+                            AND  T.AUTH_SCOPE_CD = S.AUTH_SCOPE_CD
+                            AND  T.SCOPE_VALUE   = S.SCOPE_VALUE
+                     )
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.GRP_CD
+                            , T.SABUN
+                            , T.AUTH_SCOPE_CD
+                            , T.SCOPE_VALUE
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.GRP_CD
+                            , S.SABUN
+                            , S.AUTH_SCOPE_CD
+                            , S.SCOPE_VALUE
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+        </update>
+<!--        범위 항목 삭제 -->
+        <delete parameterType="map" id="deleteAuthScopeUserMgr">
+
+                <![CDATA[
+                        DELETE FROM TSYS319
+                         WHERE ENTER_CD      = TRIM(#{ssnEnterCd})
+                           AND GRP_CD        = TRIM( #{searchGrpCd} )
+                           AND SABUN         = TRIM( #{searchSabun} )
+                           AND AUTH_SCOPE_CD = TRIM(#{searchAuthScopeCd})
+                ]]>
+
+
+        </delete>
+        
+<!--        범위 항목 전부 삭제 ( 사용자 삭제 시 ) -->
+        <delete parameterType="map" id="deleteAuthScopeUserMgrUser1">
+
+                        DELETE FROM TSYS319
+                         WHERE ENTER_CD      = TRIM(#{ssnEnterCd})
+                           AND GRP_CD        = TRIM( #{searchGrpCd} )
+                           AND SABUN  IN ( NULL 
+<foreach item="rm" collection="deleteRows" >
+                        <if test='rm.sabun != null and !rm.sabun.equals("")'>
+                                        , TRIM(#{rm.sabun})
+                        </if>
+</foreach>
+                                        )
+
+        </delete>
+
+
+<!--        사용자 삭제 -->
+        <delete parameterType="map" id="deleteAuthScopeUserMgrUser2">
+
+                        DELETE FROM TSYS313
+                         WHERE ENTER_CD      = TRIM(#{ssnEnterCd})
+                           AND GRP_CD        = TRIM( #{searchGrpCd} )
+                           AND SABUN  IN ( NULL 
+<foreach item="rm" collection="deleteRows" >
+                        <if test='rm.sabun != null and !rm.sabun.equals("")'>
+                                        , TRIM(#{rm.sabun})
+                        </if>
+</foreach>
+                                        )                   
+
+
+
+        </delete>
+
+</mapper>

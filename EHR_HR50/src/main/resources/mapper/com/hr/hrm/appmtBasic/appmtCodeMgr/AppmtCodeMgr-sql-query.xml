@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmtBasic.appmtCodeMgr">
+
+<!-- 발령형태코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtCodeMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD           -- 회사구분(TORG900)
+					     , A.ORD_TYPE_CD		-- 발령형태(TSYS011)
+					     , A.ORD_TYPE_NM		-- 발령형태명
+					     , A.ORD_TYPE			-- 발령구분(H40001)
+					     , A.MAIN_YN			-- 주요발령여부
+					     , A.SEQ				-- 순서
+					     , A.USE_YN				-- 사용여부
+--					     , A.PRT_YN				-- 출력유무
+--					     , A.STATUS_CD			-- 재직상태(H10010)
+					     , A.LANGUAGE_CD
+					     , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys011', LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM
+					  FROM TSYS011 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+              	<if test='ordTypeCd != null and !ordTypeCd.equals("")'>
+					   AND LOWER(A.ORD_TYPE_CD) LIKE '%'||LOWER(TRIM(#{ordTypeCd}))||'%'
+              	</if>
+              	<if test='ordTypeNm != null and !ordTypeNm.equals("")'>
+					   AND LOWER(A.ORD_TYPE_NM) LIKE '%'||LOWER(TRIM(#{ordTypeNm}))||'%'
+				</if>
+              	<if test='ordType != null and !ordType.equals("")'>
+					   AND A.ORD_TYPE = #{ordType}
+				</if>
+					 ORDER BY A.SEQ
+
+
+		</select>
+
+<!-- 발령담당자 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtUserMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.ORD_TYPE_CD
+					     , B.SABUN
+					     , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, 'ALIAS') AS ALIAS
+					     , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					     , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+					     , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+					     , B.SDATE
+					     , B.EDATE
+					  FROM TSYS011 A
+					     , THRM205 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.ORD_TYPE_CD = B.ORD_TYPE_CD
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.ORD_TYPE_CD = #{ordTypeCd}
+              	 	 ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+				]]>
+
+
+		</select>
+		
+<!-- 발령형태상세코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtCodeDetailMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD           -- 회사구분(TORG900)
+					     , A.ORD_TYPE_CD		-- 발령형태(TSYS011)
+					     , A.ORD_TYPE_NM		-- 발령형태명
+					     , B.ORD_DETAIL_CD		-- 발령종류(TSYS013)
+					     , B.ORD_DETAIL_NM		-- 발령종류(TSYS013)
+					     , A.ORD_TYPE          	-- 발령종류구분(H40010)
+					     , B.SEQ				-- 순서
+					     , B.USE_YN				-- 사용여부
+					     , B.LANGUAGE_CD
+					  FROM TSYS011 A
+					     , TSYS013 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.ORD_TYPE_CD = B.ORD_TYPE_CD
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+              	<if test='ordTypeCd != null and !ordTypeCd.equals("")'>
+					   AND LOWER(A.ORD_TYPE_CD) LIKE '%'||LOWER(TRIM(#{ordTypeCd}))||'%'
+				</if>
+					 ORDER BY B.SEQ
+
+
+
+		</select>
+		
+<!-- 발령형태코드 저장 -->
+		<update parameterType="map" id="saveAppmtCodeMgr1">
+
+				<![CDATA[
+					MERGE INTO TSYS011 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.ORD_TYPE_CD
+									, A.ORD_TYPE_NM
+									, A.ORD_TYPE
+									, A.MAIN_YN
+									, A.SEQ
+									, A.USE_YN
+									, A.LANGUAGE_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORD_TYPE_CD
+											, NULL		AS ORD_TYPE_NM
+											, NULL		AS ORD_TYPE
+											, NULL		AS MAIN_YN
+											, NULL		AS SEQ
+											, NULL		AS USE_YN
+											, NULL		AS LANGUAGE_CD
+									FROM	DUAL
+									]]>
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.ordTypeCd} )	AS ORD_TYPE_CD
+											, TRIM( #{rm.ordTypeNm})	AS ORD_TYPE_NM
+											, TRIM( #{rm.ordType})		AS ORD_TYPE
+											, TRIM( #{rm.mainYn})		AS MAIN_YN
+											, TRIM( #{rm.seq})			AS SEQ
+											, TRIM( #{rm.useYn})		AS USE_YN
+											, TRIM( #{rm.languageCd})	AS LANGUAGE_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.ORD_TYPE_CD = S.ORD_TYPE_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ORD_TYPE_NM	= S.ORD_TYPE_NM
+									, T.ORD_TYPE	= S.ORD_TYPE
+									, T.MAIN_YN		= S.MAIN_YN
+									, T.SEQ			= S.SEQ
+									, T.USE_YN		= S.USE_YN
+									, T.LANGUAGE_CD	= S.LANGUAGE_CD
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.ORD_TYPE_CD
+							, T.ORD_TYPE_NM
+							, T.ORD_TYPE
+							, T.MAIN_YN
+							, T.SEQ
+							, T.USE_YN
+							, T.LANGUAGE_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.ORD_TYPE_CD
+							, S.ORD_TYPE_NM
+							, S.ORD_TYPE
+							, S.MAIN_YN
+							, S.SEQ
+							, S.USE_YN
+							, S.LANGUAGE_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 발령종류코드 저장 -->
+		<update parameterType="map" id="saveAppmtCodeDetailMgr">
+
+					MERGE INTO TSYS013 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.ORD_TYPE_CD
+									, A.ORD_DETAIL_CD
+									, A.ORD_DETAIL_NM
+									, A.SEQ
+									, A.USE_YN
+									, A.LANGUAGE_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORD_TYPE_CD
+											, NULL		AS ORD_DETAIL_CD
+											, NULL		AS ORD_DETAIL_NM
+											, NULL		AS SEQ
+											, NULL		AS USE_YN
+											, NULL		AS LANGUAGE_CD
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.ordTypeCd} )	AS ORD_TYPE_CD
+											, TRIM( #{rm.ordDetailCd} )	AS ORD_DETAIL_CD
+											, TRIM( #{rm.ordDetailNm})	AS ORD_DETAIL_NM
+											, TRIM( #{rm.seq})			AS SEQ
+											, TRIM( #{rm.useYn})		AS USE_YN
+											, TRIM( #{rm.languageCd})	AS LANGUAGE_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.ORD_TYPE_CD = S.ORD_TYPE_CD AND T.ORD_DETAIL_CD = S.ORD_DETAIL_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ORD_DETAIL_NM	= S.ORD_DETAIL_NM
+									, T.SEQ				= S.SEQ
+									, T.USE_YN			= S.USE_YN
+									, T.LANGUAGE_CD		= S.LANGUAGE_CD
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.ORD_TYPE_CD
+							, T.ORD_DETAIL_CD
+							, T.ORD_DETAIL_NM
+							, T.SEQ
+							, T.USE_YN
+							, T.LANGUAGE_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.ORD_TYPE_CD
+							, S.ORD_DETAIL_CD
+							, S.ORD_DETAIL_NM
+							, S.SEQ
+							, S.USE_YN
+							, S.LANGUAGE_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 발령담당자 저장 -->
+		<update parameterType="map" id="saveAppmtUserMgr">
+
+					MERGE INTO THRM205 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.ORD_TYPE_CD
+									, A.SABUN
+									, A.SDATE
+									, A.EDATE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORD_TYPE_CD
+											, NULL		AS SABUN
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.ordTypeCd} )	AS ORD_TYPE_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+											, TRIM( #{rm.sdate})		AS SDATE
+											, TRIM( #{rm.edate})		AS EDATE
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.ORD_TYPE_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.ORD_TYPE_CD = S.ORD_TYPE_CD AND T.SABUN = S.SABUN AND T.SDATE = S.SDATE)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.ORD_TYPE_CD
+							, T.SABUN
+							, T.SDATE
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.ORD_TYPE_CD
+							, S.SABUN
+							, S.SDATE
+							, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 발령형태코드 삭제 -->
+		<delete parameterType="map" id="deleteAppmtCodeMgr1">
+
+					DELETE FROM TSYS011
+					 WHERE  ENTER_CD||'_'||ORD_TYPE_CD IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd  != null and !ssnEnterCd.equals("") and rm.ordTypeCd != null and !rm.ordTypeCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.ordTypeCd})
+										</if>
+</foreach>
+										)
+		</delete>
+<!-- 발령종류코드 삭제 -->
+		<delete parameterType="map" id="deleteAppmtCodeMgr2">
+
+					DELETE FROM TSYS013
+					 WHERE ENTER_CD||'_'||ORD_TYPE_CD IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd  != null and !ssnEnterCd.equals("") and rm.ordTypeCd != null and !rm.ordTypeCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.ordTypeCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 발령담당자 삭제 -->
+		<delete parameterType="map" id="deleteAppmtUserMgr">
+
+					DELETE FROM THRM205
+					 WHERE ENTER_CD||'_'||ORD_TYPE_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.ordTypeCd != null and !rm.ordTypeCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM( #{rm.ordTypeCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 발령담당자 삭제 -->
+		<delete parameterType="map" id="deleteAppmtUserMgr2">
+
+					DELETE FROM THRM205
+					 WHERE ENTER_CD||'_'||ORD_TYPE_CD ||'_'||SABUN||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.ordTypeCd != null and !rm.ordTypeCd.equals("")
+											 	and rm.sabun != null and !rm.sabun.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM( #{rm.ordTypeCd})||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.sdate})
+										</if>
+</foreach>
+
+										)
+		</delete>
+		
+<!-- 발령상세코드 삭제 -->
+		<delete parameterType="map" id="deleteAppmtCodeDetailMgr">
+
+					DELETE FROM TSYS013
+					 WHERE ENTER_CD||'_'||ORD_TYPE_CD||'_'||ORD_DETAIL_CD IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd  != null and !ssnEnterCd.equals("") and rm.ordTypeCd != null and !rm.ordTypeCd.equals("") and rm.ordDetailCd != null and !rm.ordDetailCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.ordTypeCd})||'_'||TRIM(#{rm.ordDetailCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

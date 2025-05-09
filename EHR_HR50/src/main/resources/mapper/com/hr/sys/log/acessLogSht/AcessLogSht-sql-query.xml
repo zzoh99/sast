@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.log.acessLogSht">
+		<!-- 	리스트	조회 -->
+		<select parameterType="map" resultType="cMap" id="getAcessLogShtList">
+
+				<![CDATA[
+					SELECT X.ENTER_CD
+						, F_COM_GET_NAMES(X.ENTER_CD, X.CHKID, #{ssnLocaleCd}) AS NAME
+						, F_COM_GET_NAMES(X.ENTER_CD, X.CHKID, 'ALIAS') AS ALIAS
+						, F_COM_GET_JIKWEE_NM (X.ENTER_CD, X.CHKID, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+             		    , F_COM_GET_JIKGUB_NM (X.ENTER_CD, X.CHKID, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_NM
+						, X.CHKID AS SABUN
+						, X.SEQ
+						, DECODE(X.JOB,'getList', '조회','getMap', '조회','update', '저장','excute', '저장','delete', '' )AS JOB
+						, X.REQUEST_URL
+						, X.CONTROLLER
+						, X.QUERY_ID
+						, X.PARAMETER
+						, X.QUERY_STRING
+						, X.MEMO
+						, TO_CHAR(X.CHKDATE, 'YYYY-MM-DD') AS YMD
+						, TO_CHAR(X.CHKDATE, 'PM HH:MI:SS') AS HMS
+						, X.IP
+						, NVL2(X.QUERY_STRING, '0', '1') AS DETAIL
+						, Y.PRG_NM
+					FROM TSYS994 X
+						,TSYS301 Y
+					WHERE REPLACE(X.REFERER_URL,'/','') = Y.PRG_CD(+) 
+					AND X.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND X.LOG_YMD BETWEEN  REPLACE(TRIM(NVL(#{searchFromYmd},'00000101')),'-','') AND REPLACE(TRIM(NVL(#{searchToYmd},'99990101')),'-','')
+]]>
+					AND X.JOB IN
+		<foreach collection="searchJob" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			<![CDATA[
+					AND X.QUERY_ID <> 'getDecryptUrl'
+					AND X.REQUEST_URL NOT LIKE '/View.do?%'
+					]]>
+					<if test='searchName != null and !searchName.equals("")'>
+					AND F_COM_GET_NAMES(X.ENTER_CD, X.CHKID, #{ssnLocaleCd}) LIKE '%'||TRIM(#{searchName})||'%'
+					</if>
+					<if test='searchQueryId != null and !searchQueryId.equals("")'>
+					AND UPPER(X.QUERY_ID) LIKE '%'||UPPER(TRIM(#{searchQueryId}))||'%'
+					</if>
+					<if test='searchUrl != null and !searchUrl.equals("")'>
+					AND UPPER(X.REQUEST_URL) LIKE '%'||UPPER(TRIM(#{searchUrl}))||'%'
+					</if>
+					<if test='searchPrgNm != null and !searchPrgNm.equals("")'>
+					AND UPPER(Y.PRG_NM) LIKE '%'||UPPER(TRIM(#{searchPrgNm}))||'%'
+					</if>
+					ORDER BY X.CHKDATE DESC
+
+
+
+		</select>
+		
+		<!-- 	쿼리내용	조회 -->
+		<select parameterType="map" resultType="cMap" id="getAcessLogShtMap">
+
+				<![CDATA[
+					SELECT X.PARAMETER
+						 , X.QUERY_STRING
+						 , Y.PRG_NM
+					FROM TSYS994 X
+						,TSYS301 Y
+					WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+					  AND X.SEQ = #{seq}
+					  AND REPLACE(X.REFERER_URL,'/','') = REPLACE(Y.PRG_CD(+),'/','')
+				]]>
+
+
+		</select>
+
+</mapper>

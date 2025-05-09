@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	기타소득감면기간 쿼리
+ -->
+<root>
+	<!-- 기타소득감면기간 조회 -->
+	<query id="selectYearEtcReduceYmdMgr">
+		<![CDATA[
+		    SELECT S.ENTER_CD
+		          ,S.WORK_YY
+		          ,S.ADJUST_TYPE
+		          ,S.SABUN
+		          ,S.NAME
+		          ,S.BUSINESS_PLACE_CD
+		          ,S.PAY_ACTION_CD
+		          ,S.REDUCE_S_YMD
+		          ,S.REDUCE_E_YMD
+		          ,DECODE(NVL(S.ADJ_ELEMENT_YN,'0'),'0','N','Y') AS ADJ_ELEMENT_YN
+		    FROM(
+		         SELECT A.ENTER_CD
+		               ,A.WORK_YY
+		               ,A.ADJUST_TYPE
+		               ,A.SABUN
+		               ,NVL(F_COM_GET_NAMES(A.ENTER_CD,A.SABUN),(SELECT S.NAME
+		                                                         FROM THRM100 S
+		                                                         WHERE S.ENTER_CD = #ssnEnterCd#
+		                                                           AND S.SABUN = A.SABUN )) AS NAME
+		               ,A.BUSINESS_PLACE_CD
+		               ,A.PAY_ACTION_CD
+		               ,A.REDUCE_S_YMD
+		               ,A.REDUCE_E_YMD
+	                  ,(SELECT COUNT(ADJ_ELEMENT_CD) AS ADJ_ELEMENT_YN
+	                    FROM TCPN815
+	                    WHERE ENTER_CD    = A.ENTER_CD
+	                      AND WORK_YY     = A.WORK_YY
+	                      AND ADJUST_TYPE = A.ADJUST_TYPE
+	                      AND SABUN       = A.SABUN ) AS ADJ_ELEMENT_YN
+		         FROM TCPN811 A
+	             WHERE A.ENTER_CD      = #ssnEnterCd#
+	               AND A.WORK_YY       = #srchYear#
+	               AND DECODE(#searchBizPlaceCd#,'','A',BUSINESS_PLACE_CD) = DECODE(#searchBizPlaceCd#,'','A',#searchBizPlaceCd#)
+	               AND A.ADJUST_TYPE LIKE '%'|| #srchAdjustType# ||'%'
+	               AND A.ADJUST_TYPE IN (SELECT CODE
+	                                     FROM TSYS005
+	                                     WHERE ENTER_CD = #ssnEnterCd#
+	                                       AND GRCODE_CD = 'C00303'
+	                                       AND USE_YN = 'Y')
+		     ) S
+		     WHERE 1=1
+			   AND ( S.SABUN LIKE '%' || TRIM(#srchSbNm#) || '%' OR S.NAME LIKE '%' || TRIM(#srchSbNm#) || '%' )
+		]]>
+	</query>
+    <!-- 기타소득감면기간 입력 -->
+    <query id="updateYearEtcReduceYmdMgr">
+	    <![CDATA[
+           UPDATE TCPN811
+           SET REDUCE_S_YMD  = #reduce_s_ymd#
+              ,REDUCE_E_YMD  = #reduce_e_ymd#
+           WHERE ENTER_CD    = #ssnEnterCd#
+             AND WORK_YY     = #work_yy#
+             AND SABUN       = #sabun#
+             AND ADJUST_TYPE = #adjust_type#
+	    ]]>
+    </query>
+</root>

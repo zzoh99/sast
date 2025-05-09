@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.jikchakGrpSta">
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getJikchakGrpStaList2">
+			
+				<![CDATA[
+				SELECT CODE,CODE_NM
+						, SUM(CNT) AS CNT, SUM(PER_CNT) AS PER_CNT
+				  FROM (
+				SELECT CODE_NM, CNT, ROUND((CNT/SUM(CNT) OVER())*100,1) AS PER_CNT, SEQ, CODE
+				  FROM (
+				  			   --부사장~상무보 까지는 1로 넘겨서 상단에서 임원으로 판단 by JSG
+				        SELECT /*+ LEADING(A) */
+				        	   D.CODE, D.CODE_NM, D.SEQ, COUNT(A.SABUN) AS CNT
+				          FROM THRM151 A
+				              ,(SELECT MAX(A.SDATE) AS SDATE, A.ENTER_CD, A.SABUN
+                                  FROM THRM151 A
+                                 WHERE A.ENTER_CD = #{groupEnterCd}
+				                  AND (A.ENTER_CD, A.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+				                                                          FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900 WHERE ENTER_CD = #{groupEnterCd}) A
+				                                                       CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+	                           <if test="jikweeCd != null and jikweeCd neq ''">
+	                               AND A.JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if>
+	                           <if test="jikgubCd != null and jikgubCd neq ''">
+	                               AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if>
+	                           <if test="jikchakCd != null and jikchakCd neq ''">
+	                               AND A.JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if>
+	                           <if test="workType != null and workType neq ''">
+	                                 AND A.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if>
+	                           <if test="manageCd != null and manageCd neq ''">
+	                                 AND A.MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+	                           </if> <![CDATA[
+	                           AND REPLACE(#{searchYmd}, '-', '') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                                GROUP BY A.ENTER_CD, A.SABUN ) B
+				              ,THRM100 C
+				              ,(SELECT *
+				                  FROM TSYS005
+				                 WHERE ENTER_CD = #{groupEnterCd}
+				                   AND GRCODE_CD = 'H20020'
+				                   AND USE_YN = 'Y'
+				               ) D
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.SABUN    = B.SABUN
+				           AND A.SDATE    = B.SDATE
+				           AND A.ENTER_CD = C.ENTER_CD
+				           AND A.SABUN    = C.SABUN
+				           AND A.SABUN    <> '990099'
+				           AND (C.RET_YMD IS NULL OR C.RET_YMD >= REPLACE(#{searchYmd}, '-', ''))
+				           AND A.JIKCHAK_CD = D.CODE ]]>
+			           <if test="searchOrgCd != null and searchOrgCd neq ''">
+			           	   AND A.ORG_CD IN (
+				           	   				SELECT #{searchOrgCd}
+											  FROM DUAL
+					   <if test="searchType != null and searchType neq ''">
+											 UNION
+											SELECT ORG_CD
+											  FROM (
+											      	SELECT *
+													  FROM TORG105
+													 WHERE ENTER_CD = TRIM(#{groupEnterCd})
+													   AND SDATE = (
+																	 SELECT MAX(SDATE)
+																	   FROM TORG103
+																	  WHERE ENTER_CD = TRIM(#{groupEnterCd})
+																		AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+																   )
+						   						   )
+											 START WITH PRIOR_ORG_CD = #{searchOrgCd}
+											 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+												 AND PRIOR SDATE = SDATE
+												 AND PRIOR ORG_CD = PRIOR_ORG_CD
+			           </if>									   
+										   )
+			           </if>
+				         GROUP BY D.CODE, D.CODE_NM, D.SEQ
+				       )
+				ORDER BY SEQ, CODE
+				)
+				GROUP BY CODE,CODE_NM,SEQ
+				ORDER BY TO_NUMBER(NVL(SEQ, 0))
+			
+		</select>
+</mapper>

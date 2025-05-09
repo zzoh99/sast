@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanMgr">
+
+<!-- 연차휴가계획기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanMgrList">
+
+				<![CDATA[
+					SELECT 
+						 ENTER_CD
+						, SEQ
+						, VAC_RECEIVE_SYMD
+						, VAC_RECEIVE_EYMD
+						, VAC_PLAN_NM
+						, VAC_STD_SYMD
+						, VAC_STD_EYMD
+						, CLOSE_YN
+						, BIGO
+						, SEARCH_SEQ
+					    , ( SELECT X.SEARCH_DESC
+					          FROM THRI201 X
+					         WHERE X.ENTER_CD   = TTIM541.ENTER_CD
+					           AND X.SEARCH_SEQ = TTIM541.SEARCH_SEQ
+					       ) AS SEARCH_DESC
+					FROM 
+						TTIM541
+					WHERE 1=1			
+					  AND ENTER_CD = #{ssnEnterCd}
+					          ]]>
+					<if test='year != null and !year.equals("")'>
+				   	AND VAC_RECEIVE_SYMD BETWEEN TRIM( #{year} )||'0101' AND TRIM( #{year} )||'1231'
+					</if>
+	   				ORDER BY VAC_RECEIVE_SYMD DESC
+
+		</select>
+
+<!-- SEQ구하기-->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanSeq">
+
+				<![CDATA[
+					SELECT NVL(MAX(SEQ),0)+1 AS SEQ FROM TTIM541 WHERE ENTER_CD = #{ssnEnterCd}
+				]]>
+
+		</select>
+
+<!-- 연차휴가계획기준관리 저장 -->
+		<update parameterType="map" id="saveAnnualPlanMgr">
+
+					MERGE INTO TTIM541 T  
+					USING	(
+							SELECT A.ENTER_CD         
+								 , A.SEQ
+								 , A.VAC_RECEIVE_SYMD
+								 , A.VAC_RECEIVE_EYMD 
+							     , A.VAC_PLAN_NM 
+							     , A.VAC_STD_SYMD
+							     , A.VAC_STD_EYMD
+							     , A.CLOSE_YN         
+							     , A.BIGO                
+							     , A.SEARCH_SEQ                
+							     , A.CHKDATE          
+							     , A.CHKID            
+							FROM	(
+									SELECT NULL AS ENTER_CD         
+										 , NULL AS SEQ
+										 , NULL AS VAC_RECEIVE_SYMD 
+										 , NULL AS VAC_RECEIVE_EYMD
+										 , NULL AS VAC_PLAN_NM
+										 , NULL AS VAC_STD_SYMD
+										 , NULL AS VAC_STD_EYMD  
+										 , NULL AS CLOSE_YN         
+										 , NULL AS BIGO             
+										 , NULL AS SEARCH_SEQ             
+										 , NULL AS CHKDATE          
+									     , NULL AS CHKID            
+									FROM DUAL		
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										<choose><when test=' rm.seq != null and !rm.seq.equals("")'>
+											, TO_NUMBER(TRIM(#{rm.seq})) AS SEQ
+										</when><otherwise>
+											, (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM TTIM541) AS SEQ
+										<bind name="icnt" value="icnt + 1" />
+										</otherwise>
+										</choose>
+										 , TRIM( #{rm.vacReceiveSymd})	AS  VAC_RECEIVE_SYMD
+										 , TRIM( #{rm.vacReceiveEymd})	AS  VAC_RECEIVE_EYMD
+										 , TRIM( #{rm.vacPlanNm})		AS  VAC_PLAN_NM
+										 , TRIM( #{rm.vacStdSymd})		AS  VAC_STD_SYMD
+										 , TRIM( #{rm.vacStdEymd})		AS  VAC_STD_EYMD
+										 , TRIM( #{rm.closeYn})		AS  CLOSE_YN
+										 , TRIM( #{rm.bigo})			AS  BIGO
+										 , TRIM(#{rm.searchSeq}) 		AS  SEARCH_SEQ
+										 , SYSDATE						AS  CHKDATE
+										 , TRIM( #{ssnSabun} )			AS  CHKID
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( 
+							T.ENTER_CD	= S.ENTER_CD
+						AND T.SEQ = S.SEQ 
+						)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.VAC_PLAN_NM       = S.VAC_PLAN_NM  
+									, T.VAC_RECEIVE_SYMD  = S.VAC_RECEIVE_SYMD
+									, T.VAC_RECEIVE_EYMD  = S.VAC_RECEIVE_EYMD
+									, T.VAC_STD_SYMD  	  = S.VAC_STD_SYMD
+									, T.VAC_STD_EYMD      = S.VAC_STD_EYMD
+                                    , T.CLOSE_YN          = S.CLOSE_YN          
+                                    , T.BIGO              = S.BIGO         
+                                    , T.SEARCH_SEQ 		  = S.SEARCH_SEQ      
+                                    , T.CHKDATE           = S.CHKDATE           
+                                    , T.CHKID             = S.CHKID             
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SEQ
+							, T.VAC_RECEIVE_SYMD
+							, T.VAC_RECEIVE_EYMD
+							, T.VAC_PLAN_NM
+							, T.VAC_STD_SYMD
+							, T.VAC_STD_EYMD
+							, T.CLOSE_YN
+							, T.BIGO
+							, T.SEARCH_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SEQ
+							, S.VAC_RECEIVE_SYMD
+							, S.VAC_RECEIVE_EYMD
+							, S.VAC_PLAN_NM
+							, S.VAC_STD_SYMD
+							, S.VAC_STD_EYMD
+							, S.CLOSE_YN
+							, S.BIGO
+							, S.SEARCH_SEQ
+							, S.CHKDATE
+							, S.CHKID 
+						)
+		</update>
+		
+<!-- 연차휴가계획기준관리 삭제 -->
+		<delete parameterType="map" id="deleteAnnualPlanMgr">
+
+					DELETE FROM TTIM541
+					 WHERE ENTER_CD||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+										  and rm.seq != null and !rm.seq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

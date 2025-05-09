@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.timeOff.timeOffStdMgr">
+		<select parameterType="map" resultType="cMap" id="getTimeOffStdMgrList">
+
+				<![CDATA[
+					SELECT	  A.APPL_CD 		
+					      	, A.SDATE 
+					      	, A.EDATE 
+					      	, A.LIMIT_TERM 	
+					      	, A.LIMIT_UNIT 	
+					      	, A.ORD_TYPE_CD 	
+					      	, A.ORD_DETAIL_CD 
+					      	, A.APPL_CD AS APPL_CD2
+					FROM THRM510 A, THRI101 B
+					WHERE 1=1
+					AND A.ENTER_CD = B.ENTER_cD
+					AND A.APPL_CD = B.APPL_CD
+					AND		A.ENTER_CD	= #{ssnEnterCd}
+					         ]]>
+			<if test='applCdi != null and !applCdi.equals("")'>
+					AND 	A.APPL_CD	= TRIM( #{applCdi} )
+			</if>
+					ORDER BY B.SEQ, A.APPL_CD, A.SDATE
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getTimeOffStdMgrApplCodeList">
+
+				<![CDATA[                                                                                                                                        
+					SELECT APPL_CD CODE, APPL_NM CODE_NM 
+					FROM THRI101
+					WHERE 1=1
+					AND ENTER_CD = #{ssnEnterCd}
+					AND BIZ_CD = 'HRM10'
+					AND USE_YN = 'Y'
+					ORDER BY SEQ
+				]]>                                                                                                                                              
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getTimeOffStdMgrTypeCodeList">
+
+				<![CDATA[                                                                                                                                        
+					SELECT ORD_TYPE_CD CODE, ORD_TYPE_NM CODE_NM
+					FROM TSYS011
+					WHERE ENTER_CD = #{ssnEnterCd}
+				]]>
+					AND ORD_TYPE IN
+					<foreach collection="ordType" item="item" index="index" open="(" close=")" separator=",">
+						#{item}
+					</foreach>
+
+
+		</select>
+		<update parameterType="map" id="saveTimeOffStdMgr">
+
+   					MERGE INTO THRM510 T
+                  	USING (
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                           	SELECT
+                           		<choose>
+                           		<when test='!rm.applCd.equals("")'>
+                           		      TRIM(#{rm.applCd})						AS APPL_CD
+								</when>
+                           		<when test='rm.applCd.equals("")'>
+                           		      TRIM(#{rm.applCd2})						AS APPL_CD
+								</when>
+								</choose>
+                           			, REPLACE(TRIM(#{rm.sdate}),'-','')			AS SDATE
+                           			, REPLACE(TRIM(#{rm.edate}),'-','')			AS EDATE
+                           			, TO_NUMBER( TRIM(#{rm.limitTerm}) )		AS LIMIT_TERM
+                           			, TRIM(#{rm.limitUnit})						AS LIMIT_UNIT
+                           			, TRIM(#{rm.ordTypeCd})						AS ORD_TYPE_CD
+                           			, TRIM(#{rm.ordDetailCd})					AS ORD_DETAIL_CD
+                           	FROM   DUAL
+</foreach>
+                           ) S
+                        ON (
+                               	   T.ENTER_CD	= #{ssnEnterCd}
+                               AND T.APPL_CD 	= S.APPL_CD
+                               AND T.SDATE		= S.SDATE
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.EDATE        	= S.EDATE         
+         							, T.LIMIT_TERM    	= S.LIMIT_TERM    
+									, T.LIMIT_UNIT    	= S.LIMIT_UNIT       
+									, T.ORD_TYPE_CD   	= S.ORD_TYPE_CD        
+									, T.ORD_DETAIL_CD 	= S.ORD_DETAIL_CD 
+									, T.CHKDATE       	= SYSDATE
+									, T.CHKID         	= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD     
+               				, T.APPL_CD      
+							, T.SDATE        
+							, T.EDATE        
+							, T.LIMIT_TERM   
+							, T.LIMIT_UNIT   
+							, T.ORD_TYPE_CD  
+							, T.ORD_DETAIL_CD
+							, T.CHKDATE      
+							, T.CHKID        
+               			) 
+               			VALUES 
+               			(
+               				  #{ssnEnterCd}
+							, S.APPL_CD      
+							, S.SDATE        
+							, S.EDATE        
+							, S.LIMIT_TERM   
+							, S.LIMIT_UNIT   
+							, S.ORD_TYPE_CD  
+							, S.ORD_DETAIL_CD
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<delete parameterType="map" id="deleteTimeOffStdMgr">
+
+   					DELETE FROM THRM510                                                                                                                        
+					WHERE ( ENTER_CD,APPL_CD,SDATE  ) IN  (  (NULL,NULL,NULL)                                                                                               
+<foreach item="rm" collection="deleteRows" >
+,                         (  #{ssnEnterCd} ,
+	<choose>
+	<when test='!rm.applCd.equals("")'>
+	      #{rm.applCd}
+	</when>
+	<when test='rm.applCd.equals("")'>
+	      #{rm.applCd2}
+	</when>
+	</choose>
+, #{rm.sdate}  )
+</foreach>
+							)
+		</delete>
+	
+	
+	<!-- 휴직기준 타입 및 기준일 가져오기 -->
+		<select parameterType="map" resultType="cMap" id="getTimeOffTypeTermMap">
+
+				<![CDATA[
+				SELECT CASE WHEN LIMIT_UNIT = '10070'  THEN 'D'
+							WHEN LIMIT_UNIT = '10090'  THEN 'M'
+							WHEN LIMIT_UNIT = '10110'  THEN 'Y'
+							ELSE ''
+						END AS LIMIT_UNIT
+						,LIMIT_TERM
+				FROM     THRM510 
+				WHERE 	 ENTER_CD = #{ssnEnterCd}
+				AND      APPL_CD  = #{searchApplCd}
+				AND 	 #{searchApplYmd} BETWEEN SDATE AND NVL(EDATE,'99991231')
+				]]>
+
+
+		</select>
+		
+	<!-- 휴직기준 기간 사용가능 여부 체크 -->
+		<select parameterType="map" resultType="cMap" id="getTimeOffLimitTermCkMap">
+
+				SELECT 
+						<if test='limitUnit != null and limitUnit.equals("M")'>
+							CASE    WHEN MONTHS_BETWEEN(TO_DATE(REPLACE(#{edate},'-',''),'YYYYMMDD')+1,TO_DATE(REPLACE(#{sdate},'-',''),'YYYYMMDD'))  >  :limitTerm   THEN 'N'
+							ELSE 'Y'
+							END     AS LIMIT_TERM_CK
+						</if>
+						<if test='limitUnit != null and limitUnit.equals("Y")'>
+							CASE    WHEN MONTHS_BETWEEN(TO_DATE(REPLACE(#{edate},'-',''),'YYYYMMDD')+1,TO_DATE(REPLACE(#{sdate},'-',''),'YYYYMMDD'))  >  :limitTerm * 12 THEN 'N'
+							ELSE 'Y'
+							END     AS LIMIT_TERM_CK
+						</if>
+				FROM DUAL
+
+
+
+		</select>
+
+</mapper>
+                                                                                                                                                         

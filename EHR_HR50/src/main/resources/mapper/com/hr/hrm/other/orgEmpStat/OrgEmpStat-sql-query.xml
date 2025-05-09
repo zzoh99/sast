@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.orgEmpStat">
+<!-- 조회 : 개별 DB 함수와 개별 QUERY 방식에서 단일 QUERY 와 단인함수 F_HRM_GET_ELEMENT_EMP_CNT 사용으로 변경. CBS. 2017.09.28 -->
+		<select parameterType="map" resultType="cMap" id="getOrgEmpStatList">
+
+				<![CDATA[
+					
+							SELECT  A.JIKWEE_NM, A.JIKWEE_CD,  
+						    	 	A.CONST, A.CONST_COMMON, A.PLANT, A.PLANT_COMMON, A.MATERIAL, A.MATERIAL_COMMON,
+									A.TOTAL, A.TOTLA_COMMON, A.SEQ
+								FROM (
+								SELECT F_COM_GET_GRCODE_NAME(#{ssnEnterCd},'H20030', Z.JIKWEE_CD,'') AS JIKWEE_NM, Z.JIKWEE_CD,
+								       SUM(Z.CONST) AS CONST, SUM(Z.CONST_COMMON) AS CONST_COMMON, SUM(Z.PLANT) AS PLANT, SUM(Z.PLANT_COMMON) AS PLANT_COMMON, 
+								       SUM(Z.MATERIAL) AS MATERIAL, SUM(Z.MATERIAL_COMMON) AS MATERIAL_COMMON, SUM(Z.TOTAL) AS TOTAL, SUM(Z.TOTLA_COMMON) AS TOTLA_COMMON, Y.SEQ, 2 AS RN
+								 FROM 
+								        (
+								          SELECT X.ENTER_CD, X.JIKWEE_CD, 
+								                 CASE WHEN X.MAP_CD = 'B02' THEN COUNT(*) END AS CONST,
+								                 CASE WHEN X.MAP_CD = 'B02' AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS CONST_COMMON,
+								                 CASE WHEN X.MAP_CD = 'B03' THEN COUNT(*) END AS PLANT,
+								                 CASE WHEN X.MAP_CD = 'B03' AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS PLANT_COMMON,
+								                 CASE WHEN X.MAP_CD = 'B04' THEN COUNT(*) END AS MATERIAL,
+								                 CASE WHEN X.MAP_CD = 'B04' AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS MATERIAL_COMMON,
+								                 CASE WHEN X.MAP_CD IN ('B02','B03','B04') THEN COUNT(*) END AS TOTAL,
+								                 CASE WHEN X.MAP_CD IN ('B02','B03','B04') AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS TOTLA_COMMON
+								            FROM 
+								                 (SELECT T1.ENTER_CD,T1.SABUN, T1.NAME, T2.ORG_CD, T2.JIKWEE_CD, F_COM_GET_MAP_CD(T2.ENTER_CD, '900', T2.SABUN,  REPLACE ( '2018-11-21' , '-', ''), '') AS MAP_CD,
+								                         F_COM_GET_MAP_NM(T2.ENTER_CD, '900', T2.SABUN,  REPLACE( #{schDate} , '-', ''), '') AS MAP_NM,
+								                       	 F_COM_GET_ORG_MAP_CD(T2.ENTER_CD, '900', T2.ORG_CD, REPLACE( #{schDate} , '-', ''), '') AS ORG_MAP_CD,
+								                          (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE) AS INOUT_TYPE,
+								                          F_COM_GET_GRCODE_NAME(T1.ENTER_CD, 'W20050', (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE)) AS INOUT_TYPE_NM
+								                    FROM THRM100 T1, THRM151 T2
+								                   WHERE T1.ENTER_CD = #{ssnEnterCd}
+								                     AND T2.ENTER_CD = T1.ENTER_CD
+								                     AND T2.SABUN = T1.SABUN
+								                     AND T2.STATUS_CD NOT IN ('RA','ZA')
+								                     AND REPLACE( #{schDate} , '-', '') BETWEEN T2.SDATE AND T2.EDATE
+								                     AND T2.MANAGE_CD NOT IN ('E0008')) X
+								           WHERE X.ORG_MAP_CD IS NOT NULL
+								           GROUP BY X.ENTER_CD, X.JIKWEE_CD, X.MAP_CD, X.ORG_MAP_CD
+								           ) Z, TSYS005 Y
+								 WHERE Z.ENTER_CD = Y.ENTER_CD
+								   AND Z.JIKWEE_CD = Y.CODE
+								   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.S_YMD AND Y.E_YMD
+								  GROUP BY Z.JIKWEE_CD,  Y.SEQ
+								 
+								 UNION ALL
+								 		
+								 SELECT F_COM_GET_GRCODE_NAME(#{ssnEnterCd},'H10030', Z.MANAGE_CD,'') AS JIKWEE_NM, Z.MANAGE_CD,
+								       SUM(Z.CONST) AS CONST, SUM(Z.CONST_COMMON) AS CONST_COMMON, SUM(Z.PLANT) AS PLANT, SUM(Z.PLANT_COMMON) AS PLANT_COMMON, 
+								       SUM(Z.MATERIAL) AS MATERIAL, SUM(Z.MATERIAL_COMMON) AS MATERIAL_COMMON, SUM(Z.TOTAL) AS TOTAL, SUM(Z.TOTLA_COMMON) AS TOTLA_COMMON, Y.SEQ, 1 AS RN
+								 FROM 
+								        (
+								          SELECT X.ENTER_CD, X.MANAGE_CD, 
+								                 CASE WHEN X.MAP_CD = 'B02' THEN COUNT(*) END AS CONST,
+								                 CASE WHEN X.MAP_CD = 'B02' AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS CONST_COMMON,
+								                 CASE WHEN X.MAP_CD = 'B03' THEN COUNT(*) END AS PLANT,
+								                 CASE WHEN X.MAP_CD = 'B03' AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS PLANT_COMMON,
+								                 CASE WHEN X.MAP_CD = 'B04' THEN COUNT(*) END AS MATERIAL,
+								                 CASE WHEN X.MAP_CD = 'B04' AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS MATERIAL_COMMON,
+								                 CASE WHEN X.MAP_CD IN ('B02','B03','B04') THEN COUNT(*) END AS TOTAL,
+								                 CASE WHEN X.MAP_CD IN ('B02','B03','B04') AND X.ORG_MAP_CD = 'B01' THEN COUNT(*) END AS TOTLA_COMMON
+								            FROM 
+								                 (SELECT T1.ENTER_CD,T1.SABUN, T1.NAME, T2.ORG_CD, T2.MANAGE_CD, F_COM_GET_MAP_CD(T2.ENTER_CD, '900', T2.SABUN,  REPLACE ( '2018-11-21' , '-', ''), '') AS MAP_CD,
+								                         F_COM_GET_MAP_NM(T2.ENTER_CD, '900', T2.SABUN,  REPLACE( #{schDate} , '-', ''), '') AS MAP_NM,
+								                       	 F_COM_GET_ORG_MAP_CD(T2.ENTER_CD, '900', T2.ORG_CD, REPLACE( #{schDate} , '-', ''), '') AS ORG_MAP_CD,
+								                          (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE) AS INOUT_TYPE,
+								                          F_COM_GET_GRCODE_NAME(T1.ENTER_CD, 'W20050', (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE)) AS INOUT_TYPE_NM
+								                    FROM THRM100 T1, THRM151 T2
+								                   WHERE T1.ENTER_CD = #{ssnEnterCd}
+								                     AND T2.ENTER_CD = T1.ENTER_CD
+								                     AND T2.SABUN = T1.SABUN
+								                     AND T2.STATUS_CD NOT IN ('RA','ZA')
+								                     AND REPLACE ( #{schDate} , '-', '') BETWEEN T2.SDATE AND T2.EDATE
+								                     AND T2.MANAGE_CD = 'E0008') X
+								           WHERE X.ORG_MAP_CD IS NOT NULL
+								           GROUP BY X.ENTER_CD, X.MANAGE_CD, X.MAP_CD, X.ORG_MAP_CD
+								           ) Z, TSYS005 Y
+								 WHERE Z.ENTER_CD = Y.ENTER_CD
+								   AND Z.MANAGE_CD = Y.CODE AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.S_YMD AND Y.E_YMD
+								  GROUP BY Z.MANAGE_CD,  Y.SEQ
+								) A
+								ORDER BY A.RN, A.SEQ	
+				]]>
+
+
+		</select>
+
+</mapper>

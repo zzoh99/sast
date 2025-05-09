@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.perExpense.PerExpenseStd">
+    <select parameterType="map" resultType="cMap" id="getPerExpenseStdITFIDMap">
+          <![CDATA[
+             SELECT LISTAGG( INTERFACE_ID, ',') WITHIN GROUP ( ORDER BY INTERFACE_ID) AS INTERFACE_ID
+             FROM (
+                      SELECT DISTINCT INTERFACE_ID
+                      FROM EHPAY_GL_INTERFACE B
+                      WHERE ENTER_CD = #{ssnEnterCd}
+                        AND PAY_ACTION_CD = #{month}
+                        AND USER_JE_CATEGORY_NAME IN ('Payroll_CLS','Payroll_ALR'))
+          ]]>
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getPerExpenseStdLeftList">
+        <![CDATA[
+            SELECT	A.YM				/*	결산년월				*/
+                 ,	A.STD_DATE			/*	임금인상기준일자			*/
+                 ,	A.EXP_INC_RATE * 100 AS EXP_INC_RATE		/*	예상임금인상율(%)		*/
+                 ,	A.REAL_INC_RATE1 * 100 AS REAL_INC_RATE1	/*	실임금인상율(%)_사무직	*/
+                 ,	A.REAL_INC_RATE2 * 100 AS REAL_INC_RATE2	/*	실임금인상율(%)_기사직	*/
+                 ,	CASE WHEN CLOSING_STATUS IN ('S','G','T','Y') THEN 'Y' ELSE 'N' END DATA_CRE_YN
+                 ,	CASE WHEN CLOSING_STATUS IN ('G','T','Y')     THEN 'Y' ELSE 'N' END STATE_CRE_YN
+                 ,	CASE WHEN CLOSING_STATUS IN ('T','Y')         THEN 'Y' ELSE 'N' END STATE_SEND_YN
+              FROM	TCPN681	A
+             WHERE	A.ENTER_CD = #{ssnEnterCd}
+               AND	A.YM LIKE REPLACE(#{searchYyyy}, '-', '') || '%'
+        ]]>
+    </select>
+
+    <update parameterType="map" id="savePerExpenseStdLeft">
+        <![CDATA[
+          MERGE INTO TCPN681	T
+          USING
+          (
+          SELECT	ENTER_CD
+          ,	YM
+          ,	STD_DATE
+          ,	EXP_INC_RATE
+          ,	REAL_INC_RATE1
+          ,	REAL_INC_RATE2
+          ,	CHKDATE
+          ,	CHKID
+          FROM	(
+          SELECT	NULL		AS	ENTER_CD
+          ,	NULL		AS	YM
+          ,	NULL		AS	STD_DATE
+          ,	NULL		AS	EXP_INC_RATE
+          ,	NULL		AS	REAL_INC_RATE1
+          ,	NULL		AS	REAL_INC_RATE2
+          ,	NULL		AS	CHKDATE
+          ,	NULL		AS	CHKID
+          FROM	DUAL
+        ]]>
+        <foreach item="rm" collection="mergeRows">
+            <![CDATA[
+          UNION ALL
+          SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+          ,	TRIM(#{rm.ym})				AS	YM
+          ,	TRIM(#{rm.stdDate})			AS	STD_DATE
+          ,	TO_NUMBER(TRIM(#{rm.expIncRate}))/100		AS	EXP_INC_RATE
+          ,	TO_NUMBER(TRIM(#{rm.realIncRate1}))/100	AS	REAL_INC_RATE1
+          ,	TO_NUMBER(TRIM(#{rm.realIncRate2}))/100	AS	REAL_INC_RATE2
+          ,	SYSDATE						AS	CHKDATE
+          ,	#{ssnSabun}					AS	CHKID
+          FROM	DUAL
+            ]]>
+        </foreach>
+        <![CDATA[
+          )	WHERE	ENTER_CD IS NOT NULL
+          AND	YM IS NOT NULL
+          ) S
+          ON	(
+          T.ENTER_CD		=		S.ENTER_CD
+          AND	T.YM			=		S.YM
+          )
+          WHEN MATCHED THEN
+          UPDATE SET
+          T.STD_DATE			=	S.STD_DATE
+          ,	T.EXP_INC_RATE		=	S.EXP_INC_RATE
+          ,	T.REAL_INC_RATE1	=	S.REAL_INC_RATE1
+          ,	T.REAL_INC_RATE2	=	S.REAL_INC_RATE2
+          ,	T.CHKDATE			=	S.CHKDATE
+          ,	T.CHKID				=	S.CHKID
+          WHEN NOT MATCHED THEN
+          INSERT
+          (
+          T.ENTER_CD
+          ,	T.YM
+          ,	T.STD_DATE
+          ,	T.EXP_INC_RATE
+          ,	T.REAL_INC_RATE1
+          ,	T.REAL_INC_RATE2
+          ,	T.CHKDATE
+          ,	T.CHKID
+          )
+          VALUES
+          (
+          S.ENTER_CD
+          ,	S.YM
+          ,	S.STD_DATE
+          ,	S.EXP_INC_RATE
+          ,	S.REAL_INC_RATE1
+          ,	S.REAL_INC_RATE2
+          ,	S.CHKDATE
+          ,	S.CHKID
+          )
+        ]]>
+     </update>
+
+    <delete parameterType="map" id="deletePerExpenseStdLeft">
+        <![CDATA[
+            DELETE FROM TCPN681
+             WHERE (ENTER_CD, YM) IN
+                   (
+                       SELECT NULL AS ENTER_CD
+                            , NULL AS YM
+                         FROM DUAL
+        ]]>
+        <foreach item="rm" collection="deleteRows" >
+            <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.ym != null and !rm.ym.equals("")'>
+                <![CDATA[
+                       UNION ALL
+                       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                            , TRIM(#{rm.ym}) AS YM
+                         FROM DUAL
+                ]]>
+          </if>
+          </foreach>
+        <![CDATA[
+                   )
+        ]]>
+     </delete>
+
+    <select parameterType="map" resultType="cMap" id="getPerExpenseStdRightList">
+        SELECT	A.YM,
+               B.RATE1, B.RATE2, B.RATE3
+          FROM (
+               SELECT TO_CHAR(ADD_MONTHS(TO_DATE(REPLACE(#{searchYyyy}, '-', '')||'01','YYYYMM'), LEVEL - 1 ),'YYYYMM') AS YM
+               FROM DUAL
+<![CDATA[
+               CONNECT BY LEVEL -1 < (MONTHS_BETWEEN( TO_DATE(REPLACE(#{searchYyyy}, '-', '')||'12','YYYYMM'), TO_DATE(REPLACE(#{searchYyyy}, '-', '')||'01','YYYYMM')) + 1)
+]]>
+               ) A,
+               (
+               SELECT	A.ENTER_CD/*회사구분(TORG900)*/
+               ,	A.YM				/*	결산년월		*/
+               ,	A.RATE1				/*	임원(%)		*/
+               ,	A.RATE2				/*	사무직(%)		*/
+               ,	A.RATE3				/*	기사직(%)		*/
+               ,	A.CHKDATE				/*	최종수정시간		*/
+               ,	A.CHKID				/*	최종수정자		*/
+               FROM	TCPN682	A
+               WHERE	A.ENTER_CD = #{ssnEnterCd}
+               AND	A.YM LIKE REPLACE(#{searchYyyy}, '-', '') || '%'
+               ) B
+               WHERE A.YM = B.YM(+)
+               ORDER BY A.YM
+     </select>
+
+     <update parameterType="map" id="savePerExpenseStdRight">
+          MERGE INTO TCPN682	T
+          USING
+          (
+          SELECT	ENTER_CD
+          ,	YM
+          ,	RATE1
+          ,	RATE2
+          ,	RATE3
+          ,	CHKDATE
+          ,	CHKID
+          FROM	(
+          SELECT	NULL		AS	ENTER_CD
+          ,	NULL		AS	YM
+          ,	NULL		AS	RATE1
+          ,	NULL		AS	RATE2
+          ,	NULL		AS	RATE3
+          ,	NULL		AS	CHKDATE
+          ,	NULL		AS	CHKID
+          FROM	DUAL
+          <foreach item="rm" collection="mergeRows">
+          UNION ALL
+          SELECT	TRIM(#{ssnEnterCd})		AS	ENTER_CD
+          ,	TRIM(#{rm.ym})			AS	YM
+          ,	TRIM(#{rm.rate1})		AS	RATE1
+          ,	TRIM(#{rm.rate2})		AS	RATE2
+          ,	TRIM(#{rm.rate3})		AS	RATE3
+          ,	SYSDATE					AS	CHKDATE
+          ,	#{ssnSabun}				AS	CHKID
+          FROM	DUAL
+          </foreach>
+          )	WHERE	ENTER_CD IS NOT NULL
+          AND	YM IS NOT NULL
+          ) S
+          ON	(
+          T.ENTER_CD		=		S.ENTER_CD
+          AND	T.YM			=		S.YM
+          )
+          WHEN MATCHED THEN
+          UPDATE SET
+          T.RATE1			=	S.RATE1
+          ,	T.RATE2			=	S.RATE2
+          ,	T.RATE3			=	S.RATE3
+          ,	T.CHKDATE		=	S.CHKDATE
+          ,	T.CHKID			=	S.CHKID
+          WHEN NOT MATCHED THEN
+          INSERT
+          (
+          T.ENTER_CD
+          ,	T.YM
+          ,	T.RATE1
+          ,	T.RATE2
+          ,	T.RATE3
+          ,	T.CHKDATE
+          ,	T.CHKID
+          )
+          VALUES
+          (
+          S.ENTER_CD
+          ,	S.YM
+          ,	S.RATE1
+          ,	S.RATE2
+          ,	S.RATE3
+          ,	S.CHKDATE
+          ,	S.CHKID
+          )
+     </update>
+
+    <delete parameterType="map" id="deletePerExpenseStdRight">
+            DELETE FROM TCPN682
+             WHERE (ENTER_CD, YM) IN
+                   (
+                       SELECT NULL AS ENTER_CD
+                            , NULL AS YM
+                         FROM DUAL
+        <foreach item="rm" collection="deleteRows" >
+            <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.ym != null and !rm.ym.equals("")'>
+                       UNION ALL
+                        SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                             , TRIM(#{rm.ym}) AS YM
+                          FROM DUAL
+            </if>
+        </foreach>
+          )
+    </delete>
+
+    <update parameterType="map" statementType="CALLABLE" id="savePerExpenseStdPrc">
+        <![CDATA[
+            CALL PKG_CPN_CLOSING.CREATE_RESULT
+            (
+                #{sqlCode,mode=OUT,jdbcType=VARCHAR},
+                #{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+                #{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+                #{searchMonth,mode=IN,jdbcType=VARCHAR},
+                #{searchSabun,mode=IN,jdbcType=VARCHAR},
+                #{ssnSabun,mode=IN,jdbcType=VARCHAR}
+            )
+        ]]>
+    </update>
+</mapper>

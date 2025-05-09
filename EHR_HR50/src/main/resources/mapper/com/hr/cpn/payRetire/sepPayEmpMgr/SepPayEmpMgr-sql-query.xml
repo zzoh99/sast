@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 퇴직금대상자관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepPayEmpMgr">
+		<select parameterType="map" resultType="cMap" id="getSepPayEmpMgrBasicMap">
+
+				<![CDATA[
+					SELECT DISTINCT A.PAY_ACTION_CD
+						 , TRIM(A.PAY_ACTION_NM) AS PAY_ACTION_NM
+						 , SUBSTR(A.PAY_YM,1,4)||'-'||SUBSTR(A.PAY_YM,5,2) AS PAY_YM
+						 , A.PAY_CD
+						 , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn051', B.LANGUAGE_CD, #{ssnLocaleCd}), B.PAY_NM)  AS PAY_NM
+						 , DECODE(TRIM(NVL(A.ORD_SYMD,'')),'','',
+										SUBSTR(A.ORD_SYMD,1,4)||'-'||SUBSTR(A.ORD_SYMD,5,2)||'-'||SUBSTR(A.ORD_SYMD,7,2))
+						   ||'~'||
+						   DECODE(TRIM(NVL(A.ORD_EYMD,'')),'','',
+										SUBSTR(A.ORD_EYMD,1,4)||'-'||SUBSTR(A.ORD_EYMD,5,2)||'-'||SUBSTR(A.ORD_EYMD,7,2)) AS ORD_YMD
+						 , SUBSTR(A.PAYMENT_YMD,1,4)||'-'||SUBSTR(A.PAYMENT_YMD,5,2)||'-'||SUBSTR(A.PAYMENT_YMD,7,2) AS PAYMENT_YMD
+						 , SUBSTR(A.TIME_YM,1,4)||'-'||SUBSTR(A.TIME_YM,5,2) AS TIME_YM
+						 , NVL(A.ADD_TAX_RATE,0)||' %' AS ADD_TAX_RATE
+						 , TRIM(F_COM_GET_GRCODE_NAME(A.ENTER_CD,'C00110',A.CAL_TAX_METHOD, #{ssnLocaleCd})) AS CAL_TAX_METHOD
+						 , NVL(D.CLOSE_YN,'N') AS CLOSE_YN
+						 , F_CPN_GET_EMP_STATUS(A.ENTER_CD,A.PAY_ACTION_CD,'ALL') EMP_STATUS
+					  FROM TCPN201 A
+						 , TCPN051 B
+						 , TCPN981 D
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					   AND A.ENTER_CD		= B.ENTER_CD
+					   AND A.PAY_CD			= B.PAY_CD
+					   AND A.ENTER_CD		= D.ENTER_CD(+)
+					   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD(+)
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getSepPayEmpMgrList">
+
+				<![CDATA[
+					SELECT A.PAY_ACTION_CD
+						 , A.SABUN
+						 , A.BUSINESS_PLACE_CD
+						 , A.BUSINESS_PLACE_NM
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD) AS RES_NO
+						 , A.EMP_YMD
+						 , A.GEMP_YMD
+						 , A.STATUS_CD
+						 , A.STATUS_NM
+						 , A.ORG_CD
+						 , A.ORG_NM
+						 , A.PAY_TYPE
+						 , A.PAY_TYPE_NM
+						 , A.JIKGUB_CD
+						 , A.JIKGUB_NM
+						 , A.JIKWEE_CD
+						 , A.JIKWEE_NM
+						 , A.PAY_PEOPLE_STATUS
+						 , DECODE(A.PAY_PEOPLE_STATUS, 'C', '대상', 'E', '에러', 'M', '재계산대상', 'PM', '재계산대상', 'P', '작업대상', 'W', '미확정', 'J','완료',' ') PAY_PEOPLE_STATUS_TEXT
+						 , A.ADJ_YMD
+						 , A.RET_YMD
+						 , A.RET_BON_YN
+						 , A.RET_ALR_YN
+						 , (SELECT DECODE(COUNT(*),0,'N','Y') FROM TCPN708 B WHERE B.ENTER_CD=A.ENTER_CD AND B.SABUN=A.SABUN) AS PEN_CNT_YN
+						 , A.RET_TAXDED_YN
+						 , A.CC_CD
+						 , A.ORD_SYMD
+						 , A.ORD_EYMD
+						 , A.WORK_SYMD
+						 , A.WORK_EYMD
+						 , A.GNT_SYMD
+						 , A.GNT_EYMD
+						 , A.RMID_YMD
+						 , A.TRA_YMD
+						 , A.WORK_TYPE
+						 , A.WORK_TYPE_NM
+						 , A.MANAGE_CD
+						 , A.MANAGE_NM
+						 , A.Q_ORG_CD
+						 , A.PLACE_WORK_CD
+						 , A.WORKTEAM_CD
+						 , A.SAL_CLASS
+						 , A.SG_POINT
+						 , A.JOB_CD
+						 , A.JIKCHAK_CD
+						 , A.JIKCHAK_NM
+						 , A.MTH_PAY_YN
+					  FROM TCPN203 A
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					           		]]>
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND A.BUSINESS_PLACE_CD = #{businessPlaceCd}
+					</if>
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND A.SABUN||A.NAME LIKE '%'||trim(#{sabunName})||'%'
+					</if>
+					ORDER BY A.PAY_PEOPLE_STATUS, A.BUSINESS_PLACE_NM, A.NAME
+
+
+
+		</select>
+		<update parameterType="map" id="saveSepPayEmpMgrUpdateIns">
+
+
+					MERGE INTO TCPN203 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.PAY_PEOPLE_STATUS
+								 , A.CC_CD
+								 , A.EMP_YMD
+								 , A.ADJ_YMD
+								 , A.RMID_YMD
+								 , A.RET_BON_YN
+								 , A.RET_ALR_YN
+								 , A.RET_TAXDED_YN
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS SABUN
+										 , NULL		AS PAY_PEOPLE_STATUS
+										 , NULL		AS CC_CD
+										 , NULL		AS EMP_YMD
+										 , NULL		AS ADJ_YMD
+										 , NULL		AS RMID_YMD
+										 , NULL		AS RET_BON_YN
+										 , NULL		AS RET_ALR_YN
+										 , NULL		AS RET_TAXDED_YN
+									  FROM DUAL
+<foreach item="rm" collection="insertRows" >
+									UNION ALL
+									SELECT NVL(TRIM(#{rm.payActionCd}),#{searchPayActionCd})	AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})				AS SABUN
+										 , DECODE(TRIM(#{rm.payPeopleStatus}),'1','P','0','W','2','J',TRIM(#{rm.payPeopleStatus}))	AS PAY_PEOPLE_STATUS
+										 , TRIM(#{rm.ccCd})					AS CC_CD
+										 , TRIM(#{rm.empYmd})			    AS EMP_YMD
+										 , TRIM(#{rm.adjYmd})				AS ADJ_YMD
+										 , TRIM(#{rm.rmidYmd})				AS RMID_YMD
+										 , TRIM(#{rm.retBonYn})				AS RET_BON_YN
+										 , TRIM(#{rm.retAlrYn})				AS RET_ALR_YN
+										 , TRIM(#{rm.retTaxdedYn})			AS RET_TAXDED_YN
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.PAY_PEOPLE_STATUS	= S.PAY_PEOPLE_STATUS
+								 , T.CC_CD				= S.CC_CD
+								 , T.ADJ_YMD			= S.ADJ_YMD
+								 , T.EMP_YMD			= S.EMP_YMD
+								 , T.RMID_YMD			= S.RMID_YMD
+								 , T.RET_BON_YN			= S.RET_BON_YN
+								 , T.RET_ALR_YN			= S.RET_ALR_YN
+								 , T.RET_TAXDED_YN		= S.RET_TAXDED_YN
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+
+
+		</update>
+		<update parameterType="map" id="saveSepPayEmpMgr">
+
+
+					MERGE INTO TCPN203 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.CC_CD
+								 , A.EMP_YMD
+								 , A.ADJ_YMD
+								 , A.RET_BON_YN
+								 , A.RET_ALR_YN
+								 , A.RET_TAXDED_YN
+								 , A.RET_YMD
+								 , A.GEMP_YMD
+								 , A.RMID_YMD
+								 , A.BUSINESS_PLACE_CD
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS SABUN
+										 , NULL		AS CC_CD
+										 , NULL		AS EMP_YMD
+										 , NULL		AS ADJ_YMD
+										 , NULL		AS RET_BON_YN
+										 , NULL		AS RET_ALR_YN
+										 , NULL		AS RET_TAXDED_YN
+										 , NULL     AS RET_YMD
+										 , NULL 	AS GEMP_YMD
+										 , NULL     AS RMID_YMD
+										 , NULL     AS BUSINESS_PLACE_CD
+									  FROM DUAL
+<foreach item="rm" collection="updateRows" >
+									UNION ALL
+									SELECT NVL(TRIM(#{rm.payActionCd}),#{searchPayActionCd})	AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})				AS SABUN
+										 , TRIM(#{rm.ccCd})					AS CC_CD
+										 , TRIM(#{rm.empYmd})				AS EMP_YMD
+										 , TRIM(#{rm.adjYmd})				AS ADJ_YMD
+										 , TRIM(#{rm.retBonYn})				AS RET_BON_YN
+										 , TRIM(#{rm.retAlrYn})				AS RET_ALR_YN
+										 , TRIM(#{rm.retTaxdedYn})			AS RET_TAXDED_YN
+										 , TRIM(#{rm.retYmd})				AS RET_YMD
+										 , TRIM(#{rm.gempYmd})				AS GEMP_YMD
+										 , TRIM(#{rm.rmidYmd})				AS RMID_YMD
+										 , TRIM(#{rm.businessPlaceCd})		AS BUSINESS_PLACE_CD
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.CC_CD				= S.CC_CD
+						         , T.EMP_YMD			= S.EMP_YMD
+								 , T.ADJ_YMD			= S.ADJ_YMD
+								 , T.RET_BON_YN			= S.RET_BON_YN
+								 , T.RET_ALR_YN			= S.RET_ALR_YN
+								 , T.RET_TAXDED_YN		= S.RET_TAXDED_YN
+								 , T.RET_YMD			= S.RET_YMD
+								 , T.GEMP_YMD			= S.GEMP_YMD
+								 , T.RMID_YMD			= S.RMID_YMD
+								 , T.BUSINESS_PLACE_CD  = S.BUSINESS_PLACE_CD
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+
+
+
+		</update>
+
+		<update parameterType="map" id="saveSepPayEmpMgr2">
+
+
+					MERGE INTO TCPN203 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.CC_CD
+								 , A.EMP_YMD
+								 , A.ADJ_YMD
+								 , A.RET_BON_YN
+								 , A.RET_ALR_YN
+								 , A.RET_TAXDED_YN
+								 , A.RET_YMD
+								 , A.GEMP_YMD
+								 , A.RMID_YMD
+								 , A.BUSINESS_PLACE_CD
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS SABUN
+										 , NULL		AS CC_CD
+										 , NULL		AS EMP_YMD
+										 , NULL		AS ADJ_YMD
+										 , NULL		AS RET_BON_YN
+										 , NULL		AS RET_ALR_YN
+										 , NULL		AS RET_TAXDED_YN
+										 , NULL     AS RET_YMD
+										 , NULL 	AS GEMP_YMD
+										 , NULL     AS RMID_YMD
+										 , NULL     AS BUSINESS_PLACE_CD
+									  FROM DUAL
+<foreach item="rm" collection="insertRows" >
+									UNION ALL
+									SELECT NVL(TRIM(#{rm.payActionCd}),#{searchPayActionCd})	AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})				AS SABUN
+										 , TRIM(#{rm.ccCd})					AS CC_CD
+										 , TRIM(#{rm.empYmd})				AS EMP_YMD
+										 , TRIM(#{rm.adjYmd})				AS ADJ_YMD
+										 , TRIM(#{rm.retBonYn})				AS RET_BON_YN
+										 , TRIM(#{rm.retAlrYn})				AS RET_ALR_YN
+										 , TRIM(#{rm.retTaxdedYn})			AS RET_TAXDED_YN
+										 , TRIM(#{rm.retYmd})				AS RET_YMD
+										 , TRIM(#{rm.gempYmd})				AS GEMP_YMD
+										 , TRIM(#{rm.rmidYmd})				AS RMID_YMD
+										 , TRIM(#{rm.businessPlaceCd})		AS BUSINESS_PLACE_CD
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.CC_CD				= S.CC_CD
+						         , T.EMP_YMD			= S.EMP_YMD
+								 , T.ADJ_YMD			= S.ADJ_YMD
+								 , T.RET_BON_YN			= S.RET_BON_YN
+								 , T.RET_ALR_YN			= S.RET_ALR_YN
+								 , T.RET_TAXDED_YN		= S.RET_TAXDED_YN
+								 , T.RET_YMD			= S.RET_YMD
+								 , T.GEMP_YMD			= S.GEMP_YMD
+								 , T.RMID_YMD			= S.RMID_YMD
+								 , T.BUSINESS_PLACE_CD  = S.BUSINESS_PLACE_CD
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+
+
+
+		</update>
+
+		<update parameterType="map" id="saveSepPayEmpMgrPayPeopleStatus">
+
+
+					MERGE INTO TCPN203 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.PAY_PEOPLE_STATUS
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS SABUN
+										 , NULL		AS PAY_PEOPLE_STATUS
+									  FROM DUAL
+<foreach item="rm" collection="updateRows" >
+									UNION ALL
+									SELECT NVL(TRIM(#{rm.payActionCd}),#{searchPayActionCd})	AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})								AS SABUN
+										 , DECODE(TRIM(#{rm.payPeopleStatus}),'1','P','0','W','2','J',TRIM(#{rm.payPeopleStatus}))	AS PAY_PEOPLE_STATUS
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.PAY_PEOPLE_STATUS	= S.PAY_PEOPLE_STATUS
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+
+
+
+		</update>
+		<update parameterType="map" statementType="CALLABLE" id="SepPayEmpMgrP_CPN_SEP_EMP_INS">
+
+				<![CDATA[
+					CALL P_CPN_SEP_EMP_INS(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{cnt,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						NULL,
+					    NULL,
+						#{sabun,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+
+		</update>
+		<update parameterType="map" statementType="CALLABLE" id="SepPayEmpMgrP_CPN_SEP_EMP_UPD">
+
+				<![CDATA[
+					CALL P_CPN_SEP_EMP_UPD(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						#{sabun,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+
+		</update>
+		<update parameterType="map" statementType="CALLABLE" id="SepPayEmpMgrP_CPN_SEP_EMP_DEL">
+
+				<![CDATA[
+					CALL P_CPN_SEP_EMP_DEL(
+
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						#{sabun,mode=IN,jdbcType=VARCHAR},
+					    'D',
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+
+		</update>
+		<update parameterType="map" statementType="CALLABLE" id="SepPayEmpMgrP_CPN_SEP_EMP_UPD_PTCH">
+
+				<![CDATA[
+					CALL P_CPN_SEP_EMP_UPD_PTCH(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						NULL,
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+
+		</update>
+
+		<update parameterType="map" statementType="CALLABLE" id="SepPayEmpMgrP_CPN_SEP_EMP_DEL_PTCH">
+
+				<![CDATA[
+					CALL P_CPN_SEP_EMP_DEL_PTCH(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						NULL,
+						#{gubun,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR}
+					    )
+				]]>
+
+
+
+		</update>
+
+		<delete parameterType="map" id="deleteSepPayEmpMgr">
+
+
+					DELETE FROM TCPN203
+					 WHERE ENTER_CD||'_'||PAY_ACTION_CD||'_'||SABUN IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.payActionCd != null and !rm.payActionCd.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.payActionCd})||'_'||TRIM(#{rm.sabun})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산 재계산 대상자 작업
+ -->
+<root>
+
+    <!--  사업자 단위과세자 주사업자 조회 -->
+    <query id="selectBranchPlaceCdList">
+        <![CDATA[
+            SELECT BUSINESS_PLACE_CD CODE
+			     , BUSINESS_PLACE_NM CODE_NM
+			     , REGINO
+			  FROM TCPN121 A
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SDATE = (SELECT MAX(SDATE) FROM TCPN121 
+			                 WHERE ENTER_CD = A.ENTER_CD AND BUSINESS_PLACE_CD = A.BUSINESS_PLACE_CD)
+        ]]>
+    </query>
+
+    <!--  사업자 단위과세자 주사업자 조회 -->
+    <query id="selectBranchPlaceCdList_SH">
+        <![CDATA[
+            SELECT BUSINESS_PLACE_CD CODE
+                 , BUSINESS_PLACE_NM CODE_NM
+                 , REGINO
+              FROM TCPN121 A
+             WHERE ENTER_CD = #ssnEnterCd#
+               AND SDATE = (SELECT MAX(SDATE) FROM TCPN121 
+                             WHERE ENTER_CD = A.ENTER_CD AND BUSINESS_PLACE_CD = A.BUSINESS_PLACE_CD)
+             UNION ALL
+            SELECT LOCATION_CD AS CODE
+			     , LOCATION_NM AS CODE_NM
+			     , '' AS REGINO
+			  FROM TSYS015
+			 WHERE ENTER_CD = #ssnEnterCd#
+        ]]>
+    </query>
+    
+    <query id="selectBranchDt">
+        <![CDATA[
+            SELECT MAX(ORD_EYMD) ORD_EYMD  
+              FROM TCPN201
+             WHERE ENTER_CD  = #ssnEnterCd#
+               AND PAY_YM LIKE #searchWorkYy# || '%'
+               AND PAY_CD = 'Y1'
+        ]]>
+    </query>
+
+	<!-- 사업자 단위과세자 조회  -->
+	<query id="selectBranchOptionList">
+		<![CDATA[
+			SELECT A.BUSINESS_PLACE_NM
+			     , NVL(B.TAX_GRP_YN, 'N') TAX_GRP_YN 
+			     , A.BUSINESS_PLACE_CD 
+			     , A.BUSINESS_PLACE_NM 
+			     , B.SDATE
+			     , B.EDATE
+			     , NVL(B.REGINO ,A.REGINO) AS REGINO
+			     , B.SUB_REGINO
+			  FROM TCPN121 A, TCPN891 B
+			 WHERE A.ENTER_CD          = B.ENTER_CD(+)
+			   AND A.BUSINESS_PLACE_CD = B.BUSINESS_PLACE_CD(+)
+			   AND A.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+			                   WHERE Y.ENTER_CD          = A.ENTER_CD
+			                     AND Y.BUSINESS_PLACE_CD = A.BUSINESS_PLACE_CD
+			                     AND REPLACE(#searchYMD#,'-','') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+			   AND A.ENTER_CD = #ssnEnterCd#
+		]]>
+	</query>
+	
+	<!-- 사업자 단위과세자 조회  -->
+    <query id="selectBranchOptionList_SH">
+        <![CDATA[
+            SELECT A.BUSINESS_PLACE_NM
+                 , NVL(B.TAX_GRP_YN, 'N') TAX_GRP_YN 
+                 , A.BUSINESS_PLACE_CD 
+                 , A.BUSINESS_PLACE_NM 
+                 , B.SDATE
+                 , B.EDATE
+                 , A.REGINO
+                 , B.SUB_REGINO
+              FROM TCPN121 A, TCPN891 B
+             WHERE A.ENTER_CD          = B.ENTER_CD(+)
+               AND A.BUSINESS_PLACE_CD = B.BUSINESS_PLACE_CD(+)
+               AND A.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+                               WHERE Y.ENTER_CD          = A.ENTER_CD
+                                 AND Y.BUSINESS_PLACE_CD = A.BUSINESS_PLACE_CD
+                                 AND #searchYMD# BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+               AND A.ENTER_CD = #ssnEnterCd#
+             UNION ALL
+            SELECT A.LOCATION_NM BUSINESS_PLACE_NM
+                 , NVL(B.TAX_GRP_YN, 'N') TAX_GRP_YN 
+                 , A.LOCATION_CD AS BUSINESS_PLACE_CD 
+                 , A.LOCATION_NM AS BUSINESS_PLACE_NM 
+                 , B.SDATE
+                 , B.EDATE
+                 , B.REGINO
+                 , B.SUB_REGINO
+              FROM TSYS015 A, TCPN891 B
+             WHERE 1 = 1
+               AND A.ENTER_CD    = B.ENTER_CD(+)
+               AND A.LOCATION_CD = B.BUSINESS_PLACE_CD(+)
+               AND A.ENTER_CD    = #ssnEnterCd#
+        ]]>
+    </query>
+
+	<!-- 사업자 단위과세자 저장  -->
+	<query id="updateBranchOption">
+		<![CDATA[
+			 MERGE INTO TCPN891 A
+			 USING DUAL
+			    ON (       ENTER_CD          = #ssnEnterCd#
+			           AND BUSINESS_PLACE_CD = #business_place_cd#
+			           AND SDATE            = #sdate#
+			       )
+			  WHEN MATCHED THEN
+			      UPDATE 
+			         SET SUB_REGINO          = #sub_regino#
+			           , TAX_GRP_YN          = #tax_grp_yn#
+			           , REGINO              = #regino#
+			           , EDATE               = #edate#
+			           , CHKDATE             = SYSDATE
+			           , CHKID               = #ssnSabun#
+			  WHEN NOT MATCHED THEN
+			      INSERT (ENTER_CD, BUSINESS_PLACE_CD, REGINO, SUB_REGINO
+			            , BUSINESS_PLACE_NM, TAX_GRP_YN, SDATE, EDATE, CHKDATE, CHKID)
+			      VALUES (#ssnEnterCd#
+			            , #business_place_cd#
+			            , #regino#
+			            , #sub_regino#
+			            , #business_place_nm#
+			            , #tax_grp_yn#
+			            , #sdate#
+			            , #edate#
+			            , SYSDATE
+			            , #ssnSabun#)
+		]]>
+	</query>
+	
+	<!-- 사업자 단위과세자 삭제  -->
+	<query id="deleteBranchOption">
+		<![CDATA[
+			DELETE FROM TCPN891 							/*사업자과세단위자 정보	*/
+			WHERE ENTER_CD = #ssnEnterCd# 					/*회사구분*/
+			  AND BUSINESS_PLACE_CD = #business_place_cd# 	/*사업장코드*/
+			  AND SDATE = #sdate# 							/*시작일*/
+		]]>
+	</query>
+</root>

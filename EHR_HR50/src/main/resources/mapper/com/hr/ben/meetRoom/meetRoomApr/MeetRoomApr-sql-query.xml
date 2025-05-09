@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.meetRoom.meetRoomApr">
+	<!-- 회의실승인 조회 -->
+	<select id="getMeetRoomAprList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT DISTINCT
+				'0' AS DETAIL
+		       , A.ENTER_CD
+		       , A.APPL_SEQ
+		       , A.TITLE
+		       , A.APPL_CD
+		       , A.APPL_YMD
+		       , B.SABUN
+		       , B.SABUN AS APPL_SABUN
+		       , F_COM_GET_NAMES(A.ENTER_CD, A.APPL_SABUN) AS APPL_NAME
+		       , F_COM_GET_NAMES(A.ENTER_CD, A.APPL_SABUN, 'ALIAS') AS APPL_ALIAS
+		       , F_COM_GET_ORG_NM2(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) AS APPL_ORG
+		       , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) AS APPL_JOB_JIKGUN_NM
+		       , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) AS APPL_JIKCHAK_NM
+		       , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) AS APPL_JIKGUB_NM
+		       , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) AS APPL_JIKWEE_NM
+		       , A.APPL_IN_SABUN
+		       , F_COM_GET_NAMES(A.ENTER_CD, A.APPL_IN_SABUN) AS APPL_IN_NAME
+		       , F_COM_GET_NAMES(A.ENTER_CD, A.APPL_IN_SABUN, 'ALIAS') AS APPL_IN_ALIAS
+		       , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.APPL_IN_SABUN, A.APPL_YMD) AS APPL_IN_JIKGUB_NM
+		       , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.APPL_IN_SABUN, A.APPL_YMD) AS APPL_IN_JIKWEE_NM
+		       , F_COM_GET_ORG_NM2(A.ENTER_CD, A.APPL_IN_SABUN, A.APPL_YMD) AS APPL_IN_ORG
+		       , A.APPL_STATUS_CD
+		       , A.MEMO
+		       , A.AGREE_SABUN
+		       , A.AGREE_YMD
+		       , A.FINISH_YN
+		       , A.FILE_SEQ
+		       , A.DOC_NO
+		       , B.MEET_ROOM_NO
+		       , B.MEET_ROOM_NM
+		       , B.FROM_YMD
+		       , B.FROM_TIME
+		       , B.TO_YMD
+		       , B.TO_TIME
+		       , B.ORDER_SEQ
+		  FROM THRI103 A
+			 , (	SELECT X.ENTER_CD
+					     , X.SABUN
+					     , X.APPL_SEQ
+					     , X.MEET_ROOM_NO
+					     , Y.MEET_ROOM_NM
+					     , X.FROM_YMD
+					     , X.FROM_TIME
+					     , X.TO_YMD
+					     , X.TO_TIME
+					     , X.USE_PURPOSE
+					     , X.NOTE
+					     , Y.ORDER_SEQ
+					  FROM TBEN895 X
+					     , TBEN894 Y
+					 WHERE X.ENTER_CD = Y.ENTER_CD
+					   AND X.MEET_ROOM_NO = Y.MEET_ROOM_NO
+			) B
+		-- 관리자 권한범위 체크 
+		INNER JOIN ${query} AUTH ON AUTH.ENTER_CD = B.ENTER_CD AND AUTH.SABUN = B.SABUN
+		     , THRM151 C
+		 WHERE 1=1
+		   AND A.ENTER_CD = B.ENTER_CD
+		   AND A.APPL_SEQ = B.APPL_SEQ
+                    AND B.ENTER_CD = C.ENTER_CD
+                    AND B.SABUN = C.SABUN
+		   AND A.ENTER_CD = #{ssnEnterCd}
+		   AND (A.APPL_STATUS_CD IS NOT NULL AND A.APPL_STATUS_CD <> '11')
+		   AND C.SDATE = (	SELECT MAX(SDATE)
+							  FROM THRM151
+							 WHERE ENTER_CD	= C.ENTER_CD
+							   AND SABUN = C.SABUN
+							   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231') ) ]]>
+		<if test="searchOrgNm != null and searchOrgNm neq ''">
+		   AND UPPER(A.APPL_ORG_NM) LIKE '%'||UPPER(#{searchOrgNm})||'%'
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+		   AND ( UPPER(A.APPL_SABUN) LIKE '%'||UPPER(TRIM(#{searchSabunName}))||'%' OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.APPL_SABUN)) LIKE '%'||UPPER(TRIM(#{searchSabunName}))||'%' )
+		</if>
+		<if test="searchApplStatusCd != null and searchApplStatusCd neq ''">
+		   AND A.APPL_STATUS_CD = #{searchApplStatusCd}
+		</if>
+		<if test="searchFromYmd != null and searchFromYmd neq ''">
+		<![CDATA[
+		   AND A.APPL_YMD >= REPLACE(TRIM(#{searchFromYmd}), '-', '')
+		]]>
+		</if>
+		<if test="searchToYmd != null and searchToYmd neq ''">
+		<![CDATA[
+		   AND A.APPL_YMD <= REPLACE(TRIM(#{searchToYmd}), '-', '')
+		]]>
+		</if>
+		<if test="businessPlaceCd != null and businessPlaceCd neq ''">
+		   AND F_COM_GET_BP_CD(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) IN
+		<foreach collection="businessPlaceCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="payGroupCd != null and payGroupCd neq ''">
+		   AND F_COM_GET_PAY_GROUP_CD(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) IN
+		<foreach collection="payGroupCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="locationCd != null and locationCd neq ''">
+		   AND F_COM_GET_LOCATION_CD3(A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD) IN
+		<foreach collection="locationCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="searchEmpGubun != null and searchEmpGubun neq ''">
+		   AND DECODE( F_COM_GET_PAY_GROUP_CD(A.ENTER_CD, A.SABUN, A.APPL_YMD), '7', '2', '1' ) = TRIM( #{searchEmpGubun} ) -- 시급구분 생산직시급인 경우 '생산직' 그외 '일반직'
+		</if>
+		<if test="searchMeetRoomNo != null and searchMeetRoomNo neq ''">
+		   AND B.MEET_ROOM_NO = #{searchMeetRoomNo}
+		</if>
+        ORDER BY APPL_YMD DESC, MEET_ROOM_NM 
+	</select>
+
+	<!-- 회의실 승인 저장 -->
+	<update id="saveMeetRoomApr" parameterType="map">
+	<![CDATA[
+		MERGE INTO THRI103 T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT TRIM(#{ssnEnterCd})		AS	ENTER_CD
+			, TRIM(#{rm.applSeq})		AS	APPL_SEQ
+			, TRIM(#{rm.applSabun})	AS	APPL_SABUN
+			, TRIM(#{rm.applStatusCd})	AS  APPL_STATUS_CD
+			, TRIM(#{rm.agreeYmd})		AS  AGREE_YMD
+			FROM DUAL
+		</foreach>
+		<![CDATA[
+		) S
+		ON	(
+				T.ENTER_CD		=	S.ENTER_CD
+			AND	T.APPL_SEQ		=	S.APPL_SEQ
+			AND	T.APPL_SABUN   	=	S.APPL_SABUN
+		)
+		WHEN MATCHED THEN
+			UPDATE SET T.APPL_STATUS_CD = S.APPL_STATUS_CD
+					 , T.AGREE_YMD		= S.AGREE_YMD
+					 , T.CHKDATE		= SYSDATE
+				     , T.CHKID    		= #{ssnSabun}
+	]]>
+	</update>
+
+	<!-- 회의실 승인 삭제 -->
+	<delete id="deleteMeetRoomApr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN895
+		WHERE 	(ENTER_CD, APPL_SEQ) IN (  (NULL, NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.applSeq != null and rm.applSeq neq ''">
+			(#{ssnEnterCd}, TRIM( #{rm.applSeq} ))
+			</if>
+		</foreach>
+			)
+	</delete>
+		
+</mapper>

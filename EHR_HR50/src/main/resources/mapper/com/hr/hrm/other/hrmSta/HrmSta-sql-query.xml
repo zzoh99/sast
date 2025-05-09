@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.hrmSta">
+<!-- 조회 : 개별 DB 함수와 개별 QUERY 방식에서 단일 QUERY 와 단일함수 F_HRM_GET_ELEMENT_EMP_CNT 사용으로 변경. CBS. 2017.09.28 -->
+		<select parameterType="map" resultType="cMap" id="getHrmStaList">
+
+				SELECT  T2.*
+				      ,'0' AS TOT_CNT
+				FROM (
+				    SELECT
+				         T1.*
+				        ,REPLACE(T1.ORG_NM,T1.PRIOR_ORG_NM||'_','') AS  ORG_NM2
+				         <bind name="tpCnt" value="1" />
+				         <foreach item="tCnt" collection="titles" >
+				         ,MMB_CNT${tpCnt}
+				         , #{tCnt.code} AS CODEMMB_CNT${tpCnt}
+				               <bind name="tpCnt" value="tpCnt + 1" />
+						 </foreach>
+						,(
+						 SELECT COUNT(*)
+						                FROM   THRM100 A1,THRM151 A2
+						       WHERE  A1.ENTER_CD = A2.ENTER_CD
+						       AND A1.SABUN = A2.SABUN
+						       AND REPLACE( #{schDate} ,'-','') BETWEEN  A2.SDATE  AND NVL(A2.EDATE,'99991231')
+						       AND A1.ENTER_CD = T1.ENTER_CD
+						       AND A1.RET_YMD BETWEEN SUBSTR( REPLACE( '2021-09-03' ,'-',''),'1','6')||'01' AND SUBSTR( REPLACE( '2021-09-03' ,'-',''),'1','6')||'31'
+						       AND A2.ORG_CD = T1.ORG_CD
+						
+						
+						
+						) AS RCNT,
+						(
+						   SELECT COUNT(*)
+						      --INTO l_count
+						       FROM THRM100 X,
+						                THRM151 Y
+						      WHERE X.ENTER_CD = Y.ENTER_CD
+						         AND X.SABUN  = Y.SABUN
+						         AND REPLACE( #{schDate} ,'-','') BETWEEN Y.SDATE AND Y.EDATE
+						         AND Y.STATUS_CD NOT IN ('RA','RAA')    -- 퇴직자 제외
+						         AND X.SEX_TYPE = '1'
+						         AND X.ENTER_CD = T1.ENTER_CD
+						         AND Y.ORG_CD = T1.ORG_CD
+						         ) AS MAN_CNT,
+						(
+						   SELECT COUNT(*)
+						      -- INTO l_count
+						       FROM THRM100 X,
+						                THRM151 Y
+						      WHERE X.ENTER_CD = Y.ENTER_CD
+						         AND X.SABUN  = Y.SABUN
+						         AND REPLACE( #{schDate} ,'-','') BETWEEN Y.SDATE AND Y.EDATE
+						         AND Y.STATUS_CD NOT IN ('RA','RAA')    -- 퇴직자 제외
+						         AND X.SEX_TYPE = '2'
+						         AND X.ENTER_CD = T1.ENTER_CD
+						         AND Y.ORG_CD = T1.ORG_CD
+						 ) AS WOMAN_CNT,
+						 (
+						       SELECT ROUND(AVG(SUM(SYSDATE - TO_DATE(X.GEMP_YMD)))/365, 1) AS CNT
+						       --INTO l_count
+						       FROM THRM100 X,
+						                THRM151 Y
+						      WHERE X.ENTER_CD = Y.ENTER_CD
+						         AND X.SABUN  = Y.SABUN
+						         AND Y.ENTER_CD = T1.ENTER_CD
+						         AND REPLACE( #{schDate} ,'-','') BETWEEN Y.SDATE AND Y.EDATE
+						         AND Y.STATUS_CD NOT IN ('RA','RAA')    -- 퇴직자 제외
+						         AND Y.ORG_CD = T1.ORG_CD
+						       GROUP BY X.SABUN
+						  )AS YEAR_CNT 
+				        , (
+				               SELECT COUNT(*)
+				               FROM   THRM100 X,
+				                      THRM151 Y
+				               WHERE  X.ENTER_CD    = Y.ENTER_CD
+				               AND    X.SABUN       = Y.SABUN
+				               AND    Y.ENTER_CD    = T1.ENTER_CD
+				               AND    REPLACE ( #{schDate} , '-', '') BETWEEN Y.SDATE AND Y.EDATE
+				               AND    Y.STATUS_CD NOT IN ('RA','RAA')    -- 퇴직자 제외
+				                <if test='schType != null and schType.equals("JIKGUB_CD")'>
+				                          AND NVL(Y.JIKGUB_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20010' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+								</if><if test='schType != null and schType.equals("JIKWEE_CD")'>
+				                          AND NVL(Y.JIKWEE_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20030' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+								</if><if test='schType != null and schType.equals("JIKCHAK_CD")'>
+				                          AND NVL(Y.JIKCHAK_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20020' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+								</if><if test='schType != null and schType.equals("WORK_TYPE")'>
+				                          AND NVL(Y.WORK_TYPE, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H10050' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+				                </if><if test='schType != null and schType.equals("MANAGE_CD")'>
+				                          AND NVL(Y.MANAGE_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H10030' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+				                </if><if test='schType != null and schType.equals("STF_TYPE")'>
+				                          AND NVL(X.STF_TYPE, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'F10001' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+				                </if><if test='schType != null and schType.equals("EMP_TYPE")'>
+				                          AND NVL(X.EMP_TYPE, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'F10003' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+								</if>
+				               AND    Y.ORG_CD      = T1.ORG_CD
+				          ) AS ETC_CNT                                              
+				    FROM
+				    (
+				
+				        SELECT 
+				            B.ENTER_CD
+				            , B.ORG_CD
+				             <bind name="tpCnt" value="1" />
+				             <foreach item="tCnt" collection="titles" >
+				                <if test='schType != null and schType.equals("JIKGUB_CD")'>
+				                         , NVL(MAX(CASE WHEN B.JIKGUB_CD = #{tCnt.code} THEN CNT ELSE 0 END),0) AS MMB_CNT${tpCnt}
+								</if><if test='schType != null and schType.equals("JIKWEE_CD")'>
+				                          , NVL(MAX(CASE WHEN B.JIKWEE_CD = #{tCnt.code} THEN CNT ELSE 0 END),0) AS MMB_CNT${tpCnt}
+								</if><if test='schType != null and schType.equals("JIKCHAK_CD")'>
+				                         , NVL(MAX(CASE WHEN B.JIKCHAK_CD = #{tCnt.code} THEN CNT ELSE 0 END),0) AS MMB_CNT${tpCnt}
+								</if><if test='schType != null and schType.equals("WORK_TYPE")'>
+				                          , NVL(MAX(CASE WHEN B.WORK_TYPE = #{tCnt.code} THEN CNT ELSE 0 END),0) AS MMB_CNT${tpCnt}
+				                </if><if test='schType != null and schType.equals("MANAGE_CD")'>
+				                          , NVL(MAX(CASE WHEN B.MANAGE_CD = #{tCnt.code} THEN CNT ELSE 0 END),0) AS MMB_CNT${tpCnt}
+				                </if><if test='schType != null and schType.equals("STF_TYPE")'>
+				                          , NVL(MAX(CASE WHEN B.STF_TYPE = #{tCnt.code} THEN CNT ELSE 0 END),0) AS MMB_CNT${tpCnt}
+				                </if><if test='schType != null and schType.equals("EMP_TYPE")'>
+				                          , NVL(MAX(CASE WHEN B.EMP_TYPE = #{tCnt.code} THEN CNT ELSE 0 END),0) AS MMB_CNT${tpCnt}
+								</if>
+				             <bind name="tpCnt" value="tpCnt + 1" />
+							 </foreach>
+				        FROM 
+				        (
+				            SELECT
+				                A.ENTER_CD
+				                ,A.ORG_CD
+				                <if test='schType != null and schType.equals("JIKGUB_CD")'>
+					                ,A.JIKGUB_CD
+								</if><if test='schType != null and schType.equals("JIKWEE_CD")'>
+					                ,A.JIKWEE_CD                      
+								</if><if test='schType != null and schType.equals("JIKCHAK_CD")'>
+					                ,A.JIKCHAK_CD                               
+								</if><if test='schType != null and schType.equals("WORK_TYPE")'>
+					                ,A.WORK_TYPE                          
+					            </if><if test='schType != null and schType.equals("MANAGE_CD")'>
+					                ,A.MANAGE_CD                  
+					            </if><if test='schType != null and schType.equals("STF_TYPE")'>
+					                ,A.STF_TYPE                                      
+					            </if><if test='schType != null and schType.equals("EMP_TYPE")'>
+					                ,A.EMP_TYPE                                  
+								</if>
+				                ,SUM(CNT) AS CNT
+				            FROM
+				            (
+				               SELECT Y.ENTER_CD, Y.ORG_CD, Y.SABUN, Y.JIKGUB_CD, Y.JIKWEE_CD, Y.JIKCHAK_CD, Y.WORK_TYPE, Y.MANAGE_CD, X.STF_TYPE, X.EMP_TYPE, 1 AS CNT
+				                 FROM THRM100 X,
+				                          THRM151 Y
+				                WHERE X.ENTER_CD = Y.ENTER_CD
+				                   AND X.SABUN  = Y.SABUN
+				                   AND Y.ENTER_CD = #{ssnEnterCd}
+				                   AND Y.STATUS_CD NOT IN ('RA','RAA')         
+				                   AND REPLACE( #{schDate} ,'-','') BETWEEN Y.SDATE AND Y.EDATE
+				            ) A
+				            <if test='schType != null and schType.equals("JIKGUB_CD")'>
+				                GROUP BY ENTER_CD,ORG_CD,JIKGUB_CD
+							</if><if test='schType != null and schType.equals("JIKWEE_CD")'>
+				                GROUP BY ENTER_CD,ORG_CD,JIKWEE_CD                      
+							</if><if test='schType != null and schType.equals("JIKCHAK_CD")'>
+				                GROUP BY ENTER_CD,ORG_CD,JIKCHAK_CD                               
+							</if><if test='schType != null and schType.equals("WORK_TYPE")'>
+				                GROUP BY ENTER_CD,ORG_CD,WORK_TYPE                          
+				            </if><if test='schType != null and schType.equals("MANAGE_CD")'>
+				                GROUP BY ENTER_CD,ORG_CD,MANAGE_CD                  
+				            </if><if test='schType != null and schType.equals("STF_TYPE")'>
+				                GROUP BY ENTER_CD,ORG_CD,STF_TYPE                                      
+				            </if><if test='schType != null and schType.equals("EMP_TYPE")'>
+				                GROUP BY ENTER_CD,ORG_CD,EMP_TYPE                                  
+							</if>
+				             ) B
+				             GROUP BY ENTER_CD, ORG_CD 
+				         )C
+				   <![CDATA[      ,
+				         (
+				             SELECT LEVEL AS "_level"
+				                      ,LEVEL AS  level2
+				                      ,A.SDATE
+				                      ,A.PRIOR_ORG_CD
+				                      ,F_COM_GET_ORG_NM(A.ENTER_CD, A.PRIOR_ORG_CD, REPLACE( #{schDate} ,'-','')) AS PRIOR_ORG_NM
+				                      ,A.ORG_CD
+				                      ,F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, REPLACE( #{schDate} ,'-','')) AS ORG_NM
+				                      ,A.DIRECT_YN
+				                      ,A.SEQ
+				                      ,A.ORG_LEVEL
+				                      ,A.ENTER_CD
+				                FROM   TORG105 A
+				                      , TORG103 C
+				                WHERE  A.ENTER_CD = #{ssnEnterCd}
+				                AND    A.ENTER_CD = C.ENTER_CD
+				                AND    A.SDATE = C.SDATE
+				                AND    REPLACE( #{schDate} ,'-','') BETWEEN C.SDATE AND NVL(C.EDATE,'99991231')
+				                                                 
+				                START WITH A.PRIOR_ORG_CD = '0' 
+				                CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD 
+				                AND    PRIOR A.SDATE = A.SDATE 
+				                AND    PRIOR A.ORG_CD = A.PRIOR_ORG_CD 
+				                ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+				                ) T1
+				     WHERE C.ENTER_CD(+) =  T1.ENTER_CD
+				       AND C.ORG_CD(+) = T1.ORG_CD
+				  ) T2
+
+				]]>
+		</select>
+
+		<!-- 현황/검색 팝업 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHrmStaPopupList">
+
+				<![CDATA[
+					SELECT X.SABUN
+						 , X.ENTER_CD
+						 , F_COM_GET_ENTER_NM(X.ENTER_CD, '1') AS ENTER_NM
+					     , F_COM_GET_NAMES(X.ENTER_CD, X.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'H10010', Y.STATUS_CD, #{ssnLocaleCd}) AS STATUS_NM
+					     , F_COM_GET_ORG_NM(Y.ENTER_CD, Y.ORG_CD, REPLACE(#{schDate}, '-', ''), #{ssnLocaleCd}) AS ORG_NM
+					     , F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'H20020', Y.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					     , F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'H20030', Y.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+					     , F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'H20010', Y.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+					     , F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'H10050', Y.WORK_TYPE, #{ssnLocaleCd}) AS WORK_TYPE_NM
+					     , F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'H10030', Y.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+					     , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || X.ENTER_CD || chr(38) || 'searchKeyword=' || X.SABUN || chr(38) || 'type=1' AS PHOTO
+					     , '1' AS DETAIL0
+					     , F_SYS_GET_ENDOW_AUTH_YN( X.ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  X.SABUN ) AS AUTH_YN
+					 FROM THRM100 X, THRM151 Y
+					WHERE X.ENTER_CD = Y.ENTER_CD
+					  AND X.SABUN  = Y.SABUN
+					  AND Y.ENTER_CD = #{ssnEnterCd}
+					  AND REPLACE(#{schDate}, '-', '') BETWEEN Y.SDATE AND Y.EDATE
+					          ]]>
+					<choose><when test='schType != null and schType.equals("ECNT")'>
+	   				  AND X.EMP_YMD BETWEEN SUBSTR( REPLACE(#{schDate}, '-', ''),'1','6')||'01' AND SUBSTR( REPLACE(#{schDate}, '-', ''),'1','6')||'31'
+					</when>
+					<when test='schType != null and schType.equals("RCNT")'>
+					  AND X.RET_YMD BETWEEN SUBSTR( REPLACE(#{schDate}, '-', ''),'1','6')||'01' AND SUBSTR( REPLACE(#{schDate}, '-', ''),'1','6')||'31'
+					</when>
+				    <otherwise>
+					  AND Y.STATUS_CD NOT IN ('RA','RAA')
+		   				<if test='schType != null and schType.equals("JIKGUB_CD")'>
+		   					<choose><when test='schCode != null and schCode.equals("-1")'>
+						  		AND NVL(Y.JIKGUB_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20010' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+							</when>
+							<otherwise>
+						  		AND Y.JIKGUB_CD = #{schCode}
+							</otherwise>
+							</choose>
+						</if><if test='schType != null and schType.equals("JIKWEE_CD")'>
+		   					<choose><when test='schCode != null and schCode.equals("-1")'>
+						  		AND NVL(Y.JIKWEE_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20030' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+							</when>
+								<otherwise>
+						  		AND Y.JIKWEE_CD = #{schCode}
+								</otherwise>
+							</choose>
+						</if><if test='schType != null and schType.equals("JIKCHAK_CD")'>
+		   					<choose><when test='schCode != null and schCode.equals("-1")'>
+						  		AND NVL(Y.JIKCHAK_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20020' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+							</when>
+								<otherwise>
+						  		AND Y.JIKCHAK_CD = #{schCode}
+							</otherwise>
+							</choose>
+						</if><if test='schType != null and schType.equals("WORK_TYPE")'>
+		   					<choose><when test='schCode != null and schCode.equals("-1")'>
+						  		AND NVL(Y.WORK_TYPE, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H10050' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD)
+							</when>
+								<otherwise>
+						  		AND Y.WORK_TYPE = #{schCode}
+								</otherwise>
+							</choose>
+							</if><if test='schType != null and schType.equals("MANAGE_CD")'>
+		   					<choose><when test='schCode != null and schCode.equals("-1")'>
+						  		AND NVL(Y.MANAGE_CD, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H10030' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD )
+							</when>
+								<otherwise>
+						  		AND Y.MANAGE_CD = #{schCode}
+								</otherwise>
+							</choose>
+							</if><if test='schType != null and schType.equals("STF_TYPE")'>
+		   					<choose><when test='schCode != null and schCode.equals("-1")'>
+						  		AND NVL(X.STF_TYPE, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'F10001' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD)
+							</when>
+								<otherwise>
+						  		AND X.STF_TYPE = #{schCode}
+								</otherwise>
+								</choose>
+							</if><if test='schType != null and schType.equals("EMP_TYPE")'>
+		   					<choose><when test='schCode != null and schCode.equals("-1")'>
+						  		AND NVL(X.EMP_TYPE, '^') NOT IN ( SELECT CODE FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'F10003' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD)
+							</when>
+								<otherwise>
+						  		AND X.EMP_TYPE = #{schCode}
+								</otherwise>
+							</choose>
+							</if><if test='schType != null and schType.equals("SEX")'>
+						  		AND X.SEX_TYPE = #{schCode}
+		   				</if>
+					</otherwise>
+					</choose>
+	   				
+					  AND Y.ORG_CD = #{schOrgCd}
+					  ORDER BY F_COM_JIKJE_SORT(#{ssnEnterCd}, X.SABUN, REPLACE(#{schDate}, '-', ''))
+
+
+
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getHrmStaTitleList">
+
+ 					SELECT CODE, CODE_NM
+					FROM TSYS005
+   					WHERE ENTER_CD = #{ssnEnterCd}
+     				AND GRCODE_CD = trim( #{grpCd} ) AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+ 					ORDER BY USE_YN DESC, SEQ, CODE, CODE_NM 
+
+
+
+		</select>
+		
+		
+
+
+</mapper>

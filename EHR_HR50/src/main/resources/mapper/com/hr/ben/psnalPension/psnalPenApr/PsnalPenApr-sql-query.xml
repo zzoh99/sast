@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.psnalPension.psnalPenApr">
+
+	<select id="getPsnalPenAprList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT A.ENTER_CD
+				, A.APPL_SEQ
+				, A.SABUN
+				, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+				, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+				, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+				, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+				, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+				, F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS WORKTYPE_NM
+			    , A.JIKGUB_CD
+			    , A.PENS_CD
+			    , A.COMP_MON
+			    , A.PSNL_MON
+			    , A.PAY_YM
+			    , A.NOTE
+				, B.APPL_YMD
+				, B.APPL_SABUN
+				, B.APPL_IN_SABUN
+				, B.APPL_STATUS_CD
+				, '0' AS DETAIL
+				, CASE WHEN B.APPL_STATUS_CD = '99' THEN '1' ELSE '0' END AS SHTCOL_EDIT
+		     FROM TBEN651 A, THRI103 B
+		    WHERE A.ENTER_CD   = #{ssnEnterCd}
+		      AND A.ENTER_CD   = B.ENTER_CD
+		      AND A.APPL_SEQ   = B.APPL_SEQ
+		      AND B.APPL_STATUS_CD NOT IN ('11') ]]>
+			<if test="searchFrom != null and searchFrom neq '' and searchTo != null and searchTo neq ''">
+		      AND B.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+			</if>
+			<if test="searchApplStatusCd != null and searchApplStatusCd neq ''">
+		      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+			</if>
+			<if test="searchPsnalPenCd != null and searchPsnalPenCd neq ''">
+		      AND A.OCC_CD = #{searchPsnalPenCd}
+			</if>
+			<if test="searchPayYm != null and searchPayYm neq ''">
+		      AND A.PAY_YM = REPLACE(#{searchPayYm}, '-','')
+			</if>
+			<if test="searchSabunName != null and searchSabunName neq ''">
+		      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+			</if>
+			<if test="searchOrgNm != null and searchOrgNm neq ''">
+		     AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+			</if>
+		    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC
+	</select>
+
+	<update id="savePsnalPenApr" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN651 T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+
+			    SELECT TRIM(#{ssnEnterCd})			AS	ENTER_CD
+			         , TRIM(#{rm.applSeq})			AS	APPL_SEQ
+			         , TRIM(#{rm.sabun})			AS	SABUN
+                     , TRIM(#{rm.psnlMon})			AS	PSNL_MON
+                     , TRIM(#{rm.payYm})			AS	PAY_YM
+			      FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S
+		ON	(
+				T.ENTER_CD	=	S.ENTER_CD
+			AND	T.APPL_SEQ	=	S.APPL_SEQ
+			AND	T.SABUN   	=	S.SABUN
+		)
+
+		WHEN MATCHED THEN
+			UPDATE SET T.PSNL_MON		=	S.PSNL_MON
+				     , T.PAY_YM   	=	S.PAY_YM
+				     , T.CHKDATE		=	sysdate
+				     , T.CHKID			=	#{ssnSabun}
+	]]>
+	</update>
+</mapper>

@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalAssurance">
+
+<!-- 인사기본(보증) 보증보험 조회 -->
+		<select id="getPsnalAssuranceWarrantyList" resultType="cMap" parameterType="map">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.TYPE
+					     , A.WARRANTY_S_YMD
+					     , A.WARRANTY_E_YMD
+					     , A.WARRANTY_CD
+					     , A.WARRANTY_NO
+					     , A.CURRENCY_CD
+					     , A.WARRANTY_MON
+					     , A.JOB_GBN_CD
+					     , A.NOTE
+					     , A.FILE_SEQ
+					     , A.DED_YM
+					  FROM THRM119 A
+					 WHERE A.ENTER_CD = NVL( #{searchUserEnterCd}, #{ssnEnterCd} )
+					   AND A.SABUN = #{sabun}
+					   AND A.TYPE = #{type}
+				]]>
+
+
+		</select>
+
+<!-- 인사기본(보증) 보증인 조회 -->
+		<select id="getPsnalAssuranceWarrantyUserList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.TYPE
+					     , A.WARRANTY_S_YMD
+					     , A.WARRANTY_E_YMD
+					     , A.WARRANTY_NM
+					     , A.REL_NM
+					     , CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD) AS RES_NO
+					     , A.TEL_NO
+					     , A.ZIP
+					     , A.ADDR1
+					     , A.ADDR2
+					     , A.WARRANTY_MON
+					     , A.NOTE
+					     , A.FILE_SEQ
+					  FROM THRM119 A
+					 WHERE A.ENTER_CD = NVL( #{searchUserEnterCd}, #{ssnEnterCd} )
+					   AND A.SABUN = #{sabun}
+					   AND A.TYPE = #{type}
+				]]>
+
+
+		</select>
+
+<!-- 인사기본(보증) 보증보험 저장 -->
+		<update id="savePsnalAssuranceWarranty" parameterType="map" >
+
+
+					MERGE INTO THRM119 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.TYPE
+									, A.WARRANTY_S_YMD
+									, A.WARRANTY_E_YMD
+									, A.WARRANTY_CD
+									, A.WARRANTY_NO
+									, A.CURRENCY_CD
+									, A.WARRANTY_MON									
+									, A.JOB_GBN_CD
+									, A.NOTE
+									, A.FILE_SEQ
+									, A.DED_YM
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS TYPE
+											, NULL		AS WARRANTY_S_YMD
+											, NULL		AS WARRANTY_E_YMD
+											, NULL		AS WARRANTY_CD
+											, NULL		AS WARRANTY_NO
+											, NULL      AS CURRENCY_CD
+											, NULL		AS WARRANTY_MON											
+											, NULL      AS JOB_GBN_CD
+											, NULL      AS NOTE
+											, NULL      AS FILE_SEQ
+											, NULL      AS DED_YM
+									FROM	DUAL
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.type} )			AS TYPE
+											, TRIM( #{rm.warrantySYmd} )	AS WARRANTY_S_YMD
+											, TRIM( #{rm.warrantyEYmd} )	AS WARRANTY_E_YMD
+											, TRIM( #{rm.warrantyCd} )		AS WARRANTY_CD
+											, TRIM( #{rm.warrantyNo} )		AS WARRANTY_NO
+											, TRIM( #{rm.currencyCd} )		AS CURRENCY_CD
+											, TRIM( #{rm.warrantyMon} )		AS WARRANTY_MON
+											, TRIM( #{rm.jobGbnCd} )		AS JOB_GBN_CD
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.fileSeq} )			AS FILE_SEQ
+											, TRIM( #{rm.dedYm} )			AS DED_YM
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.TYPE IS NOT NULL
+										  AND A.WARRANTY_S_YMD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.TYPE = S.TYPE AND T.WARRANTY_S_YMD = S.WARRANTY_S_YMD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.WARRANTY_E_YMD	= S.WARRANTY_E_YMD
+									, T.WARRANTY_CD   	= S.WARRANTY_CD
+									, T.WARRANTY_NO   	= S.WARRANTY_NO
+									, T.CURRENCY_CD  	= S.CURRENCY_CD
+									, T.WARRANTY_MON  	= S.WARRANTY_MON									
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+									, T.JOB_GBN_CD      = S.JOB_GBN_CD
+									, T.NOTE            = S.NOTE
+									, T.FILE_SEQ        = S.FILE_SEQ
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.TYPE
+							, T.WARRANTY_S_YMD
+							, T.WARRANTY_E_YMD
+							, T.WARRANTY_CD
+							, T.WARRANTY_NO
+							, T.CURRENCY_CD
+							, T.WARRANTY_MON
+							, T.CHKDATE
+							, T.CHKID
+							, T.JOB_GBN_CD
+							, T.NOTE
+							, T.FILE_SEQ
+							, T.DED_YM
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.TYPE
+							, S.WARRANTY_S_YMD
+							, S.WARRANTY_E_YMD
+							, S.WARRANTY_CD
+							, S.WARRANTY_NO
+							, S.CURRENCY_CD
+							, S.WARRANTY_MON
+							, SYSDATE
+							, #{ssnSabun}
+							, S.JOB_GBN_CD
+							, S.NOTE
+							, S.FILE_SEQ
+							, S.DED_YM
+						)
+		</update>
+
+<!-- 인사기본(보증) 보증인 저장 -->
+		<update id="savePsnalAssuranceWarrantyUser" parameterType="map">
+
+					MERGE INTO THRM119 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.TYPE
+									, A.WARRANTY_S_YMD
+									, A.WARRANTY_E_YMD
+									, A.WARRANTY_NM
+									, A.REL_NM
+									, A.RES_NO
+									, A.TEL_NO
+									, A.ZIP
+									, A.ADDR1
+									, A.ADDR2
+									, A.WARRANTY_MON
+									, A.NOTE
+									, A.FILE_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS TYPE
+											, NULL		AS WARRANTY_S_YMD
+											, NULL		AS WARRANTY_E_YMD
+											, NULL		AS WARRANTY_NM
+											, NULL		AS REL_NM
+											, NULL		AS RES_NO
+											, NULL		AS TEL_NO
+											, NULL		AS ZIP
+											, NULL		AS ADDR1
+											, NULL		AS ADDR2
+											, NULL		AS WARRANTY_MON
+											, NULL      AS NOTE
+											, NULL      AS FILE_SEQ
+									FROM	DUAL
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.type} )			AS TYPE
+											, TRIM( #{rm.warrantySYmd} )	AS WARRANTY_S_YMD
+											, TRIM( #{rm.warrantyEYmd} )	AS WARRANTY_E_YMD
+											, TRIM( #{rm.warrantyNm} )		AS WARRANTY_NM
+											, TRIM( #{rm.relNm} )			AS REL_NM
+											, TRIM( #{rm.resNo} )			AS RES_NO
+											, TRIM( #{rm.telNo} )			AS TEL_NO
+											, TRIM( #{rm.zip} )				AS ZIP
+											, TRIM( #{rm.addr1} )			AS ADDR1
+											, TRIM( #{rm.addr2} )			AS ADDR2
+											, TRIM( #{rm.warrantyMon} )		AS WARRANTY_MON
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.fileSeq} )			AS FILE_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.TYPE  IS NOT NULL
+										  AND A.WARRANTY_S_YMD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.TYPE = S.TYPE AND T.WARRANTY_S_YMD = S.WARRANTY_S_YMD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.WARRANTY_E_YMD	= S.WARRANTY_E_YMD
+									, T.WARRANTY_NM   	= S.WARRANTY_NM
+									, T.REL_NM        	= S.REL_NM
+									, T.RES_NO          = CRYPTIT.ENCRYPT( S.RES_NO,S.ENTER_CD )
+									, T.TEL_NO          = S.TEL_NO
+									, T.ZIP             = S.ZIP
+									, T.ADDR1           = S.ADDR1
+									, T.ADDR2           = S.ADDR2
+									, T.WARRANTY_MON    = S.WARRANTY_MON
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+									, T.NOTE            = S.NOTE
+									, T.FILE_SEQ        = S.FILE_SEQ
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.TYPE
+							, T.WARRANTY_S_YMD
+							, T.WARRANTY_E_YMD
+							, T.WARRANTY_NM
+							, T.REL_NM
+							, T.RES_NO
+							, T.TEL_NO
+							, T.ZIP
+							, T.ADDR1
+							, T.ADDR2
+							, T.WARRANTY_MON
+							, T.CHKDATE
+							, T.CHKID
+							, T.NOTE
+							, T.FILE_SEQ
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.TYPE
+							, S.WARRANTY_S_YMD
+							, S.WARRANTY_E_YMD
+							, S.WARRANTY_NM
+							, S.REL_NM
+							, CRYPTIT.ENCRYPT( S.RES_NO,S.ENTER_CD )
+							, S.TEL_NO
+							, S.ZIP
+							, S.ADDR1
+							, S.ADDR2
+							, S.WARRANTY_MON
+							, SYSDATE
+							, #{ssnSabun}
+							, S.NOTE
+							, S.FILE_SEQ
+						)
+
+
+		</update>
+
+<!-- 인사기본(보증) 보증보험 삭제 -->
+		<delete id="deletePsnalAssuranceWarranty" parameterType="map">
+
+					DELETE FROM THRM119
+					WHERE  ENTER_CD||'_'||SABUN||'_'||TYPE||'_'||WARRANTY_S_YMD IN 	(  NULL
+					<foreach collection="deleteRows" item="rm" >
+
+						<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+							and rm.sabun != null and !rm.sabun.equals("")
+							and rm.type != null and !rm.type.equals("")
+							and rm.warrantySYmd != null and !rm.warrantySYmd.equals("")' >
+								, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.type} )||'_'||TRIM( #{rm.warrantySYmd} )
+						</if>
+
+					</foreach>
+										)
+
+		</delete>
+
+<!-- 인사기본(보증) 보증인 삭제 -->
+		<delete id="deletePsnalAssuranceWarrantyUser">
+
+					DELETE FROM THRM119
+					WHERE  ENTER_CD||'_'||SABUN||'_'||TYPE||'_'||WARRANTY_S_YMD IN 	(  NULL
+									<foreach collection="deleteRows" item="rm" >
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.type != null and !rm.type.equals("")
+												and rm.warrantySYmd != null and !rm.warrantySYmd.equals("")' >
+
+											, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.type} )||'_'||TRIM( #{rm.warrantySYmd} )
+										</if>
+									</foreach>
+										)
+
+		</delete>
+	</mapper>

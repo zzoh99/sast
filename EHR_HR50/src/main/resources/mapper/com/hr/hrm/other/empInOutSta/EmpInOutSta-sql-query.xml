@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.empInOutSta">
+		<select parameterType="map" resultType="cMap" id="getEmpInoutStaList">
+
+				<![CDATA[
+					SELECT A.*
+					  FROM (
+							SELECT A.ENTER_CD
+							 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN ||  chr(38) || 'type=1' AS PHOTO
+							 , DECODE(A.ORD_TYPE_CD, 'E', '퇴사자', '입사자') AS GUBUN
+							 , F_COM_GET_ENTER_NM(A.ENTER_CD, '1') AS ENTER_NM
+							 , F_SYS_GET_ENDOW_AUTH_YN( A.ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  A.SABUN ) AS AUTH_YN
+							 , F_COM_GET_PRIOR_ORG_TYPE_NM(A.ENTER_CD, A.ORG_CD, '20', A.ORD_YMD) AS PRIOR_ORG_NM	-- 본부
+							 , A.ORG_CD
+							 , A.ORG_NM							--소속
+							 , A.SABUN
+							 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, '', A.ORD_YMD) AS NAME
+							 , A.STATUS_CD
+							 , A.STATUS_NM
+							 , A.JIKWEE_CD
+							 , A.JIKWEE_NM					--직위
+							 , A.JIKGUB_CD
+							 , A.JIKGUB_NM					--직급
+							 , A.JIKCHAK_CD
+							 , A.JIKCHAK_NM					--직책
+							 , A.JOB_NM							--직무
+							 , A.WORK_TYPE_NM				--직군
+							 , A.MANAGE_NM					--사원구분
+							 , F_COM_GET_JOB_NM_201 (A.ENTER_CD, A.JOB_CD, A.ORD_YMD) AS JOB_GBN 	-- 직무구분
+							 , A.SAL_CLASS					--호봉
+							 , SUBSTR(CRYPTIT.DECRYPT(B.RES_NO, A.ENTER_CD), 0, 6) || '-' || SUBSTR(CRYPTIT.DECRYPT(B.RES_NO, A.ENTER_CD), 7, 13) AS RES_NO	-- 주민번호
+							 , DECODE(SUBSTR(CRYPTIT.DECRYPT(TRIM(B.RES_NO), A.ENTER_CD), 7, 1), '1', '남', '2', '여', '3', '남', '4', '여', '5', '남', '6', '여') AS SEX_TYPE_NM	-- 성별
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'W90091', B.BASE3_CD) AS BASE3_CD	-- 구소속
+							 , A.GEMP_YMD						--그룹입사일
+							 , A.EMP_YMD						--입사일
+							 , A.ORD_YMD						--발령일
+							 , A.ORD_TYPE_CD				--발령형태
+							 , A.ORD_DETAIL_CD			--발령종류
+							 , A.ORD_REASON_CD			--발령세부사유
+							 , F_COM_GET_ORD_TYPE_NM(A.ENTER_CD, A.ORD_TYPE_CD) AS ORD_TYPE_NM	-- 발령명
+							 , F_COM_GET_ORD_DETAIL_NM(A.ENTER_CD, A.ORD_TYPE_CD, A.ORD_DETAIL_CD) AS ORD_DETAIL_NM	-- 발령상세명
+							 , A.ORD_REASON_NM			--세부발령
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H40100',A.RESIGN_REASON_CD, 'ko_KR') AS RESIGN_REASON_NM	--			퇴직사유명
+							 , B.RET_PATH_NM				--이직처
+							 , DECODE(#{searchGubun}, 'E', '퇴직', '재직') AS STATUS_GB
+							 , A.MEMO
+						  FROM THRM191 A,
+						       THRM100 B
+						 WHERE 1=1
+						   AND A.ENTER_CD      = TRIM(#{ssnEnterCd})
+						   AND A.ENTER_CD      = B.ENTER_CD
+						   AND A.SABUN         = B.SABUN
+				   ) A
+				WHERE 1=1   ]]>
+				  <choose>
+					  <when test='searchGubun != null and !searchGubun.equals("")'>
+				    AND F_COM_GET_ORD_TYPE(A.ENTER_CD, A.ORD_TYPE_CD)   = #{searchGubun}				--Fix
+					  </when>
+					  <otherwise>
+				    AND F_COM_GET_ORD_TYPE(A.ENTER_CD, A.ORD_TYPE_CD) IN ('10', '60')
+					  </otherwise>
+				  </choose>
+				  <if test='searchOrdTypeCd != null and !searchOrdTypeCd.equals("")'>
+				    AND A.ORD_TYPE_CD = #{searchOrdTypeCd}
+				  </if>
+				  <if test='searchOrdDetailCd != null and !searchOrdDetailCd.equals("")'>
+				    AND A.ORD_DETAIL_CD = #{searchOrdDetailCd}
+				  </if>
+				  <if test='searchOrdReasonCd != null and !searchOrdReasonCd.equals("")'>
+				    AND A.ORD_REASON_CD = #{searchOrdReasonCd}
+				  </if>
+				  <if test='sdate != null and !sdate.equals("") and edate != null and !edate.equals("")'>
+					AND A.ORD_YMD BETWEEN REPLACE(#{sdate}, '-', '') AND REPLACE(#{edate}, '-', '')
+				  </if>
+				  <if test='statusCd != null and !statusCd.equals("")'>
+   					AND A.STATUS_CD IN
+		<foreach collection="statusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				  </if>
+				  <if test='jikchakCd != null and !jikchakCd.equals("")'>
+   					AND A.JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				  </if>
+				  <if test='jikweeCd != null and !jikweeCd.equals("")'>
+   					AND A.JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				  </if>
+				  <if test='jikgubCd != null and !jikgubCd.equals("")'>
+   					AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				  </if>
+				  <if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+				   AND UPPER(F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))) LIKE '%' || UPPER(#{searchOrgNm}) || '%'
+				  </if>
+				  <if test='searchSabunName !=null and !searchSabunName.equals("")'>
+				   AND ( UPPER(A.SABUN) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%' OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+				  </if>
+				  				  				  
+				  
+				  ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.ORD_YMD)
+
+
+		</select>
+
+</mapper>

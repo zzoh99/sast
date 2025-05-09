@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.locationMgr">
+<!-- 		Location관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLocationMgrList">
+
+				<![CDATA[
+					SELECT  '0' AS DETAIL
+						  , A.MAP_CD AS LOCATION_CD
+						  , A.MAP_NM AS LOCATION_NM
+						  , B.NATIONAL_CD
+						  , B.ZIP
+						  , B.ADDR
+						  , B.DETAIL_ADDR
+						  , B.ENG_ADDR
+						  , B.DETAIL_ENG_ADDR
+						  , B.TAX_OFFICE_NM
+						  , B.REC_OFFICE_NM
+						  , B.TAX_LOCATION_CD
+						  , B.OFFICE_TAX_YN
+						  , B.TAX_BP_CD
+						  , B.ORDER_SEQ
+					  FROM TORG109 A
+					  LEFT OUTER JOIN TSYS015 B
+					    ON B.ENTER_CD = A.ENTER_CD
+					   AND B.LOCATION_CD = A.MAP_CD
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.MAP_TYPE_CD = '600'
+				       AND A.SDATE = (SELECT MAX (SDATE) FROM TORG109
+					                   WHERE ENTER_CD = A.ENTER_CD
+					                     AND MAP_TYPE_CD = A.MAP_TYPE_CD
+					                     AND MAP_CD = A.MAP_CD
+					                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+				               ]]>
+       				<if test='searchLocationNm != null and !searchLocationNm.equals("")'>
+				       AND B.LOCATION_NM LIKE '%'||TRIM(#{searchLocationNm})||'%'
+					</if>
+					--ORDER BY NVL(A.SORT, A.MAP_CD), B.LOCATION_CD
+					ORDER BY A.SORT, A.MAP_CD
+
+
+		</select>
+
+<!-- 		Location관리 저장 -->
+		<update parameterType="map" id="saveLocationMgr">
+
+					MERGE INTO TSYS015 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.LOCATION_CD
+									, A.LOCATION_NM
+									, A.NATIONAL_CD
+									, A.ZIP
+									, A.ADDR
+									, A.DETAIL_ADDR
+									, A.ENG_ADDR
+									, A.DETAIL_ENG_ADDR
+									, A.TAX_OFFICE_NM
+									, A.REC_OFFICE_NM
+									, A.TAX_LOCATION_CD
+									, A.OFFICE_TAX_YN
+									, A.TAX_BP_CD
+									, A.ORDER_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS LOCATION_CD
+											, NULL		AS LOCATION_NM
+											, NULL		AS NATIONAL_CD
+											, NULL		AS ZIP
+											, NULL		AS ADDR
+											, NULL		AS DETAIL_ADDR
+											, NULL      AS ENG_ADDR
+											, NULL		AS DETAIL_ENG_ADDR
+											, NULL		AS TAX_OFFICE_NM
+											, NULL		AS REC_OFFICE_NM
+											, NULL		AS TAX_LOCATION_CD
+											, NULL		AS OFFICE_TAX_YN
+											, NULL		AS TAX_BP_CD
+											, NULL		AS ORDER_SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.locationCd})	AS LOCATION_CD
+											, TRIM( #{rm.locationNm})	AS LOCATION_NM
+											, TRIM( #{rm.nationalCd})	AS NATIONAL_CD
+											, TRIM( #{rm.zip})	AS ZIP
+											, TRIM( #{rm.addr})	AS ADDR
+											, TRIM( #{rm.detailAddr})	AS DETAIL_ADDR
+											, TRIM( #{rm.engAddr}) AS ENG_ADDR
+											, TRIM( #{rm.detailEngAddr})	AS DETAIL_ENG_ADDR
+											, TRIM( #{rm.taxOfficeNm}) AS TAX_OFFICE_NM
+											, TRIM( #{rm.recOfficeNm}) AS REC_OFFICE_NM
+											, TRIM( #{rm.taxLocationCd}) AS TAX_LOCATION_CD
+											, TRIM( #{rm.officeTaxYn}) AS OFFICE_TAX_YN
+											, TRIM( #{rm.taxBpCd}) AS TAX_BP_CD
+											, TRIM( #{rm.orderSeq}) AS ORDER_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.LOCATION_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.LOCATION_CD = UPPER(S.LOCATION_CD) )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.LOCATION_NM	= S.LOCATION_NM
+									, T.NATIONAL_CD	= UPPER(S.NATIONAL_CD)
+									, T.ZIP	= S.ZIP
+									, T.ADDR	= S.ADDR
+									, T.DETAIL_ADDR	= S.DETAIL_ADDR
+									, T.ENG_ADDR = S.ENG_ADDR
+									, T.DETAIL_ENG_ADDR	= S.DETAIL_ENG_ADDR
+									, T.TAX_OFFICE_NM = S.TAX_OFFICE_NM
+									, T.REC_OFFICE_NM = S.REC_OFFICE_NM
+									, T.TAX_LOCATION_CD = S.TAX_LOCATION_CD
+									, T.OFFICE_TAX_YN = S.OFFICE_TAX_YN
+									, T.TAX_BP_CD = S.TAX_BP_CD
+									, T.ORDER_SEQ = S.ORDER_SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.LOCATION_CD
+							, T.LOCATION_NM
+							, T.NATIONAL_CD
+							, T.ZIP
+							, T.ADDR
+							, T.DETAIL_ADDR
+							, T.ENG_ADDR
+							, T.DETAIL_ENG_ADDR
+							, T.TAX_OFFICE_NM
+							, T.REC_OFFICE_NM
+							, T.TAX_LOCATION_CD
+							, T.OFFICE_TAX_YN
+							, T.TAX_BP_CD
+							, T.ORDER_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, UPPER(S.LOCATION_CD)
+							, S.LOCATION_NM
+							, S.NATIONAL_CD
+							, S.ZIP
+							, S.ADDR
+							, S.DETAIL_ADDR
+							, S.ENG_ADDR
+							, S.DETAIL_ENG_ADDR
+							, S.TAX_OFFICE_NM
+							, S.REC_OFFICE_NM
+							, S.TAX_LOCATION_CD
+							, S.OFFICE_TAX_YN
+							, S.TAX_BP_CD
+							, S.ORDER_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		Location관리 삭제 -->
+		<delete parameterType="map" id="deleteLocationMgr">
+
+					DELETE FROM TSYS015
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||LOCATION_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.locationCd != null and !rm.locationCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.locationCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

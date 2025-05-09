@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="main.login">
+
+	
+	<select id="getLoginEnterList" parameterType="map" resultType="cMap">
+		<![CDATA[
+
+	        SELECT ENTER_CD,
+	        	   NVL(F_COM_GET_LANGUAGE_MAPPING (ENTER_CD, 'torg900', A.LANGUAGE_CD, #{localeCd}), ENTER_NM) AS ENTER_NM,
+	        	   ALIAS AS ENTER_ALIAS,
+	        	   COPYRIGHT,
+			      ( SELECT S_FILE_NM
+					    FROM TSYS201
+					   WHERE ENTER_CD = A.ENTER_CD
+                               AND (ENTER_CD, FILE_SEQ, SEQ_NO ) in (SELECT ENTER_CD, FILE_SEQ, SEQ_NO
+                                                                FROM TORG903
+                                                               WHERE CODE = '1'
+                                                                 AND ORG_CD = '0'))   AS LOGO_IMG
+	        FROM TORG900 A
+	        WHERE TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN NVL(S_YMD,'18000101') AND NVL(E_YMD, '99991231')
+	        AND NVL(USE_YN,'Y') = 'Y'
+	        ORDER BY SEQ
+		]]>
+	</select>
+
+	<select id="getLoginEnterMap" parameterType="map" resultType="cMap">
+			<![CDATA[
+					SELECT ENTER_CD, ENTER_NM, ENTER_ENG_NM, ALIAS, LANG_USE_YN
+					FROM TORG900
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+	</select>
+
+
+	<!-- 임시비밀번호 요청단계1_ 본인확인  -->
+	<select id="getLoginPwdFind" parameterType="map" resultType="cMap">
+
+			<![CDATA[
+					SELECT COUNT(1) AS CNT
+					  FROM THRM124 A
+					 WHERE ENTER_CD = #{enterCd}
+					   AND UPPER(SABUN) = UPPER(TRIM(#{sabun}))
+					   AND F_COM_GET_NAMES(A.ENTER_CD , A.SABUN, #{ssnLocaleCd} ) = TRIM(#{name})
+					   ]]>
+					   <if test='type.equals("0")'>
+					   AND (A.CONT_TYPE='IM' AND A.CONT_ADDRESS=TRIM(#{email}))
+					   </if>
+						<if test='type.equals("1")'>
+					   AND (A.CONT_TYPE='HP' AND REPLACE(A.CONT_ADDRESS,'-','') = REPLACE(TRIM(#{phone}),'-',''))
+						</if>
+					   AND ROWNUM = 1
+	</select>
+
+	<select id="loginTryCnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT DECODE(T2.ID,NULL,'N','Y') AS ID_EXST
+			     , NVL(T2.ROCKING_YN,'N')     AS ROCKING_YN
+			     , NVL(T2.LOGIN_FAIL_CNT,'0') AS LOGIN_FAIL_CNT
+			     , CASE WHEN T2.PASSWORD <> CRYPTIT.CRYPT(#{loginPassword}, #{loginEnterCd}) THEN 'Y'
+			       ELSE 'N'
+			       END AS PSWD_CLCT
+			     , F_COM_GET_STD_CD_VALUE(#{loginEnterCd}, 'LOGIN_FAIL_CNT') AS  LOGIN_FAIL_CNT_STD
+			     , #{loginPassword} AS PASS
+			     , CASE WHEN NVL(T2.LOGIN_FAIL_CNT,'0') >= F_COM_GET_STD_CD_VALUE(#{loginEnterCd}, 'LOGIN_FAIL_CNT') THEN 'Y'
+			       ELSE 'N'
+			       END AS LOGIN_FAIL_CNT_YN
+			  FROM (
+			        SELECT UPPER(TRIM(#{loginUserId})) AS ID
+			             , '' AS ROCKING_YN
+			             , '' AS LOGIN_FAIL_CNT
+			          FROM DUAL
+			       ) T1
+			    , (
+			        SELECT UPPER(TRIM(ID)) AS ID
+			             , ROCKING_YN
+			             , LOGIN_FAIL_CNT
+			             , PASSWORD
+			          FROM TSYS305 D
+			         WHERE 1=1
+			           AND D.ENTER_CD  = #{loginEnterCd}
+			           AND UPPER(D.ID) = UPPER(TRIM(#{loginUserId}))
+			       ) T2
+			 WHERE T1.ID = T2.ID(+)
+		]]>
+	</select>
+	
+	<update id="saveLoingFailCnt" parameterType="map">
+		<![CDATA[
+             UPDATE TSYS305 T SET
+             LOGIN_FAIL_CNT  = #{loginFailCnt} + 1
+             WHERE ENTER_CD  = #{loginEnterCd}
+             AND   UPPER(ID) = UPPER(TRIM(#{loginUserId}))
+         ]]>
+	</update>
+
+	<select id="loginUserChk" parameterType="map" resultType="cMap">
+		<![CDATA[
+		SELECT A.SABUN	AS SSN_SABUN
+		  FROM THRM100 A
+		     , THRM151 B
+		     , TSYS305 D
+		     , TORG900 E
+		 WHERE 1=1
+		   AND D.ENTER_CD 	= #{loginEnterCd}
+		   AND UPPER(D.ID) = UPPER(TRIM(#{loginUserId})) ]]>
+		   <if test='ssnSso == "Y"'>
+		   <![CDATA[
+		   AND D.PASSWORD = CRYPTIT.CRYPT(#{loginPassword}, A.ENTER_CD)		   
+		   ]]>
+		   </if>
+		   <![CDATA[
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+		   AND NVL(B.STATUS_CD,'RA') <> 'RA'
+		   AND A.ENTER_CD  = B.ENTER_CD
+		   AND A.ENTER_CD 	= D.ENTER_CD
+		   AND A.ENTER_CD  = E.ENTER_CD
+		   AND A.SABUN 	= B.SABUN
+		   AND A.SABUN 	= D.SABUN
+		   AND D.ROCKING_YN = 'N'
+		   AND ROWNUM = 1
+		]]>
+	</select>
+	
+	<select id="systemOption" parameterType="map" resultType="cMap">
+		<![CDATA[
+			WITH SEC_VALUE AS (
+			    SELECT A.ENTER_CD
+			         , A.ENTER_CD AS SSN_ENTER_CD
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SECURITY_CHECK'),'N') AS "SSN_SECURITY_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SEC_DUP_LOGIN_ALLOW_YN'),'N') AS "SSN_SEC_DUP_LOGIN_ALLOW_YN"
+			         --,NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SECURITY_CHECK_DETAIL'),'N|N|N') AS "SSN_SECURITY_DETAIL"
+			         , DECODE(SUBSTR(NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SECURITY_CHECK_DETAIL'),'N|N|N'), 1,1), 'Y','S','X')
+			           || DECODE(SUBSTR(NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SECURITY_CHECK_DETAIL'),'N|N|N'), 3,1), 'Y','P','X')
+			           || DECODE(SUBSTR(NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SECURITY_CHECK_DETAIL'),'N|N|N'), 5,1), 'Y','U','X') AS "SSN_SECURITY_DETAIL"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_ADMIN_FNC_YN'), 'Y') AS "SSN_ADMIN_FNC_YN"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'ADMIN_LOG_ROW_YN'), 'Y') AS "SSN_ADMIN_LOG_ROW_YN"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_LOGIN_PW_EXPIRED_MONTH'), 3) AS "SSN_LOGIN_PW_EXPIRED_MONTH"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_LOGIN_PW_EXPIRED_NOTI'), 7) AS "SSN_LOGIN_PW_EXPIRED_NOTI"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_LOGIN_PW_EXPIRED_YN'), 'Y') AS "SSN_LOGIN_PW_EXPIRED_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_LOGIN_PW_LEVEL'), 'M') AS "SSN_LOGIN_PW_LEVEL"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_MRD_CHK_TIME'), 20) AS "SSN_MRD_CHK_TIME"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_TOKEN_CHK_TIME'), 1000) AS "SSN_TOKEN_CHK_TIME"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_TIME_OUT'), 30) AS "SSN_TIME_OUT"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_TIME_LOCK'), 0) AS "SSN_TIME_LOCK"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_ALIAS_USE_YN'), 'N') AS "SSN_ALIAS_USE_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_JIKWEE_USE_YN'), 'N') AS "SSN_JIKWEE_USE_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SEC_JIKGUB_USE_YN'), 'N') AS "SSN_JIKGUB_USE_YN"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'BEN_DECLARATION_USE_YN'), 'N') AS "SSN_DECLARATION_USE_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'SMS_SENDER'), '000-0000-0000') AS "SSN_SMS_SENDER"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SEC_TABS_LIMIT_CNT'),'6')  AS "SSN_TABS_LIMIT_CNT"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SSN_DEV_MODE_YN'),'N')  AS "SSN_DEV_MODE_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SSN_GUIDE_MODE_YN'),'N')  AS "SSN_GUIDE_MODE_YN"
+			         --2020.11.19
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'LOG_MENU_HIT'),'N')  AS "SSN_LOG_MENU_HIT_YN"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'MAIN_SITEMAP_VIEW_YN'),'N')  AS "SSN_MAIN_SITEMAP_VIEW_YN"
+-- 			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'MAIN_SEARCHMENU_VIEW_YN'),'N')  AS "SSN_MAIN_SEARCHMENU_VIEW_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'LEFT_MENU_OPEN_CNT'),'N')  AS "SSN_LEFT_MENU_OPEN_CNT"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'RET_AGREE_YN'),'Y')  AS "SSN_RET_AGREE_YN"
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'RET_SURVEY_YN'),'Y')  AS "SSN_RET_SURVEY_YN"
+			         --2022.03.21
+			         , NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD ,'SYS_NOTIFICATION_USE_YN'),'N') AS "SSN_NOTIFICATION_USE_YN"
+			      FROM TORG900 A
+			     )
+			SELECT *
+			  FROM SEC_VALUE
+			 WHERE ENTER_CD = #{loginEnterCd}
+			]]>
+	</select>
+
+	<select id="getChkPwdsMdfDateMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT NVL(RMN_DATE, 99 ) AS RMN_DATE
+			     , CASE WHEN ID_PW_SAME_CHK = 'IPS'             THEN 'IPS' -- 비밀번호가 주민번호 뒷자리와 일치하는 경우
+			            WHEN RMN_DATE <= NOTI AND RMN_DATE >= 0 THEN 'NTC' -- 7일 이전부터 알림
+			            WHEN RMN_DATE < 0                       THEN 'BLK' -- 로그인 불가
+			            ELSE 'UCK'
+			       END  AS CHK_CODE
+			     , NVL(F_COM_GET_STD_CD_VALUE(#{loginEnterCd},'SEC_LOGIN_PW_LEVEL'),'L') AS PW_CHK_LEV -- 비밀번호 체크 레벨
+			  FROM (
+			         SELECT ENTER_CD
+			              , SABUN
+			              , DECODE(CHK_YN, 'Y', (END_DATE-TODAY), 99) AS RMN_DATE
+			              , TO_NUMBER(NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD,'SEC_LOGIN_PW_EXPIRED_NOTI'),'7')) AS NOTI
+			              , ID_PW_SAME_CHK
+			           FROM (
+			                  SELECT U.ENTER_CD
+			                       , U.SABUN
+			                       , ADD_MONTHS(TO_DATE(U.PSWD_CHG_YMD,'YYYYMMDD')
+			                                  , TO_NUMBER(NVL(F_COM_GET_STD_CD_VALUE(U.ENTER_CD,'SEC_LOGIN_PW_EXPIRED_MONTH'),'3'))
+			                         )  AS END_DATE -- 3개월
+			                       , TO_DATE(TO_CHAR(SYSDATE,'YYYYMMDD'),'YYYYMMDD') AS TODAY
+			                       , NVL(F_COM_GET_STD_CD_VALUE(U.ENTER_CD, 'SEC_LOGIN_PW_EXPIRED_YN'),'N') AS CHK_YN -- 비밀번호 만료 체크 여부
+			                       , CASE WHEN CRYPTIT.CRYPT(SUBSTR(CRYPTIT.DECRYPT(H.RES_NO, H.ENTER_CD),7,7), H.ENTER_CD) = U.PASSWORD THEN 'IPS'
+			                              ELSE 'UCK'
+			                         END AS ID_PW_SAME_CHK -- 아이디랑 비밀번호 일치시에
+			                    FROM TSYS305 U
+			                       , THRM100 H
+			                   WHERE 1 = 1
+			                     AND U.ENTER_CD = H.ENTER_CD
+			                     AND U.SABUN    = H.SABUN
+			                     AND U.ENTER_CD = #{loginEnterCd}
+			                     AND U.SABUN    = #{loginSabun}
+			                )
+			       )
+		]]>
+	</select>
+
+	<select id="loginUser" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT    A.SABUN									AS SSN_SABUN		--사번
+					, A.ENTER_CD								AS SSN_ENTER_CD		--회사코드
+					, E.ENTER_NM								AS SSN_ENTER_NM		--회사명
+					--, E.ENTER_ENG_NM							AS SSN_ENTER_ENG_NM	--회사영문명
+					, E.ALIAS									AS SSN_ALIAS		--회사 ALIAS
+					, E.COPYRIGHT								AS SSN_COPYRIGHT	--회사 COPYRIGHT
+					, F_COM_GET_NAMES( A.ENTER_CD, A.SABUN, #{ssnLocaleCd})									AS SSN_NAME			--성명
+					, B.ORG_CD									AS SSN_ORG_CD		--조직코드
+					, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030' , B.JIKWEE_CD, #{ssnLocaleCd}) AS SSN_JIKWEE_NM
+					, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010' , B.JIKGUB_CD, #{ssnLocaleCd}) AS SSN_JIKGUB_NM
+					, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020' , B.JIKCHAK_CD, #{ssnLocaleCd}) AS SSN_JIKCHAK_NM
+					, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10050' , B.JIKCHAK_CD, #{ssnLocaleCd}) AS SSN_WORK_TYPE_NM
+					, F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD , TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS SSN_ORG_NM
+					, TO_CHAR(SYSDATE, 'YYYYMMDD')				AS SSN_BASE_DATE
+-- 					, CASE 	WHEN D.CHKDATE >= ADD_MONTHS(SYSDATE,-NVL(H.ATTRIBUTE_3,1)) THEN 'N'
+-- 							WHEN D.CHKDATE <  ADD_MONTHS(SYSDATE,-NVL(H.ATTRIBUTE_3,1)) THEN 'Y'
+-- 						END 										AS SSN_PW_EDIT_YN
+					, NVL(D.SKIN_TYPE, 'blue') 					AS SSN_SKIN_TYPE
+					, NVL(D.FONT_TYPE, 'nanum') 					AS SSN_FONT_TYPE
+					, NVL(D.MAIN_TYPE, 'M') 					AS SSN_MAIN_TYPE
+					, NVL(D.WIDGET_TYPE, 'A') 					AS SSN_WIDGET_TYPE
+-- 					, NVL(F_COM_GET_LAST_LOGIN_DATE(D.ENTER_CD,A.SABUN), TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI')) AS SSN_LAST_LOGIN
+-- 					, F_SYS_GET_PRIVACY_AGREEMENT_YN(A.ENTER_CD,TO_CHAR(SYSDATE,'YYYYMMDD'), A.SABUN, NULL) AS SSN_PRIVACY_AGREEMENT_YN
+					, F_SEC_GET_ENCODED_KEY AS SSN_ENCODED_KEY
+					, NVL(#{localeCd}, #{baseLang}) AS SSN_LOCALE_CD
+					, NVL(E.LANG_USE_YN, '0') AS SSN_LANG_USE_YN
+					, DECODE((SELECT SABUN FROM TPAP993 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN),'','N','Y') AS SSN_PAP_ADMIN_YN
+					, F_COM_GET_ADMIN_GRP_YN(A.ENTER_CD, A.SABUN) AS SSN_ADMIN_GRP_YN  -- 관리자 그룹 보유 여부
+					, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_COMPANY_MGR_YN'),'N') AS SSN_COMPANY_MGR_YN
+					, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_FILE_DOWN_SET_PWD'),'N') AS SSN_FILE_DOWN_SET_PWD -- 다운로드 암호 설정 여부
+					, NVL(CRYPTIT.DECRYPT(D.PASSWORD_DOWNLOAD, D.ENTER_CD), A.SABUN) AS SSN_FILE_DOWN_PWD
+					, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_FILE_DOWN_REG_REASON'),'N') AS SSN_FILE_DOWN_REG_REASON -- 다운로드 사유등록 여부
+					, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_FILE_DOWN_MOBILE_YN'),'N') AS SSN_FILE_DOWN_MOBILE_YN -- 모바일 파일 다운로드 허용 여부
+					, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_CHATBOT_YN'),'N') AS SSN_CHATBOT_YN -- 챗봇 사용 여부
+					, 'N' AS SSN_ENTER_ALL_YN
+					, 'N' AS SSN_PRE_SRCH_YN
+					, 'Y' AS SSN_RET_SRCH_YN
+					, 'N' AS SSN_RES_SRCH_YN
+					, D.ID AS SSN_USER_ID
+			FROM THRM100 A
+		   INNER JOIN THRM151 B
+			  ON A.ENTER_CD  = B.ENTER_CD
+			 AND NVL(B.STATUS_CD, 'RA') <> 'RA'
+			 AND A.SABUN 	= B.SABUN
+			 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+		   INNER JOIN TSYS305 D
+		      ON A.ENTER_CD 	= D.ENTER_CD
+		     AND A.SABUN 	= D.SABUN
+		   INNER JOIN TORG900 E
+		      ON A.ENTER_CD  = E.ENTER_CD
+		    LEFT OUTER JOIN TORG999 H
+		      ON A.ENTER_CD 	= H.ENTER_CD
+		   WHERE 1=1
+			 AND D.ENTER_CD 	= #{loginEnterCd}
+			 AND UPPER(D.ID) = UPPER(TRIM(#{loginUserId})) ]]>
+		<if test='ssnSso == "Y"'>
+		<![CDATA[
+			AND D.PASSWORD = CRYPTIT.CRYPT(#{loginPassword}, A.ENTER_CD)
+		]]>
+		</if>
+		<![CDATA[
+			 AND ROWNUM 		= 1
+			 AND D.ROCKING_YN = 'N'
+		]]>
+	</select>
+
+
+
+	<update id="saveLoingFailCntInte" parameterType="map">
+		<![CDATA[
+            UPDATE TSYS305 T SET
+            LOGIN_FAIL_CNT   = 0
+            WHERE  ENTER_CD  = #{loginEnterCd}
+            AND    SABUN     = #{ssnSabun}
+        ]]>
+	</update>
+
+
+	<!-- 토큰 사번 체크 -->
+	<select parameterType="map" resultType="cMap" id="chUserToken">
+
+			<![CDATA[
+					SELECT REPLACE(PRG_CD,'/','') AS TSABUN
+					  FROM TSEC001 A
+					 WHERE A.TOKEN = #{chgSabun}
+					  AND A.CHKDATE BETWEEN SYSDATE-(TRIM(#{ssnTokenChkTime})/24/60/60) AND SYSDATE
+					  AND ROWNUM = 1
+				]]>
+
+
+	</select>
+
+
+	<select parameterType="map" resultType="cMap" id="chgUser">
+
+			<![CDATA[
+					SELECT    A.SABUN									AS SSN_SABUN		--사번
+							, A.ENTER_CD								AS SSN_ENTER_CD		--회사코드
+							, E.ENTER_NM								AS SSN_ENTER_NM		--회사명
+-- 							, E.ENTER_ENG_NM							AS SSN_ENTER_ENG_NM	--회사영문명
+							, E.ALIAS									AS SSN_ALIAS		--회사 ALIAS
+							, F_COM_GET_NAMES( A.ENTER_CD, A.SABUN, #{ssnLocaleCd} )									AS SSN_NAME			--성명
+							, B.ORG_CD									AS SSN_ORG_CD		--조직코드
+
+							, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030' , B.JIKWEE_CD, #{ssnLocaleCd}) AS SSN_JIKWEE_NM
+							, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010' , B.JIKGUB_CD, #{ssnLocaleCd}) AS SSN_JIKGUB_NM
+							, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020' , B.JIKCHAK_CD, #{ssnLocaleCd}) AS SSN_JIKCHAK_NM
+							, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10050' , B.WORK_TYPE, #{ssnLocaleCd}) AS SSN_WORK_TYPE_NM
+							, F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD , TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS SSN_ORG_NM
+
+							, TO_CHAR(SYSDATE, 'YYYYMMDD')				AS SSN_BASE_DATE
+-- 							, CASE 	WHEN D.CHKDATE >= ADD_MONTHS(SYSDATE,-NVL(H.ATTRIBUTE_3,1)) THEN 'N'
+-- 									WHEN D.CHKDATE <  ADD_MONTHS(SYSDATE,-NVL(H.ATTRIBUTE_3,1)) THEN 'Y'
+-- 								END 										AS SSN_PW_EDIT_YN
+							, NVL(D.SKIN_TYPE, 'blue') 					AS SSN_SKIN_TYPE
+							, NVL(D.FONT_TYPE, 'nanum') 					AS SSN_FONT_TYPE
+							, NVL(D.WIDGET_TYPE, 'nanum') 					AS SSN_WIDGET_TYPE
+-- 							, NVL(F_COM_GET_LAST_LOGIN_DATE(D.ENTER_CD,A.SABUN), TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI')) AS SSN_LAST_LOGIN
+-- 							, F_SYS_GET_PRIVACY_AGREEMENT_YN(A.ENTER_CD,TO_CHAR(SYSDATE,'YYYYMMDD'),A.SABUN,NULL) AS SSN_PRIVACY_AGREEMENT_YN
+							, F_SEC_GET_ENCODED_KEY AS SSN_ENCODED_KEY
+							, DECODE((SELECT SABUN FROM TPAP993 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN),'','N','Y') AS SSN_PAP_ADMIN_YN
+							, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_TEST_YN'),'N') AS SSN_SYS_TEST_YN
+							, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_FILE_DOWN_SET_PWD'),'N') AS SSN_FILE_DOWN_SET_PWD -- 다운로드 암호 설정 여부
+							, NVL(CRYPTIT.DECRYPT(D.PASSWORD_DOWNLOAD, D.ENTER_CD), A.SABUN) AS SSN_FILE_DOWN_PWD
+							, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_FILE_DOWN_REG_REASON'),'N') AS SSN_FILE_DOWN_REG_REASON -- 다운로드 사유등록 여부
+							, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_FILE_DOWN_MOBILE_YN'),'N') AS SSN_FILE_DOWN_MOBILE_YN -- 모바일 파일 다운로드 허용 여부
+							, NVL(F_COM_GET_STD_CD_VALUE(A.ENTER_CD , 'SYS_CHATBOT_YN'),'N') AS SSN_CHATBOT_YN -- 챗봇 사용 여부
+							, 'N' AS SSN_ENTER_ALL_YN
+							, 'N' AS SSN_PRE_SRCH_YN
+							, 'Y' AS SSN_RET_SRCH_YN
+							, 'N' AS SSN_RES_SRCH_YN
+					FROM THRM100 A
+				   INNER JOIN THRM151 B
+					  ON A.ENTER_CD  = B.ENTER_CD
+					 AND NVL(B.STATUS_CD,'RA') <> 'RA'
+					 AND A.SABUN 	= B.SABUN
+					 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+				   INNER JOIN TSYS305 D
+				      ON A.ENTER_CD 	= D.ENTER_CD
+				     AND A.SABUN 	= D.SABUN
+				   INNER JOIN TORG900 E
+				      ON A.ENTER_CD  = E.ENTER_CD
+				    LEFT JOIN TORG999 H
+				      ON A.ENTER_CD 	= H.ENTER_CD
+				   WHERE 1=1
+					AND D.ENTER_CD 	= #{ssnEnterCd}
+					AND D.SABUN  	= TRIM( #{chgSabun} )
+					AND ROWNUM 		= 1
+				]]>
+
+
+	</select>
+
+	<select id="getAuthGrpList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT ENTER_CD
+			     , GRP_CD        AS SSN_GRP_CD
+			     , NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys307', LANGUAGE_CD, #{ssnLocaleCd}), GRP_NM) AS SSN_GRP_NM
+			     , DATA_RW_TYPE  AS SSN_DATA_RW_TYPE
+-- 			     , COMMON_YN     AS SSN_COMMON_YN
+			     , SEARCH_TYPE   AS SSN_SEARCH_TYPE
+-- 			     , SEQ           AS SSN_GRP_SEQ
+			     , ERROR_ACC_YN  AS SSN_ERROR_ACC_YN
+			     , ERROR_ADMIN_YN AS SSN_ERROR_ADMIN_YN
+			     , ADMIN_YN 	  AS SSN_ADMIN_YN
+			     , ENTER_ALL_YN  AS SSN_ENTER_ALL_YN
+				 , PRE_SRCH_YN   AS SSN_PRE_SRCH_YN
+				 , RET_SRCH_YN   AS SSN_RET_SRCH_YN
+				 , RES_SRCH_YN   AS SSN_RES_SRCH_YN ]]>
+		<if test="ssnEncodedKey != null and ssnEncodedKey != ''">
+			<![CDATA[
+				, REPLACE(REPLACE( ISU_BLOCK_ENCRYPT('{ "subGrpCd":"'||GRP_CD||'"
+			                                               ,"subGrpNm":"'|| NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys307', LANGUAGE_CD, #{ssnLocaleCd}), GRP_NM) ||'"
+			                                               ,"subDataRwType":"'|| DATA_RW_TYPE ||'"
+			                                               ,"subSearchType":"'|| SEARCH_TYPE ||'"}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'') AS RURL
+		]]>
+		</if>
+		<![CDATA[ FROM (SELECT X.ENTER_CD
+			             , X.GRP_CD
+			             , X.GRP_NM
+			             , X.DATA_RW_TYPE
+			             , X.COMMON_YN
+			             , X.SEARCH_TYPE
+			             , X.SEQ
+			             , X.ERROR_ACC_YN
+			             , X.ERROR_ADMIN_YN
+			             , X.LANGUAGE_CD
+			             , X.ADMIN_YN
+			             , X.ENTER_ALL_YN
+						 , X.PRE_SRCH_YN
+						 , X.RET_SRCH_YN
+						 , X.RES_SRCH_YN
+			          FROM TSYS307 X
+			         WHERE X.ENTER_CD   = #{ssnEnterCd}
+			           AND X.COMMON_YN  = 'Y'
+			           AND X.GRP_CD NOT IN (SELECT Z.GRP_CD
+			                                  FROM TSYS313 Z
+			                                 WHERE Z.ENTER_CD = X.ENTER_CD
+			                                   AND Z.SABUN = #{ssnSabun}
+			                                   AND Z.GRP_CD IN ('85', '11') )
+			         UNION
+			        SELECT A.ENTER_CD
+			             , A.GRP_CD
+			             , B.GRP_NM
+			             , A.DATA_RW_TYPE
+			             , B.COMMON_YN
+			             , A.SEARCH_TYPE
+			             , B.SEQ
+			             , B.ERROR_ACC_YN
+			             , B.ERROR_ADMIN_YN
+			             , B.LANGUAGE_CD
+			             , B.ADMIN_YN
+			             , B.ENTER_ALL_YN
+						 , B.PRE_SRCH_YN
+						 , B.RET_SRCH_YN
+						 , B.RES_SRCH_YN
+			          FROM TSYS313 A
+			             , TSYS307 B
+			         WHERE A.ENTER_CD  = #{ssnEnterCd}
+			           AND A.SABUN     = #{ssnSabun}
+			           AND A.ENTER_CD  = B.ENTER_CD
+			           AND A.GRP_CD    = B.GRP_CD
+			           AND B.COMMON_YN <> 'Y'
+			     ) ORDER BY SEQ
+		]]>
+	</select>
+
+	<select id="getChgUserAuthGrpList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT ENTER_CD
+			     , GRP_CD        AS SSN_GRP_CD
+			     , NVL(F_COM_GET_LANGUAGE_MAPPING (#{chgSsnEnterCd}, 'tsys307', LANGUAGE_CD, #{chgSsnLocaleCd}), GRP_NM) AS SSN_GRP_NM
+			     , DATA_RW_TYPE  AS SSN_DATA_RW_TYPE
+-- 			     , COMMON_YN     AS SSN_COMMON_YN
+			     , SEARCH_TYPE   AS SSN_SEARCH_TYPE
+-- 			     , SEQ           AS SSN_GRP_SEQ
+			     , ERROR_ACC_YN  AS SSN_ERROR_ACC_YN
+			     , ERROR_ADMIN_YN AS SSN_ERROR_ADMIN_YN
+			     , ADMIN_YN 	  AS SSN_ADMIN_YN
+			     , ENTER_ALL_YN  AS SSN_ENTER_ALL_YN
+				 , PRE_SRCH_YN   AS SSN_PRE_SRCH_YN
+				 , RET_SRCH_YN   AS SSN_RET_SRCH_YN
+				 , RES_SRCH_YN   AS SSN_RES_SRCH_YN ]]>
+		<if test="ssnEncodedKey != null and ssnEncodedKey != ''">
+			<![CDATA[
+				, REPLACE(REPLACE( ISU_BLOCK_ENCRYPT('{ "subGrpCd":"'||GRP_CD||'"
+			                                               ,"subGrpNm":"'|| NVL(F_COM_GET_LANGUAGE_MAPPING (#{chgSsnEnterCd}, 'tsys307', LANGUAGE_CD, #{chgSsnLocaleCd}), GRP_NM) ||'"
+			                                               ,"subDataRwType":"'|| DATA_RW_TYPE ||'"
+			                                               ,"subSearchType":"'|| SEARCH_TYPE ||'"}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'') AS RURL
+		]]>
+		</if>
+		<![CDATA[ FROM (SELECT X.ENTER_CD
+			             , X.GRP_CD
+			             , X.GRP_NM
+			             , X.DATA_RW_TYPE
+			             , X.COMMON_YN
+			             , X.SEARCH_TYPE
+			             , X.SEQ
+			             , X.ERROR_ACC_YN
+			             , X.ERROR_ADMIN_YN
+			             , X.LANGUAGE_CD
+			             , X.ADMIN_YN
+			             , X.ENTER_ALL_YN
+						 , X.PRE_SRCH_YN
+						 , X.RET_SRCH_YN
+						 , X.RES_SRCH_YN
+			          FROM TSYS307 X
+			         WHERE X.ENTER_CD   = #{chgSsnEnterCd}
+			           AND X.COMMON_YN  = 'Y'
+			           AND X.GRP_CD NOT IN (SELECT Z.GRP_CD
+			                                  FROM TSYS313 Z
+			                                 WHERE Z.ENTER_CD = X.ENTER_CD
+			                                   AND Z.SABUN = #{chgSsnSabun}
+			                                   AND Z.GRP_CD IN ('85', '11') )
+			         UNION
+			        SELECT A.ENTER_CD
+			             , A.GRP_CD
+			             , B.GRP_NM
+			             , A.DATA_RW_TYPE
+			             , B.COMMON_YN
+			             , A.SEARCH_TYPE
+			             , B.SEQ
+			             , B.ERROR_ACC_YN
+			             , B.ERROR_ADMIN_YN
+			             , B.LANGUAGE_CD
+			             , B.ADMIN_YN
+			             , B.ENTER_ALL_YN
+						 , B.PRE_SRCH_YN
+						 , B.RET_SRCH_YN
+						 , B.RES_SRCH_YN
+			          FROM TSYS313 A
+			             , TSYS307 B
+			         WHERE A.ENTER_CD  = #{chgSsnEnterCd}
+			           AND A.SABUN     = #{chgSsnSabun}
+			           AND A.ENTER_CD  = B.ENTER_CD
+			           AND A.GRP_CD    = B.GRP_CD
+			           AND B.COMMON_YN <> 'Y'
+			     ) ORDER BY SEQ
+		]]>
+	</select>
+
+	<!-- 패스워드 확인  -->
+	<select parameterType="map" resultType="cMap" id="getPwdConfirm">
+		
+			<![CDATA[
+					SELECT DECODE(COUNT(*), 0, 'N', 'Y') AS CHK
+					  FROM TSYS305 A
+					 WHERE A.ENTER_CD =#{ssnEnterCd}
+					   AND A.SABUN = #{loginSabun}
+					   AND A.PASSWORD = CRYPTIT.CRYPT(#{confirmPwd}, ENTER_CD)
+					   AND ROWNUM = 1
+				]]>
+
+		
+
+	</select>
+
+	<select id="getLoadGrobal" parameterType="map" resultType="cMap">
+
+		SELECT F_SYS_LOAD(#{gCode}) AS ${gNm} FROM DUAL WHERE ROWNUM = 1
+
+	</select>
+
+</mapper>

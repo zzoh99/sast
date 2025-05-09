@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	신용카드내역관리
+ -->
+<root>
+
+	<!-- 신용카드 내역 조회  -->
+	<query id="selectCardHisMgrList">
+		<![CDATA[
+			SELECT A.ENTER_CD
+			     , A.WORK_YY
+			     , A.USE_YYYY
+				 , A.ADJUST_TYPE
+				 , A.SABUN
+				 , A.SEQ
+				 , A.CARD_TYPE
+				 , A.CARD_ENTER_NM
+				 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+				 , A.HALF_GUBUN
+				 , A.USE_MON
+				 , A.MED_MON
+				 ,(SELECT FAM_CD FROM TCPN823
+				 	WHERE ENTER_CD = A.ENTER_CD
+				 	  AND WORK_YY = A.WORK_YY
+				 	  AND ADJUST_TYPE = A.ADJUST_TYPE
+				 	  AND SABUN = A.SABUN
+				 	  AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+				   ) AS FAM_CD
+				 ,(SELECT FAM_NM FROM TCPN823
+				 	WHERE ENTER_CD = A.ENTER_CD
+				 	  AND WORK_YY = A.WORK_YY
+				 	  AND ADJUST_TYPE = A.ADJUST_TYPE
+				 	  AND SABUN = A.SABUN
+				 	  AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+				   ) AS FAM_NM
+			     , A.CO_DEDUCT_MON
+			     , A.NTS_YN
+			     , A.APPL_MON
+			     , A.ADJ_INPUT_TYPE
+			     , B.NAME
+			     , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+			     , A.DOC_SEQ
+                 , A.DOC_SEQ_DETAIL
+                 , A.FEEDBACK_TYPE
+			  FROM TCPN821 A, THRM100 B
+			 WHERE A.ENTER_CD       = B.ENTER_CD
+			   AND A.SABUN          = B.SABUN
+			   AND A.ENTER_CD       = #ssnEnterCd#
+			   AND A.WORK_YY  	    = #searchYear#
+			   --$query$
+			   AND A.ADJUST_TYPE LIKE '%'|| #searchAdjustType#||'%'
+			   AND A.ADJUST_TYPE IN (SELECT CODE
+									 FROM TSYS005
+									WHERE ENTER_CD = #ssnEnterCd#
+									  AND GRCODE_CD = 'C00303'
+									  AND USE_YN = 'Y')
+			   AND A.ADJ_INPUT_TYPE LIKE #searchInputType#||'%'
+			   AND (B.NAME LIKE '%' || #searchSbNm# || '%' OR A.SABUN LIKE '%' || #searchSbNm# || '%')
+			   AND A.CARD_TYPE = NVL(#searchCardType#, A.CARD_TYPE)
+			   AND A.USE_YYYY = #searchUseYyyy#
+			   AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+               AND DECODE('',#searchFeedBackType#,'A',A.FEEDBACK_TYPE) = DECODE('',#searchFeedBackType#,'A',#searchFeedBackType#)
+			 ORDER BY A.SABUN, FAM_CD, F_COM_GET_GRCODE_SEQ(A.ENTER_CD,'C00304',A.HALF_GUBUN) DESC
+			        , F_COM_GET_GRCODE_SEQ(A.ENTER_CD,'C00305',A.CARD_TYPE)
+	   ]]>
+	</query>
+
+    <!-- 공통코드(신용카드구분) -->
+    <query id="selectYeaDataCardCardType">
+        <![CDATA[
+            SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+              FROM TSYS005
+            WHERE ENTER_CD = #ssnEnterCd#
+                AND GRCODE_CD = 'C00305'
+                AND VISUAL_YN = 'Y'
+                AND USE_YN = 'Y'
+                AND NOTE1 = 'Y'
+               AND (CASE
+                    WHEN #searchYyType# = '0' AND CODE IN ('1', '2', '3', '4', '6', '7', '11', '13', '14' ,'15', '17', '18', '35', '61', '63', '65', '67') THEN 1 /* 당해년도 */
+                    WHEN #searchYyType# = '-1' AND CODE IN ('51', '52', '53', '54', '55', '56', '57', '58', '59') THEN 1 /* 전년도 */
+                    WHEN #searchYyType# = '-2' AND CODE IN ('41', '42', '43', '44', '45', '46', '47', '48', '49') THEN 1 /* 전전년도 */
+                    WHEN #searchYyType# = '-99' AND CODE IN ('1', '2', '3', '4', '7', '11', '13','15', '17', '41', '42', '43', '44', '45', '46', '47', '48', '49','51', '52', '53', '54', '55', '56', '57', '58', '59','35') THEN 1 /* 전전년도 */
+                    ELSE 0 END) = 1
+            ORDER BY SEQ
+        ]]>
+    </query>
+    <!-- 20년사업관련비용불러오기 -->
+    <query id="getYeaBpCardLoad">
+        <![CDATA[
+			SELECT COUNT(A.SABUN) AS CNT
+			  FROM TCPN821 A,
+			       TCPN823 B,
+			       TCPN811 C
+			 WHERE A.ENTER_CD = B.ENTER_CD
+			       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+			       AND A.WORK_YY     = B.WORK_YY
+			       AND A.SABUN       = B.SABUN
+			       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+			       AND A.ENTER_CD    = C.ENTER_CD
+			       AND A.ADJUST_TYPE = C.ADJUST_TYPE
+			       AND A.WORK_YY     = C.WORK_YY
+			       AND A.SABUN       = C.SABUN
+			       AND A.ENTER_CD    = #ssnEnterCd#
+			       AND A.WORK_YY     = '2020'
+			       AND A.ADJUST_TYPE = #searchAdjustType#
+			       AND A.CARD_TYPE IN ('3','4')
+			       AND B.FAM_CD = '0'
+        ]]>
+    </query>
+    <!-- 공통코드(신용카드구분) -->
+    <query id="selectDataCardType">
+        <![CDATA[
+            SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+              FROM TSYS005
+            WHERE ENTER_CD = #ssnEnterCd#
+                AND GRCODE_CD = 'C00305'
+                AND VISUAL_YN = 'Y'
+                AND USE_YN = 'Y'
+                AND NOTE1 = 'Y'
+               AND (CASE
+                    WHEN #searchYyType# = '0' AND CODE IN ('1', '2', '3', '4', '6', '7', '11', '13', '14' ,'15', '17', '18', '35', '61', '63', '65', '67') THEN 1 /* 당해년도 */
+                    WHEN #searchYyType# = '-1' AND CODE IN ('51', '52', '53', '54', '55', '56', '57', '58', '59') THEN 1 /* 전년도 */
+                    WHEN #searchYyType# = '-2' AND CODE IN ('41', '42', '43', '44', '45', '46', '47', '48', '49') THEN 1 /* 전전년도 */
+                    WHEN #searchYyType# = '-99' AND CODE IN ('1', '2', '3', '4', '7', '11', '13','15', '17', '41', '42', '43', '44', '45', '46', '47', '48', '49','51', '52', '53', '54', '55', '56', '57', '58', '59','35') THEN 1 /* 전전년도 */
+                    ELSE 0 END) = 1
+            ORDER BY SEQ
+        ]]>
+    </query>
+</root>

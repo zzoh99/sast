@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.config.wtmWorkCdMgr">
+
+    <!-- 근무코드관리 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmWorkCdMgrList">
+		<![CDATA[
+        SELECT A.ENTER_CD
+             , A.WORK_CD
+             , A.WORK_NM
+             , A.WORK_S_NM
+             , A.SEQ
+             , A.USE_YN
+			 , '<span class="att-code" style="background-color: '|| COLOR ||'">' || WORK_S_NM || '</span>' AS WORK_S_NM_HTML
+             , A.DEEMED_YN
+             , A.WORK_TIME_TYPE
+             , A.COLOR
+             , A.LANGUAGE_CD
+             , A.REQUEST_USE_YN
+             , A.REQUEST_USE_TYPE
+             , A.REQUEST_DAY_TYPE
+             , A.APPLY_HOUR
+             , A.BASE_CNT
+             , A.MAX_CNT
+             , A.ORG_LEVEL_CD
+             , A.EXCP_SEARCH_SEQ
+             , B.SEARCH_DESC
+             , A.NOTE
+		 	 , DECODE(
+			 (
+			 	SELECT
+					COUNT(*)
+				FROM TWTM102 WHERE ENTER_CD = A.ENTER_CD AND WORK_CD = A.WORK_CD
+			 ), 0,  'N', 'Y')   AS REG_YN
+          FROM TWTM051 A
+          LEFT JOIN THRI201 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.EXCP_SEARCH_SEQ = B.SEARCH_SEQ
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+		]]>
+         <if test='searchUseYn != null and searchUseYn.equals("Y")'>
+		   AND NVL(A.USE_YN, 'N') = 'Y'
+		 </if>
+		<if test='searchWorkNm != null and !searchWorkNm.equals("")'>
+			AND A.WORK_NM LIKE '%'|| #{searchWorkNm} ||'%'
+		</if>
+		 ORDER BY A.SEQ
+    </select>
+
+	<!-- 대표코드 설정 중복체크 -->
+	<select parameterType="map" resultType="cMap" id="getWtmWorkCdMgrDupCnt">
+		SELECT COUNT(*) AS CNT
+		  FROM TWTM041 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.GNT_GUBUN_CD = #{gntGubunCd}
+		   AND A.GNT_CD != #{gntCd}
+		   AND NVL(A.BASIC_GNT_CD_YN, 'N') = 'Y'
+	</select>
+
+    <!-- 근무코드 저장 -->
+    <update parameterType="map" id="saveWtmWorkCdMgr">
+         MERGE INTO TWTM051 T
+		 USING (
+		        SELECT #{ssnEnterCd} AS ENTER_CD
+                     , CASE WHEN TRIM(#{workCd}) IS NULL OR TRIM(#{workCd}) = '0' THEN
+                                (SELECT TO_CHAR(NVL(MAX(WORK_CD),0) + 1) FROM TWTM051 WHERE ENTER_CD = #{ssnEnterCd} )
+                            ELSE #{workCd}
+                       END AS WORK_CD
+                     , TRIM(#{useYn}) AS USE_YN
+					 , TRIM(#{workNm}) AS WORK_NM
+					 , TRIM(#{workSNm}) AS WORK_S_NM
+					 , TRIM(#{deemedYn}) AS DEEMED_YN
+					 , TRIM(#{workTimeType}) AS WORK_TIME_TYPE
+					 , TRIM(#{color}) AS COLOR
+					 , TRIM(#{languageCd}) AS LANGUAGE_CD
+					 , TRIM(#{requestUseYn}) AS REQUEST_USE_YN
+					 , TRIM(#{requestUseType}) AS REQUEST_USE_TYPE
+					 , TRIM(#{requestDayType}) AS REQUEST_DAY_TYPE
+					 , TRIM(#{applyHour}) AS APPLY_HOUR
+					 , TRIM(#{baseCnt}) AS BASE_CNT
+					 , TRIM(#{maxCnt}) AS MAX_CNT
+					 , TRIM(#{orgLevelCd}) AS ORG_LEVEL_CD
+					 , TRIM(#{excpSearchSeq}) AS EXCP_SEARCH_SEQ
+					 , TRIM(#{note}) AS NOTE
+                  FROM DUAL
+               ) S
+            ON (
+		            T.ENTER_CD = S.ENTER_CD
+		        AND T.WORK_CD  = S.WORK_CD
+				)
+		    WHEN MATCHED THEN
+			UPDATE SET T.WORK_NM = S.WORK_NM
+					 , T.WORK_S_NM = S.WORK_S_NM
+					 , T.USE_YN = S.USE_YN
+					 , T.DEEMED_YN = S.DEEMED_YN
+					 , T.WORK_TIME_TYPE = S.WORK_TIME_TYPE
+					 , T.COLOR = S.COLOR
+					 , T.LANGUAGE_CD = S.LANGUAGE_CD
+					 , T.REQUEST_USE_YN = S.REQUEST_USE_YN
+					 , T.REQUEST_USE_TYPE = S.REQUEST_USE_TYPE
+					 , T.REQUEST_DAY_TYPE = S.REQUEST_DAY_TYPE
+					 , T.APPLY_HOUR = S.APPLY_HOUR
+					 , T.BASE_CNT = S.BASE_CNT
+					 , T.MAX_CNT = S.MAX_CNT
+					 , T.ORG_LEVEL_CD = S.ORG_LEVEL_CD
+					 , T.EXCP_SEARCH_SEQ = S.EXCP_SEARCH_SEQ
+					 , T.NOTE = S.NOTE
+			 		 , T.CHKDATE	= SYSDATE
+					 , T.CHKID	    = #{ssnSabun}
+		    WHEN NOT MATCHED THEN
+		  	   INSERT
+			   (
+						  T.ENTER_CD
+						, T.WORK_CD
+						, T.WORK_NM
+						, T.WORK_S_NM
+						, T.USE_YN
+						, T.DEEMED_YN
+						, T.WORK_TIME_TYPE
+						, T.COLOR
+						, T.LANGUAGE_CD
+						, T.REQUEST_USE_YN
+						, T.REQUEST_USE_TYPE
+						, T.REQUEST_DAY_TYPE
+						, T.APPLY_HOUR
+						, T.BASE_CNT
+						, T.MAX_CNT
+						, T.ORG_LEVEL_CD
+						, T.EXCP_SEARCH_SEQ
+						, T.NOTE
+						, T.INSDATE
+						, T.INSID
+						, T.CHKDATE
+						, T.CHKID
+			   )
+			   VALUES
+			   (
+						  S.ENTER_CD
+						, S.WORK_CD
+						, S.WORK_NM
+						, S.WORK_S_NM
+						, S.USE_YN
+						, S.DEEMED_YN
+						, S.WORK_TIME_TYPE
+						, S.COLOR
+						, S.LANGUAGE_CD
+						, S.REQUEST_USE_YN
+						, S.REQUEST_USE_TYPE
+						, S.REQUEST_DAY_TYPE
+						, S.APPLY_HOUR
+						, S.BASE_CNT
+						, S.MAX_CNT
+						, S.ORG_LEVEL_CD
+						, S.EXCP_SEARCH_SEQ
+						, S.NOTE
+					    , SYSDATE
+					    , #{ssnSabun}
+						, SYSDATE
+						, #{ssnSabun}
+			   )
+    </update>
+
+    <!-- 근무코드 순서 저장 -->
+    <update parameterType="map" id="saveWtmWorkCdSeq">
+        MERGE INTO TWTM051 T
+		USING (
+        <foreach item="rm" collection="mergeRows" index="idx" separator=" UNION ALL ">
+		       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+		            , TRIM(#{rm.workCd}) AS WORK_CD
+		            , TRIM(#{rm.seq}) AS SEQ
+		        FROM DUAL
+        </foreach>
+		      ) S
+		   ON (
+		             T.ENTER_CD = S.ENTER_CD
+		        AND  T.WORK_CD = S.WORK_CD
+		      )
+		   WHEN MATCHED THEN
+		 UPDATE SET T.CHKDATE	= SYSDATE
+		          , T.CHKID	    = #{ssnSabun}
+		          , T.SEQ = S.SEQ
+    </update>
+
+    <!-- 근무코드 삭제 -->
+    <delete parameterType="map" id="deleteWtmWorkCdMgr">
+
+        DELETE FROM TWTM051
+         WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+           AND ( WORK_CD ) IN ( ( NULL)
+        <foreach item="rm" collection="deleteRows">
+            <if test="rm.workCd != null and !rm.workCd neq '' ">
+                , ( TRIM( #{rm.workCd} ) )
+            </if>
+        </foreach>
+        )
+    </delete>
+
+</mapper>

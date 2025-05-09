@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.applyApproval.appDeputyMgr">
+		<select parameterType="map" resultType="cMap" id="getAppDeputyMgrList">
+
+				<![CDATA[
+					SELECT    A.ENTER_CD    
+					        , A.AGREE_SABUN 
+					        , A.SDATE       
+					        , A.DEPUTY_SABUN
+					        , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) 									AS DEPUTY_NAME                                                                        
+					        , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS')							AS DEPUTY_ALIAS                                                                        
+					        , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020' , B.JIKCHAK_CD) 			AS DEPUTY_JIKCHAK_NM                                                      
+					        , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030' , B.JIKWEE_CD) 			AS DEPUTY_JIKWEE_NM                                                       
+					        , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010' , B.JIKGUB_CD) 			AS DEPUTY_JIKGUB_NM                                                       
+					        , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD') ) 	AS DEPUTY_ORG_NM
+					        , A.EDATE       
+					        , A.APPL_YMD    
+					        , A.USE_YN      
+					        , A.MEMO  
+					FROM THRI120 A, THRM151 B
+					WHERE 1=1
+					AND A.ENTER_CD 		= #{ssnEnterCd}
+					AND A.AGREE_SABUN 	= TRIM( #{agreeSabun} )
+					AND A.ENTER_CD 		= B.ENTER_CD
+					AND A.DEPUTY_SABUN 	= B.SABUN
+					AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')   
+					ORDER BY A.APPL_YMD DESC
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveAppDeputyMgr">
+			MERGE INTO THRI120 TARGETTABLE
+			USING (
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+					SELECT
+							   TRIM(#{rm.sdate})  		AS SDATE
+							,  TRIM(#{rm.deputySabun})	AS DEPUTY_SABUN
+							,  TRIM(#{rm.edate}) 		AS EDATE
+							,  TRIM(#{rm.useYn})		AS USE_YN
+							,  TRIM(#{rm.memo}) 		AS MEMO
+					FROM   DUAL
+		</foreach>
+				   ) SOURCETABLE
+				ON (
+						   TARGETTABLE.ENTER_CD 	= #{ssnEnterCd}
+					   AND TARGETTABLE.AGREE_SABUN 	= TRIM( #{agreeSabun} )
+					   AND TARGETTABLE.SDATE 		= SOURCETABLE.SDATE
+				   )
+			WHEN MATCHED THEN
+				UPDATE SET    TARGETTABLE.DEPUTY_SABUN  	= SOURCETABLE.DEPUTY_SABUN
+							, TARGETTABLE.EDATE         	= SOURCETABLE.EDATE
+							, TARGETTABLE.USE_YN        	= SOURCETABLE.USE_YN
+							, TARGETTABLE.MEMO          	= SOURCETABLE.MEMO
+							, TARGETTABLE.CHKDATE       	= SYSDATE
+							, TARGETTABLE.CHKID         	= #{ssnSabun}
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					  TARGETTABLE.ENTER_CD
+					, TARGETTABLE.AGREE_SABUN
+					, TARGETTABLE.SDATE
+					, TARGETTABLE.DEPUTY_SABUN
+					, TARGETTABLE.EDATE
+					, TARGETTABLE.APPL_YMD
+					, TARGETTABLE.USE_YN
+					, TARGETTABLE.MEMO
+					, TARGETTABLE.CHKDATE
+					, TARGETTABLE.CHKID
+				)
+				VALUES
+				(
+
+					  #{ssnEnterCd}
+					, TRIM( #{agreeSabun} )
+					, SOURCETABLE.SDATE
+					, SOURCETABLE.DEPUTY_SABUN
+					, SOURCETABLE.EDATE
+					, TO_CHAR(SYSDATE, 'YYYYMMDD')
+					, SOURCETABLE.USE_YN
+					, SOURCETABLE.MEMO
+					, SYSDATE
+					, #{ssnSabun}
+				)
+		</update>
+		<delete parameterType="map" id="deleteAppDeputyMgr">
+
+   					DELETE FROM THRI120
+					WHERE ( ENTER_CD,AGREE_SABUN,SDATE  ) IN  (  (NULL,NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         ( #{ssnEnterCd} ,  #{agreeSabun} ,#{rm.sdate} )
+</foreach>
+							)
+		</delete>
+
+</mapper>
+

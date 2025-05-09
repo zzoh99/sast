@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.holWorkApr">
+
+<!-- 휴일근무승인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolWorkAprList">
+
+				<![CDATA[
+
+					   SELECT A.ENTER_CD
+							, A.APPL_SEQ
+							, A.SABUN
+							, (SELECT F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME -- 성명
+							, (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+
+							, A.YMD
+						    , A.REQ_S_HM
+						    , A.REQ_E_HM
+						    , A.REQ_TIME_CD
+						    , A.REQUEST_HOUR
+						    , A.REASON
+						    , A.NOTE
+						    , A.ALTER_YMD
+						    
+						    
+						    , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '1' ) AS S_HM
+						    , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '2' ) AS E_HM
+						     
+							, (SELECT LPAD(X.WORK_HH,2,0)||LPAD(X.WORK_MM,2,0) 
+							     FROM TTIM337 X 
+							    WHERE X.ENTER_CD = A.ENTER_CD
+							      AND X.YMD      = A.YMD
+							      AND X.SABUN    = A.SABUN
+							      AND X.WORK_CD  = '0070' ) AS WORK_TIME -- 휴일 인정 근무시간
+							
+							, B.APPL_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+							, B.APPL_STATUS_CD
+							, '0' AS DETAIL
+							
+							, CASE WHEN B.APPL_STATUS_CD = '99' THEN '1' ELSE '0' END AS SHTCOL_EDIT
+							
+					     FROM TTIM601 A, THRI103 B
+					    WHERE A.ENTER_CD   = #{ssnEnterCd}
+					      AND A.ENTER_CD   = B.ENTER_CD 
+					      AND A.APPL_SEQ   = B.APPL_SEQ
+					      AND B.APPL_STATUS_CD NOT IN ('11')
+					      AND B.APPL_CD    = '120'
+					      ]]>
+<if test='searchFrom != null and !searchFrom.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD >= REPLACE(#{searchFrom}, '-','')
+	]]>
+</if>
+<if test='searchTo != null and !searchTo.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD <= REPLACE(#{searchTo}, '-','')
+	]]>
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR (SELECT F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					      AND (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+<if test='searchSYmd != null and !searchSYmd.equals("")'>
+	<![CDATA[
+					      AND A.YMD >= REPLACE(#{searchSYmd}, '-','')
+	]]>
+</if>
+<if test='searchEYmd != null and !searchEYmd.equals("")'>
+	<![CDATA[
+					      AND A.YMD <= REPLACE(#{searchEYmd}, '-','')
+	]]>
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC 
+
+
+		</select>
+
+<!-- 휴일근무신청 세부내역 저장 -->		
+		<update parameterType="map" id="saveHolWorkApr">
+
+					MERGE INTO TTIM603 T
+					USING	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+								SELECT  #{ssnEnterCd} 					AS ENTER_CD
+									  , TRIM(#{rm.applSeq})     		AS APPL_SEQ
+									  , TRIM(#{rm.sabun})    			AS SABUN
+									  , TRIM(#{rm.reqTimeCd})  			AS REQ_TIME_CD
+									  , TRIM(#{rm.reqTimeCd})  			AS REQUEST_HOUR
+									  , TRIM(#{rm.note})  				AS NOTE
+								FROM   DUAL
+
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.APPL_SEQ = S.APPL_SEQ 
+					     AND  T.SABUN    = S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+								, T.REQ_TIME_CD		= S.REQ_TIME_CD
+								, T.REQUEST_HOUR	= S.REQUEST_HOUR
+								, T.NOTE	        = S.NOTE
+		</update>
+
+</mapper>

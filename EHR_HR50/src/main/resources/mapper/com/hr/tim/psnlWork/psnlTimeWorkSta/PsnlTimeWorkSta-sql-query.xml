@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.psnlWork.psnlTimeWorkSta">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeWorkStaList1">
+
+				<![CDATA[
+					SELECT   A.GNT_CD AS GNT_CD --근태종류
+							,SUM(A.APP_DAY) AS GNT_CNT --일수
+							,(SELECT SEQ FROM TTIM014 WHERE ENTER_CD = A.ENTER_CD AND GNT_CD = A.GNT_CD) AS SEQ
+					FROM     TTIM405 A
+							,THRI103 B
+					WHERE    A.ENTER_CD       = #{ssnEnterCd}
+					AND      A.SABUN          = #{searchSabun}
+					AND 	 A.YMD            BETWEEN TRIM( REPLACE(#{searchSYm}, '-', '') || '01' ) AND TO_CHAR(LAST_DAY( TO_DATE(TRIM( REPLACE(#{searchEYm}, '-', '')) ,'YYYYMM' ) ), 'YYYYMMDD')
+					AND		 A.ENTER_CD       = B.ENTER_CD
+					AND		 A.APPL_SEQ       = B.APPL_SEQ
+					AND		 B.APPL_STATUS_CD = '99'
+					GROUP BY A.ENTER_CD, A.SABUN, A.GNT_CD
+					ORDER BY SEQ, A.SABUN
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeWorkStaList2">
+
+				<![CDATA[
+		          SELECT A.WORK_CD
+		          		,SUM(A.APPLY_HOUR) AS WORK_HOUR
+		                ,(SELECT SEQ FROM TTIM015 WHERE ENTER_CD = A.ENTER_CD AND WORK_CD = A.WORK_CD) AS SEQ
+		          	FROM TTIM303 A
+		           WHERE A.ENTER_CD = #{ssnEnterCd}
+		             AND A.SABUN    = #{searchSabun}
+		             AND A.S_YMD BETWEEN TRIM( REPLACE(#{searchSYm}, '-', '') || '01' ) AND TO_CHAR(LAST_DAY( TO_DATE(TRIM( REPLACE(#{searchEYm}, '-', '')) ,'YYYYMM' ) ), 'YYYYMMDD')
+		           GROUP BY A.ENTER_CD, A.SABUN, A.WORK_CD
+		           UNION ALL
+		           SELECT A.WORK_CD
+		          		,SUM(A.WORK_HOUR) AS WORK_HOUR
+		                ,(SELECT SEQ FROM TTIM015 WHERE ENTER_CD = A.ENTER_CD AND WORK_CD = A.WORK_CD) AS SEQ
+		          	FROM TTIM407 A
+		           WHERE A.ENTER_CD = #{ssnEnterCd}
+		             AND A.SABUN    = #{searchSabun}
+		             AND A.YMD BETWEEN TRIM( REPLACE(#{searchSYm}, '-', '') || '01' ) AND TO_CHAR(LAST_DAY( TO_DATE(TRIM( REPLACE(#{searchEYm}, '-', '')) ,'YYYYMM' ) ), 'YYYYMMDD')
+		           GROUP BY A.ENTER_CD, A.SABUN, A.WORK_CD
+		           ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeWorkStaMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePsnlTimeWorkSta1">
+
+					MERGE INTO TTIM401 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.YM
+									, A.SABUN
+									, A.GNT_CD
+									, A.GNT_CNT
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS YM
+											, NULL		AS SABUN
+											, NULL		AS GNT_CD
+											, NULL		AS GNT_CNT
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( REPLACE( #{searchYm},'-','') )	    AS YM
+											, TRIM( #{searchSabun} )	AS SABUN
+											, TRIM( #{rm.gntCd} )	AS GNT_CD
+											, TRIM( #{rm.gntCnt} )	AS GNT_CNT
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.YM           = S.YM
+					AND  T.SABUN        = S.SABUN
+					AND  T.GNT_CD       = S.GNT_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.GNT_CNT	= S.GNT_CNT
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YM
+							, T.SABUN
+							, T.GNT_CD
+							, T.GNT_CNT
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YM
+							, S.SABUN
+							, S.GNT_CD
+							, S.GNT_CNT
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePsnlTimeWorkSta1">
+
+					DELETE FROM TTIM401
+					WHERE 	(ENTER_CD,YM,SABUN,GNT_CD) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+											#{ssnEnterCd}
+											, #{searchYm}
+											, #{searchSabun}
+											<if test=' rm.gntCd != null and !rm.gntCd.equals("")'>
+											,TRIM( #{rm.gntCd} )
+											</if>
+										)
+</foreach>
+										)
+
+
+		</delete>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePsnlTimeWorkSta2">
+
+					MERGE INTO TTIM403 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPLY_YY
+									, A.YM
+									, A.SABUN
+									, A.WORK_CD
+									, A.WORK_HOUR
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS APPLY_YY
+											, NULL		AS YM
+											, NULL		AS SABUN
+											, NULL		AS WORK_CD
+											, NULL		AS WORK_HOUR
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	 AS ENTER_CD
+											, REPLACE( TRIM( #{rm.applyYy} ),'-','')	 AS APPLY_YY
+											, REPLACE( TRIM( #{searchYm} ),'-','')	     AS YM
+											, TRIM( #{searchSabun} )	 AS SABUN
+											, TRIM( #{rm.workCd} )	 AS WORK_CD
+											, TRIM( #{rm.workHour} ) AS WORK_HOUR
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	 	 = S.ENTER_CD
+					AND  T.APPLY_YY      = S.APPLY_YY
+					AND  T.YM            = S.YM
+					AND  T.SABUN         = S.SABUN
+					AND  T.WORK_CD       = S.WORK_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.WORK_HOUR	= S.WORK_HOUR
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPLY_YY
+							, T.YM
+							, T.SABUN
+							, T.WORK_CD
+							, T.WORK_HOUR
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPLY_YY
+							, S.YM
+							, S.SABUN
+							, S.WORK_CD
+							, S.WORK_HOUR
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePsnlTimeWorkSta2">
+
+					DELETE FROM TTIM403
+					WHERE 	(ENTER_CD,APPLY_YY,YM,SABUN,WORK_CD) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+											#{ssnEnterCd}
+											<if test=' rm.applyYy != null and !rm.applyYy.equals("")'>
+											,REPLACE(TRIM( #{rm.applyYy} ),'-','')
+											</if>
+											,REPLACE(TRIM( #{searchYm} ),'-','')
+											,searchSabun
+											<if test=' rm.workCd != null and !rm.workCd.equals("")'>
+											,TRIM( #{rm.workCd} )
+											</if>
+										)
+</foreach>
+										)
+		</delete>
+
+
+
+
+
+
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertPsnlTimeWorkSta">
+
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePsnlTimeWorkSta">
+
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+<!-- 대상년월(현재일 기준으로 기준월일) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeWorkStaCurrYmd">
+
+				<![CDATA[
+					SELECT *
+					  FROM
+					  (
+						SELECT (CASE WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD >= STDW_E_DD THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+	          						 WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_S_DD
+	                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD >= STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -2), 'YYYYMM')||STDW_S_DD
+	                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+						             ELSE YM||STDW_S_DD
+						        END) AS STDW_S_DD
+						      ,(CASE WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD >= STDW_E_DD THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_E_DD
+	          						 WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), 1), 'YYYYMM')||STDW_E_DD
+	                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD >= STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_E_DD
+	                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_E_DD
+						             ELSE YM||STDW_E_DD
+						        END) AS STDW_E_DD
+						      , YM
+						  FROM TTIM004
+						 WHERE ENTER_CD = #{ssnEnterCd}
+						   AND PAY_TYPE = F_COM_GET_PAY_TYPE( #{ssnEnterCd} , TRIM( #{ssnSabun} ), TO_CHAR(SYSDATE,'YYYYMMDD'))
+					  ) T1,
+					  (
+						SELECT MAX(PAY_YM) AS PAY_YM
+						  FROM TCPN201 A, TCPN981 B
+						 WHERE A.ENTER_CD = B.ENTER_CD
+						   AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+						   AND A.ENTER_CD = #{ssnEnterCd}
+	                	   AND B.CLOSE_YN = 'Y'
+						   AND A.PAY_CD = DECODE(F_COM_GET_MANAGE_CD(#{ssnEnterCd},TRIM( #{ssnSabun} ),TO_CHAR(SYSDATE,'YYYYMMDD')),'11','01','31','02','41','04','01')
+					  ) T2
+					 WHERE T1.YM = T2.PAY_YM
+				]]>
+
+
+		</select>
+
+<!-- 대상년월(선택월로 기준년월일) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeWorkStaYmd">
+
+				<![CDATA[
+				SELECT MIN(STDW_S_DD) STDW_S_DD
+				     , MAX(STDW_E_DD) STDW_E_DD
+				  FROM (
+					SELECT (CASE WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD >= STDW_E_DD THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+          						 WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_S_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD >= STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -2), 'YYYYMM')||STDW_S_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+					             ELSE YM||STDW_S_DD
+					        END) AS STDW_S_DD
+					      ,(CASE WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD >= STDW_E_DD THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_E_DD
+          						 WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), 1), 'YYYYMM')||STDW_E_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD >= STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_E_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_E_DD
+					             ELSE YM||STDW_E_DD
+					        END) AS STDW_E_DD
+					  FROM TTIM004
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND PAY_TYPE = F_COM_GET_PAY_TYPE( #{ssnEnterCd} , TRIM( #{ssnSabun} ), TO_CHAR(SYSDATE,'YYYYMMDD'))
+					   AND YM = TRIM( REPLACE(#{searchSYm},'-','') )
+					UNION
+					SELECT (CASE WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD >= STDW_E_DD THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+          						 WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_S_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD >= STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -2), 'YYYYMM')||STDW_S_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+					             ELSE YM||STDW_S_DD
+					        END) AS STDW_S_DD
+					      ,(CASE WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD >= STDW_E_DD THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_E_DD
+          						 WHEN WORK_DAY_TYPE = '3' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), 1), 'YYYYMM')||STDW_E_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD >= STDW_E_DD  THEN TO_CHAR(ADD_MONTHS(TO_DATE(YM, 'YYYYMM'), -1), 'YYYYMM')||STDW_E_DD
+                       			 WHEN WORK_DAY_TYPE = '1' AND STDW_S_DD < STDW_E_DD  THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYYMM')||STDW_E_DD
+					             ELSE YM||STDW_E_DD
+					        END) AS STDW_E_DD
+					  FROM TTIM004
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND PAY_TYPE = F_COM_GET_PAY_TYPE( #{ssnEnterCd} , TRIM( #{ssnSabun} ), TO_CHAR(SYSDATE,'YYYYMMDD'))
+					   AND YM = TRIM( REPLACE(#{searchEYm},'-','') )
+				   )
+				]]>
+
+
+		</select>
+
+</mapper>

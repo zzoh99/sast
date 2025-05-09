@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 개별퇴직가산율관리(임원)
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepRateStd">
+		<select parameterType="map" resultType="cMap" id="getSepRateStdList">
+
+
+					SELECT JIKWEE_CD
+						 , SDATE
+						 , EDATE
+						 , RATE
+					  FROM TCPN705
+					 WHERE ENTER_CD		= #{ssnEnterCd}
+					<if test='jikweeCd != null and !jikweeCd.equals("")'>
+					   AND JIKWEE_CD	= #{jikweeCd}
+					</if>
+					ORDER BY JIKWEE_CD, SDATE DESC
+
+
+
+		</select>
+		<update parameterType="map" id="saveSepRateStd">
+
+
+					MERGE INTO TCPN705 T
+					USING	(
+							SELECT A.JIKWEE_CD
+								 , A.SDATE
+								 , A.EDATE
+								 , A.RATE
+							  FROM (
+									SELECT NULL	AS JIKWEE_CD
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+										 , NULL	AS RATE
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.jikweeCd})			AS JIKWEE_CD
+										 , TRIM(#{rm.sdate})			AS SDATE
+										 , TRIM(#{rm.edate})			AS EDATE
+										 , TO_NUMBER(TRIM(#{rm.rate}))	AS RATE
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.JIKWEE_CD	IS NOT NULL
+							  AND A.SDATE		IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD	= #{ssnEnterCd}
+						AND	T.JIKWEE_CD	= S.JIKWEE_CD
+						AND	T.SDATE		= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE		= S.EDATE
+								 , T.RATE		= S.RATE
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.JIKWEE_CD
+						  , T.SDATE
+						  , T.EDATE
+						  , T.RATE
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.JIKWEE_CD
+						  , S.SDATE
+						  , S.EDATE
+						  , S.RATE
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" id="updateSepRateStdEdate">
+
+
+					MERGE INTO TCPN705 T
+					USING	(
+							SELECT A.JIKWEE_CD
+								 , A.SDATE
+								 , A.EDATE
+							  FROM (
+									SELECT NULL	AS JIKWEE_CD
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+									  FROM DUAL
+<foreach item="rm" collection="insertRows" >
+	<![CDATA[
+									UNION ALL
+									SELECT A.JIKWEE_CD
+										 , A.SDATE
+										 , TO_CHAR(TO_DATE(TRIM(#{rm.sdate}),'YYYYMMDD')-1,'YYYYMMDD')	AS EDATE
+									  FROM TCPN705 A
+									 WHERE A.ENTER_CD	= #{ssnEnterCd}
+									   AND A.JIKWEE_CD = TRIM(#{rm.jikweeCd})
+									   AND A.EDATE IS NULL
+									   AND A.SDATE = (SELECT MAX(SDATE)
+													  FROM TCPN705
+													 WHERE ENTER_CD  = A.ENTER_CD
+													   AND JIKWEE_CD = A.JIKWEE_CD
+													   AND SDATE < TRIM(#{rm.sdate})
+									   				)
+									   				]]>
+</foreach>
+									) A
+							WHERE A.JIKWEE_CD	IS NOT NULL
+							  AND A.SDATE		IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD	= #{ssnEnterCd}
+						AND	T.JIKWEE_CD	= S.JIKWEE_CD
+						AND	T.SDATE		= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE		= S.EDATE
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepRateStd">
+
+
+					DELETE FROM TCPN705
+					 WHERE ENTER_CD||'_'||JIKWEE_CD||'_'||SDATE IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.jikweeCd != null and !rm.jikweeCd.equals("") and #{rm.sdate} != null and !rm.sdate.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jikweeCd})||'_'||TRIM(#{rm.sdate})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

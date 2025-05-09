@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.hrQueryApr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getHrQueryAprList">
+
+				SELECT T3.*
+				       , TRUNC(MONTHS_BETWEEN(SYSDATE, TO_DATE(NVL(T3.EMP_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')),'YYYYMMDD'))/12)||'년'||
+				         TRUNC(MOD(MONTHS_BETWEEN(SYSDATE, TO_DATE(NVL(T3.EMP_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')),'YYYYMMDD')),12))||'개월' AS WORK_PERIOD
+				       , '0' AS DETAIL
+			    FROM
+				(
+					SELECT   T1.SABUN
+							,T1.APPL_SEQ
+							,T1.GUBUN
+							,T1.REQ_DATE
+							,T1.REV_DATE
+							,T1.PROCESS_DATA
+							,T2.APPL_IN_SABUN
+							,T2.APPL_SABUN
+							,T2.APPL_CD
+							,T2.APPL_STATUS_CD
+							,F_COM_GET_ORG_NM2(T1.ENTER_CD,T1.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+							,F_COM_GET_JIKWEE_NM(T1.ENTER_CD,T1.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+							,F_COM_GET_JIKCHAK_NM(T1.ENTER_CD,T1.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+							,F_COM_GET_JIKGUB_NM(T1.ENTER_CD,T1.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+							,(SELECT EMP_YMD FROM THRM100 WHERE ENTER_CD = T1.ENTER_CD AND SABUN = T1.SABUN ) AS EMP_YMD
+							,F_COM_GET_NAMES(T1.ENTER_CD,T1.SABUN, #{ssnLocaleCd}) AS NAME
+							,F_COM_GET_NAMES(T1.ENTER_CD,T1.SABUN,'ALIAS') AS ALIAS
+							,F_COM_GET_NAMES(T1.ENTER_CD,T1.REV_SABUN,'ALIAS') AS REV_EMP_ALIAS
+					FROM     TBEN892 T1
+<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = T1.ENTER_CD
+  AND AUTH.SABUN = T1.SABUN
+</if>
+					, THRI103 T2
+					WHERE    T1.ENTER_CD = T2.ENTER_CD
+					AND      T1.APPL_SEQ = T2.APPL_SEQ
+					AND      T1.ENTER_CD = #{ssnEnterCd}
+					AND      T1.REQ_DATE BETWEEN REPLACE( #{searchFromYmd} ,'-','') AND REPLACE( #{searchToYmd} ,'-','')
+				<if test='searchGubun != null and !searchGubun.equals("")'>
+					AND      T1.GUBUN    = #{searchGubun}
+				</if>
+					AND      T2.APPL_STATUS_CD != '11'
+				) T3
+				WHERE 1=1
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+				  AND T3.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+				  AND T3.ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+</if>
+<if test='searchSabunName !=null and !searchSabunName.equals("")'>
+				  AND (T3.SABUN LIKE '%' || #{searchSabunName} || '%' OR T3.NAME LIKE '%' || #{searchSabunName} || '%')
+</if>
+
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveHrQueryApr">
+
+					MERGE INTO TBEN892 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.APPL_SEQ
+									, A.REV_DATE
+									, A.REV_SABUN
+							FROM	(
+									SELECT	  NULL      AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS APPL_SEQ
+											, NULL		AS REV_DATE
+											, NULL		AS REV_SABUN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    #{ssnEnterCd}         AS ENTER_CD
+											, TRIM(#{rm.sabun})   AS SABUN
+											, TRIM(#{rm.applSeq}) AS APPL_SEQ
+											, TRIM(#{rm.revDate}) AS REV_DATE
+											, TRIM(#{ssnSabun})   AS REV_SABUN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.SABUN        = S.SABUN
+					AND  T.APPL_SEQ     = S.APPL_SEQ
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.REV_DATE	= S.REV_DATE
+									, T.REV_SABUN	= S.REV_SABUN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+
+
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteHrQueryApr">
+
+					DELETE FROM TBEN892
+					WHERE 	(ENTER_CD,SABUN,APPL_SEQ) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										(
+											 #{ssnEnterCd}
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											,TRIM( #{rm.sabun} )
+										</if>
+										<if test='rm.applSeq != null and !rm.applSeq.equals("")'>
+											,TRIM( #{rm.applSeq} )
+										</if>
+										)
+</foreach>
+										)
+
+
+
+		</delete>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateHrQueryApr">
+
+					UPDATE TBEN892 T SET
+					(	  REV_DATE
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.REV_DATE
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	 NULL   AS SABUN
+									,NULL   AS APPL_SEQ
+									,NULL 	AS REV_DATE
+							FROM   	DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT    TRIM(#{rm.sabun})   AS SABUN
+										, TRIM(#{rm.applSeq}) AS APPL_SEQ
+										, TRIM(#{rm.revDate}) AS REV_DATE
+								FROM    DUAL
+</foreach>
+							) S
+						WHERE T.ENTER_CD = #{ssnEnterCd}
+						AND   T.SABUN    = S.SABUN
+						AND   T.APPL_SEQ = S.APPL_SEQ
+					)
+					WHERE EXISTS (
+									SELECT 'Y'
+									FROM (
+											SELECT	S.SABUN
+											        S.APPL_SEQ
+											        S.REV_DATE
+											FROM (
+												SELECT	 NULL 				AS SABUN
+														,NULL 				AS APPL_SEQ
+														,NULL 				AS REV_DATE
+												FROM	 DUAL
+<foreach item="rm" collection="updateRows" > UNION ALL
+												SELECT	 TRIM(#{rm.sabun})	    AS SABUN
+														,TRIM(#{rm.applSeq})	AS APPL_SEQ
+														,TRIM(#{rm.revDate})	AS REV_DATE
+												FROM	DUAL
+</foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+
+
+
+		</update>
+
+</mapper>

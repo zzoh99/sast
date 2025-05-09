@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.etc.sealMgr">
+
+	<!-- 조직도 조회 -->
+	<select id="getSealMgrOrgList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.LVL AS "_level"
+                , A.ORG_CD 
+                , A.ORG_NM
+                , NVL(B.MAP_CD, F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'TIM_STD_WORK_ORG_CD')) AS WORK_ORG_CD
+                , B.MAP_NM AS WORK_ORG_NM
+            FROM (
+			    SELECT LEVEL AS LVL
+	                 , A.ENTER_CD
+	                 , A.ORG_CD
+			    	 , B.ORG_NM
+	                 , A.ORDER_SEQ
+			      FROM ( SELECT T.ENTER_CD, T.SDATE, T.ORG_CD, T.PRIOR_ORG_CD, T.SEQ, T.ORDER_SEQ
+			               FROM TORG105 T
+			              WHERE T.ENTER_CD = TRIM( #{ssnEnterCd} )
+			                AND T.SDATE =
+			                    ( SELECT MAX(SDATE)
+			                        FROM TORG103
+			                       WHERE ENTER_CD = T.ENTER_CD
+			                         AND  TRIM(#{searchSdate}) BETWEEN SDATE AND NVL(EDATE, '29991231') )
+					   ) A, TORG101 B
+			     WHERE A.ENTER_CD = B.ENTER_CD
+		           AND A.ORG_CD   = B.ORG_CD
+		           AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+			     START WITH A.PRIOR_ORG_CD = '0'
+			   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+				   AND PRIOR A.SDATE       = A.SDATE
+				   AND PRIOR A.ORG_CD      = A.PRIOR_ORG_CD ) A 
+               , (SELECT ENTER_CD, ORG_CD, MAP_CD, F_COM_GET_MAP_NM2(ENTER_CD, MAP_TYPE_CD, MAP_CD, SDATE) AS MAP_NM
+                    FROM TORG107
+                   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                     AND MAP_TYPE_CD = '500'
+                     AND NVL(TRIM(#{searchSdate}),'99991231') BETWEEN SDATE AND NVL(EDATE, '99991231')) B
+           WHERE A.ENTER_CD = B.ENTER_CD(+)
+             AND A.ORG_CD   = B.ORG_CD(+)
+           ORDER BY ORDER_SEQ      
+	]]>
+	</select>
+
+	<!-- 인장현황 조회 -->
+	<select id="getSealMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[		
+			SELECT A.ENTER_CD
+			     , A.SEQ
+			     , A.ORG_CD
+				 , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TRIM(#{searchSdate}) ) AS ORG_NM
+			     , A.SEAL_NO
+			     , A.SDATE
+			     , A.EDATE
+			     , A.STATUS_CD
+			     , A.DIS_SABUN
+				 , F_COM_GET_NAMES(A.ENTER_CD, A.DIS_SABUN, #{ssnLocaleCd} ) AS DIS_NAME
+			     , A.DIS_REASON
+			     , A.DIS_YMD
+			     , A.FILE_SEQ
+			     , A.NOTE
+			     , CASE WHEN A.FILE_SEQ IS NULL THEN '<a class=sbasic>첨부</a>' ELSE '<a class=sbasic>다운로드</a>' END AS BTN_FILE
+			  FROM TBEN742 A 
+			 WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd}) ]]>
+		<if test="searchStatusCd != null and searchStatusCd neq ''">
+			   AND A.STATUS_CD = TRIM(#{searchStatusCd})
+		</if>
+		<if test="searchYmd2 != null and searchYmd2 neq ''">
+			   AND REPLACE(TRIM(#{searchYmd2}), '-', '') BETWEEN A.SDATE AND NVL( A.EDATE, '99991231')
+		</if>
+		<if test="searchOrgCd != null and searchOrgCd neq ''">
+			   AND A.ORG_CD IN (SELECT #{searchOrgCd} FROM DUAL
+			   <if test='searchOrgType != null and searchOrgType eq "Y"'>
+			   					 		 UNION
+                                        SELECT ORG_CD
+                                          FROM ( SELECT ENTER_CD, SDATE, ORG_CD, PRIOR_ORG_CD
+                                                   FROM TORG105
+                                                  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                                    AND SDATE    = TRIM( #{searchSdate} ) )
+                                         START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                                         CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                AND PRIOR SDATE    = SDATE
+                                                AND PRIOR ORG_CD   = PRIOR_ORG_CD
+			   </if>
+			   					)
+		</if>
+		     ORDER BY A.SEAL_NO, A.SDATE
+	</select>
+		
+	<!-- 인장현황 담당자 조회 -->
+	<select id="getSealMgrMngList" parameterType="map" resultType="cMap">
+	<![CDATA[		
+		SELECT A.ENTER_CD
+		     , A.ORG_CD
+		     , A.SEQ
+			 , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TRIM(#{searchSdate}) ) AS ORG_NM
+		     , A.GUBUN
+		     , A.SDATE
+		     , A.EDATE
+		     , A.SABUN
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+			 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD') ) AS JIKWEE_NM
+		     , A.NOTE
+		  FROM TBEN743 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+	   	   AND A.SEQ      = TRIM(#{searchSeq}) ]]>
+		<if test="searchYmd != null and searchYmd neq ''">
+		   AND REPLACE(TRIM(#{searchYmd}), '-', '') BETWEEN A.SDATE AND NVL( A.EDATE, '99991231')
+		</if>	   	
+	 	ORDER BY A.GUBUN, A.SDATE DESC  
+	</select>
+
+	<update id="saveSealMgr" parameterType="map">
+	<![CDATA[			
+		 MERGE INTO TBEN742 T 
+		 USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD 
+	             , TRIM(#{searchOrgCd})  	AS  ORG_CD
+	             , TRIM(#{rm.seq})  		AS  SEQ
+	             , TRIM(#{rm.sealNo})  	AS  SEAL_NO
+	             , TRIM(#{rm.sdate}) 	AS  SDATE
+	             , TRIM(#{rm.edate})  	AS  EDATE
+	             , TRIM(#{rm.statusCd})  AS  STATUS_CD
+	             , TRIM(#{rm.disSabun})  AS  DIS_SABUN
+	             , TRIM(#{rm.disReason}) AS  DIS_REASON
+	             , TRIM(#{rm.disYmd})  	AS  DIS_YMD
+	             , TRIM(#{rm.fileSeq})  	AS  FILE_SEQ
+	             , TRIM(#{rm.note})  	AS  NOTE
+	          FROM DUAL
+		</foreach> 
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.ORG_CD 		= S.ORG_CD 
+		     AND  T.SEQ 		= S.SEQ 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE		= sysdate 
+		            , T.CHKID		= #{ssnSabun} 
+		            , T.SEAL_NO 	= S.SEAL_NO 
+		            , T.SDATE 		= S.SDATE 
+		            , T.EDATE		= S.EDATE 
+		            , T.STATUS_CD 	= S.STATUS_CD 
+		            , T.DIS_SABUN 	= S.DIS_SABUN 
+		            , T.DIS_REASON 	= S.DIS_REASON 
+		            , T.DIS_YMD 	= S.DIS_YMD 
+		            , T.FILE_SEQ 	= S.FILE_SEQ 
+		            , T.NOTE 		= S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.ORG_CD
+		            , T.SEQ
+		            , T.SEAL_NO
+		            , T.SDATE
+		            , T.EDATE
+		            , T.STATUS_CD
+		            , T.DIS_SABUN
+		            , T.DIS_REASON
+		            , T.DIS_YMD
+		            , T.FILE_SEQ
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.ORG_CD
+		            , S_TBEN742.NEXTVAL
+		            , S.SEAL_NO
+		            , S.SDATE
+		            , S.EDATE
+		            , S.STATUS_CD
+		            , S.DIS_SABUN
+		            , S.DIS_REASON
+		            , S.DIS_YMD
+		            , S.FILE_SEQ
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+		
+	<!-- 인장담당자 저장 -->		
+	<update id="saveSealMgrMng" parameterType="map">
+	<![CDATA[	
+		 MERGE INTO TBEN743 T 
+		 USING ( ]]> 
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD 
+	             , TRIM(#{searchOrgCd})  	AS  ORG_CD
+	             , TRIM(#{searchSeq})  	AS  SEQ
+	             , TRIM(#{rm.gubun})  	AS  GUBUN
+	             , TRIM(#{rm.sdate})  	AS  SDATE
+	             , TRIM(#{rm.edate})  	AS  EDATE
+	             , TRIM(#{rm.sabun})  	AS  SABUN
+	             , TRIM(#{rm.note})  	AS  NOTE
+	          FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.ORG_CD 		= S.ORG_CD 
+		     AND  T.SEQ 		= S.SEQ 
+		     AND  T.GUBUN 		= S.GUBUN 
+		     AND  T.SDATE 		= S.SDATE 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun} 
+		            , T.EDATE 	= S.EDATE 
+		            , T.SABUN 	= S.SABUN 
+		            , T.NOTE 	= S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.ORG_CD
+		            , T.SEQ
+		            , T.GUBUN
+		            , T.SDATE
+		            , T.EDATE
+		            , T.SABUN
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.ORG_CD
+		            , S.SEQ
+		            , S.GUBUN
+		            , S.SDATE
+		            , S.EDATE
+		            , S.SABUN
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+		
+	<delete id="deleteSealMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN742
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( SEQ ) IN ( ( NULL) ]]> 
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.seq and rm.seq neq ''">
+				, ( TRIM( #{rm.seq} ) )	
+			</if>
+		</foreach>
+		       )
+	</delete>
+		
+	<delete id="deleteSealMgrMng" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN743
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ORG_CD = TRIM(#{searchOrgCd})
+		   AND GUBUN = TRIM(#{searchGubun})
+		   AND SDATE IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.sdate != null and rm.sdate neq ''">
+				, TRIM( #{rm.sdate} )
+			</if>
+		</foreach>
+			)
+	</delete>
+</mapper>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.schedualMgr">
+<!-- 		일정관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchedualMgrList">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL    
+							, X.SEQ
+							, X.SCH_GUBUN_CD
+							, X.SDATE
+							, X.EDATE
+							, X.TITLE
+							, X.MEMO
+							, X.YY
+					FROM TSYS811 X
+					WHERE X.ENTER_CD = TRIM(#{ssnEnterCd}) ]]>
+				<if test='searchFromYmd != null and !searchFromYmd.equals("")'>
+					AND X.SDATE  >= REPLACE(#{searchFromYmd},'-','')
+				</if>
+				<if test='searchToYmd != null and !searchToYmd.equals("")'>
+					<![CDATA[ AND X.SDATE  <= REPLACE(#{searchToYmd},'-','') ]]>
+				</if>
+
+				<if test='searchSchGubunCd != null and !searchSchGubunCd.equals("")'>
+					AND X.SCH_GUBUN_CD =  #{searchSchGubunCd}
+				</if>
+
+				<if test='searchTitle != null and !searchTitle.equals("")'>
+					AND X.TITLE LIKE  '%'||#{searchTitle}||'%'
+				</if>
+				ORDER BY X.SDATE DESC, X.EDATE DESC, X.SCH_GUBUN_CD
+
+
+
+		</select>
+		
+<!-- 		일정관리 저장 -->	
+		<update parameterType="map" id="saveSchedualMgr">
+
+
+					MERGE INTO TSYS811 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SEQ
+									, A.SCH_GUBUN_CD
+									, A.YY
+									, A.SDATE
+									, A.EDATE
+									, A.TITLE
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SEQ
+											, NULL		AS SCH_GUBUN_CD
+											, NULL		AS YY
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS TITLE
+											, NULL		AS MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+												, TRIM(#{rm.seq}) 			AS SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+												, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM TSYS811) )	AS SEQ
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM( #{rm.schGubunCd} )	AS SCH_GUBUN_CD
+											, TRIM( #{rm.yy} )		AS YY
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.title} )	AS TITLE
+											, TRIM( #{rm.memo} )	AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SEQ = S.SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SCH_GUBUN_CD	= S.SCH_GUBUN_CD
+									, T.SDATE	= S.SDATE
+									, T.EDATE	= S.EDATE
+									, T.TITLE	= S.TITLE
+									, T.MEMO	= S.MEMO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD
+							, T.SEQ
+							, T.SCH_GUBUN_CD
+							, T.YY
+							, T.SDATE
+							, T.EDATE
+							, T.TITLE
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  S.ENTER_CD
+							, S.SEQ
+							, S.SCH_GUBUN_CD
+							, S.YY
+							, S.SDATE
+							, S.EDATE
+							, S.TITLE
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		일정관리 삭제 -->
+		<delete parameterType="map" id="deleteSchedualMgr">
+
+
+					DELETE FROM TSYS811 
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.seq})
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+
+</mapper>

@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.workTimeCdMgr">
+
+<!-- 근무시간코드설정 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeCdMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+                		 , A.TIME_CD
+                		 , A.TIME_NM
+                		 , A.WORK_SHM
+                		 , A.WORK_EHM
+                		 , A.WORK_YN
+                		 , A.TIME_TYPE
+                		 , A.ABSENCE_CD
+                		 , A.ABSENCE_YN
+                		 , A.WORK_TIME_CD
+                		 , A.HOL_TIME_CD
+                		 , A.SEQ
+                		 , A.SHORT_TERM
+                		 , A.RGB_COLOR
+                		 , A.APPLY_YN
+                		 , A.WORKDAY_STD
+                		 , A.LATE_CHECK_YN
+                		 , A.LEAVE_CHECK_YN
+                		 , A.BEGIN_SHM
+                		 , A.NIGHT_YN
+                		 , A.HALF_HOLIDAY1
+                		 , A.HALF_HOLIDAY2
+                		 , A.HOL_TIME_HOUR
+                		 , A.USE_YN
+
+                		 , A.RGB_COLOR AS RGB_COLOR_BACK_COLOR
+                		 , CASE WHEN A.WORK_YN = 'Y' THEN '0' ELSE '1' END HOL_TIME_CD_EDIT
+                		 , CASE WHEN A.WORK_YN = 'Y' THEN '0' ELSE '1' END HOL_TIME_HOUR_EDIT
+                		 , CASE WHEN A.ABSENCE_YN = 'Y' THEN '1' ELSE '0' END ABSENCE_CD_EDIT
+
+                		 , Z.TEXT AS HOL_TIME_CD_COMBO_TEXT
+                		 , Z.CODE AS HOL_TIME_CD_COMBO_CODE
+                		 , Z.TEXT AS WORK_TIME_CD_COMBO_TEXT
+                		 , Z.CODE AS WORK_TIME_CD_COMBO_CODE
+
+                		 , (SELECT COUNT(*)
+                		      FROM TTIM119 X
+                		     WHERE X.ENTER_CD = A.ENTER_CD
+                		       AND X.TIME_CD = A.TIME_CD ) AS WORK_TEAM_CNT
+
+                		 , (SELECT COUNT(*)
+                		      FROM TTIM120 X
+                		     WHERE X.ENTER_CD = A.ENTER_CD
+                		       AND X.TIME_CD = A.TIME_CD ) AS IO_CNT   /* 음.. 속도이슈 있으면 삭제 할 것... */
+
+					  FROM TTIM017 A
+					     , (SELECT '|' || LISTAGG(TIME_CD, '|') WITHIN GROUP (ORDER BY SEQ) AS CODE
+					             , '|' || LISTAGG(TIME_NM, '|') WITHIN GROUP (ORDER BY SEQ) AS TEXT
+					          FROM TTIM017
+					         WHERE ENTER_CD     = #{ssnEnterCd}
+					       ) Z -- 근무시간 콤보
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+<if test='searchTimeCdNm != null and !searchTimeCdNm.equals("")'>
+					   AND A.TIME_CD LIKE TRIM( #{searchTimeCdNm} )||'%'
+</if>
+<if test='searchTimeNm != null and !searchTimeNm.equals("")'>
+					   AND LOWER(A.TIME_NM) LIKE '%'||LOWER(TRIM( #{searchTimeNm} ))||'%'
+</if>
+
+					 ORDER BY A.SEQ
+
+		</select>
+
+<!-- 근무시간코드설정(근무조) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeCdMgrWorkTeamList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.TIME_CD
+					     , A.WORKTEAM_CD
+					  FROM TTIM917 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.TIME_CD = TRIM( #{timeCd} )
+					 ORDER BY A.WORKTEAM_CD
+				]]>
+
+
+		</select>
+
+
+
+
+<!-- 근무시간별 예외인정시간 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeCdMgrStdHourList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.GNT_CD
+						 , A.GNT_NM
+						 , A.GNT_GUBUN_CD
+					     , A.STD_APPLY_HOUR AS DF_STD_APPLY_HOUR
+					     , A.WORK_CD AS DF_WORK_CD
+					     , B.TIME_CD                       
+					     , B.STD_APPLY_HOUR
+					     , B.WORK_CD
+					           ]]>
+<choose><when test='tempTimeCd2 != null and !tempTimeCd2.equals("")'>
+                         , CASE WHEN B.STD_APPLY_HOUR IS NULL AND B.WORK_CD IS NULL THEN 'R' ELSE 'U' END AS S_STATUS              
+		</when><otherwise>
+                         , 'R' AS S_STATUS
+</otherwise>
+</choose>
+
+					  FROM TTIM014 A, TTIM081 B
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.ENTER_CD = B.ENTER_CD(+)
+<choose><when test='tempTimeCd2 != null and !tempTimeCd2.equals("")'>
+					   AND TRIM(#{tempTimeCd2})  = B.TIME_CD(+)
+		</when><otherwise>
+                       AND TRIM(#{searchTimeCd}) = B.TIME_CD(+)
+</otherwise>
+</choose>
+					   AND A.GNT_CD   = B.GNT_CD(+)
+<if test='searchGntCd != null and !searchGntCd.equals("")'>
+					   AND A.GNT_CD = TRIM( #{searchGntCd} )
+</if>
+<if test='searchGntGubunCd != null and !searchGntGubunCd.equals("")'>
+					   AND A.GNT_GUBUN_CD = TRIM( #{searchGntGubunCd} )
+</if>
+					 ORDER BY A.SEQ
+
+		</select>
+
+
+
+<!-- 근무시간별 예외인정시간-  근태종류 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeCdMgrStdHourComboList">
+
+				<![CDATA[
+					SELECT B.CODE, B.CODE_NM
+					  FROM TTIM014 A, TSYS005 B
+					 WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					   AND A.ENTER_CD     = B.ENTER_CD
+					   AND B.GRCODE_CD    = 'T10003'
+					   AND A.GNT_GUBUN_CD = B.CODE
+					 GROUP BY B.CODE, B.CODE_NM
+					 ORDER BY MAX(A.SEQ)
+				]]>
+
+
+		</select>
+
+
+
+<!-- 근무시간코드설정 저장 -->
+		<update parameterType="map" id="saveWorkTimeCdMgr">
+
+					MERGE INTO TTIM017 T
+					USING	(
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+								SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+									 , TRIM( #{rm.timeCd})			AS  TIME_CD
+									 , TRIM( #{rm.timeNm})			AS  TIME_NM
+									 , TRIM( #{rm.workShm})		AS  WORK_SHM
+									 , TRIM( #{rm.workEhm})		AS  WORK_EHM
+									 , TRIM( #{rm.workYn})			AS  WORK_YN
+									 , TRIM( #{rm.absenceCd})		AS  ABSENCE_CD
+									 , TRIM( #{rm.absenceYn})		AS  ABSENCE_YN
+									 , TRIM( #{rm.workTimeCd})		AS  WORK_TIME_CD
+									 , TRIM( #{rm.holTimeCd})		AS  HOL_TIME_CD
+									 , TRIM( #{rm.seq} )			AS  SEQ
+									 , TRIM( #{rm.shortTerm})		AS  SHORT_TERM
+									 , TRIM( #{rm.rgbColor})		AS  RGB_COLOR
+									 , TRIM( #{rm.applyYn})		AS  APPLY_YN
+									 , TRIM( #{rm.workdayStd})		AS  WORKDAY_STD
+									 , TRIM( #{rm.lateCheckYn}) 	AS LATE_CHECK_YN
+						     		 , TRIM( #{rm.leaveCheckYn}) 	AS LEAVE_CHECK_YN
+               		                 , TRIM( #{rm.beginShm})	 	AS BEGIN_SHM
+               		                 , TRIM( #{rm.nightYn})	 	AS NIGHT_YN
+               		                 , TRIM( #{rm.halfHoliday1})	AS HALF_HOLIDAY1
+               		                 , TRIM( #{rm.halfHoliday2})	AS HALF_HOLIDAY2
+               		                 , TRIM( #{rm.holTimeHour})	AS HOL_TIME_HOUR
+               		                 , TRIM( #{rm.useYn} )			AS USE_YN
+								  FROM DUAL
+</foreach>
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.TIME_CD = S.TIME_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.TIME_NM			= S.TIME_NM
+									, T.WORK_SHM		= S.WORK_SHM
+									, T.WORK_EHM		= S.WORK_EHM
+									, T.WORK_YN			= S.WORK_YN
+									, T.ABSENCE_CD		= S.ABSENCE_CD
+									, T.ABSENCE_YN		= S.ABSENCE_YN
+									, T.WORK_TIME_CD	= S.WORK_TIME_CD
+									, T.HOL_TIME_CD		= S.HOL_TIME_CD
+									, T.SEQ				= S.SEQ
+									, T.SHORT_TERM		= S.SHORT_TERM
+									, T.RGB_COLOR		= S.RGB_COLOR
+									, T.APPLY_YN		= S.APPLY_YN
+									, T.WORKDAY_STD		= S.WORKDAY_STD
+									, T.LATE_CHECK_YN	= S.LATE_CHECK_YN
+									, T.LEAVE_CHECK_YN	= S.LEAVE_CHECK_YN
+                		            , T.BEGIN_SHM		= S.BEGIN_SHM
+                		            , T.NIGHT_YN		= S.NIGHT_YN
+                		            , T.HALF_HOLIDAY1	= S.HALF_HOLIDAY1
+                		            , T.HALF_HOLIDAY2	= S.HALF_HOLIDAY2
+                		            , T.HOL_TIME_HOUR	= S.HOL_TIME_HOUR
+                		            , T.USE_YN			= S.USE_YN
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.TIME_CD
+							, T.TIME_NM
+							, T.WORK_SHM
+							, T.WORK_EHM
+							, T.WORK_YN
+							, T.ABSENCE_CD
+							, T.ABSENCE_YN
+							, T.WORK_TIME_CD
+							, T.HOL_TIME_CD
+							, T.SEQ
+							, T.SHORT_TERM
+							, T.RGB_COLOR
+							, T.APPLY_YN
+							, T.WORKDAY_STD
+							, T.LATE_CHECK_YN
+							, T.LEAVE_CHECK_YN
+                		    , T.BEGIN_SHM
+                		    , T.NIGHT_YN
+                		    , T.HALF_HOLIDAY1
+                		    , T.HALF_HOLIDAY2
+                		    , T.HOL_TIME_HOUR
+                		    , T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.TIME_CD
+							, S.TIME_NM
+							, S.WORK_SHM
+							, S.WORK_EHM
+							, S.WORK_YN
+							, S.ABSENCE_CD
+							, S.ABSENCE_YN
+							, S.WORK_TIME_CD
+							, S.HOL_TIME_CD
+							, S.SEQ
+							, S.SHORT_TERM
+							, S.RGB_COLOR
+							, S.APPLY_YN
+							, S.WORKDAY_STD
+							, S.LATE_CHECK_YN
+							, S.LEAVE_CHECK_YN
+      		                , S.BEGIN_SHM
+      		                , S.NIGHT_YN
+      		                , S.HALF_HOLIDAY1
+      		                , S.HALF_HOLIDAY2
+      		                , S.HOL_TIME_HOUR
+      		                , S.USE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 근무시간코드설정(근무조) 저장 -->
+		<update parameterType="map" id="saveWorkTimeCdMgrWorkTeam">
+
+					MERGE INTO TTIM917 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.TIME_CD
+							     , A.WORKTEAM_CD
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS TIME_CD
+										 , NULL AS WORKTEAM_CD
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 , TRIM( #{rm.timeCd})		AS  TIME_CD
+										 , TRIM( #{rm.workteamCd})	AS  WORKTEAM_CD
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.TIME_CD IS NOT NULL
+										  AND A.WORKTEAM_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.TIME_CD = S.TIME_CD AND T.WORKTEAM_CD = S.WORKTEAM_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.TIME_CD
+							, T.WORKTEAM_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.TIME_CD
+							, S.WORKTEAM_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 예외인정근무시간 저장 -->
+		<update parameterType="map" id="saveWorkTimeCdMgrStdHour">
+
+					 MERGE INTO TTIM081 T
+					 USING
+					(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD
+					            , TRIM(#{searchTimeCd})  		AS  TIME_CD
+					            , TRIM(#{rm.gntCd})  		AS  GNT_CD
+					            , TRIM(#{rm.stdApplyHour})  AS  STD_APPLY_HOUR
+					            , TRIM(#{rm.workCd})  		AS  WORK_CD
+					        FROM DUAL
+</foreach>
+					) S
+					ON (
+					          T.ENTER_CD 	= S.ENTER_CD
+					     AND  T.TIME_CD 	= S.TIME_CD
+					     AND  T.GNT_CD 		= S.GNT_CD
+					)
+					WHEN MATCHED THEN
+					   UPDATE SET T.CHKDATE			= sysdate
+					            , T.CHKID			= #{ssnSabun}
+					            , T.STD_APPLY_HOUR 	= S.STD_APPLY_HOUR
+					            , T.WORK_CD 		= S.WORK_CD
+					WHEN NOT MATCHED THEN
+					   INSERT
+					   (
+					              T.ENTER_CD
+					            , T.TIME_CD
+					            , T.GNT_CD
+					            , T.STD_APPLY_HOUR
+					            , T.WORK_CD
+					            , T.CHKDATE
+					            , T.CHKID
+					   )
+					   VALUES
+					   (
+					              S.ENTER_CD
+					            , S.TIME_CD
+					            , S.GNT_CD
+					            , S.STD_APPLY_HOUR
+					            , S.WORK_CD
+					            , sysdate
+					            , #{ssnSabun}
+					   )
+
+		</update>
+
+<!-- 근무시간코드설정 삭제 -->
+		<delete parameterType="map" id="deleteWorkTimeCdMgr">
+
+					DELETE FROM TTIM017
+					 WHERE (ENTER_CD, TIME_CD ) IN 	(  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM( #{ssnEnterCd} ), TRIM( #{rm.timeCd}) )
+</foreach>
+										)
+		</delete>
+
+<!-- 근무시간코드설정(근무조) 삭제 -->
+		<delete parameterType="map" id="deleteWorkTimeCdMgrWorkTeam">
+
+					DELETE FROM TTIM917
+					 WHERE ( ENTER_CD, TIME_CD, WORKTEAM_CD ) IN 	(  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,   ( TRIM( #{ssnEnterCd} ), TRIM( #{rm.timeCd}), TRIM( #{rm.workteamCd}))
+</foreach>
+										)
+		</delete>
+
+<!-- 예외인정근무시간 삭제 -->
+		<delete parameterType="map" id="deleteWorkTimeCdMgrStdHour">
+
+					DELETE FROM TTIM081
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND TIME_CD = TRIM(#{searchTimeCd})
+					   AND ( GNT_CD ) IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+    <if test='rm.gntCd != null and !rm.gntCd.equals("") '>
+					     , TRIM( #{rm.gntCd} )
+	</if>
+</foreach>
+					       )
+
+		</delete>
+
+<!-- 근무시간코드설정(근무조) 삭제 -->
+		<delete parameterType="map" id="deleteWorkTimeCdMgrWorkTeamAll">
+
+					DELETE FROM TTIM018
+					 WHERE (ENTER_CD, TIME_CD ) IN ( ( NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+		and rm.timeCd != null and !rm.timeCd.equals("")'>
+						, (TRIM( #{ssnEnterCd} ), TRIM( #{rm.timeCd}))
+	</if>
+</foreach>
+										)
+		</delete>
+
+
+	<!-- 근무조근무시간그룹 삭제 -->
+	<delete parameterType="map" id="deleteWorkTimeCdMgrWorkGrp">
+		DELETE FROM TTIM116
+		WHERE (ENTER_CD, TIME_CD ) IN ( ( NULL, NULL)
+		<foreach item="rm" collection="deleteRows" >
+			<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+		and rm.timeCd != null and !rm.timeCd.equals("")'>
+				, (TRIM( #{ssnEnterCd} ), TRIM( #{rm.timeCd}))
+			</if>
+		</foreach>
+		)
+	</delete>
+
+	<!-- 근무조패턴 삭제 -->
+	<delete parameterType="map" id="deleteWorkTimeCdMgrPatten">
+		DELETE FROM TTIM119
+		WHERE (ENTER_CD, TIME_CD ) IN ( ( NULL, NULL)
+		<foreach item="rm" collection="deleteRows" >
+			<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+		and rm.timeCd != null and !rm.timeCd.equals("")'>
+				, (TRIM( #{ssnEnterCd} ), TRIM( #{rm.timeCd}))
+			</if>
+		</foreach>
+		)
+	</delete>
+
+</mapper>

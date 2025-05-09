@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.benefitBasis.healthRatioMgr">
+
+	<select id="getHealthRatioMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT SDATE
+				 , EDATE
+				 , HIGH_MON
+				 , LOW_MON
+				 , SELF_RATE
+				 , COMP_RATE
+				 , LONGTERMCARE_RATE
+			  FROM TBEN002
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			ORDER BY SDATE DESC
+	]]>
+	</select>
+		
+	<update id="saveHealthRatioMgr" parameterType="map">
+	<![CDATA[
+			MERGE INTO TBEN002 T
+			USING	(
+					SELECT A.SDATE
+						 , A.EDATE
+						 , A.HIGH_MON
+						 , A.LOW_MON
+						 , A.SELF_RATE
+						 , A.COMP_RATE
+						 , A.LONGTERMCARE_RATE
+					  FROM (
+							SELECT NULL		AS SDATE
+								 , NULL		AS EDATE
+								 , NULL		AS HIGH_MON
+								 , NULL		AS LOW_MON
+								 , NULL		AS SELF_RATE
+								 , NULL		AS COMP_RATE
+								 , NULL		AS LONGTERMCARE_RATE
+							  FROM DUAL ]]>
+			<foreach item="rm" collection="mergeRows">
+							UNION ALL
+						SELECT TRIM(#{rm.sdate})			AS SDATE
+							 , TRIM(#{rm.edate})			AS EDATE
+							 , TRIM(#{rm.highMon})			AS HIGH_MON
+							 , TRIM(#{rm.lowMon})			AS LOW_MON
+							 , TRIM(#{rm.selfRate})			AS SELF_RATE
+							 , TRIM(#{rm.compRate})			AS COMP_RATE
+							 , TRIM(#{rm.longtermcareRate})	AS LONGTERMCARE_RATE
+						  FROM DUAL
+			</foreach>
+	<![CDATA[
+							) A
+					WHERE A.SDATE IS NOT NULL
+					) S
+			ON ( 	T.ENTER_CD	= #{ssnEnterCd}
+				AND	T.SDATE		= S.SDATE
+				)
+			WHEN MATCHED THEN
+				UPDATE SET T.EDATE				= S.EDATE
+						 , T.HIGH_MON 			= S.HIGH_MON
+						 , T.LOW_MON  			= S.LOW_MON
+						 , T.SELF_RATE			= S.SELF_RATE
+						 , T.COMP_RATE			= S.COMP_RATE
+						 , T.LONGTERMCARE_RATE	= S.LONGTERMCARE_RATE
+						 , T.CHKDATE			= SYSDATE
+						 , T.CHKID				= #{ssnSabun}
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					T.ENTER_CD
+				  , T.SDATE
+				  , T.EDATE
+				  , T.HIGH_MON
+				  , T.LOW_MON
+				  , T.SELF_RATE
+				  , T.COMP_RATE
+				  , T.LONGTERMCARE_RATE
+				  , T.CHKDATE
+				  , T.CHKID
+				)
+				VALUES
+				(
+					#{ssnEnterCd}
+				  , S.SDATE
+				  , S.EDATE
+				  , S.HIGH_MON
+				  , S.LOW_MON
+				  , S.SELF_RATE
+				  , S.COMP_RATE
+				  , S.LONGTERMCARE_RATE
+				  , SYSDATE
+				  , #{ssnSabun}
+				)
+	]]>
+	</update>
+		
+	<delete id="deleteHealthRatioMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN002
+		 WHERE ENTER_CD||'_'||SDATE IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sdate != null and rm.sdate neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sdate})
+			</if>
+		</foreach>
+			)
+	</delete>
+	
+</mapper>

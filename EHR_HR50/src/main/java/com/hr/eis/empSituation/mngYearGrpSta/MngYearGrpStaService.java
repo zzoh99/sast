@@ -1,0 +1,94 @@
+package com.hr.eis.empSituation.mngYearGrpSta;
+import java.util.List;
+import java.util.Map;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+
+import org.springframework.stereotype.Service;
+
+import com.hr.common.dao.Dao;
+import com.hr.common.logger.Log;
+
+/**
+ * mngYearGrpSta Service
+ *
+ * @author EW
+ *
+ */
+@Service("MngYearGrpStaService")
+public class MngYearGrpStaService{
+
+	@Inject
+	@Named("Dao")
+	private Dao dao;
+
+	/**
+	 * mngYearGrpSta1 다건 조회 Service
+	 *
+	 * @param paramMap
+	 * @return List
+	 * @throws Exception
+	 */
+	public List<?> getMngYearGrpStaList1(Map<?, ?> paramMap) throws Exception {
+		Log.Debug();
+		return (List<?>) dao.getList("getMngYearGrpStaList1", paramMap);
+	}
+	
+	/**
+	 * mngYearGrpSta2 다건 조회 Service
+	 *
+	 * @param paramMap
+	 * @return List
+	 * @throws Exception
+	 */
+	public List<?> getMngYearGrpStaList2(Map<?, ?> paramMap) throws Exception {
+		Log.Debug();
+		return (List<?>) dao.getList("getMngYearGrpStaList2", paramMap);
+	}
+	
+	/**
+	 * mngYearGrpStaAvgAttYear 다건 조회 Service
+	 *
+	 * @param paramMap
+	 * @return List
+	 * @throws Exception
+	 */
+	public List<?> getMngYearGrpStaAvgAttYear(Map<?, ?> paramMap) throws Exception {
+		Log.Debug();
+		return (List<?>) dao.getList("getMngYearGrpStaAvgAttYear", paramMap);
+	}
+
+	/**
+	 * mngYearGrpSta 저장 Service
+	 *
+	 * @param convertMap
+	 * @return int
+	 * @throws Exception
+	 */
+	public int saveMngYearGrpSta(Map<?, ?> convertMap) throws Exception {
+		Log.Debug();
+		int cnt=0;
+		if( ((List<?>)convertMap.get("deleteRows")).size() > 0){
+			cnt += dao.delete("deleteMngYearGrpSta", convertMap);
+		}
+		if( ((List<?>)convertMap.get("mergeRows")).size() > 0){
+			cnt += dao.update("saveMngYearGrpSta", convertMap);
+		}
+
+		return cnt;
+	}
+	/**
+	 * mngYearGrpSta 단건 조회 Service
+	 *
+	 * @param paramMap
+	 * @return Map
+	 * @throws Exception
+	 */
+	public Map<?, ?> getMngYearGrpStaMap(Map<?, ?> paramMap) throws Exception {
+		Log.Debug();
+		Map<?, ?> resultMap = dao.getMap("getMngYearGrpStaMap", paramMap);
+		Log.Debug();
+		return resultMap;
+	}
+}

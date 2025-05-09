@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.flexibleWorkOrgMgr">
+
+<!-- 근무제대상자관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrList">
+
+				<![CDATA[
+						SELECT
+								A.ENTER_CD				/*회사구분(TORG900)*/
+								, A.FLEXIBLE_WORK_TYPE	/*근무제구분(T00020)*/
+								, A.SDATE				/*유효시작일*/
+								, A.EDATE				/*유효종료일*/
+								, A.SCOPE_GUBUN			/*범위구분(A:전체, O:범위적용)*/
+								, A.NOTE				/*비고*/
+								, '0' AS SCOPE
+						FROM	TTIM221 A
+						WHERE	1=1
+						  AND	A.ENTER_CD = TRIM(#{ssnEnterCd}) ]]>
+						<if test='searchFlexibleWorkType != null and !searchFlexibleWorkType.equals("")'>
+						  AND	A.FLEXIBLE_WORK_TYPE	=	TRIM(#{searchFlexibleWorkType})
+						</if>
+
+		</select>
+
+<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrTblNm">
+
+				<![CDATA[
+				SELECT A.SCOPE_CD, B. AUTH_SCOPE_NM, B.TABLE_NM
+				  FROM (
+						SELECT ENTER_CD, SCOPE_CD
+						FROM  TTIM223
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND USE_GUBUN = 'C'
+						AND ITEM_VALUE1 =  TRIM(#{flexibleWorkType})
+						AND ITEM_VALUE2 =  TRIM(#{sdate})
+						AND ITEM_VALUE3 =  0
+						GROUP BY ENTER_CD,SCOPE_CD
+						) A, TSYS315 B
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+				]]>
+
+
+		</select>
+
+<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrScopeCd">
+
+				<![CDATA[
+
+				SELECT A.SCOPE_CD, A.SCOPE_VALUE, A.SCOPE_VALUE_NM
+				  FROM TTIM223 A
+				 WHERE ENTER_CD =TRIM(#{ssnEnterCd})
+				   AND USE_GUBUN = 'C'
+				   AND ITEM_VALUE1 = TRIM(#{itemValue1})
+				   AND ITEM_VALUE2 = TRIM(#{itemValue2})
+				   AND ITEM_VALUE3 = TRIM(#{itemValue3})
+				   AND SCOPE_CD = TRIM(#{scopeCd})
+				ORDER BY 1,2,3
+				]]>
+
+
+		</select>
+
+<!-- 근무제대상자관리 삭제 -->
+		<delete parameterType="map" id="deleteFlexibleWorkOrgMgr">
+
+				<![CDATA[
+					DELETE FROM TTIM221
+					 WHERE (ENTER_CD, FLEXIBLE_WORK_TYPE, SDATE) IN 	((NULL,NULL,NULL)
+					                                                       ]]>
+									<foreach item="rm" collection="deleteRows" >
+										,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+										and rm.flexibleWorkType != null and !rm.flexibleWorkType.equals("")
+										and rm.sdate != null and !rm.sdate.equals("")
+										'>
+										(TRIM( #{ssnEnterCd} ), TRIM( #{rm.flexibleWorkType} ), TRIM( #{rm.sdate} ))
+										</if>
+									</foreach>
+					)
+		</delete>
+
+<!-- 근무제대상자관리 저장 -->
+		<update parameterType="map" id="saveFlexibleWorkOrgMgr">
+
+					MERGE INTO TTIM221 T
+					USING	(
+							SELECT
+									A.ENTER_CD
+									, A.FLEXIBLE_WORK_TYPE
+									, A.SDATE
+									, A.EDATE
+									, A.SCOPE_GUBUN
+									, A.NOTE
+							FROM	(
+									SELECT
+									NULL		AS ENTER_CD
+									, NULL		AS FLEXIBLE_WORK_TYPE
+									, NULL		AS SDATE
+									, NULL		AS EDATE
+									, NULL		AS SCOPE_GUBUN
+									, NULL		AS NOTE
+									FROM	DUAL
+						<bind name="icnt" value="1" />
+						<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+									#{ssnEnterCd}                 	AS ENTER_CD
+									, TRIM( #{rm.flexibleWorkType})		AS FLEXIBLE_WORK_TYPE
+									, TRIM( #{rm.sdate})		AS SDATE
+									, TRIM( #{rm.edate})		AS EDATE
+									, TRIM( #{rm.scopeGubun})		AS SCOPE_GUBUN
+									, TRIM( #{rm.note})		AS NOTE
+									FROM   DUAL
+						</foreach>
+									) A WHERE
+									A.ENTER_CD IS NOT NULL
+									AND A.FLEXIBLE_WORK_TYPE IS NOT NULL
+									AND A.SDATE IS NOT NULL
+							) S
+					ON (
+									T.ENTER_CD		= S.ENTER_CD
+									AND	T.FLEXIBLE_WORK_TYPE		= S.FLEXIBLE_WORK_TYPE
+									AND	T.SDATE		= S.SDATE
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET
+									T.EDATE		= S.EDATE
+									, T.SCOPE_GUBUN		= S.SCOPE_GUBUN
+									, T.NOTE		= S.NOTE
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+									T.ENTER_CD
+									, T.FLEXIBLE_WORK_TYPE
+									, T.SDATE
+									, T.EDATE
+									, T.SCOPE_GUBUN
+									, T.NOTE
+									, T.CHKDATE
+									, T.CHKID
+						)
+						VALUES
+						(
+									S.ENTER_CD
+									, S.FLEXIBLE_WORK_TYPE
+									, S.SDATE
+									, S.EDATE
+									, S.SCOPE_GUBUN
+									, S.NOTE
+									, SYSDATE
+									, #{ssnSabun}
+						)
+		</update>
+
+
+</mapper>

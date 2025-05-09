@@ -1,0 +1,1309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="wtm.workMgr.wtmWorkCalendar">
+
+		<!-- 캘린더 출/퇴근조회(실제출/퇴근 기준) -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarInOutList1">
+			SELECT A.ENTER_CD
+				 , A.YMD
+				 , A.SABUN
+				 , A.IN_YMD
+				 , A.IN_HM
+				 , A.OUT_YMD
+				 , A.OUT_HM
+				 , A.LATE_YN
+				 , A.LEAVE_EARLY_YN
+				 , A.ABSENCE_YN
+			     , '1' AS PRIORITY
+				 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+			  FROM TWTM101 A
+			INNER JOIN THRM151 E
+			ON A.SABUN = E.SABUN
+			AND A.ENTER_CD = E.ENTER_CD
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND NVL(E.EDATE, '99991231')
+			 WHERE A.ENTER_CD =  #{ssnEnterCd}
+			   AND A.YMD BETWEEN TRIM( REPLACE(#{searchSYmd}, '-', '') ) AND TRIM( REPLACE(#{searchEYmd}, '-', '') )
+			<if test='searchOrgCd == null or searchOrgCd.equals("")'>
+				AND A.SABUN = TRIM( #{searchSabun} )
+			</if>
+			<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT #{searchOrgCd}
+				FROM DUAL
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+				  /*하위조직포함일때 Y , 아닐때 N */
+				  UNION
+				  SELECT ORG_CD
+				  FROM (
+				  SELECT *
+				  FROM TORG105
+				  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				  AND SDATE    =
+				 (
+				  SELECT MAX(SDATE)
+				  FROM TORG105
+				  WHERE ENTER_CD = #{ssnEnterCd}
+				  AND SDATE <= REPLACE( #{searchSymd},'-','')
+				  )
+				  )
+				  START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+				  CONNECT BY PRIOR ENTER_CD = ENTER_CD
+				  AND PRIOR SDATE    = SDATE
+				  AND PRIOR ORG_CD   = PRIOR_ORG_CD
+			]]>
+				</if>
+				)
+			</if>
+			<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT SCOPE_VALUE
+				FROM TSYS319
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				AND GRP_CD  = #{ssnGrpCd}
+				AND AUTH_SCOPE_CD = 'W10'
+				AND SABUN = #{ssnSabun}
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+					  /*하위조직포함일때 Y , 아닐때 N */
+					  UNION
+					  SELECT ORG_CD
+						FROM (
+								 SELECT ENTER_CD, ORG_CD, SDATE, PRIOR_ORG_CD
+								   FROM TORG105
+								  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									AND SDATE    =
+										(
+											SELECT MAX(SDATE)
+											  FROM TORG105
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											   AND SDATE <= REPLACE( #{searchSymd},'-','')
+										)
+							 )
+					   START WITH PRIOR_ORG_CD IN
+								  (
+									  SELECT SCOPE_VALUE
+										FROM TSYS319
+									   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+										 AND GRP_CD  = #{ssnGrpCd}
+										 AND AUTH_SCOPE_CD = 'W10'
+										 AND SABUN = #{ssnSabun}
+								  )
+					 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+							AND PRIOR SDATE    = SDATE
+							AND PRIOR ORG_CD   = PRIOR_ORG_CD
+					]]>
+				</if>
+				)
+			</if>
+			ORDER BY A.YMD, A.SABUN
+		</select>
+
+		<!-- 캘린더 출/퇴근조회(근무스케줄 기준) -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarInOutList2">
+			SELECT A.ENTER_CD
+				 , A.YMD
+				 , A.SABUN
+				 , A.PLAN_SYMD AS IN_YMD
+				 , A.PLAN_SHM AS IN_HM
+				 , A.PLAN_EYMD AS OUT_YMD
+				 , A.PLAN_EHM AS OUT_HM
+				 , '2' AS PRIORITY
+				 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+			  FROM TWTM102 A
+			INNER JOIN THRM151 E
+			ON A.SABUN = E.SABUN
+			AND A.ENTER_CD = E.ENTER_CD
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND NVL(E.EDATE, '99991231')
+			 WHERE A.ENTER_CD =  #{ssnEnterCd}
+			   AND A.YMD BETWEEN TRIM( REPLACE(#{searchSYmd}, '-', '') ) AND TRIM( REPLACE(#{searchEYmd}, '-', '') )
+			   AND A.WORK_CD = F_COM_GET_STD_CD_VALUE (A.ENTER_CD, 'WTM_STD_WORK_CD') -- 기본근무코드
+			<if test='searchOrgCd == null or searchOrgCd.equals("")'>
+				AND A.SABUN = TRIM( #{searchSabun} )
+			</if>
+			<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT #{searchOrgCd}
+				FROM DUAL
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+				  /*하위조직포함일때 Y , 아닐때 N */
+				  UNION
+				  SELECT ORG_CD
+				  FROM (
+				  SELECT *
+				  FROM TORG105
+				  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				  AND SDATE    =
+				 (
+				  SELECT MAX(SDATE)
+				  FROM TORG105
+				  WHERE ENTER_CD = #{ssnEnterCd}
+				  AND SDATE <= REPLACE( #{searchSymd},'-','')
+				  )
+				  )
+				  START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+				  CONNECT BY PRIOR ENTER_CD = ENTER_CD
+				  AND PRIOR SDATE    = SDATE
+				  AND PRIOR ORG_CD   = PRIOR_ORG_CD
+			]]>
+				</if>
+				)
+			</if>
+			<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT SCOPE_VALUE
+				FROM TSYS319
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				AND GRP_CD  = #{ssnGrpCd}
+				AND AUTH_SCOPE_CD = 'W10'
+				AND SABUN = #{ssnSabun}
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+					  /*하위조직포함일때 Y , 아닐때 N */
+					  UNION
+					  SELECT ORG_CD
+						FROM (
+								 SELECT ENTER_CD, ORG_CD, SDATE, PRIOR_ORG_CD
+								   FROM TORG105
+								  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									AND SDATE    =
+										(
+											SELECT MAX(SDATE)
+											  FROM TORG105
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											   AND SDATE <= REPLACE( #{searchSymd},'-','')
+										)
+							 )
+					   START WITH PRIOR_ORG_CD IN
+								  (
+									  SELECT SCOPE_VALUE
+										FROM TSYS319
+									   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+										 AND GRP_CD  = #{ssnGrpCd}
+										 AND AUTH_SCOPE_CD = 'W10'
+										 AND SABUN = #{ssnSabun}
+								  )
+					 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+							AND PRIOR SDATE    = SDATE
+							AND PRIOR ORG_CD   = PRIOR_ORG_CD
+					]]>
+				</if>
+				)
+			</if>
+			ORDER BY A.YMD, A.SABUN
+		</select>
+
+		<!-- 캘린더 출/퇴근조회(근무유형 기준) -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarInOutList3">
+			<![CDATA[
+			WITH DATES AS (
+				SELECT #{ssnEnterCd} AS ENTER_CD
+					 , TRIM( #{searchSabun} ) AS SABUN
+					 , TO_CHAR(TO_DATE(TRIM( REPLACE(#{searchSYmd}, '-', '') ) , 'YYYYMMDD') + LEVEL - 1, 'YYYYMMDD') AS YMD
+				  FROM DUAL
+			   CONNECT BY LEVEL <= TO_DATE(TRIM( REPLACE(#{searchEYmd}, '-', '') ), 'YYYYMMDD') - TO_DATE(TRIM( REPLACE(#{searchSYmd}, '-', '') ) , 'YYYYMMDD') + 1
+			)
+			SELECT DT.ENTER_CD
+				 , DT.YMD
+				 , DT.SABUN
+				 , X.WORK_DAY
+				 , NVL2(Y.WORK_CLASS_CD, Y.YMD, DT.YMD) AS IN_YMD
+				 , NVL2(Y.WORK_CLASS_CD, Y.WORK_TIME_F, X.WORK_TIME_F) AS IN_HM
+				 , NVL2(Y.WORK_CLASS_CD, Y.YMD, DT.YMD) AS OUT_YMD
+				 , NVL2(Y.WORK_CLASS_CD, Y.WORK_TIME_T, X.WORK_TIME_T) AS OUT_HM
+				 , '3' AS PRIORITY
+				 , F_COM_GET_NAMES(DT.ENTER_CD, DT.SABUN, #{ssnLocaleCd} ) AS NAME
+			  FROM DATES DT
+			  JOIN TWTM021 X
+				ON DT.ENTER_CD = X.ENTER_CD
+			   AND X.WORK_CLASS_DEF_YN = 'Y'
+			  LEFT JOIN (
+					SELECT A.ENTER_CD
+						 , DT.YMD
+						 , A.WORK_CLASS_CD
+						 , A.SABUN
+						 , B.WORK_TIME_F
+						 , B.WORK_TIME_T
+					  FROM DATES DT
+					  LEFT JOIN TWTM022 A
+						ON DT.ENTER_CD = A.ENTER_CD
+					   AND DT.YMD BETWEEN A.SDATE AND A.EDATE
+					  LEFT JOIN TWTM021 B
+						ON A.ENTER_CD = B.ENTER_CD
+					   AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+					 WHERE A.SABUN = DT.SABUN
+				   ) Y
+				ON X.ENTER_CD = Y.ENTER_CD
+			   AND DT.YMD = Y.YMD
+			  INNER JOIN THRM151 E
+						 ON DT.SABUN = E.SABUN
+							 AND DT.ENTER_CD = E.ENTER_CD
+							 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND NVL(E.EDATE, '99991231')
+				WHERE 1=1
+
+		   ]]>
+			<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT #{searchOrgCd}
+				FROM DUAL
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+				/*하위조직포함일때 Y , 아닐때 N */
+				UNION
+				SELECT ORG_CD
+				FROM (
+				SELECT *
+				FROM TORG105
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+  AND SDATE    =
+	(
+				SELECT MAX(SDATE)
+				FROM TORG105
+				WHERE ENTER_CD = #{ssnEnterCd}
+  AND SDATE <= REPLACE( #{searchSymd},'-','')
+				)
+				)
+				START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+				CONNECT BY PRIOR ENTER_CD = ENTER_CD
+  AND PRIOR SDATE    = SDATE
+  AND PRIOR ORG_CD   = PRIOR_ORG_CD
+			]]>
+				</if>
+				)
+			</if>
+			<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT SCOPE_VALUE
+				FROM TSYS319
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				AND GRP_CD  = #{ssnGrpCd}
+				AND AUTH_SCOPE_CD = 'W10'
+				AND SABUN = #{ssnSabun}
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+					  /*하위조직포함일때 Y , 아닐때 N */
+					  UNION
+					  SELECT ORG_CD
+						FROM (
+								 SELECT ENTER_CD, ORG_CD, SDATE, PRIOR_ORG_CD
+								   FROM TORG105
+								  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									AND SDATE    =
+										(
+											SELECT MAX(SDATE)
+											  FROM TORG105
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											   AND SDATE <= REPLACE( #{searchSymd},'-','')
+										)
+							 )
+					   START WITH PRIOR_ORG_CD IN
+								  (
+									  SELECT SCOPE_VALUE
+										FROM TSYS319
+									   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+										 AND GRP_CD  = #{ssnGrpCd}
+										 AND AUTH_SCOPE_CD = 'W10'
+										 AND SABUN = #{ssnSabun}
+								  )
+					 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+							AND PRIOR SDATE    = SDATE
+							AND PRIOR ORG_CD   = PRIOR_ORG_CD
+					]]>
+				</if>
+				)
+			</if>
+		</select>
+
+		<!-- 진행중인 출퇴근변경 신청 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarInOutList4">
+			SELECT A.ENTER_CD
+				 , A.APPL_SEQ
+				 , A.YMD
+				 , A.SABUN
+				 , TO_CHAR(MIN(TO_DATE(B.AF_IN_YMD || B.AF_IN_HM, 'YYYYMMDDHH24MI')), 'HH24MI') AS IN_HM
+				 , TO_CHAR(MAX(TO_DATE(B.AF_OUT_YMD || B.AF_OUT_HM, 'YYYYMMDDHH24MI')), 'HH24MI') AS OUT_HM
+				 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010', C.APPL_STATUS_CD) AS APPL_STATUS_NM
+			     , C.APPL_STATUS_CD
+				 , '4' AS PRIORITY
+				 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+			  FROM TWTM321 A
+			  JOIN TWTM322 B
+				ON A.ENTER_CD = B.ENTER_CD
+			   AND A.APPL_SEQ = B.APPL_SEQ
+			  JOIN THRI103 C
+				ON A.ENTER_CD = C.ENTER_CD
+			   AND A.APPL_SEQ = C.APPL_SEQ
+			INNER JOIN THRM151 E
+			ON A.SABUN = E.SABUN
+			AND A.ENTER_CD = E.ENTER_CD
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND NVL(E.EDATE, '99991231')
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.YMD BETWEEN TRIM( REPLACE(#{searchSYmd}, '-', '') ) AND TRIM( REPLACE(#{searchEYmd}, '-', '') )
+			   AND B.CHG_TYPE NOT IN ('D')
+			   AND C.APPL_STATUS_CD IN ('11', '21', '31')
+			<if test='searchOrgCd == null or searchOrgCd.equals("")'>
+				AND A.SABUN = TRIM( #{searchSabun} )
+			</if>
+			<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT #{searchOrgCd}
+				FROM DUAL
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+				/*하위조직포함일때 Y , 아닐때 N */
+				UNION
+				SELECT ORG_CD
+				FROM (
+				SELECT *
+				FROM TORG105
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+  AND SDATE    =
+	(
+				SELECT MAX(SDATE)
+				FROM TORG105
+				WHERE ENTER_CD = #{ssnEnterCd}
+  AND SDATE <= REPLACE( #{searchSymd},'-','')
+				)
+				)
+				START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+				CONNECT BY PRIOR ENTER_CD = ENTER_CD
+  AND PRIOR SDATE    = SDATE
+  AND PRIOR ORG_CD   = PRIOR_ORG_CD
+			]]>
+				</if>
+				)
+			</if>
+			<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT SCOPE_VALUE
+				FROM TSYS319
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				AND GRP_CD  = #{ssnGrpCd}
+				AND AUTH_SCOPE_CD = 'W10'
+				AND SABUN = #{ssnSabun}
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+					  /*하위조직포함일때 Y , 아닐때 N */
+					  UNION
+					  SELECT ORG_CD
+						FROM (
+								 SELECT ENTER_CD, ORG_CD, SDATE, PRIOR_ORG_CD
+								   FROM TORG105
+								  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									AND SDATE    =
+										(
+											SELECT MAX(SDATE)
+											  FROM TORG105
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											   AND SDATE <= REPLACE( #{searchSymd},'-','')
+										)
+							 )
+					   START WITH PRIOR_ORG_CD IN
+								  (
+									  SELECT SCOPE_VALUE
+										FROM TSYS319
+									   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+										 AND GRP_CD  = #{ssnGrpCd}
+										 AND AUTH_SCOPE_CD = 'W10'
+										 AND SABUN = #{ssnSabun}
+								  )
+					 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+							AND PRIOR SDATE    = SDATE
+							AND PRIOR ORG_CD   = PRIOR_ORG_CD
+					]]>
+				</if>
+				)
+			</if>
+			 GROUP BY A.ENTER_CD, A.APPL_SEQ, A.YMD, A.SABUN, C.APPL_STATUS_CD
+		</select>
+
+		<!-- 캘린더 근무 리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarWorkList">
+			<![CDATA[
+			SELECT ENTER_CD, SABUN, WORK_CD, WORK_S_NM, WORK_TIME_TYPE
+			     , WORK_SYMD, WORK_SHM, WORK_EYMD, WORK_EHM, WORK_APPL_SEQ, NAME
+			     , WORK_SEQ, APPL_STATUS_CD
+			     , CASE WHEN APPL_STATUS_CD = '41' THEN '취소처리중'
+			            ELSE F_COM_GET_GRCODE_NAME(ENTER_CD, 'R10010', APPL_STATUS_CD) END AS APPL_STATUS_NM
+			  FROM (
+						SELECT A.ENTER_CD
+							 , A.SABUN
+							 , A.WORK_CD
+							 , D.WORK_S_NM
+							 , D.WORK_TIME_TYPE
+							 , B.S_YMD AS WORK_SYMD
+							 , B.REQ_S_HM AS WORK_SHM
+							 , B.E_YMD AS WORK_EYMD
+							 , B.REQ_E_HM AS WORK_EHM
+							 , A.APPL_SEQ AS WORK_APPL_SEQ
+							 , B.SEQ AS WORK_SEQ
+				 			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+							 , CASE WHEN EXISTS
+							             (
+											 SELECT 1
+											   FROM TWTM311 T1
+											  INNER JOIN TWTM312 T2
+											     ON T2.ENTER_CD = T1.ENTER_CD
+											    AND T2.APPL_SEQ = T1.APPL_SEQ
+											  INNER JOIN THRI103 T3
+											     ON T3.ENTER_CD = T1.ENTER_CD
+											    AND T3.APPL_SEQ = T1.APPL_SEQ
+											  WHERE T1.ENTER_CD = A.ENTER_CD
+											    AND T2.BF_APPL_SEQ = A.APPL_SEQ
+											    AND T2.BF_SEQ = B.SEQ
+											    AND T2.REQ_TYPE = 'D' -- 취소신청
+							                    AND T3.APPL_STATUS_CD IN ('21', '31') -- 결재진행중
+								         ) THEN '41'
+							        ELSE C.APPL_STATUS_CD END AS APPL_STATUS_CD
+						  FROM TWTM311 A
+						 INNER JOIN TWTM312 B
+							ON B.ENTER_CD = A.ENTER_CD
+						   AND B.APPL_SEQ = A.APPL_SEQ
+						 INNER JOIN THRI103 C
+							ON C.ENTER_CD = A.ENTER_CD
+						   AND C.APPL_SEQ = A.APPL_SEQ
+						  JOIN TWTM051 D
+							ON A.ENTER_CD = D.ENTER_CD
+						   AND A.WORK_CD = D.WORK_CD
+						 INNER JOIN THRM151 E
+							ON A.SABUN = E.SABUN
+						   AND A.ENTER_CD = E.ENTER_CD
+						   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND NVL(E.EDATE, '99991231')
+						 WHERE A.ENTER_CD =  #{ssnEnterCd}
+						   AND B.REQ_TYPE = 'I' -- 입력
+						   AND B.S_YMD <= TRIM( REPLACE(#{searchEYmd}, '-', '') )
+						   AND B.E_YMD >= TRIM( REPLACE(#{searchSYmd}, '-', '') )
+						   AND NOT EXISTS
+							 (
+								 SELECT 1
+								   FROM TWTM311 T1
+								  INNER JOIN TWTM312 T2
+									 ON T2.ENTER_CD = T1.ENTER_CD
+									AND T2.APPL_SEQ = T1.APPL_SEQ
+								  INNER JOIN THRI103 T3
+									 ON T3.ENTER_CD = T1.ENTER_CD
+									AND T3.APPL_SEQ = T1.APPL_SEQ
+								  WHERE T1.ENTER_CD = A.ENTER_CD
+									AND T2.BF_APPL_SEQ = A.APPL_SEQ
+									AND T2.BF_SEQ = B.SEQ
+									AND T2.REQ_TYPE = 'D' -- 취소신청
+									AND T3.APPL_STATUS_CD = '99' -- 결재완료
+							 )
+			]]>
+			<if test='searchOrgCd == null or searchOrgCd.equals("")'>
+				AND A.SABUN = TRIM( #{searchSabun} )
+			</if>
+			<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT #{searchOrgCd}
+				FROM DUAL
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+				  /*하위조직포함일때 Y , 아닐때 N */
+				  UNION
+				  SELECT ORG_CD
+				  FROM (
+				  SELECT *
+				  FROM TORG105
+				  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				  AND SDATE    =
+				 (
+				  SELECT MAX(SDATE)
+				  FROM TORG105
+				  WHERE ENTER_CD = #{ssnEnterCd}
+				  AND SDATE <= REPLACE( #{searchSymd},'-','')
+				  )
+				  )
+				  START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+				  CONNECT BY PRIOR ENTER_CD = ENTER_CD
+				  AND PRIOR SDATE    = SDATE
+				  AND PRIOR ORG_CD   = PRIOR_ORG_CD
+			]]>
+				</if>
+				)
+			</if>
+			<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT SCOPE_VALUE
+				FROM TSYS319
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				AND GRP_CD  = #{ssnGrpCd}
+				AND AUTH_SCOPE_CD = 'W10'
+				AND SABUN = #{ssnSabun}
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+					  /*하위조직포함일때 Y , 아닐때 N */
+					  UNION
+					  SELECT ORG_CD
+						FROM (
+								 SELECT ENTER_CD, ORG_CD, SDATE, PRIOR_ORG_CD
+								   FROM TORG105
+								  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									AND SDATE    =
+										(
+											SELECT MAX(SDATE)
+											  FROM TORG105
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											   AND SDATE <= REPLACE( #{searchSymd},'-','')
+										)
+							 )
+					   START WITH PRIOR_ORG_CD IN
+								  (
+									  SELECT SCOPE_VALUE
+										FROM TSYS319
+									   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+										 AND GRP_CD  = #{ssnGrpCd}
+										 AND AUTH_SCOPE_CD = 'W10'
+										 AND SABUN = #{ssnSabun}
+								  )
+					 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+							AND PRIOR SDATE    = SDATE
+							AND PRIOR ORG_CD   = PRIOR_ORG_CD
+					]]>
+				</if>
+				)
+			</if>
+			       )
+			 ORDER BY WORK_APPL_SEQ, WORK_SYMD, SABUN, WORK_SHM
+		</select>
+
+		<!-- 캘린더 근태 리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarAttendList">
+			<![CDATA[
+			SELECT SABUN, ATTEND_APPL_SEQ, ATTEND_SEQ, GNT_CD, GNT_SHORT_NM
+			     , GNT_NM, REQ_TYPE, ATTEND_SYMD, ATTEND_SHM, ATTEND_EYMD, ATTEND_EHM
+			     , APPL_STATUS_CD
+				 , CASE WHEN APPL_STATUS_CD = '41' THEN '취소처리중'
+				        ELSE F_COM_GET_GRCODE_NAME(ENTER_CD, 'R10010', APPL_STATUS_CD) END AS APPL_STATUS_NM
+				 , NAME
+			  FROM (
+						SELECT A.ENTER_CD, A.SABUN
+							 , A.APPL_SEQ AS ATTEND_APPL_SEQ
+							 , B.SEQ AS ATTEND_SEQ
+							 , A.GNT_CD
+							 , NVL(D.GNT_SHORT_NM, D.GNT_NM) AS GNT_SHORT_NM
+							 , D.GNT_NM
+							 , B.REQ_TYPE
+							 , B.S_YMD AS ATTEND_SYMD
+							 , B.REQ_S_HM AS ATTEND_SHM
+							 , B.E_YMD AS ATTEND_EYMD
+							 , B.REQ_E_HM AS ATTEND_EHM
+				 			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+							 , CASE WHEN EXISTS
+										 (
+											 SELECT 1
+											   FROM TWTM301 T1
+											  INNER JOIN TWTM302 T2
+												 ON T2.ENTER_CD = T1.ENTER_CD
+												AND T2.APPL_SEQ = T1.APPL_SEQ
+											  INNER JOIN THRI103 T3
+												 ON T3.ENTER_CD = T1.ENTER_CD
+												AND T3.APPL_SEQ = T1.APPL_SEQ
+											  WHERE T1.ENTER_CD = A.ENTER_CD
+												AND T2.BF_APPL_SEQ = A.APPL_SEQ
+												AND T2.BF_SEQ = B.SEQ
+												AND T2.REQ_TYPE = 'D' -- 취소신청
+												AND T3.APPL_STATUS_CD IN ('21', '31') -- 결재처리중
+										 ) THEN '41' ELSE C.APPL_STATUS_CD END AS APPL_STATUS_CD
+						  FROM TWTM301 A
+						 INNER JOIN TWTM302 B
+							ON B.ENTER_CD = A.ENTER_CD
+						   AND B.APPL_SEQ = A.APPL_SEQ
+						 INNER JOIN THRI103 C
+							ON C.ENTER_CD = A.ENTER_CD
+						   AND C.APPL_SEQ = A.APPL_SEQ
+						 INNER JOIN TWTM041 D
+							ON D.ENTER_CD = A.ENTER_CD
+						   AND D.GNT_CD = A.GNT_CD
+						 INNER JOIN THRM151 E
+							ON A.SABUN = E.SABUN
+						   AND A.ENTER_CD = E.ENTER_CD
+						   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND NVL(E.EDATE, '99991231')
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND B.REQ_TYPE = 'I' -- 입력
+						   AND B.E_YMD >= TRIM( REPLACE(#{searchSYmd}, '-', '') )
+						   AND B.S_YMD <= TRIM( REPLACE(#{searchEYmd}, '-', '') )
+						   AND NOT EXISTS
+							   (
+								   SELECT 1
+									 FROM TWTM301 T1
+									INNER JOIN TWTM302 T2
+									   ON T2.ENTER_CD = T1.ENTER_CD
+									  AND T2.APPL_SEQ = T1.APPL_SEQ
+									INNER JOIN THRI103 T3
+									   ON T3.ENTER_CD = T1.ENTER_CD
+									  AND T3.APPL_SEQ = T1.APPL_SEQ
+									WHERE T1.ENTER_CD = A.ENTER_CD
+									  AND T2.BF_APPL_SEQ = A.APPL_SEQ
+									  AND T2.BF_SEQ = B.SEQ
+									  AND T2.REQ_TYPE = 'D' -- 취소신청
+									  AND T3.APPL_STATUS_CD = '99' -- 결재완료
+							   )
+			]]>
+
+			<if test='searchOrgCd == null or searchOrgCd.equals("")'>
+				AND A.SABUN = TRIM( #{searchSabun} )
+			</if>
+			<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT #{searchOrgCd}
+				FROM DUAL
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+						/*하위조직포함일때 Y , 아닐때 N */
+						UNION
+						SELECT ORG_CD
+						FROM (
+						SELECT *
+						FROM TORG105
+						WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+					   AND SDATE    =
+						 (
+						SELECT MAX(SDATE)
+						FROM TORG105
+						WHERE ENTER_CD = #{ssnEnterCd}
+					   AND SDATE <= REPLACE( #{searchSymd},'-','')
+						)
+						)
+						START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+						CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					   AND PRIOR SDATE    = SDATE
+					   AND PRIOR ORG_CD   = PRIOR_ORG_CD
+					]]>
+				</if>
+				)
+			</if>
+			<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+				AND E.ORG_CD IN
+				(
+				SELECT SCOPE_VALUE
+				FROM TSYS319
+				WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+				AND GRP_CD  = #{ssnGrpCd}
+				AND AUTH_SCOPE_CD = 'W10'
+				AND SABUN = #{ssnSabun}
+				<if test='searchOrgType and searchOrgType.equals("Y")'>
+					<![CDATA[
+					  /*하위조직포함일때 Y , 아닐때 N */
+					  UNION
+					  SELECT ORG_CD
+						FROM (
+								 SELECT ENTER_CD, ORG_CD, SDATE, PRIOR_ORG_CD
+								   FROM TORG105
+								  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									AND SDATE    =
+										(
+											SELECT MAX(SDATE)
+											  FROM TORG105
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											   AND SDATE <= REPLACE( #{searchSymd},'-','')
+										)
+							 )
+					   START WITH PRIOR_ORG_CD IN
+								  (
+									  SELECT SCOPE_VALUE
+										FROM TSYS319
+									   WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+										 AND GRP_CD  = #{ssnGrpCd}
+										 AND AUTH_SCOPE_CD = 'W10'
+										 AND SABUN = #{ssnSabun}
+								  )
+					 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+							AND PRIOR SDATE    = SDATE
+							AND PRIOR ORG_CD   = PRIOR_ORG_CD
+					]]>
+				</if>
+				)
+			</if>
+				   )
+			 ORDER BY ATTEND_SYMD, ATTEND_SHM
+		</select>
+
+		<!-- 연차현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarVacationMap">
+			SELECT A.ENTER_CD
+				 , A.SABUN
+				 , A.GNT_CD
+				 , SUM(A.CRE_CNT) AS CRE_CNT    /* 총발생일수(당해년도발생일수) */
+				 , SUM(A.USE_CNT) AS USE_CNT    /* 사용가능일 */
+				 , SUM(A.USED_CNT) AS USED_CNT  /* 사용일(당해년도사용일수) */
+				 , SUM(A.REST_CNT) AS REST_CNT  /* 현잔여일수 */
+			  FROM TWTM511 A
+			  JOIN TWTM041 B
+				ON A.ENTER_CD = B.ENTER_CD
+			   AND A.GNT_CD = B.GNT_CD
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.SABUN = #{searchSabun}
+			   AND B.GNT_GUBUN_CD = '1'
+			   AND B.BASIC_GNT_CD_YN = 'Y'
+			   AND REPLACE(#{searchBaseYmd}, '-', '') BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+			 GROUP BY A.ENTER_CD, A.SABUN, A.GNT_CD
+		</select>
+
+		<!-- 기본근무, 연장근무 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWtmWorkCalendarWorkTimeMap">
+			<![CDATA[
+			SELECT ROUND(SUM(TOTAL_REAL), 1) AS TOTAL_REAL
+				 , ROUND(SUM(TOTAL_PLAN), 1) AS TOTAL_PLAN
+				 , ROUND(SUM(BASE_WORK_PLAN), 1) AS BASE_WORK_PLAN
+				 , ROUND(SUM(TOTAL_PLAN) - SUM(BASE_WORK_PLAN), 1) AS OT_WORK_PLAN
+			  FROM (
+					SELECT (SUM(NVL(BASIC_MM, 0)) + SUM(NVL(OT_MM, 0)))/60 AS TOTAL_REAL, 0 AS TOTAL_PLAN, 0 AS BASE_WORK_PLAN
+					  FROM TWTM101
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND SABUN = #{searchSabun}
+					   AND YMD BETWEEN REPLACE(#{searchSYmd}, '-', '') AND REPLACE(#{searchEYmd}, '-', '')
+					 UNION ALL
+					SELECT 0, SUM(CASE WHEN NVL(C.NOTE1, B.DEEMED_YN) = 'Y' THEN A.PLAN_MM ELSE A.PLAN_MM * -1 END)/60, 0
+					  FROM TWTM102 A
+					  JOIN TWTM051 B
+						ON A.ENTER_CD = B.ENTER_CD
+					   AND A.WORK_CD = B.WORK_CD
+					  LEFT JOIN TSYS005 C
+						ON A.ENTER_CD = C.ENTER_CD
+					   AND B.WORK_TIME_TYPE = C.CODE
+					   AND C.GRCODE_CD = 'WT0511'
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN = #{searchSabun}
+					   AND A.YMD BETWEEN REPLACE(#{searchSYmd}, '-', '') AND REPLACE(#{searchEYmd}, '-', '')
+					 UNION ALL
+					SELECT 0, 0, SUM(CASE WHEN NVL(D.NOTE1, C.DEEMED_YN) = 'Y' THEN A.PLAN_MM ELSE A.PLAN_MM * -1 END)/60
+					  FROM TWTM102 A
+					  JOIN TWTM051 C
+						ON A.ENTER_CD = C.ENTER_CD
+					   AND A.WORK_CD = C.WORK_CD
+					  LEFT JOIN TSYS005 D
+						ON C.ENTER_CD = D.ENTER_CD
+					   AND C.WORK_TIME_TYPE = D.CODE
+					   AND D.GRCODE_CD = 'WT0511'
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND EXISTS (
+							SELECT 1
+							  FROM TWTM102 X
+							 WHERE X.ENTER_CD = A.ENTER_CD
+							   AND X.YMD = A.YMD
+							   AND X.SABUN = A.SABUN
+							   AND X.WORK_CD = F_COM_GET_STD_CD_VALUE (X.ENTER_CD, 'WTM_STD_WORK_CD') -- 기본근무코드
+							   AND TO_DATE(A.PLAN_SYMD || A.PLAN_SHM, 'YYYYMMDDHH24MI') >= TO_DATE(X.PLAN_SYMD || X.PLAN_SHM, 'YYYYMMDDHH24MI')
+							   AND TO_DATE(A.PLAN_EYMD || A.PLAN_EHM, 'YYYYMMDDHH24MI') <= TO_DATE(X.PLAN_EYMD || X.PLAN_EHM, 'YYYYMMDDHH24MI')
+						   )
+					   AND A.SABUN = #{searchSabun}
+					   AND A.YMD BETWEEN REPLACE(#{searchSYmd}, '-', '') AND REPLACE(#{searchEYmd}, '-', '')
+				   )
+				]]>
+		</select>
+
+	<select id="getHolidayList" resultType="cMap">
+		SELECT ENTER_CD,
+			   YY,
+			   HOLIDAY_CD,
+			   HOLIDAY_NM,
+			   MM,
+			   DD,
+			   YY || MM || DD AS HOLIDAY_DATE,
+			   GUBUN,
+			   FESTIVE_YN,
+			   PAY_YN,
+			   LOCATION_CD,
+			   WORKTEAM_YN,
+			   BUSINESS_PLACE_CD,
+			   LANGUAGE_CD,
+			   RP_YY,
+			   RP_MM,
+			   RP_DD,
+			   HOLIDAY_YN,
+			   SUBSTITUTE_TYPE
+		  FROM TWTM001
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND BUSINESS_PLACE_CD = F_COM_GET_BP_CD(#{ssnEnterCd}, #{ssnSabun}, SYSDATE)
+		   AND YY || MM || DD BETWEEN TRIM( REPLACE(#{searchAppSYmd}, '-', '') ) AND TRIM( REPLACE(#{searchAppEYmd}, '-', '') )
+	</select>
+
+	<!-- 신청자 근무유형 조회 -->
+	<select id="getWtmWorkCalendarWorkClass" resultType="cMap">
+		SELECT A.WORK_CLASS_CD
+			 , B.WORK_CLASS_NM
+			 , B.APPL_CD
+			 , B.INTERVAL_CD
+			 , C.NOTE2 AS APPL_UNIT
+			 , C.NOTE3 AS APPL_MIN_UNIT
+		     , B.WEEK_BEGIN_DAY
+			 , B.SDATE
+			 , A.SDATE AS PSNL_SDATE
+			 , B.EDATE
+			 , A.EDATE AS PSNL_EDATE
+			 , B.WORK_DAY
+			 , B.WEEK_REST_DAY
+			 , B.WORK_HOURS
+			 , B.WORK_TIME_F
+			 , B.WORK_TIME_T
+			 , B.CORE_TIME_F
+			 , B.CORE_TIME_T
+			 , NVL(B.SAME_DAY_CHG_YN, 'N') AS SAME_DAY_CHG_YN
+			 , B.START_WORK_TIME_F
+			 , B.START_WORK_TIME_T
+			 , B.BREAK_TIME_TYPE
+			 , B.BREAK_TIME_DET
+			 , B.BREAK_TIME_T
+			 , B.BREAK_TIME_R
+		  FROM TWTM022 A
+		  JOIN TWTM021 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+		  LEFT JOIN TSYS005 C
+		    ON A.ENTER_CD = C.ENTER_CD
+		   AND B.INTERVAL_CD = C.CODE
+		   AND C.GRCODE_CD = 'T90200'
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.SABUN = #{searchApplSabun}
+		   AND TRIM( REPLACE(#{searchYmd}, '-', '') ) BETWEEN A.SDATE AND A.EDATE
+		   AND B.APPL_CD IS NOT NULL
+	</select>
+
+	<!-- 신청단위 조회 -->
+	<select id="getWtmWorkCalendarApplUnit" resultType="cMap">
+		SELECT C.CODE
+			 , C.CODE_NM
+		  FROM TWTM021 A
+		  JOIN TSYS005 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.INTERVAL_CD = B.CODE
+		   AND B.GRCODE_CD = 'T90200'
+		  JOIN TSYS005 C
+			ON B.ENTER_CD = C.ENTER_CD
+		   AND B.NOTE1 = C.GRCODE_CD
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.WORK_CLASS_CD = #{searchWorkClassCd}
+	</select>
+
+	<!-- 근태코드 전체 조회 -->
+	<select id="getWtmWorkCalendarGntCdList" resultType="cMap">
+		SELECT GNT_CD, GNT_GUBUN_CD, GNT_NM, GNT_SHORT_NM, COLOR, REQUEST_USE_TYPE
+		  FROM TWTM041
+		 WHERE ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<!-- 근무코드 전체 조회 -->
+	<select id="getWtmWorkCalendarWorkCdList" resultType="cMap">
+		SELECT A.WORK_CD, A.WORK_NM, A.WORK_S_NM, A.WORK_TIME_TYPE
+		  FROM TWTM051 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<!-- 기준 코드 조회 -->
+	<select id="getWtmWorkCalendarBaseCd" resultType="cMap">
+		SELECT F_COM_GET_STD_CD_VALUE (#{ssnEnterCd}, 'WTM_STD_WORK_CD') AS STD_WORK_CD
+			 , F_COM_GET_STD_CD_VALUE (#{ssnEnterCd}, 'WTM_STD_BREAK_CD') AS STD_BREAK_CD
+			 , F_COM_GET_STD_CD_VALUE (#{ssnEnterCd}, 'WTM_STD_OT_CD') AS STD_OT_CD
+		  FROM DUAL
+	</select>
+
+	<!-- 신청자 휴일 조회 -->
+	<select id="getWtmWorkCalendarHolidays" resultType="cMap">
+		SELECT A.YY||A.MM||A.DD AS YMD
+		     , A.RP_YY||A.RP_MM||A.RP_DD AS RP_YMD
+			 , A.HOLIDAY_NM
+		  FROM TWTM001 A
+		  JOIN BP_V B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.BUSINESS_PLACE_CD = B.BUSINESS_PLACE_CD
+		   AND (A.YY||A.MM||A.DD BETWEEN B.SDATE AND B.EDATE OR A.RP_YY||A.RP_MM||A.RP_DD BETWEEN B.SDATE AND B.EDATE)
+		   AND B.SABUN = #{searchSabun}
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND (A.YY||A.MM||A.DD BETWEEN REPLACE(#{sdate}, '-', '') AND REPLACE(#{edate}, '-', '')
+			 	OR A.RP_YY||A.RP_MM||A.RP_DD BETWEEN REPLACE(#{sdate}, '-', '') AND REPLACE(#{edate}, '-', ''))
+
+	</select>
+
+	<!-- 근무스케줄 조회 -->
+	<select id="getReqWorkScheduleSchList" resultType="cMap">
+		SELECT A.*, B.NAME
+		  FROM (
+				SELECT A.ENTER_CD
+					 , A.YMD
+					 , A.SABUN
+					 , A.WORK_CD AS ATT_CD
+					 , B.WORK_S_NM AS ATT_NM
+					 , B.COLOR
+					 , A.PLAN_SYMD AS SYMD
+					 , A.PLAN_SHM AS SHM
+					 , A.PLAN_EYMD AS EYMD
+					 , A.PLAN_EHM AS EHM
+					 , A.PLAN_MM AS MM
+					 , NVL(C.NOTE1, NVL(B.DEEMED_YN, 'N')) AS ADD_WORK_TIME_YN
+					 , 'WORK' AS TYPE
+					 , NULL AS REQUEST_USE_TYPE
+				  FROM TWTM102 A
+				  JOIN TWTM051 B
+					ON A.ENTER_CD = B.ENTER_CD
+				   AND A.WORK_CD = B.WORK_CD
+				  LEFT JOIN TSYS005 C
+					ON B.ENTER_CD = C.ENTER_CD
+				   AND B.WORK_TIME_TYPE = C.CODE
+				   AND C.GRCODE_CD = 'WT0511'
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = #{ssnSabun}
+				   AND A.YMD BETWEEN #{sYmd} AND #{eYmd}
+				 UNION ALL
+				SELECT A.ENTER_CD
+					 , A.YMD
+					 , A.SABUN
+					 , A.GNT_CD
+					 , B.GNT_SHORT_NM
+					 , B.COLOR
+					 , A.SYMD
+					 , A.SHM
+					 , A.EYMD
+					 , A.EHM
+					 , A.MM
+					 , 'N'
+					 , 'GNT' AS TYPE
+					 , B.REQUEST_USE_TYPE
+				  FROM TWTM103 A
+				  JOIN TWTM041 B
+					ON A.ENTER_CD = B.ENTER_CD
+				   AND A.GNT_CD = B.GNT_CD
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = #{ssnSabun}
+				   AND A.YMD BETWEEN #{sYmd} AND #{eYmd}
+			   ) A
+		  JOIN THRM100 B
+		    ON A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN = B.SABUN
+		 ORDER BY A.SABUN, A.YMD, A.SHM, A.EHM
+	</select>
+
+	<!-- 근무스케줄 신청 저장 -->
+	<update parameterType="map" id="saveWtmReqWorkSchedule">
+		INSERT INTO TWTM201 (ENTER_CD, APPL_SEQ, WORK_CLASS_CD, YMD, UNIT, APPL_UNIT, SDATE, EDATE, ORG_CD, ORG_AUTH, INSDATE, INSID, CHKDATE, CHKID)
+		VALUES (#{ssnEnterCd}, #{applSeq}, #{workClassCd}, REPLACE(#{searchYmd}, '-', ''), #{applUnit}, #{searchApplUnit}, REPLACE(#{sdate}, '-', ''), REPLACE(#{edate}, '-', ''), #{orgCd}, #{orgAuth}, SYSDATE, #{ssnSabun}, SYSDATE, #{ssnSabun})
+	</update>
+
+	<!-- 근무스케줄 신청 상세 저장 -->
+	<update parameterType="map" id="saveWtmReqWorkScheduleDetail">
+		INSERT INTO TWTM202 (ENTER_CD, APPL_SEQ, SABUN, YMD, WRK_DTL_ID, WORK_CD, SYMD, SHM, EYMD, EHM, MM, INSDATE, INSID, CHKDATE, CHKID)
+		SELECT ENTER_CD, APPL_SEQ, SABUN, YMD, WRK_DTL_ID, WORK_CD, SYMD, SHM, EYMD, EHM, MM, INSDATE, INSID, CHKDATE, CHKID
+		  FROM (
+		      SELECT NULL AS ENTER_CD, NULL AS APPL_SEQ, NULL AS SABUN, NULL AS YMD, NULL AS WRK_DTL_ID, NULL AS WORK_CD, NULL AS SYMD, NULL AS SHM, NULL AS EYMD, NULL AS EHM, NULL AS MM
+		           , NULL AS INSDATE, NULL AS INSID, NULL AS CHKDATE, NULL AS CHKID
+		        FROM DUAL
+			<foreach collection="dataList" item="rm">
+				UNION ALL
+				SELECT #{rm.ssnEnterCd} AS ENTER_CD, #{rm.applSeq} AS APPL_SEQ, #{rm.sabun} AS SABUN, #{rm.ymd} AS YMD
+				     , #{rm.wrkDtlId} AS WRK_DTL_ID, #{rm.attCd} AS WORK_CD, #{rm.symd} AS SYMD, #{rm.shm} AS SHM, #{rm.eymd} AS EYMD, #{rm.ehm} AS EHM, #{rm.mm} AS MM
+				     , SYSDATE AS INSDATE, #{rm.ssnSabun} AS INSID, SYSDATE AS CHKDATE, #{rm.ssnSabun} AS CHKID
+				  FROM DUAL
+			</foreach>
+		       )
+		 WHERE ENTER_CD IS NOT NULL
+		   AND APPL_SEQ IS NOT NULL
+		   AND SABUN IS NOT NULL
+		   AND YMD IS NOT NULL
+		   AND WRK_DTL_ID IS NOT NULL
+	</update>
+
+	<!-- 근무스케줄 신청 조회 -->
+	<select id="getWtmReqWorkScheduleDet" resultType="cMap">
+		SELECT A.APPL_SEQ
+			 , A.YMD AS BASE_YMD
+			 , A.UNIT
+			 , A.SDATE
+			 , A.EDATE
+			 , A.ORG_CD
+			 , A.ORG_AUTH
+			 , A.NOTE
+			 , B.SABUN
+			 , B.YMD
+			 , B.WORK_CD
+			 , B.SYMD
+			 , B.SHM
+			 , B.EYMD
+			 , B.EHM
+			 , B.MM
+		  FROM TWTM201 A
+		  JOIN TWTM202 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.APPL_SEQ = B.APPL_SEQ
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.APPL_SEQ = #{searchApplSeq}
+	</select>
+
+	<!-- 근무스케줄 변경전 내역 조회 -->
+	<select id="getWtmWorkCalendarBfWorkList" resultType="cMap">
+		<![CDATA[
+		SELECT A.*
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+			 , D.NOTE1 AS ADD_WORK_TIME_YN
+			 , NVL(D.NOTE1, NVL(C.DEEMED_YN, 'N'))
+			 , C.WORK_TIME_TYPE
+			 , C.REQUEST_USE_TYPE
+		  FROM TWTM102 A
+		  JOIN (SELECT ENTER_CD, APPL_SEQ, SABUN, YMD
+		          FROM TWTM202
+				 WHERE ENTER_CD = #{ssnEnterCd}
+				   AND APPL_SEQ = #{applSeq}
+		         GROUP BY ENTER_CD, APPL_SEQ, SABUN, YMD) B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN = B.SABUN
+		   AND A.YMD = B.YMD
+		  JOIN TWTM051 C
+			ON A.ENTER_CD = C.ENTER_CD
+		   AND A.WORK_CD = C.WORK_CD
+		  LEFT JOIN TSYS005 D
+			ON C.ENTER_CD = D.ENTER_CD
+		   AND C.WORK_TIME_TYPE = D.CODE
+		   AND D.GRCODE_CD = 'WT0511'
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND EXISTS (
+				SELECT 1
+				  FROM TWTM102 X
+				 WHERE X.ENTER_CD = A.ENTER_CD
+				   AND X.YMD = A.YMD
+				   AND X.SABUN = A.SABUN
+				   AND X.WORK_CD = F_COM_GET_STD_CD_VALUE (X.ENTER_CD, 'WTM_STD_WORK_CD') -- 기본근무코드
+				   AND TO_DATE(A.PLAN_SYMD || A.PLAN_SHM, 'YYYYMMDDHH24MI') >= TO_DATE(X.PLAN_SYMD || X.PLAN_SHM, 'YYYYMMDDHH24MI')
+				   AND TO_DATE(A.PLAN_EYMD || A.PLAN_EHM, 'YYYYMMDDHH24MI') <= TO_DATE(X.PLAN_EYMD || X.PLAN_EHM, 'YYYYMMDDHH24MI')
+			   )
+	   ]]>
+	</select>
+
+	<!-- 신청 기간 전체의 근무 상세 내역 -->
+	<select id="getWtmWorkCalendarWorkDetailList_bk" resultType="cMap">
+		SELECT A.*
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+			 , NVL(D.NOTE1, NVL(C.DEEMED_YN, 'N')) AS ADD_WORK_TIME_YN
+			 , C.WORK_TIME_TYPE
+			 , C.REQUEST_USE_TYPE
+		  FROM TWTM102 A
+		  JOIN (
+		        SELECT A.ENTER_CD, A.SDATE, A.EDATE, B.SABUN
+				  FROM TWTM201 A
+				  JOIN TWTM202 B
+					ON A.ENTER_CD = B.ENTER_CD
+				   AND A.APPL_SEQ = B.APPL_SEQ
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.APPL_SEQ = #{applSeq}
+				 GROUP BY A.ENTER_CD, A.SDATE, A.EDATE, B.SABUN
+			   ) B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN = B.SABUN
+		   AND A.YMD BETWEEN B.SDATE AND B.EDATE
+		  JOIN TWTM051 C
+			ON A.ENTER_CD = C.ENTER_CD
+		   AND A.WORK_CD = C.WORK_CD
+		  LEFT JOIN TSYS005 D
+			ON C.ENTER_CD = D.ENTER_CD
+		   AND C.WORK_TIME_TYPE = D.CODE
+		   AND D.GRCODE_CD = 'WT0511'
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<!-- 단위 기간 전체의 근무 상세 내역 -->
+	<select id="getWtmWorkCalendarWorkDetailList" resultType="cMap">
+		SELECT A.*
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+			 , NVL(D.NOTE1, NVL(C.DEEMED_YN, 'N')) AS ADD_WORK_TIME_YN
+			 , C.WORK_TIME_TYPE
+			 , C.REQUEST_USE_TYPE
+		  FROM TWTM102 A
+		  JOIN (
+				SELECT A.ENTER_CD, A.SABUN
+				  FROM TWTM202 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.APPL_SEQ = #{applSeq}
+				 GROUP BY A.ENTER_CD, A.SABUN
+			   ) B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN = B.SABUN
+		   AND A.YMD BETWEEN #{unitSdate} AND #{unitEdate}
+		  JOIN TWTM051 C
+			ON A.ENTER_CD = C.ENTER_CD
+		   AND A.WORK_CD = C.WORK_CD
+		  LEFT JOIN TSYS005 D
+			ON C.ENTER_CD = D.ENTER_CD
+		   AND C.WORK_TIME_TYPE = D.CODE
+		   AND D.GRCODE_CD = 'WT0511'
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		 ORDER BY A.SABUN, A.YMD
+	</select>
+
+	<!-- 근태 상세 조회 -->
+	<select id="getWtmWorkCalendarGntList" resultType="cMap">
+		SELECT B.ENTER_CD
+			 , B.GNT_DTL_ID
+			 , B.YMD
+			 , B.SABUN
+			 , C.NAME
+			 , B.GNT_CD
+			 , B.SYMD
+			 , B.SHM
+			 , B.EYMD
+			 , B.EHM
+			 , B.MM
+		  FROM (
+		        SELECT A.ENTER_CD, A.SABUN
+				  FROM TWTM202 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.APPL_SEQ = #{applSeq}
+				 GROUP BY A.ENTER_CD, A.SABUN
+			   ) A
+		  JOIN TWTM103 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN = B.SABUN
+		   AND B.YMD BETWEEN #{unitSdate} AND #{unitEdate}
+		  JOIN THRM100 C
+			ON B.ENTER_CD = C.ENTER_CD
+		   AND B.SABUN = C.SABUN
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		 GROUP BY B.ENTER_CD, B.GNT_DTL_ID, B.YMD, B.SABUN, C.NAME, B.GNT_CD
+		        , B.SYMD, B.SHM, B.EYMD, B.EHM, B.MM
+	</select>
+
+	<!-- 근태 상세 조회 -->
+	<select id="getWtmWorkCalendarGntList_bk" resultType="cMap">
+		SELECT B.ENTER_CD
+			 , B.GNT_DTL_ID
+			 , B.YMD
+			 , B.SABUN
+			 , C.NAME
+			 , B.GNT_CD
+			 , B.SYMD
+			 , B.SHM
+			 , B.EYMD
+			 , B.EHM
+			 , B.MM
+		  FROM (
+		        SELECT A.ENTER_CD, A.SDATE, A.EDATE, B.SABUN
+				  FROM TWTM201 A
+				  JOIN TWTM202 B
+					ON A.ENTER_CD = B.ENTER_CD
+				   AND A.APPL_SEQ = B.APPL_SEQ
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.APPL_SEQ = #{applSeq}
+				 GROUP BY A.ENTER_CD, A.SDATE, A.EDATE, B.SABUN
+			   ) A
+		  JOIN TWTM103 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.SABUN = B.SABUN
+		   AND B.YMD BETWEEN A.SDATE AND A.EDATE
+		  JOIN THRM100 C
+			ON B.ENTER_CD = C.ENTER_CD
+		   AND B.SABUN = C.SABUN
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		 GROUP BY B.ENTER_CD, B.GNT_DTL_ID, B.YMD, B.SABUN, C.NAME, B.GNT_CD
+		        , B.SYMD, B.SHM, B.EYMD, B.EHM, B.MM
+	</select>
+
+	<select id="getWtmWorkClassCdBySabun" resultType="cMap">
+		SELECT A.WORK_CLASS_CD
+			 , A.WORK_CLASS_NM
+			 , A.WORK_TYPE_CD
+			 , A.DAY_WK_LMT
+			 , A.DAY_OT_LMT
+			 , A.WEEK_WK_LMT
+			 , A.WEEK_OT_LMT
+			 , A.AVG_WEEK_WK_LMT
+			 , A.AVG_WEEK_OT_LMT
+			 , A.WORK_HOURS
+			 , A.WORK_TIME_F
+			 , A.WORK_TIME_T
+			 , A.CORE_TIME_F
+			 , A.CORE_TIME_T
+			 , A.START_WORK_TIME_F
+			 , A.START_WORK_TIME_T
+			 , A.INTERVAL_CD
+			 , A.INTERVAL_BEGIN_TYPE
+			 , A.WORK_DAY
+			 , A.WEEK_BEGIN_DAY
+			 , C.NOTE2 AS APPL_UNIT
+			 , C.NOTE3 AS APPL_MIN_UNIT
+		  FROM TWTM021 A
+		  JOIN TWTM022 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+		   AND B.SABUN = #{sabun}
+		   AND (#{sdate} BETWEEN B.SDATE AND B.EDATE AND #{edate} BETWEEN B.SDATE AND B.EDATE)
+		  JOIN TSYS005 C
+			ON A.ENTER_CD = C.ENTER_CD
+		   AND A.INTERVAL_CD = C.CODE
+		   AND C.GRCODE_CD = 'T90200'
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<select id="getWtmWorkSchInfo" resultType="cMap">
+		SELECT *
+		  FROM TWTM032 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.WORK_CLASS_CD = #{workClassCd}
+		   AND A.WORK_GROUP_CD = #{workGroupCd}
+	</select>
+
+	<select id="getWtmWorkSchInfoBySabun" resultType="cMap">
+		<![CDATA[
+		SELECT A.*
+		  FROM TWTM032 A
+		  JOIN TWTM033 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+		   AND A.WORK_GROUP_CD = B.WORK_GROUP_CD
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.WORK_CLASS_CD = #{workClassCd}
+		   /*추후 코드 수정 필요*/
+		   AND B.TYPE = 'EMP'
+		   AND B.TARGET_CD = #{sabun}
+		   AND B.SDATE < #{sdate}
+		   AND B.SDATE < #{edate}
+	   ]]>
+	</select>
+
+	<!-- 근태신청 마스터 데이터 삭제 -->
+	<delete parameterType="map" id="deleteWtmAttendCalendarMaster">
+		<![CDATA[
+		DELETE FROM TWTM301
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND APPL_SEQ = TRIM(#{searchApplSeq})
+		]]>
+	</delete>
+
+	<!-- 근태신청 상세 데이터 삭제 -->
+	<delete parameterType="map" id="deleteWtmAttendCalendarDetail">
+		<![CDATA[
+		DELETE FROM TWTM302
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND APPL_SEQ = TRIM(#{searchApplSeq})
+		]]>
+	</delete>
+
+	<!-- 근무신청 마스터 데이터 삭제 -->
+	<delete parameterType="map" id="deleteWtmWorkCalendarMaster">
+		<![CDATA[
+		DELETE FROM TWTM311
+		WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		  AND APPL_SEQ = TRIM(#{searchApplSeq})
+		]]>
+	</delete>
+
+	<!-- 근무신청 상세 데이터 삭제 -->
+	<delete parameterType="map" id="deleteWtmWorkCalendarDetail">
+		<![CDATA[
+		DELETE FROM TWTM312
+		WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		  AND APPL_SEQ = TRIM(#{searchApplSeq})
+		]]>
+	</delete>
+
+</mapper>

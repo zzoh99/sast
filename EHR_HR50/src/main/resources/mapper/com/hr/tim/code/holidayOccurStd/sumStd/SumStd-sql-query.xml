@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.holidayOccurStd.sumStd">
+
+<!-- 휴가 연차휴가사용집계기준 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSumStdList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GNT_CD
+					     , A.S_MD
+					     , A.E_MD
+					  FROM TTIM023 A, TTIM014 B
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+  					   AND A.ENTER_CD = B.ENTER_CD
+  					   AND A.GNT_CD = B.GNT_CD
+					 ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+<!-- 휴가 연차휴가사용집계기준 저장 -->
+		<update parameterType="map" id="saveSumStd">
+
+					MERGE INTO TTIM023 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.GNT_CD
+							     , A.S_MD
+							     , A.E_MD
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS GNT_CD
+										 , NULL AS S_MD
+										 , NULL AS E_MD
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 , TRIM( #{rm.gntCd} )		AS  GNT_CD
+										 , TRIM( #{rm.sMd})		AS  S_MD
+										 , TRIM( #{rm.eMd})		AS  E_MD
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GNT_CD = S.GNT_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.S_MD        	= S.S_MD
+									, T.E_MD        	= S.E_MD
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.GNT_CD
+							, T.S_MD
+							, T.E_MD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.GNT_CD
+							, S.S_MD
+							, S.E_MD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 휴가 연차휴가사용집계기준 삭제 -->
+		<delete parameterType="map" id="deleteSumStd">
+
+					DELETE FROM TTIM023
+					 WHERE ENTER_CD||'_'||GNT_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.gntCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

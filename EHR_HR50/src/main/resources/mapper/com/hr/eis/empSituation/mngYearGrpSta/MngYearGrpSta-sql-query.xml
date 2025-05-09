@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.mngYearGrpSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getMngYearGrpStaAvgAttYear">
+			
+				<![CDATA[
+				SELECT /*+ LEADING(A) */
+						C.ENTER_CD, TRUNC( AVG(C.WKP_CNT) / 12) AS WKP_AVG_Y ,  TRUNC(mod(AVG(C.WKP_CNT),12) ) AS WKP_AVG_M
+		          FROM THRM151 A
+		              ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, REPLACE(#{searchYmd},'-','')) AS ORG_NM
+				                  FROM THRM151
+				                 WHERE ENTER_CD = #{groupEnterCd}
+				                   AND REPLACE(#{searchYmd}, '-') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	 			                   AND (ENTER_CD, STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+				                                                       FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900 WHERE ENTER_CD = #{groupEnterCd}) A
+				                                                    CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+					              <if test="jikweeCd != null and jikweeCd neq ''">
+				                      AND JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+				                  <if test="jikchakCd != null and jikchakCd neq ''">
+			                          AND JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+				                  <if test="jikgubCd != null and jikgubCd neq ''">
+			                          AND JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+			                      <if test="workType != null and workType neq ''">
+			                            AND WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+			                      <if test="manageCd != null and manageCd neq ''">
+			                            AND MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+				                 GROUP BY ENTER_CD, SABUN  ,ORG_CD
+		               ) B
+		              ,(SELECT ENTER_CD, SABUN, (MONTHS_BETWEEN(TO_DATE(DECODE(RET_YMD,NULL,REPLACE(#{searchYmd},'-',''), RET_YMD),'YYYYMMDD'),
+		                                                   TO_DATE(EMP_YMD,'YYYYMMDD') - 1)) AS WKP_CNT
+		                  FROM THRM100
+		                 WHERE ENTER_CD = #{groupEnterCd}
+		                   AND (RET_YMD IS NULL OR RET_YMD >= REPLACE(#{searchYmd},'-',''))
+		               ) C
+		         WHERE A.ENTER_CD = B.ENTER_CD
+		           AND A.SABUN    = B.SABUN
+		           AND A.SDATE    = B.SDATE
+		           AND A.ENTER_CD = C.ENTER_CD
+		           AND A.SABUN    = C.SABUN
+	           <if test="searchOrgCd != null and searchOrgCd neq ''">
+	           	   AND A.ORG_CD IN (
+		           	   				SELECT #{searchOrgCd}
+									  FROM DUAL
+			   <if test="searchType != null and searchType neq ''">
+									 UNION
+									SELECT ORG_CD
+									  FROM (
+				   							SELECT *
+											  FROM TORG105
+											 WHERE ENTER_CD = TRIM(#{groupEnterCd})
+											   AND SDATE = (
+															 SELECT MAX(SDATE)
+															   FROM TORG103
+															  WHERE ENTER_CD = TRIM(#{groupEnterCd})
+																AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+														   )
+				   							)
+									 START WITH PRIOR_ORG_CD = #{searchOrgCd}
+									 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+										 AND PRIOR SDATE = SDATE
+										 AND PRIOR ORG_CD = PRIOR_ORG_CD
+	           </if>									   
+								   )
+	           </if>
+			GROUP BY C.ENTER_CD
+		</select>
+		
+			<select parameterType="map" resultType="cMap" id="getMngYearGrpStaList1">
+			
+				<![CDATA[
+				SELECT CODE,CODE_NM  AS CODE_NM , CNT, PER_CNT
+					FROM(
+					SELECT CODE, Y.CODE_NM, COUNT(X.WKP_CODE) AS CNT, ROUND((COUNT(X.WKP_CODE)/SUM(COUNT(X.WKP_CODE)) OVER())*100,1) AS PER_CNT
+					  FROM (SELECT C.ENTER_CD, C.SABUN, C.WKP_CNT, A.ORG_CD,
+					  --(CASE WHEN C.WKP_CNT BETWEEN 0 AND 4 THEN 5 WHEN C.WKP_CNT BETWEEN 5 AND 9 THEN 10 WHEN C.WKP_CNT BETWEEN 10 AND 14 THEN 15 WHEN C.WKP_CNT BETWEEN 15 AND 19 THEN 20 ELSE 99 END) AS WKP_CODE
+					    (SELECT /*+ LEADING(A) */
+					    		MAX(CODE) FROM TSYS005 WHERE GRCODE_CD = 'E00002' AND C.WKP_CNT BETWEEN NOTE1 AND NOTE2) AS WKP_CODE
+					          FROM THRM151 A
+                                  ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN, F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, #{searchYmd}) AS ORG_NM
+                                      FROM THRM151
+                                     WHERE ENTER_CD = #{groupEnterCd}
+                                       AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                       AND (ENTER_CD, STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+                                                    					  FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900 WHERE ENTER_CD = #{groupEnterCd}) A
+                                               								    CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+					              <if test="jikweeCd != null and jikweeCd neq ''">
+				                      AND JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+				                  <if test="jikchakCd != null and jikchakCd neq ''">
+			                          AND JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+				                  <if test="jikgubCd != null and jikgubCd neq ''">
+			                          AND JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+			                      <if test="workType != null and workType neq ''">
+			                            AND WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+			                      <if test="manageCd != null and manageCd neq ''">
+			                            AND MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			                      </if>
+				                 GROUP BY ENTER_CD, SABUN  ,ORG_CD
+					               ) B
+					              ,(SELECT ENTER_CD, SABUN,
+					                TRUNC(MONTHS_BETWEEN(TO_DATE(DECODE(RET_YMD,NULL,REPLACE(#{searchYmd}, '-', ''), RET_YMD),'YYYYMMDD'), TO_DATE(EMP_YMD,'YYYYMMDD') - 1) / 12) AS WKP_CNT
+					                  FROM THRM100
+					                 WHERE ENTER_CD = #{groupEnterCd}
+					                   AND (RET_YMD IS NULL OR RET_YMD >= REPLACE(#{searchYmd}, '-', ''))
+					               ) C
+					         WHERE A.ENTER_CD = B.ENTER_CD
+					           AND A.SABUN    = B.SABUN
+					           AND A.SDATE    = B.SDATE
+					           AND A.ENTER_CD = C.ENTER_CD
+					           AND A.SABUN    = C.SABUN
+				           <if test="searchOrgCd != null and searchOrgCd neq ''">
+				           	   AND A.ORG_CD IN (
+					           	   				SELECT #{searchOrgCd}
+												  FROM DUAL
+						   <if test="searchType != null and searchType neq ''">
+												 UNION
+												SELECT ORG_CD
+												  FROM (
+												      	SELECT *
+														  FROM TORG105
+														 WHERE ENTER_CD = TRIM(#{groupEnterCd})
+														   AND SDATE = (
+																		 SELECT MAX(SDATE)
+																		   FROM TORG103
+																		  WHERE ENTER_CD = TRIM(#{groupEnterCd})
+																			AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+																	   )
+							   						   )
+												 START WITH PRIOR_ORG_CD = #{searchOrgCd}
+												 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+													 AND PRIOR SDATE = SDATE
+													 AND PRIOR ORG_CD = PRIOR_ORG_CD
+				           </if>									   
+										   )
+				           </if>
+					      ) X
+					     ,(
+							SELECT CODE,CODE_NM,NOTE1,NOTE2 from TSYS005
+							WHERE GRCODE_CD = 'E00002'
+							  AND ENTER_CD = #{groupEnterCd}
+					      ) Y
+					 WHERE X.WKP_CODE= CODE
+					 GROUP BY Y.CODE_NM, Y.CODE
+					 ORDER BY Y.CODE)
+		</select>
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getMngYearGrpStaList2">
+				<![CDATA[
+				SELECT CODE,CODE_NM, CNT, PER_CNT, PER_CNT
+				  FROM (
+				        SELECT /*+ LEADING(A) */
+				        	   D.CODE, D.CODE_NM, D.SEQ, COUNT(A.SABUN) AS CNT
+				              ,ROUND((COUNT(A.SABUN)/SUM(COUNT(A.SABUN)) OVER())*100,1) AS PER_CNT
+				          FROM THRM151 A
+				              ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, #{searchYmd}) AS ORG_NM
+				                  FROM THRM151
+				                 WHERE ENTER_CD = #{groupEnterCd}
+				                   AND REPLACE(#{searchYmd}, '-') BETWEEN SDATE AND NVL(EDATE, '99991231') ]]>
+				              <if test="jikweeCd != null and jikweeCd neq ''">
+			                      AND JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+			                  <if test="jikchakCd != null and jikchakCd neq ''">
+		                          AND JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+			                  <if test="jikgubCd != null and jikgubCd neq ''">
+		                          AND JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+		                      <if test="workType != null and workType neq ''">
+		                            AND WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+		                      <if test="manageCd != null and manageCd neq ''">
+		                            AND MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+		                      <![CDATA[
+				                 GROUP BY ENTER_CD, SABUN  ,ORG_CD ) B
+				              ,THRM100 C
+				              ,(SELECT *
+				                  FROM TSYS005
+				                 WHERE ENTER_CD = #{groupEnterCd}
+				                   AND GRCODE_CD = 'H10030'
+				                   AND CODE <> 'ZZ'--협력업체 제외
+				               ) D
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.SABUN    = B.SABUN
+				           AND A.SDATE    = B.SDATE
+				           AND A.ENTER_CD = C.ENTER_CD
+				           AND A.SABUN    = C.SABUN
+				           AND (C.RET_YMD IS NULL OR C.RET_YMD > REPLACE(#{searchYmd}, '-', ''))
+				           AND A.MANAGE_CD(+) = D.CODE ]]>
+			           <if test="searchOrgCd != null and searchOrgCd neq ''">
+			           	   AND A.ORG_CD IN (
+				           	   				SELECT #{searchOrgCd}
+											  FROM DUAL
+					   <if test="searchType != null and searchType neq ''">
+											 UNION
+											SELECT ORG_CD
+											  FROM (
+											      	SELECT *
+													  FROM TORG105
+													 WHERE ENTER_CD = TRIM(#{groupEnterCd})
+													   AND SDATE = (
+																	 SELECT MAX(SDATE)
+																	   FROM TORG103
+																	  WHERE ENTER_CD = TRIM(#{groupEnterCd})
+																		AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+																   )
+						   							)
+											 START WITH PRIOR_ORG_CD = #{searchOrgCd}
+											 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+												 AND PRIOR SDATE = SDATE
+												 AND PRIOR ORG_CD = PRIOR_ORG_CD
+			           </if>									   
+										   )
+			           </if>
+				         GROUP BY D.CODE, D.CODE_NM, D.SEQ
+				       )
+				ORDER BY SEQ, CODE
+		</select>
+</mapper>

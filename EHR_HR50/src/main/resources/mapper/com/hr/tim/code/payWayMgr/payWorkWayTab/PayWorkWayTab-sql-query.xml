@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.payWayMgr.payWorkWayTab">
+
+<!-- 근무사항 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayWorkWayTabList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.WORK_CD
+					     , A.ELEMENT_CD
+					     , F_CPN_GET_ELEMENT_NM(A.ENTER_CD,A.ELEMENT_CD,TO_CHAR(SYSDATE,'YYYYMMDD')) AS ELEMENT_NM
+					     , A.APPLY_RATE
+					  FROM TTIM009 A
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					 ORDER BY A.WORK_CD
+				]]>
+
+
+		</select>
+
+<!-- 근무사항 저장 -->
+		<update parameterType="map" id="savePayWorkWayTab">
+
+					MERGE INTO TTIM009 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.WORK_CD
+							     , A.ELEMENT_CD
+							     , A.APPLY_RATE
+							FROM	(
+									SELECT NULL AS ENTER_CD  
+										 , NULL AS WORK_CD   
+										 , NULL AS ELEMENT_CD
+										 , NULL AS APPLY_RATE
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.workCd})			AS  WORK_CD
+										 , TRIM( #{rm.elementCd})		AS  ELEMENT_CD
+										 , TRIM( #{rm.applyRate})		AS  APPLY_RATE
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.WORK_CD IS NOT NULL
+										  AND A.ELEMENT_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_CD = S.WORK_CD AND T.ELEMENT_CD = S.ELEMENT_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APPLY_RATE   	= S.APPLY_RATE
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD  
+							, T.WORK_CD   
+							, T.ELEMENT_CD
+							, T.APPLY_RATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD  
+							, S.WORK_CD   
+							, S.ELEMENT_CD
+							, S.APPLY_RATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 근무사항 삭제 -->
+		<delete parameterType="map" id="deletePayWorkWayTab">
+
+					DELETE FROM TTIM009
+					 WHERE ENTER_CD||'_'||WORK_CD||'_'||ELEMENT_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.workCd != null and !rm.workCd.equals("")
+												and rm.elementCd != null and !rm.elementCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.workCd})||'_'||TRIM( #{rm.elementCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 근무사항 단건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayWorkWayTabMap">
+
+					SELECT A.ENTER_CD
+					     , A.WORK_CD
+					     , A.ELEMENT_CD
+					     , F_CPN_GET_ELEMENT_NM(A.ENTER_CD,A.ELEMENT_CD,TO_CHAR(SYSDATE,'YYYYMMDD')) AS ELEMENT_NM
+					     , A.APPLY_RATE
+					  FROM TTIM009 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+<if test='searchWorkCd != null and !searchWorkCd.equals("")'>
+					   AND A.WORK_CD  = #{searchWorkCd}
+</if>
+<if test='searchElementCd != null and !searchElementCd.equals("")'>
+					   AND A.ELEMENT_CD = #{searchElementCd}
+</if>
+					   AND ROWNUM = 1
+
+		</select>
+
+</mapper>

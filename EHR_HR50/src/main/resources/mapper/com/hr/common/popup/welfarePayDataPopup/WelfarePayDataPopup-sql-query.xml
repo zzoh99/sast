@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.welfarePayDataPopup">
+	
+	<!-- 조회 -->
+	<select id="getWelfarePayDataPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ENTER_CD
+		     , PAY_YM AS YM
+		     , CLOSE_CD
+		     , CLOSE_ST
+		     , BIGO
+		FROM TBEN991
+		WHERE ENTER_CD = #{ssnEnterCd}
+		AND PAY_YM LIKE #{searchYear} || '%' 
+		AND CLOSE_CD = #{closeCd}
+		ORDER BY PAY_YM DESC
+	]]>
+	</select>
+
+	<!-- 	마감여부 확인
+			업무단 의료비 / 학자금 / 대출 / 사내여직원결혼선물 / 이주비의 승인 저장일때 체크 함
+	-->
+	<select id="getWelfarePayDataPopupMap">
+	<![CDATA[
+		SELECT DECODE(COUNT(1), 0, 'Y', 'N') AS APPL_YN 
+		FROM TBEN991
+		WHERE ENTER_CD = #{ssnEnterCd}
+		AND CLOSE_CD = #{closeCd}
+		AND CLOSE_ST = '10005'
+		AND PAY_YM = #{ym}
+		ORDER BY PAY_YM DESC
+	]]>
+	</select>
+			
+	<!-- 저장 -->	
+	<update id="saveWelfarePayDataPopup" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN991 T
+		USING	(
+				SELECT	  PAY_YM
+						, CLOSE_CD
+						, CLOSE_ST
+						, BIGO
+				FROM	(
+						SELECT	  NULL		AS PAY_YM      
+								, NULL		AS CLOSE_CD
+								, NULL		AS CLOSE_ST
+								, NULL		AS BIGO    
+						FROM	DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+				UNION ALL	
+				SELECT TRIM(#{rm.ym}) AS PAY_YM       
+					 , TRIM(#{rm.closeCd}) AS CLOSE_CD 
+					 , TRIM(#{rm.closeSt}) AS CLOSE_ST 
+					 , TRIM(#{rm.bigo}) AS BIGO     
+				 FROM  DUAL
+		</foreach>
+	<![CDATA[
+						)  WHERE PAY_YM IS NOT NULL
+				) S
+		ON ( T.ENTER_CD = #{ssnEnterCd}
+		AND  T.PAY_YM = S.PAY_YM
+		AND  T.CLOSE_CD = S.CLOSE_CD
+		)
+		WHEN MATCHED THEN
+			UPDATE SET	  T.CLOSE_ST = S.CLOSE_ST
+						, T.BIGO     = S.BIGO
+						, T.CHKDATE	= SYSDATE
+						, T.CHKID	= #{ssnSabun}
+	]]>
+	</update>
+	
+	<!-- 삭제 -->
+	<delete id="deleteWelfarePayDataPopup" parameterType="map">
+	<![CDATA[
+		DELETE FROM TCPN201 
+		WHERE 	(ENTER_CD, PAY_ACTION_CD) IN 	(  (NULL, NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.payActionCd != null and rm.payActionCd neq ''">
+				(#{ssnEnterCd}, TRIM( #{rm.payActionCd} ) )	
+			</if>
+		</foreach>
+		)
+	</delete>
+		
+</mapper>

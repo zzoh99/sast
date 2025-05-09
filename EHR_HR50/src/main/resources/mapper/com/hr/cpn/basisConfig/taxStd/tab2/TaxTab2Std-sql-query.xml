@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.taxStd.tab2">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getTaxTab2StdList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					    , WORK_YY
+					    , SEQ
+					    , HIGH_MON
+					    , LOW_MON
+					    , TAX_RATE
+					    , NUJIN_MON
+					FROM TCPN502
+					WHERE ENTER_CD  = #{ssnEnterCd} ]]>
+					<if test='searchYear != null and !searchYear.equals("")'>
+					   AND WORK_YY LIKE '%'||TRIM(#{searchYear})||'%'
+					</if>
+					ORDER BY WORK_YY DESC
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveTaxTab2Std">
+					MERGE INTO TCPN502 T
+                    USING   (
+                            SELECT    A.SEQ
+                                    , A.WORK_YY
+                                    , A.LOW_MON
+									, A.HIGH_MON
+									, A.TAX_RATE
+									, A.NUJIN_MON
+                            FROM    (
+                                    SELECT    NULL AS SEQ
+                                            , NULL AS WORK_YY
+                                            , NULL AS LOW_MON
+											, NULL AS HIGH_MON
+											, NULL AS TAX_RATE
+											, NULL AS NUJIN_MON
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT --증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+                                            <choose><when test='rm.seq != null and !rm.seq.equals("")'>
+                                                TRIM(#{rm.seq})            AS SEQ
+                                            --증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+                                            </when><when test='rm.seq != null and rm.seq.equals("")' >
+                                                TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM TCPN502 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_YY = TRIM(#{rm.workYy})) )  AS SEQ
+                                                --icnt 증가
+                                                <bind name="icnt" value="icnt + 1" />
+                                            </when></choose>
+                                            , TRIM(#{rm.workYy})   AS WORK_YY
+                                            , TRIM(#{rm.lowMon})   AS LOW_MON      
+											, TRIM(#{rm.highMon})  AS HIGH_MON     
+											, TRIM(#{rm.taxRate})  AS TAX_RATE     
+											, TRIM(#{rm.nujinMon}) AS NUJIN_MON    
+                                    FROM   DUAL
+</foreach>
+                                    ) A WHERE A.LOW_MON IS NOT NULL
+                            ) S
+                    ON (    T.ENTER_CD    = #{ssnEnterCd}
+                        AND T.WORK_YY     = S.WORK_YY
+                        AND T.SEQ         = S.SEQ    
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.LOW_MON    = S.LOW_MON               
+									, T.HIGH_MON   = S.HIGH_MON              
+									, T.TAX_RATE   = S.TAX_RATE              
+									, T.NUJIN_MON  = S.NUJIN_MON             
+                                    , T.CHKDATE    = SYSDATE
+                                    , T.CHKID      = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+						  T.ENTER_CD
+						, T.WORK_YY
+						, T.SEQ
+						, T.LOW_MON
+						, T.HIGH_MON
+						, T.TAX_RATE
+						, T.NUJIN_MON
+						, T.CHKDATE
+						, T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd}
+							, S.WORK_YY
+							, S.SEQ
+							, S.LOW_MON
+							, S.HIGH_MON
+							, S.TAX_RATE
+							, S.NUJIN_MON
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteTaxTab2Std">
+                    DELETE FROM TCPN502 
+                    WHERE (ENTER_CD, WORK_YY, SEQ)  IN  (  (NULL, NULL, NULL)  
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.workYy != null and !rm.workYy.equals("")'>
+                                              <if test='rm.seq != null and !rm.seq.equals("")'>
+                                                (#{ssnEnterCd} , #{rm.workYy} , #{rm.seq})
+                                             </if>
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+		</delete>
+		
+<!-- 		생성 -->	
+		<insert parameterType="map" id="insertTaxTab2Std">
+						INSERT INTO MainMnStdTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+		
+<!-- 		수정 -->
+		<update parameterType="map" id="updateTaxTab2Std">
+					UPDATE ZTST002 T SET 
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID 
+						) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT   
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+	</mapper>

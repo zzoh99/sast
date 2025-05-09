@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perAccChgApr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerAccChgAprList">
+			
+				<![CDATA[
+				SELECT A.ORG_CD
+				      ,A.ORG_NM
+				      ,A.WORK_TYPE
+				      ,A.JIKCHAK_CD
+				      ,A.JIKWEE_CD
+				      ,A.JIKCHAK_CD
+				      ,A.JIKWEE_CD
+				      ,A.MANAGE_CD
+				      ,A.STATUS_CD
+				      ,B.STATUS    AS DMY_STATUS
+				      ,A.SABUN
+				      ,A.NAME
+				      ,A.EMP_YMD
+				      ,A.GEMP_YMD
+				      ,A.RES_NO
+				      ,A.RET_YMD
+				      ,A.PAY_TYPE
+				      ,B.REQ_SEQ
+				      ,B.REQ_DATE
+				      ,B.STATUS
+				      ,B.AGREE_DATE
+				      ,B.ACCOUNT_TYPE
+				      ,B.BANK_CD
+				      ,CRYPTIT.decrypt(B.ACCOUNT_NO, B.ENTER_CD) AS ACCOUNT_NO
+				      ,B.ACC_NAME
+				      ,B.BIGO
+				      ,B.FILE_SEQ
+				FROM (
+				      SELECT Y.ORG_CD
+				            ,F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE) AS ORG_NM
+				            ,Y.WORK_TYPE
+				            ,Y.JIKCHAK_CD
+				            ,Y.JIKWEE_CD
+				            ,Y.MANAGE_CD
+				            ,Y.STATUS_CD
+				            ,X.SABUN
+				            ,X.NAME
+				            ,X.EMP_YMD
+				            ,X.GEMP_YMD
+				            ,CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+				            ,X.RET_YMD
+				            ,Y.PAY_TYPE
+				      FROM   THRM100 X
+				            ,THRM151 Y
+				      WHERE  X.ENTER_CD = Y.ENTER_CD
+				        AND  X.SABUN    = Y.SABUN
+				        AND  X.ENTER_CD = #{ssnEnterCd}
+				        AND  Y.SDATE    = (SELECT MAX(SDATE)
+				                           FROM   THRM151
+				                           WHERE  ENTER_CD = Y.ENTER_CD
+				                           AND    SABUN = Y.SABUN
+  				                           AND    TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231')
+				                          )
+				     ) A
+				    , TCPN183 B
+				WHERE B.ENTER_CD = #{ssnEnterCd} 
+				AND A.SABUN = B.SABUN ]]>
+				<choose>
+					<when test="searchFrom != null and searchFrom neq '' and searchTo != null and searchTo neq ''">
+						AND REQ_DATE BETWEEN REPLACE(#{searchFrom}, '-', '') AND REPLACE(#{searchTo}, '-', '')
+					</when>
+					<otherwise>
+						AND REQ_DATE BETWEEN TO_CHAR(SYSDATE,'YYYYMMDD') AND '99991231'
+					</otherwise>
+				</choose>
+				<if test="searchWorkTypeHidden != null and searchWorkTypeHidden neq ''">
+					AND A.WORK_TYPE IN
+		<foreach collection="searchWorkTypeHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchManageCdHidden != null and searchManageCdHidden neq ''">
+					AND A.MANAGE_CD IN
+		<foreach collection="searchManageCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchStatusCdHidden != null and searchStatusCdHidden neq ''">
+					AND A.STATUS_CD IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+				<if test="searchSabunName != null and searchSabunName neq ''">
+	         		  AND    (A.SABUN LIKE '%' || #{searchSabunName} || '%' OR A.NAME LIKE '%' || #{searchSabunName} || '%')
+	            </if>
+	            <if test="searchProssStatus != null and searchProssStatus neq ''">
+					AND B.STATUS = #{searchProssStatus}
+				</if>
+				ORDER BY B.SABUN ASC, ACCOUNT_TYPE, REQ_DATE DESC, REQ_SEQ DESC , STATUS
+		</select>
+		
+<!-- TCPN183 이력테이블 데이터 삭제 -->
+		<delete parameterType="map" id="deleteMainPerAccChgApr">
+					DELETE FROM TCPN183
+					WHERE 	(ENTER_CD, SABUN, REQ_SEQ) IN 	(  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+											<if test="rm.sabun != null and rm.sabun neq ''">
+												<if test="rm.reqSeq != null and rm.reqSeq neq ''">
+													(#{ssnEnterCd}, TRIM( #{rm.sabun} ) ,TRIM( #{rm.reqSeq} ) )
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<update parameterType="map" id="updatePerAccChgApr1">
+            
+                <![CDATA[
+					UPDATE	TCPN180	A
+					SET		EDATE	=	(
+											SELECT	EDATE
+											FROM	(
+														SELECT	ENTER_CD
+															,	SABUN
+															,	ACCOUNT_TYPE
+															,	SDATE
+															,	NVL(LEAD(TO_CHAR(TO_DATE(SDATE,'YYYYMMDD')-1,'YYYYMMDD')) OVER( ORDER BY SEQ), '99991231')	AS	EDATE
+														FROM	(
+																	SELECT	TO_CHAR( ROW_NUMBER() OVER(PARTITION BY ENTER_CD ORDER BY SDATE))	AS	SEQ
+																		,	SABUN
+																		,	ENTER_CD
+																		,	SDATE
+																		,	ACCOUNT_TYPE
+																	FROM	TCPN180
+																	WHERE	ENTER_CD		=	#{ssnEnterCd}
+																	AND		SABUN			=	#{sabun}
+																	AND		ACCOUNT_TYPE	=	#{accountType}
+																	ORDER	BY
+																			SDATE	DESC
+																)
+														ORDER	BY
+																	SEQ	DESC
+													)
+											WHERE	ENTER_CD		=	A.ENTER_CD
+											AND		SABUN			=	A.SABUN
+											AND		ACCOUNT_TYPE	=	A.ACCOUNT_TYPE
+											AND		SDATE			=	A.SDATE
+										)
+					WHERE	A.ENTER_CD		=	#{ssnEnterCd}
+					AND		A.SABUN			=	#{sabun}
+					AND		A.ACCOUNT_TYPE	=	#{accountType}
+                ]]>
+            
+            
+        </update>
+
+
+        <update parameterType="map" id="savePerAccChgApr1">
+            
+                <![CDATA[
+                    MERGE INTO TCPN180 T
+                    USING   (
+                            SELECT    ENTER_CD
+                                    , SABUN
+                                    , ACCOUNT_TYPE
+                                    , SDATE
+                                    , EDATE
+                                    , BANK_CD
+                                    , ACCOUNT_NO
+                                    , ACC_NAME
+                            FROM    (
+                                    SELECT    NULL      AS ENTER_CD
+                                            , NULL      AS SABUN
+                                            , NULL      AS ACCOUNT_TYPE
+                                            , NULL      AS SDATE
+                                            , NULL      AS EDATE
+                                            , NULL      AS BANK_CD
+                                            , NULL      AS ACCOUNT_NO
+                                            , NULL      AS ACC_NAME
+                                    FROM    DUAL
+                            UNION ALL
+                                    SELECT    #{ssnEnterCd}                               AS ENTER_CD
+                                            , #{sabun}                                    AS SABUN
+                                            , #{accountType}                              AS ACCOUNT_TYPE
+                                            , #{reqDate}                                  AS SDATE
+                                            , ''             		                    AS EDATE
+                                            , #{bankCd}                                   AS BANK_CD
+                                            , CRYPTIT.encrypt(#{accountNo}, #{ssnEnterCd})  AS ACCOUNT_NO
+                                            , #{accName}                                  AS ACC_NAME
+                                            FROM   DUAL
+                                    )  WHERE SABUN IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD      = S.ENTER_CD
+                    AND  T.SABUN         = S.SABUN
+                    AND  T.ACCOUNT_TYPE  = S.ACCOUNT_TYPE
+                    AND  T.SDATE         = S.SDATE
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.EDATE	      = S.EDATE
+                                    , T.BANK_CD       = S.BANK_CD
+                                    , T.ACCOUNT_NO    = S.ACCOUNT_NO
+                                    , T.ACC_NAME	  = S.ACC_NAME
+                                    , T.CHKDATE       = SYSDATE
+                                    , T.CHKID         = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.SABUN
+                            , T.ACCOUNT_TYPE
+                            , T.SDATE
+                            , T.EDATE
+                            , T.BANK_CD
+                            , T.ACCOUNT_NO
+                            , T.ACC_NAME
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              #{ssnEnterCd}
+                            , S.SABUN
+                            , S.ACCOUNT_TYPE
+                            , S.SDATE
+                            , S.EDATE
+                            , S.BANK_CD
+                            , S.ACCOUNT_NO
+                            , S.ACC_NAME
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+                ]]>
+            
+            
+        </update>
+
+
+        <update parameterType="map" id="updatePerAccChgApr2">
+            
+                <![CDATA[
+                    UPDATE TCPN183
+                    SET    STATUS       = #{status}
+                          ,AGREE_DATE   = TO_CHAR(SYSDATE,'YYYYMMDD')
+                          ,BIGO         = #{bigo}
+                          ,CHKDATE      = SYSDATE
+                          ,CHKID        = #{ssnSabun}
+                    WHERE  ENTER_CD     = #{ssnEnterCd}
+                    AND    SABUN        = #{sabun}
+                    AND    REQ_SEQ      = #{reqSeq}
+                ]]>
+            
+        </update>
+
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePerAccChgApr">
+			
+					UPDATE TCPN183 T SET
+					(	  STATUS
+						, AGREE_DATE
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.STATUS
+								, S.AGREE_DATE
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL AS ENTER_CD
+									, NULL AS SABUN
+									, NULL AS REQ_SEQ
+									, NULL AS STATUS
+									, NULL AS AGREE_DATE
+									, NULL AS CHKDATE
+									, NULL AS CHKID
+									FROM   DUAL
+<foreach item="rm" collection="updateRows">
+					UNION ALL
+								SELECT    #{ssnEnterCd} AS ENTER_CD
+										, TRIM(#{rm.sabun})	AS SABUN
+										, TRIM(#{rm.reqSeq})AS REQ_SEQ
+										, '02'	AS STATUS
+										, TO_CHAR(SYSDATE, 'YYYYMMDD')	AS AGREE_DATE
+										, TO_CHAR(SYSDATE, 'YYYYMMDD')	AS CHKDATE
+										, #{ssnSabun}
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.STATUS IS NOT NULL
+						AND   S.ENTER_CD = T.ENTER_CD
+						AND   S.SABUN    = T.SABUN
+						AND   S.REQ_SEQ  = T.REQ_SEQ
+					)
+					WHERE EXISTS (
+									SELECT ENTER_CD
+									     , SABUN
+									     , REQ_SEQ
+									FROM (
+											SELECT	*
+											FROM (
+												SELECT	NULL AS ENTER_CD
+													  , NULL AS SABUN
+													  , NULL AS REQ_SEQ
+												FROM	DUAL
+<foreach item="rm" collection="updateRows"> UNION ALL		SELECT	#{ssnEnterCd}     	AS ENTER_CD
+													  , TRIM(#{rm.sabun})	AS SABUN
+													  , TRIM(#{rm.reqSeq})	AS REQ_SEQ
+												FROM	DUAL
+</foreach>
+												) S
+											WHERE S.ENTER_CD IS NOT NULL
+										)S
+									WHERE T.ENTER_CD = S.ENTER_CD
+									AND   T.SABUN    = S.SABUN
+									AND   T.REQ_SEQ  = S.REQ_SEQ
+								)
+		</update>
+</mapper>

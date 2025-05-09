@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	작업일자정의 팝업
+ -->
+<root>
+
+	<!-- 작업일자정의 조회  -->
+	<query id="selectRetCalcPayDayPopupList">
+		<![CDATA[
+			SELECT PAY_ACTION_CD
+			     , PAY_ACTION_NM
+			     , PAY_YM
+			     , PAY_CD
+			     , RUN_TYPE
+			     , PAYMENT_YMD
+			     , TO_CHAR(TO_DATE(PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+			     , ORD_SYMD
+			     , ORD_EYMD
+			     , PAY_NM
+			FROM (
+			        SELECT DISTINCT A.ENTER_CD
+	                      , A.PAY_ACTION_CD
+	                      , A.PAY_ACTION_NM
+	                      , A.PAY_YM
+	                      , A.PAY_CD
+	                      , B.RUN_TYPE
+	                      , A.PAYMENT_YMD
+	                      , A.ORD_SYMD
+	                      , A.ORD_EYMD
+						  , B.PAY_NM
+			          FROM TCPN201 A, TCPN051 B, TCPN981 C
+			         WHERE A.ENTER_CD		= #ssnEnterCd#
+			           AND B.ENTER_CD		= A.ENTER_CD
+			           AND B.PAY_CD        	= A.PAY_CD
+			           AND A.ENTER_CD      	= C.ENTER_CD      (+)
+			           AND A.PAY_ACTION_CD 	= C.PAY_ACTION_CD (+)
+			           AND A.PAY_CD LIKE '%'|| #searchPayCd# ||'%'
+			           AND F_CPN_YEA_PAY_CD(#ssnEnterCd#,A.PAY_CD) NOT IN ('S9')	/*퇴직시뮬레이션 제외*/
+			           AND A.PAY_YM BETWEEN NVL(REPLACE(#searchMonthFrom#, '-', ''),'000000') AND NVL(REPLACE(#searchMonthTo#, '-', ''),'999999')
+			         ORDER BY A.PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+			    )
+		]]>
+	</query>
+
+	<!-- 작업일자정의 저장  -->
+	<query id="insertRetCalcPayDayPopup">
+		<![CDATA[
+			INSERT INTO TCPN201
+			(
+				ENTER_CD
+				, PAY_ACTION_CD
+				, PAY_ACTION_NM
+				, PAY_YM
+				, PAY_CD
+				, PAYMENT_YMD
+				, ORD_SYMD
+				, ORD_EYMD
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #pay_ym# || TO_CHAR( (SELECT LPAD((NVL(MAX(TO_NUMBER(PAY_ACTION_CD)),0) + 1), 3, '0')
+										  FROM TCPN201
+										 WHERE SUBSTR (PAY_ACTION_CD, 1, 6) = REPLACE(#pay_ym#, '-', '')
+										   AND ENTER_CD = #ssnEnterCd#
+									  ) )
+				, #pay_action_nm#
+				, #pay_ym#
+				, #pay_cd#
+				, #payment_ymd#
+				, #ord_symd#
+				, #ord_eymd#
+				, SYSDATE
+				, #ssnSabun#
+			)
+
+		]]>
+	</query>
+
+	<!-- 작업일자정의 삭제  -->
+	<query id="deleteRetCalcPayDayPopup">
+		<![CDATA[
+			DELETE FROM TCPN201
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND PAY_ACTION_CD = #pay_action_cd#
+		]]>
+	</query>
+
+</root>

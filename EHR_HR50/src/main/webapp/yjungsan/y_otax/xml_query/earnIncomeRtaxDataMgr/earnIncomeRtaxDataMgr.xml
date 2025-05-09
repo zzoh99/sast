@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	지방세
+ -->
+<root>
+
+	<!-- 지방세 조회  -->
+	<query id="selectEarnIncomeRtaxDataMgrList">
+		<![CDATA[
+			SELECT TAX_DOC_NO
+			     , LOCATION_CD
+			     , LOCATION_NM
+			     , ZIP
+			     , ADDR
+			     , SUM(DECODE(EARN_CD, '01', EMP_CNT, 0))     AS INTEREST_EMP_CNT               /* 이자소득(인원) */
+			     , SUM(DECODE(EARN_CD, '01', TAX_STD_MON, 0)) AS INTEREST_TAX_STD               /* 이자소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '01', RTAX_MON, 0))    AS INTEREST_TAX_AMOUNT            /* 이자소득(세액) */
+			     , SUM(DECODE(EARN_CD, '02', EMP_CNT, 0))     AS DIVIDEND_EMP_CNT               /* 배당소득(인원) */
+			     , SUM(DECODE(EARN_CD, '02', TAX_STD_MON, 0)) AS DIVIDEND_TAX_STD               /* 배당소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '02', RTAX_MON, 0))    AS DIVIDEND_TAX_AMOUNT            /* 배당소득(세액) */
+			     , SUM(DECODE(EARN_CD, '03', EMP_CNT, 0))     AS BUSINESS_EMP_CNT               /* 사업소득(인원) */
+			     , SUM(DECODE(EARN_CD, '03', TAX_STD_MON, 0)) AS BUSINESS_TAX_STD               /* 사업소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '03', RTAX_MON, 0))    AS BUSINESS_TAX_AMOUNT            /* 사업소득(세액) */
+			     , SUM(DECODE(EARN_CD, '04', EMP_CNT, 0))     AS EARN_EMP_CNT                   /* 근로소득(인원) */
+			     , SUM(DECODE(EARN_CD, '04', TAX_STD_MON, 0)) AS EARN_TAX_STD                   /* 근로소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '04', RTAX_MON, 0)) + NVL(MAX(R_CRE_REFUND_MON),0) AS EARN_TAX_AMOUNT /* 근로소득(세액) */ 
+			     , SUM(DECODE(EARN_CD, '06', EMP_CNT, 0))     AS OTHER_EMP_CNT                  /* 기타소득(인원) */
+			     , SUM(DECODE(EARN_CD, '06', TAX_STD_MON, 0)) AS OTHER_TAX_STD                  /* 기타소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '06', RTAX_MON, 0))    AS OTHER_TAX_AMOUNT               /* 기타소득(세액) */
+			     , SUM(DECODE(EARN_CD, '05', EMP_CNT, 0))     AS PENSION_EMP_CNT                /* 연금소득(인원) */
+			     , SUM(DECODE(EARN_CD, '05', TAX_STD_MON, 0)) AS PENSION_TAX_STD                /* 연금소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '05', RTAX_MON, 0))    AS PENSION_TAX_AMOUNT             /* 연금소득(세액) */
+			     , SUM(DECODE(EARN_CD, '07', EMP_CNT, 0))     AS RETIREMENT_EMP_CNT             /* 퇴직소득(인원) */
+			     , SUM(DECODE(EARN_CD, '07', TAX_STD_MON, 0)) AS RETIREMENT_TAX_STD             /* 퇴직소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '07', RTAX_MON, 0))    AS RETIREMENT_TAX_AMOUNT          /* 퇴직소득(세액) */
+			     , SUM(DECODE(EARN_CD, '11', EMP_CNT, 0))     AS  WITHHOLDING_TAX_ETC_EMP_CNT   /* 저축해지 추징세액 등(인원) */
+			     , SUM(DECODE(EARN_CD, '11', TAX_STD_MON, 0)) AS WITHHOLDING_TAX_ETC_TAX_STD    /* 저축해지 추징세액 등(과세표준) */
+			     , SUM(DECODE(EARN_CD, '11', RTAX_MON, 0))    AS WITHHOLDING_TAX_ETC_TAX_AMOUNT /* 저축해지 추징세액 등(세액) */
+			     , SUM(DECODE(EARN_CD, '10', EMP_CNT, 0))     AS CAPITAL_EMP_CNT                /* 양도소득(인원) */
+			     , SUM(DECODE(EARN_CD, '10', TAX_STD_MON, 0)) AS CAPITAL_TAX_STD                /* 양도소득(과세표준) */
+			     , SUM(DECODE(EARN_CD, '10', RTAX_MON, 0))    AS CAPITAL_TAX_AMOUNT             /* 양도소득(세액) */
+			     , SUM(DECODE(EARN_CD, '12', EMP_CNT, 0))     AS DOMESTIC_CORP_EMP_CNT          /* 내국법인(인원) */
+			     , SUM(DECODE(EARN_CD, '12', TAX_STD_MON, 0)) AS DOMESTIC_CORP_TAX_STD          /* 내국법인(과세표준) */
+			     , SUM(DECODE(EARN_CD, '12', RTAX_MON, 0))    AS DOMESTIC_CORP_TAX_AMOUNT       /* 내국법인(세액) */
+			     , SUM(DECODE(EARN_CD, '09', EMP_CNT, 0))     AS FOREIGN_CORP_EMP_CNT           /* 외국법인(인원) */
+			     , SUM(DECODE(EARN_CD, '09', TAX_STD_MON, 0)) AS FOREIGN_CORP_TAX_STD           /* 외국법인(과세표준) */
+			     , SUM(DECODE(EARN_CD, '09', RTAX_MON, 0))    AS FOREIGN_CORP_TAX_AMOUNT        /* 외국법인(세액) */
+			     , SUM(ADD_MM_RTN)                            AS REFUND_CUR_MON                 /* 환급액(당월) */
+			     , MAX(E_CRE_REFUND_MON)                      AS REFUND_YEAR_SETTLEMENT         /* 환급액(연말정산) */ 
+			     , MAX(R_CRE_REFUND_MON)                      AS REFUND_DROPOUT                 /* 환급액(중도퇴사자) */
+			     , SUM(ADD_MM_AAMT)                           AS ADD_PAYMENT_CUR_MON            /* 추가납부액(당월) */
+			     , SUM(ADD_YY_TAMT)                           AS ADD_PAYMENT_YEAR_SETTLEMENT    /* 추가납부액(연말정산) */
+			     , SUM(ADD_RDT_ADTX)                          AS ADD_PAYMENT_TAX                /* 추가납부액(가산세) */
+			  FROM (
+			            SELECT X.TAX_DOC_NO 
+			                 , X.BUSINESS_PLACE_CD
+			                 , X.LOCATION_CD
+			                 , X.LOCATION_NM
+			                 , X.SQ,X.EARN_CD
+			                 , X.CODE_NM
+			                 , X.SEQ
+			                 , DECODE(X.EMP_CNT,'0','',X.EMP_CNT) AS EMP_CNT
+			                 , DECODE(X.TAX_STD_MON,'0','',X.TAX_STD_MON) AS TAX_STD_MON
+			                 , DECODE(X.RTAX_MON,'0','',X.RTAX_MON) AS RTAX_MON
+			                 , X.ORDER_SEQ
+			                 , X.ENTER_CD 
+			                 , NVL(Z.ADD_MM_RTN, 0) AS ADD_MM_RTN
+			                 , NVL(Z.ADD_YY_TRTN, 0) AS ADD_YY_TRTN
+			                 , NVL(Z.ADD_ETC_RTN, 0) AS ADD_ETC_RTN
+			                 , NVL(Z.ADD_MM_AAMT, 0) AS ADD_MM_AAMT
+			                 , NVL(Z.ADD_YY_TAMT, 0) AS ADD_YY_TAMT
+			                 , NVL(Z.ADD_RDT_ADTX, 0) AS ADD_RDT_ADTX 
+			                 , NVL(Z.E_CRE_REFUND_MON, 0) AS E_CRE_REFUND_MON
+			                 , NVL(Z.R_CRE_REFUND_MON, 0) AS R_CRE_REFUND_MON
+			                 , ZIP         
+			                 , ADDR       
+			              FROM (SELECT TAX_DOC_NO 
+			                         , A.BUSINESS_PLACE_CD
+			                         , C.LOCATION_CD
+			                         , C.LOCATION_NM
+			                         , '1' AS SQ
+			                         , A.EARN_CD
+			                         , B.CODE_NM
+			                         , B.SEQ
+			                         , EMP_CNT
+			                         , TAX_STD_MON
+			                         , RTAX_MON
+			                         , C.ORDER_SEQ
+			                         , A.ENTER_CD 
+			                         , C.ZIP
+			                         , C.ADDR
+			                      FROM TCPN931 A
+			                         , TSYS005 B
+			                         , TSYS015 C
+			                     WHERE A.ENTER_CD = #ssnEnterCd#
+			                       AND '^' || A.TAX_DOC_NO || '^' LIKE '%' || DECODE(TRIM(#taxDocNo#), NULL, '', '^'||TRIM(#taxDocNo#)||'^')  || '%'
+			                       AND A.EARN_CD  <> '99'
+			                       AND A.ENTER_CD = B.ENTER_CD
+			                       AND B.GRCODE_CD  ='C00501'
+			                       AND A.EARN_CD  = B.CODE
+			                       AND C.ENTER_CD   = A.ENTER_CD
+			                       AND C.LOCATION_CD = A.LOCATION_CD
+			                       AND C.LOCATION_CD LIKE '%'||trim(#locationCd#)||'%'
+			                       AND TO_CHAR(SYSDATE,'YYYYMM')||'10' BETWEEN B.S_YMD AND B.E_YMD
+			                ) X, TCPN933 Z  
+			             WHERE X.ENTER_CD   = Z.ENTER_CD(+)
+			               AND X.TAX_DOC_NO = Z.TAX_DOC_NO(+)
+			               AND X.BUSINESS_PLACE_CD = Z.BUSINESS_PLACE_CD(+)
+			               AND X.LOCATION_CD  = Z.LOCATION_CD(+)
+			       ) Y
+			 WHERE 1 = 1
+			 GROUP BY Y.LOCATION_CD, Y.LOCATION_NM, Y.ORDER_SEQ, Y.ZIP, Y.TAX_DOC_NO, Y.ADDR
+			 ORDER BY TAX_DOC_NO DESC, ORDER_SEQ
+		]]>
+	</query>
+	
+</root>

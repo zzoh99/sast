@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.commonApproval.comAppDet">
+	
+<!-- SEQ -->
+		<select parameterType="map" resultType="cMap" id="getComAppDetSeqList">
+
+				<![CDATA[
+				    SELECT CODE AS SEQ
+				      FROM TSYS005 A
+					 WHERE A.ENTER_CD  	= TRIM(#{ssnEnterCd})
+                       AND A.GRCODE_CD 	= 'Z80230'
+                       AND A.USE_YN     = 'Y' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+                     ORDER BY TO_NUMBER(CODE)  
+				]]>
+
+
+		</select>
+	
+	
+	
+<!-- 신청서 타입 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppDetAppType">
+
+				<![CDATA[
+					   SELECT APPL_TYPE_CD
+					     FROM THRI800 A
+					    WHERE A.ENTER_CD  = TRIM( #{ssnEnterCd} )
+                          AND A.APPL_CD   = TRIM( #{searchApplCd} )
+				]]>
+
+
+		</select>
+
+<!-- 신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppDet">
+
+				<![CDATA[
+				
+					   SELECT '' AS TITLE
+						    , F_HRI_GET_APP_FORMAT(TRIM( #{ssnEnterCd} ), TRIM( #{searchApplCd} ), TRIM( #{searchApplSabun} ) ) AS CONTENTS
+							, '' AS NOTE
+						    , F_HRI_GET_APP_FORMAT(TRIM( #{ssnEnterCd} ), TRIM( #{searchApplCd} ), TRIM( #{searchApplSabun} ) ) AS TMP_CONTENTS
+					     FROM DUAL
+					    WHERE 1 = 1
+						  AND NOT EXISTS ( SELECT 1 
+						                     FROM THRI811 
+						                    WHERE ENTER_CD = #{ssnEnterCd}
+						                      AND APPL_SEQ = TRIM(#{searchApplSeq})
+						                  )
+					   UNION ALL
+					   SELECT A.TITLE
+						    , A.CONTENTS
+							, A.NOTE
+						    , F_HRI_GET_APP_FORMAT(TRIM( #{ssnEnterCd} ), TRIM( #{searchApplCd} ), TRIM( #{searchApplSabun} ) ) AS TMP_CONTENTS
+					     FROM THRI811 A
+					    WHERE A.ENTER_CD   = TRIM( #{ssnEnterCd} )
+                          AND A.APPL_SEQ   = TRIM( #{searchApplSeq} )
+                          AND ROWNUM = 1  
+                          
+				]]>
+
+
+		</select>
+		
+<!-- 신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppDetData">
+
+				<![CDATA[
+						SELECT A.*
+                            , CASE WHEN  A.COLUMN_TYPE_CD = 'Popup' AND A.POPUP_ITEM_CD = 'emp' THEN F_COM_GET_NAMES( A.ENTER_CD, A.VAL) 
+                                   WHEN  A.COLUMN_TYPE_CD = 'Popup' AND A.POPUP_ITEM_CD = 'org' THEN F_COM_GET_ORG_NM( A.ENTER_CD, A.VAL, TO_CHAR(SYSDATE, 'YYYYMMDD')) 
+                                   ELSE NULL END AS VAL_NM
+						  FROM (	
+								   SELECT A.ENTER_CD
+								        , A.COLUMN_TYPE_CD
+			                            , A.POPUP_ITEM_CD
+			                            , A.LAYOUT_SEQ
+								        , 'data' || A.LAYOUT_SEQ AS ID
+								        , ( SELECT CASE
+								            ]]>
+<foreach item="tSeq" collection="seqList" >
+							                			WHEN A.LAYOUT_SEQ = #{tSeq.seq} THEN DATA${tSeq.seq}
+</foreach>
+										                ELSE NULL END 
+										      FROM THRI811 X
+										     WHERE X.ENTER_CD = A.ENTER_CD
+										       AND X.APPL_CD  = A.APPL_CD
+										       AND X.APPL_SEQ = TRIM(#{searchApplSeq})
+										  ) AS VAL
+									 FROM THRI804 A
+									WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+									  AND A.APPL_CD =  TRIM(#{searchApplCd})
+							  ) A	  
+						ORDER BY A.LAYOUT_SEQ	
+		</select>
+
+<!--  세부내역 저장 -->
+		<update parameterType="map" id="saveComAppDet">
+
+					MERGE INTO THRI811 T
+					USING  (		
+								  SELECT  TRIM( #{ssnEnterCd} )				AS ENTER_CD
+								   	 	, TRIM( #{searchApplSeq} )			AS APPL_SEQ
+										, TRIM( #{searchApplSabun} )			AS SABUN
+										, TRIM( #{title} ) 					AS TITLE
+								    FROM  DUAL
+								
+							) S
+					ON (      T.ENTER_CD = S.ENTER_CD
+					      AND T.APPL_SEQ = S.APPL_SEQ
+					   )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.TITLE     		= S.TITLE
+									, T.CONTENTS 	    = EMPTY_CLOB()
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPL_SEQ
+							, T.SABUN
+							, T.TITLE
+							, T.CONTENTS
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPL_SEQ
+							, S.SABUN
+							, S.TITLE
+							, EMPTY_CLOB()
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+
+<!--  세부내역 저장 -->
+		<update parameterType="map" id="saveComAppDetData">
+
+						 MERGE INTO THRI811 T 
+						 USING 
+						( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+						       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD
+						            , TRIM(#{rm.searchApplSeq})  	AS  APPL_SEQ
+						            , TRIM(#{rm.searchApplCd})  	AS  APPL_CD
+						            , TRIM(#{rm.searchApplSabun})	AS  SABUN
+						            , TRIM(#{rm.data1})  		AS  DATA1
+						            , TRIM(#{rm.data2})  		AS  DATA2
+						            , TRIM(#{rm.data3})  		AS  DATA3
+						            , TRIM(#{rm.data4})  		AS  DATA4
+						            , TRIM(#{rm.data5}) 		AS  DATA5
+						            , TRIM(#{rm.data6})  		AS  DATA6
+						            , TRIM(#{rm.data7})  		AS  DATA7
+						            , TRIM(#{rm.data8})  		AS  DATA8
+						            , TRIM(#{rm.data9})  		AS  DATA9
+						            , TRIM(#{rm.data10})  		AS  DATA10
+						            , TRIM(#{rm.data11})  		AS  DATA11
+						            , TRIM(#{rm.data12})  		AS  DATA12
+						            , TRIM(#{rm.data13})  		AS  DATA13
+						            , TRIM(#{rm.data14})  		AS  DATA14
+						            , TRIM(#{rm.data15})  		AS  DATA15
+						            , TRIM(#{rm.data16})  		AS  DATA16
+						            , TRIM(#{rm.data17})  		AS  DATA17
+						            , TRIM(#{rm.data18})  		AS  DATA18
+						            , TRIM(#{rm.data19})  		AS  DATA19
+						            , TRIM(#{rm.data20})  		AS  DATA20
+						            , TRIM(#{rm.data21})  		AS  DATA21
+						            , TRIM(#{rm.data22})  		AS  DATA22
+						            , TRIM(#{rm.data23})  		AS  DATA23
+						            , TRIM(#{rm.data24})  		AS  DATA24
+						            , TRIM(#{rm.data25})  		AS  DATA25
+						            , TRIM(#{rm.data26})  		AS  DATA26
+						            , TRIM(#{rm.data27})  		AS  DATA27
+						            , TRIM(#{rm.data28})  		AS  DATA28
+						            , TRIM(#{rm.data29})  		AS  DATA29
+						            , TRIM(#{rm.data30})  		AS  DATA30
+						            , TRIM(#{rm.note})  		AS  NOTE
+						        FROM DUAL
+</foreach>
+						) S 
+						ON ( 
+						          T.ENTER_CD 	= S.ENTER_CD 
+						     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+						) 
+						WHEN MATCHED THEN 
+						   UPDATE SET T.CHKDATE	= sysdate 
+						            , T.CHKID	= #{ssnSabun}
+						            , T.DATA1 	= S.DATA1 
+						            , T.DATA2 	= S.DATA2 
+						            , T.DATA3 	= S.DATA3 
+						            , T.DATA4 	= S.DATA4 
+						            , T.DATA5 	= S.DATA5 
+						            , T.DATA6 	= S.DATA6 
+						            , T.DATA7 	= S.DATA7 
+						            , T.DATA8 	= S.DATA8 
+						            , T.DATA9 	= S.DATA9 
+						            , T.DATA10 	= S.DATA10 
+						            , T.DATA11 	= S.DATA11 
+						            , T.DATA12 	= S.DATA12 
+						            , T.DATA13 	= S.DATA13 
+						            , T.DATA14 	= S.DATA14 
+						            , T.DATA15 	= S.DATA15 
+						            , T.DATA16 	= S.DATA16 
+						            , T.DATA17 	= S.DATA17 
+						            , T.DATA18 	= S.DATA18 
+						            , T.DATA19 	= S.DATA19 
+						            , T.DATA20 	= S.DATA20 
+						            , T.DATA21 	= S.DATA21 
+						            , T.DATA22 	= S.DATA22 
+						            , T.DATA23 	= S.DATA23 
+						            , T.DATA24 	= S.DATA24 
+						            , T.DATA25 	= S.DATA25 
+						            , T.DATA26 	= S.DATA26 
+						            , T.DATA27 	= S.DATA27 
+						            , T.DATA28 	= S.DATA28 
+						            , T.DATA29 	= S.DATA29 
+						            , T.DATA30 	= S.DATA30 
+						WHEN NOT MATCHED THEN 
+						   INSERT 
+						   ( 
+						              T.ENTER_CD
+						            , T.APPL_SEQ
+						            , T.APPL_CD
+						            , T.SABUN
+						            , T.DATA1
+						            , T.DATA2
+						            , T.DATA3
+						            , T.DATA4
+						            , T.DATA5
+						            , T.DATA6
+						            , T.DATA7
+						            , T.DATA8
+						            , T.DATA9
+						            , T.DATA10
+						            , T.DATA11
+						            , T.DATA12
+						            , T.DATA13
+						            , T.DATA14
+						            , T.DATA15
+						            , T.DATA16
+						            , T.DATA17
+						            , T.DATA18
+						            , T.DATA19
+						            , T.DATA20
+						            , T.DATA21
+						            , T.DATA22
+						            , T.DATA23
+						            , T.DATA24
+						            , T.DATA25
+						            , T.DATA26
+						            , T.DATA27
+						            , T.DATA28
+						            , T.DATA29
+						            , T.DATA30
+						            , T.CHKDATE
+						            , T.CHKID
+						   ) 
+						   VALUES 
+						   ( 
+						              S.ENTER_CD
+						            , S.APPL_SEQ
+						            , S.APPL_CD
+						            , S.SABUN
+						            , S.DATA1
+						            , S.DATA2
+						            , S.DATA3
+						            , S.DATA4
+						            , S.DATA5
+						            , S.DATA6
+						            , S.DATA7
+						            , S.DATA8
+						            , S.DATA9
+						            , S.DATA10
+						            , S.DATA11
+						            , S.DATA12
+						            , S.DATA13
+						            , S.DATA14
+						            , S.DATA15
+						            , S.DATA16
+						            , S.DATA17
+						            , S.DATA18
+						            , S.DATA19
+						            , S.DATA20
+						            , S.DATA21
+						            , S.DATA22
+						            , S.DATA23
+						            , S.DATA24
+						            , S.DATA25
+						            , S.DATA26
+						            , S.DATA27
+						            , S.DATA28
+						            , S.DATA29
+						            , S.DATA30
+						            , sysdate
+						            , #{ssnSabun}
+						   ) 
+								
+		</update>
+		
+<!-- 세부내역 저장 -->
+		<update parameterType="map" id="updateComAppDet">
+
+				<![CDATA[			
+					 UPDATE THRI811
+					     SET CONTENTS = #{contents}
+					   WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					     AND APPL_SEQ = TRIM(#{searchApplSeq})
+
+				]]>
+
+		</update>
+
+
+</mapper>

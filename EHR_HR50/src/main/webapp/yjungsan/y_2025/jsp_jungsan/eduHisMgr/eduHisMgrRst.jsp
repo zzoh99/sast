@@ -1,0 +1,155 @@
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="yjungsan.util.*"%>
+
+<%@ page import="java.util.List"%>
+<%@ page import="java.util.ArrayList"%>
+<%@ page import="java.util.Map"%>
+<%@ page import="java.util.HashMap"%>
+
+<%@ page import="com.hr.common.logger.Log" %>
+<%@ include file="../common/include/session.jsp"%>
+<%@ include file="../auth/saveLog.jsp"%>
+<%!
+//의료비 내역 조회
+public List selectEduHisMgrList(Map paramMap, String locPath, String ssnYeaLogYn) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	//xml 파서를 이용한 방법;
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);	
+	List listData = null;
+	String searchWorkType = String.valueOf(pm.get("searchWorkType"));
+
+	StringBuffer query   = new StringBuffer();
+	query.setLength(0);
+
+	if(searchWorkType.trim().length() != 0){
+		query.append(" AND WORK_TYPE = #searchWorkType#");
+	}
+
+	pm.put("query", query.toString());
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectEduHisMgrList",pm);
+		saveLog(null, pm, ssnYeaLogYn);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+
+	return listData;
+}
+
+%>
+
+<%
+	String locPath = xmlPath+"/eduHisMgr/eduHisMgr.xml";
+
+	String ssnEnterCd = (String)session.getAttribute("ssnEnterCd");
+	String ssnSabun = (String)session.getAttribute("ssnSabun");
+	String ssnYeaLogYn = (String)session.getAttribute("ssnYeaLogYn");
+	String cmd = (String)request.getParameter("cmd");
+
+	if("selectEduHisMgrList".equals(cmd)) {
+		//의료비 내역 조회
+
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		mp.put("cmd", cmd);
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+
+		try {
+			listData = selectEduHisMgrList(mp, locPath, ssnYeaLogYn);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("Data", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+
+	} else if("saveEduHisMgr".equals(cmd)) {
+		//개인연금등 내역 저장
+
+		Map paramMap = StringUtil.getRequestMap(request);
+		paramMap.put("ssnEnterCd", ssnEnterCd);
+		paramMap.put("ssnSabun", ssnSabun);
+
+		List listMap = StringUtil.getParamListData(paramMap);
+
+		String message = "";
+		String code = "1";
+		int cnt = 0;
+
+		try {
+
+			for(int i = 0; i < listMap.size(); i++) {
+				Map data = (Map)listMap.get(i);
+
+				String sStatus = (String)data.get("sStatus");
+				String workYy = (String)data.get("work_yy");
+
+				String adjust_type = (String)data.get("adjust_type");
+				String sabun = (String)data.get("sabun");
+				String seq = (String)data.get("seq");
+				String famres = (String)data.get("famres");
+				String workType = (String)data.get("work_type");
+				String appl_mon = (String)data.get("appl_mon");
+				String adj_input_type = (String)data.get("adj_input_type");
+				String nts_yn = (String)data.get("nts_yn");
+				String restrict_cd = (String)data.get("restrict_cd");
+				String feedback_type = (String)data.get("feedback_type");
+				String nanim_yn = (String)data.get("nanim_yn");
+				String docSeq = (String)data.get("doc_seq");
+				String docSeqDetail = (String)data.get("doc_seq_detail");
+
+				String[] type =  new String[]{"OUT","OUT","STR","STR","STR"
+						,"STR","STR","STR","STR","STR"
+						,"STR","STR","STR","STR","STR","STR","STR","STR"};
+				String[] param = new String[]{"","",sStatus,ssnEnterCd,workYy
+						,adjust_type,sabun,seq,famres
+						,workType,appl_mon,adj_input_type,nts_yn,restrict_cd,feedback_type,ssnSabun,docSeq,docSeqDetail};
+
+				String[] rstStr = DBConn.executeProcedure("PKG_CPN_YEA_"+yeaYear+"_SYNC.EDUCATION_INS",type,param);
+
+				if(rstStr[1] != null && rstStr[1].length() > 0) {
+					message = rstStr[1]+"\n";
+				}
+				cnt++;
+			}
+
+			if(cnt > 0) {
+				if(message.length() == 0) {
+					message = "저장되었습니다.";
+				}
+			} else {
+				code = "-1";
+				message = "저장된 내용이 없습니다.";
+			}
+
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+
+		out.print((new org.json.JSONObject(rstMap)).toString());
+	}
+%>

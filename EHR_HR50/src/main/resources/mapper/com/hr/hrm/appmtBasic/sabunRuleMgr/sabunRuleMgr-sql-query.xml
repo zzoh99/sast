@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmtBasic.sabunRuleMgr">
+
+<!-- 사번생성규칙 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSabunRuleMgrList">
+
+				<![CDATA[
+					SELECT SABUN_TYPE	-- 사번생성룰구분(H10160)
+					     , AUTO_YN		-- 자동부여여부(Y/N)
+					     , FIX_GBN		-- 구분
+					     , FIX_VAL		-- 고정값
+					     , FIX_VAL_LOC	-- 고정값위치
+					     , AUTONUM		-- 사번부여자릿수
+					     , AUTONUM_GBN	-- 사번부여규칙
+					     , START_VAL
+					     , END_VAL
+					  FROM THRM001
+					 WHERE ENTER_CD = #{ssnEnterCd}
+				]]>
+
+
+		</select>
+
+<!-- 사번생성규칙 저장 -->
+		<update parameterType="map" id="saveSabunRuleMgr">
+
+				<![CDATA[
+					MERGE INTO THRM001 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN_TYPE
+									, A.AUTO_YN
+									, A.FIX_GBN
+									, A.FIX_VAL
+									, A.FIX_VAL_lOC
+									, A.AUTONUM
+									, A.AUTONUM_GBN
+									, A.START_VAL
+									, A.END_VAL
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN_TYPE
+											, NULL		AS AUTO_YN
+											, NULL		AS FIX_GBN
+											, NULL		AS FIX_VAL
+											, NULL		AS FIX_VAL_LOC
+											, NULL		AS AUTONUM
+											, NULL		AS AUTONUM_GBN
+											, NULL		AS START_VAL
+											, NULL		AS END_VAL
+									FROM	DUAL
+									]]>
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT 	  TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabunType})	AS SABUN_TYPE
+											, TRIM( #{rm.autoYn})		AS AUTO_YN
+											, TRIM( #{rm.fixGbn})		AS FIX_GBN
+											, TRIM( #{rm.fixVal})		AS FIX_VAL
+											, TRIM( #{rm.fixValLoc})		AS FIX_VAL_LOC
+											, TRIM( #{rm.autonum})		AS AUTONUM
+											, TRIM( #{rm.autonumGbn})		AS AUTONUM_GBN
+											, TRIM( #{rm.startVal})		AS START_VAL
+											, TRIM( #{rm.endVal})		AS END_VAL
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN_TYPE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN_TYPE = S.SABUN_TYPE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.AUTO_YN	= S.AUTO_YN
+									, T.FIX_GBN	= S.FIX_GBN
+									, T.FIX_VAL	= S.FIX_VAL
+									, T.FIX_VAL_lOC	= S.FIX_VAL_LOC
+									, T.AUTONUM	= S.AUTONUM
+									, T.AUTONUM_GBN	= S.AUTONUM_GBN
+									, T.START_VAL	= S.START_VAL
+									, T.END_VAL		= S.END_VAL
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN_TYPE
+							, T.AUTO_YN
+							, T.FIX_GBN
+							, T.FIX_VAL
+							, T.FIX_VAL_LOC
+							, T.AUTONUM
+							, T.AUTONUM_GBN
+							, T.CHKDATE
+							, T.CHKID
+							, T.START_VAL
+							, T.END_VAL
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN_TYPE
+							, S.AUTO_YN
+							, S.FIX_GBN
+							, S.FIX_VAL
+							, S.FIX_VAL_LOC
+							, S.AUTONUM
+							, S.AUTONUM_GBN
+							, SYSDATE
+							, #{ssnSabun}
+							, S.START_VAL
+							, S.END_VAL
+						)
+		</update>
+
+<!-- 사번생성규칙 삭제 -->
+		<delete parameterType="map" id="deleteSabunRuleMgr">
+
+					DELETE FROM THRM001
+					 WHERE  ENTER_CD||'_'||SABUN_TYPE IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd  != null and !ssnEnterCd.equals("") and rm.sabunType != null and !rm.sabunType.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabunType})
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

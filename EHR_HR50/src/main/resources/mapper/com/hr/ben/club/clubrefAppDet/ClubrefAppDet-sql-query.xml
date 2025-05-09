@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubrefAppDet">
+	
+	<!-- 동호회명 콤보 -->		
+	<select id="getClubrefAppDetClubCode" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT CLUB_SEQ AS CODE
+		     , (DECODE( NVL(TEMP_YN,'N'), 'Y', '(임시)', '') || CLUB_NM) AS CODE_NM
+		  FROM TBEN500
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+		<if test='searchAllYn == null or "Y" neq searchAllYn'>
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE
+		    AND ( SABUN_A = #{searchApplSabun} OR SABUN_B = #{searchApplSabun} OR SABUN_C = #{searchApplSabun} )
+		</if>
+		  ORDER BY CLUB_NM
+	</select>
+		
+	<!-- 신청내용 조회 -->
+	<select id="getClubrefAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+		     , A.YEAR
+		     , A.GUBUN_CD
+		     , A.CLUB_SEQ
+		     , A.CLUB_NM
+		     , A.CLUB_FEE
+		     , A.SABUN_A
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_VIEW -- 성명
+		     , A.SABUN_B
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_VIEW -- 성명
+		     , A.SABUN_C
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_VIEW -- 성명
+		     , A.MEMER_CNT
+		     , A.YEAR_IN_CNT
+		     , A.YEAR_OUT_CNT
+		     , A.PURPOSE
+		     , A.ACT_PLAN
+		     , A.BUD_PLAN
+		     , A.ETC_NOTE
+		     , A.NOTE
+          FROM TBEN505 A, TBEN500 B
+         WHERE A.ENTER_CD   = #{ssnEnterCd}
+           AND A.APPL_SEQ   = #{searchApplSeq}
+           AND A.ENTER_CD   = B.ENTER_CD(+)
+           AND A.CLUB_SEQ   = B.CLUB_SEQ(+)
+	]]>
+	</select>
+		
+	<!-- 동호회 정보 조회 -->
+	<select id="getClubrefAppDetClubMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.CLUB_SEQ
+		     , A.CLUB_NM
+		     , A.SDATE
+		     , A.EDATE
+		     , NVL(A.CLUB_FEE,'10000') AS CLUB_FEE
+		     , A.SABUN_A
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_VIEW -- 회장 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_A, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_A_NM
+		     , A.SABUN_B
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_VIEW -- 고문 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_B, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_B_NM
+		     , A.SABUN_C
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_VIEW -- 총무 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_C, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_C_NM
+		     , (
+				SELECT COUNT(1) FROM (
+					SELECT SABUN AS CNT
+					  FROM TBEN501 A, THRI103 B
+					 WHERE A.ENTER_CD  = #{ssnEnterCd}
+					   AND A.CLUB_SEQ  = #{clubSeq}
+					   AND A.JOIN_TYPE = 'A'
+					   AND SUBSTR(A.SDATE,1,4) = TO_CHAR( TO_NUMBER(SUBSTR(#{year},1,4))-1 )
+					   AND A.ENTER_CD  = B.ENTER_CD
+					   AND A.APPL_SEQ  = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD = '99'
+					GROUP BY A.SABUN
+				)
+			) AS YEAR_IN_CNT
+			, (
+				SELECT COUNT(1) FROM (
+					SELECT SABUN AS CNT
+					  FROM TBEN501 A, THRI103 B
+					 WHERE A.ENTER_CD  = #{ssnEnterCd}
+					   AND A.CLUB_SEQ  = #{clubSeq}
+					   AND A.JOIN_TYPE = 'D'
+					   AND SUBSTR(A.EDATE,1,4) = TO_CHAR( TO_NUMBER(SUBSTR(#{year},1,4))-1 )
+					   AND A.ENTER_CD  = B.ENTER_CD
+					   AND A.APPL_SEQ  = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD = '99'
+					GROUP BY A.SABUN
+				)
+			) AS YEAR_OUT_CNT
+                  FROM TBEN500 A
+                 WHERE A.ENTER_CD   = #{ssnEnterCd}
+                   AND A.CLUB_SEQ   = #{clubSeq}
+	]]>
+	</select>
+		
+	<!-- 급여공제동의내역 회원 조회 -->
+	<select id="getClubrefAppDetMember" parameterType="map" resultType="cMap">
+	<![CDATA[
+           SELECT A.ENTER_CD AS ENTER_CD_SHEET
+                , A.CLUB_SEQ AS CLUB_SEQ_SHEET
+				, A.SABUN AS SABUN_SHEET
+				, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME_SHEET
+				, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM_SHEET
+				, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM_SHEET
+				, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM_SHEET
+			 	, F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM_SHEET
+				, B.CLUB_FEE AS CLUB_FEE_SHEET
+				, B.CLUB_NM AS CLUB_NM_SHEET
+				, B.SABUN_A AS SABUN_A_SHEET
+				, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_A, 'ko_KR' ) AS SABUN_A_NAME_SHEET  --회장성명
+				, B.SABUN_B AS SABUN_B_SHEET
+				, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_B, 'ko_KR' ) AS SABUN_B_NAME_SHEET  --고문성명
+				, B.SABUN_C AS SABUN_C_SHEET
+				, F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_C, 'ko_KR' ) AS SABUN_C_NAME_SHEET  --총무성명
+				, A.SDATE AS SDATE_SHEET 
+				, A.EDATE AS EDATE_SHEET 
+				, A.AGREE_DATE AS AGREE_DATE_SHEET 
+				, ('/SignPhotoOut.do' || chr(63) || 'enterCd=' || #{ssnEnterCd} || chr(38) || 'fileSeq=' || A.FILE_SEQ) AS FILE_SEQ_URL_SHEET
+				, ( 
+					F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN_A, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd})||chr(47)||F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_A, #{ssnLocaleCd} )
+				  ) AS SABUN_A_VIEW_SHEET
+				, A.NOTE AS NOTE_SHEET
+				, COUNT(1) OVER() AS CNT_SHEET
+			 FROM TBEN502 A, TBEN500 B
+			WHERE A.ENTER_CD 	 = #{ssnEnterCd}
+			  AND A.ENTER_CD 	 = B.ENTER_CD 
+			  AND A.CLUB_SEQ 	 = B.CLUB_SEQ
+			  AND A.CLUB_SEQ 	 = #{clubSeq} 
+			  AND #{searchApplYmd} BETWEEN A.SDATE AND A.EDATE
+			  AND NVL(A.AGREE_YN,'N') = 'Y'
+            ORDER BY B.CLUB_NM, A.EDATE DESC, A.SABUN
+	]]>
+	</select>
+		
+	<!-- 급여공제동의내역 비고 저장 -->
+	<update id="saveClubrefAppDetMember" parameterType="map" >
+	<![CDATA[
+		 MERGE INTO TBEN502 T 
+		 USING ( ]]>
+        <foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+		    SELECT TRIM(#{ssnEnterCd})  	AS ENTER_CD 
+	             , TRIM(#{rm.sabunSheet}) 	AS SABUN
+	             , TRIM(#{rm.clubSeqSheet}) AS CLUB_SEQ
+	             , TRIM(#{rm.sdateSheet}) 	AS SDATE
+	             , TRIM(#{rm.noteSheet}) 	AS NOTE
+	          FROM DUAL
+	    </foreach>
+        <![CDATA[
+			) S 
+			ON ( 
+			          T.ENTER_CD = S.ENTER_CD 
+			     AND  T.SABUN	 = S.SABUN 
+			     AND  T.CLUB_SEQ = S.CLUB_SEQ 
+			     AND  T.SDATE 	 = S.SDATE 
+			) 
+			WHEN MATCHED THEN 
+			   UPDATE SET T.CHKDATE	= sysdate 
+			            , T.CHKID   = #{ssnSabun} 
+			            , T.NOTE 	= S.NOTE 
+			WHEN NOT MATCHED THEN 
+			   INSERT 
+			   ( 
+			              T.ENTER_CD
+			            , T.SABUN
+			            , T.CLUB_SEQ
+			            , T.SDATE
+			            , T.NOTE
+			            , T.CHKDATE
+			            , T.CHKID
+			   ) 
+			   VALUES 
+			   ( 
+			              S.ENTER_CD
+			            , S.SABUN
+			            , S.CLUB_SEQ
+			            , S.SDATE
+			            , S.NOTE
+			            , sysdate
+			            , #{ssnSabun}
+			   ) 
+	]]>
+	</update>
+		
+	<!-- 신청 내용 저장 -->
+	<update id="saveClubrefAppDet" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN505 T
+		USING ( 
+				SELECT	  TRIM( #{ssnEnterCd} ) 				AS ENTER_CD
+						, TRIM( #{searchApplSeq}) 				AS APPL_SEQ
+						, TRIM( #{searchApplSabun})				AS SABUN
+						, TRIM( #{year})  						AS YEAR
+						, (SELECT DECODE(NVL(Z.TEMP_YN,'Y'),'N','R','N')  FROM TBEN500 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.CLUB_SEQ = TRIM( #{clubSeq} )) AS GUBUN_CD
+						, TRIM( #{clubSeq})  					AS CLUB_SEQ
+           				, TRIM( #{clubNm})  					AS CLUB_NM
+           				, REPLACE(TRIM(#{clubFee}),',','')	AS CLUB_FEE
+			            , TRIM(#{sabunA})  						AS SABUN_A
+			            , TRIM(#{sabunB})  						AS SABUN_B
+			            , TRIM(#{sabunC})  						AS SABUN_C
+			            , TRIM(#{memerCnt})  					AS MEMER_CNT
+			            , TRIM(#{yearInCnt})  					AS YEAR_IN_CNT
+			            , TRIM(#{yearOutCnt})  					AS YEAR_OUT_CNT
+			            , TRIM(#{purpose})  					AS PURPOSE
+			            , TRIM(#{actPlan})  					AS ACT_PLAN
+			            , TRIM(#{budPlan})  					AS BUD_PLAN
+			            , TRIM(#{etcNote})  					AS ETC_NOTE
+			            , TRIM(#{note})  						AS NOTE
+				 FROM   DUAL
+			 ) S
+		ON ( 		 T.ENTER_CD	= S.ENTER_CD
+				AND  T.APPL_SEQ	= S.APPL_SEQ
+		 )
+		WHEN MATCHED THEN
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun} 
+		            , T.GUBUN_CD = S.GUBUN_CD 
+		            , T.CLUB_SEQ = S.CLUB_SEQ 
+		            , T.CLUB_NM = S.CLUB_NM 
+		            , T.CLUB_FEE = S.CLUB_FEE 
+		            , T.SABUN_A = S.SABUN_A 
+		            , T.SABUN_B = S.SABUN_B 
+		            , T.SABUN_C = S.SABUN_C 
+		            , T.MEMER_CNT = S.MEMER_CNT 
+		            , T.YEAR_IN_CNT = S.YEAR_IN_CNT 
+		            , T.YEAR_OUT_CNT = S.YEAR_OUT_CNT 
+		            , T.PURPOSE = S.PURPOSE 
+		            , T.ACT_PLAN = S.ACT_PLAN 
+		            , T.BUD_PLAN = S.BUD_PLAN 
+		            , T.ETC_NOTE = S.ETC_NOTE 
+		            , T.NOTE = S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.APPL_SEQ
+		            , T.SABUN
+		            , T.YEAR
+		            , T.GUBUN_CD
+		            , T.CLUB_SEQ
+		            , T.CLUB_NM
+		            , T.CLUB_FEE
+		            , T.SABUN_A
+		            , T.SABUN_B
+		            , T.SABUN_C
+		            , T.MEMER_CNT
+		            , T.YEAR_IN_CNT
+		            , T.YEAR_OUT_CNT
+		            , T.PURPOSE
+		            , T.ACT_PLAN
+		            , T.BUD_PLAN
+		            , T.ETC_NOTE
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.APPL_SEQ
+		            , S.SABUN
+		            , S.YEAR
+		            , S.GUBUN_CD
+		            , S.CLUB_SEQ
+		            , S.CLUB_NM
+		            , S.CLUB_FEE
+		            , S.SABUN_A
+		            , S.SABUN_B
+		            , S.SABUN_C
+		            , S.MEMER_CNT
+		            , S.YEAR_IN_CNT
+		            , S.YEAR_OUT_CNT
+		            , S.PURPOSE
+		            , S.ACT_PLAN
+		            , S.BUD_PLAN
+		            , S.ETC_NOTE
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<!-- 중복신청 조회 -->
+	<select id="getClubrefAppDetDupChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT COUNT(1) AS CNT
+		     FROM TBEN505 A
+		    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+		      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+                       AND A.CLUB_SEQ    = TRIM( #{clubSeq} )
+                       AND A.YEAR   		= TRIM( #{year} )
+                       AND EXISTS ( SELECT 1
+                                      FROM THRI103 X
+                                     WHERE X.ENTER_CD = A.ENTER_Cd
+                                       AND X.APPL_SEQ = A.APPL_SEQ
+                                       AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+                                   )                                             
+	]]>
+	</select>
+
+</mapper>

@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.monPayMailCre">
+
+<!-- 1 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMonPayMailCreList">
+
+				<![CDATA[
+			       	 SELECT
+					        A.SABUN                                                               -- 사번
+					       ,F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+					       ,F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+					       ,SUBSTR(CRYPTIT.DECRYPT (C.RES_NO, C.ENTER_CD),0,6)||'-'|| SUBSTR(CRYPTIT.DECRYPT (C.RES_NO, C.ENTER_CD),7,7) AS RES_NO            -- 주민등록번호
+					       ,A.ORG_NM                                                              -- 조직명
+					       ,A.ORG_CD
+					       ,A.JIKGUB_CD
+					       ,A.JIKWEE_CD
+					       ,A.STATUS_CD
+					       ,F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM -- 직책
+					       ,F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM   -- 직급
+					       ,F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM   -- 직위
+					       ,A.PAY_TYPE                                                            -- 임금유형명
+					       ,F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10010',A.STATUS_CD, #{ssnLocaleCd}) AS STATUS_NM  -- 재직상태
+					       ,A.EMP_YMD                                                             -- 입사일
+					       ,F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE
+					       ,F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+					       ,E.TITLE AS MAILTITLE
+					       ,DECODE(LENGTH(E.CONTENTS), NULL, 1,0) AS MAILCNT
+					       ,E.SEQ AS MAILSEQ
+					       ,E.CONTENTS AS MAILCONTENTS
+					       ,NVL(E.SUCCESS_YN, 'F') AS SUCCESS_YN
+					  FROM  TCPN203 A
+					       ,TCPN201 B
+					       ,THRM100 C
+					       ,TSYS996 E
+					 WHERE A.ENTER_CD      	= B.ENTER_CD
+					   AND A.PAY_ACTION_CD 	= B.PAY_ACTION_CD
+					   AND A.ENTER_CD      	= C.ENTER_CD
+					   AND A.SABUN         	= C.SABUN
+					   AND A.ENTER_CD 		= E.ENTER_CD(+)
+					   AND A.MAIL_SEQ 		= E.SEQ(+)
+					   AND A.ENTER_CD      	= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD  = #{searchPayActionCd}
+					   ]]>
+			         <if test='searchOrgCd != null and !searchOrgCd.equals("") '>
+					   AND A.ORG_CD = #{searchOrgCd}
+					 </if>
+			         <if test='searchNameSabun != null and !searchNameSabun.equals("") '>
+					   AND (A.SABUN LIKE '%'|| #{searchNameSabun} ||'%' OR A.NAME LIKE '%'|| #{searchNameSabun} ||'%')
+					 </if>
+			         <if test='searchSuccessYn != null and !searchSuccessYn.equals("") '>
+					   AND NVL(E.SUCCESS_YN, 'F') IN
+					       <foreach collection="searchSuccessYn" item="item" open="(" close=")" separator=",">
+							   #{item}
+						   </foreach>
+					 </if>
+					 ORDER BY A.NAME, A.SABUN
+
+
+
+		</select>
+<!-- 메일생성 데이터 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMonPayMailCreHTML1">
+
+				<![CDATA[
+			    SELECT A.NAME                                                                     AS KR_NAME,
+			       F_COM_GET_CONT_ADDRESS(#{ssnEnterCd},A.SABUN,'IM') AS MAIL_ID,
+			       A.JIKWEE_NM                                                                AS JIKWEE_NM,
+			       DECODE(A.EMP_YMD, NULL, '', TO_CHAR(TO_DATE(A.EMP_YMD,'YYYYMMDD'),'YYYY-MM-DD'))  AS EMP_YMD,
+			       A.ORG_NM                                                                   AS ORG_NM,
+			       B.PAY_YM                                                                   AS PAY_YM,
+			       F_COM_GET_GRCODE_NAME(A.ENTER_CD,'C00001',C.RUN_TYPE, #{ssnLocaleCd})                      AS PAY_GBN,         --급여구분
+			       --C.PAY_NM                                                                 AS "급여구분",
+			       TO_CHAR(D.TOT_EARNING_MON,'999G999G999')                           AS TOT_EARNING_MON, --급여총액
+			       TO_CHAR(D.TOT_DED_MON,'999G999G999')                                       AS TOT_DED_MON,     --공제총액
+			       TO_CHAR(D.PAYMENT_MON,'999G999G999')                                       AS PAYMENT_MON,     --실지급액
+			      -- F_CPN_RESULT_INFO(A.ENTER_CD,A.PAY_ACTION_CD,A.SABUN)                      AS TIME_COMMENT,
+			       B.PAY_ACTION_NM                                                            AS PAY_ACTION_NM,
+			       (SELECT TO_CHAR(TO_DATE(PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') FROM TCPN201 WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS PAYMENT_YMD,
+			       A.SABUN
+			  FROM TCPN203 A, TCPN201 B, TCPN051 C, TCPN303 D
+			 WHERE A.SABUN                = #{receiverSabun}
+			   AND A.ENTER_CD             = #{ssnEnterCd}
+			   AND A.PAY_ACTION_CD        = #{searchPayActionCd}
+			   AND B.ENTER_CD      = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.ENTER_CD      = B.ENTER_CD
+			   AND C.PAY_CD        = B.PAY_CD
+			   AND D.ENTER_CD(+)      = A.ENTER_CD
+			   AND D.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+			   AND D.SABUN(+)         = A.SABUN
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getMonPayMailCreHTML2">
+
+				<![CDATA[
+			-- 급여명세 수당쿼리
+			 SELECT REPORT_NM, RESULT_MON
+			   FROM (
+					     SELECT A.SABUN, B.REPORT_NM,  TO_CHAR(SUM(A.RESULT_MON),'999G999G999') AS RESULT_MON, MIN(B.PRIORITY) PRIORITY
+					       FROM TCPN205 A, TCPN011 B, TCPN201 C
+					      WHERE A.SABUN                = #{receiverSabun}
+						    AND A.ENTER_CD             = #{ssnEnterCd}
+						    AND A.PAY_ACTION_CD        = #{searchPayActionCd}
+					        AND B.ELEMENT_TYPE  = 'A'
+					        AND (B.DEDUCTION_TYPE IS NULL OR B.DEDUCTION_TYPE <> 'ER_CAG') -- 회사부담금 제외
+					        AND A.ENTER_CD  = B.ENTER_CD    -- 항목테이블 조인
+					        AND A.ELEMENT_CD = B.ELEMENT_CD -- 항목테이블 조인
+					        AND A.ENTER_CD = C.ENTER_CD
+					        AND A.PAY_ACTION_CD = C.PAY_ACTION_CD
+					        --AND A.TOT_MON_YN = 'N'
+	                        AND B.SDATE = (SELECT MAX(SDATE)
+	                       					 FROM TCPN011
+	                       					WHERE ENTER_CD = A.ENTER_CD
+	                                          AND ELEMENT_CD = A.ELEMENT_CD
+	                                          AND C.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					      GROUP BY A.SABUN, B.REPORT_NM
+					      ORDER BY PRIORITY
+				    )
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getMonPayMailCreHTML3">
+
+				<![CDATA[
+				-- 급여명세서 공제 쿼리
+			 SELECT REPORT_NM, RESULT_MON
+			   FROM (
+					     SELECT A.SABUN, B.REPORT_NM, TO_CHAR(SUM(A.RESULT_MON),'999G999G999')  AS RESULT_MON, MIN(B.PRIORITY) PRIORITY
+					       FROM TCPN205 A, TCPN011 B, TCPN201 C
+					      WHERE A.SABUN                = #{receiverSabun}
+						    AND A.ENTER_CD             = #{ssnEnterCd}
+						    AND A.PAY_ACTION_CD        = #{searchPayActionCd}
+					        AND B.ELEMENT_TYPE  = 'D'
+					        AND (B.DEDUCTION_TYPE IS NULL OR B.DEDUCTION_TYPE <> 'ER_CAG') -- 회사부담금 제외
+					        AND A.ENTER_CD  = B.ENTER_CD    -- 항목테이블 조인
+					        AND A.ELEMENT_CD = B.ELEMENT_CD -- 항목테이블 조인
+					        AND A.ENTER_CD = C.ENTER_CD
+					        AND A.PAY_ACTION_CD = C.PAY_ACTION_CD
+					        --AND A.TOT_MON_YN = 'N'
+	                        AND B.SDATE = (SELECT MAX(SDATE)
+	                       					 FROM TCPN011
+	                       					WHERE ENTER_CD = A.ENTER_CD
+	                                          AND ELEMENT_CD = A.ELEMENT_CD
+	                                          AND C.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					      GROUP BY A.SABUN, B.REPORT_NM
+					      ORDER BY PRIORITY
+				    )
+				]]>
+
+
+		</select>
+<!-- 1 저장 -->
+		<update parameterType="map" id="saveMonPayMailCre">
+
+
+					MERGE INTO TTIM118 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.WORK_ORG_CD
+									, A.SDATE
+									, A.EDATE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS WORK_ORG_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.workOrgCd} )	AS WORK_ORG_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )		AS EDATE
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_ORG_CD = S.WORK_ORG_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_ORG_CD
+							, T.SDATE
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.WORK_ORG_CD
+							, S.SDATE
+							, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+
+<!-- 1 삭제 -->
+		<delete parameterType="map" id="deleteMonPayMailCre">
+
+				<![CDATA[
+					DELETE FROM TTIM118
+					 WHERE ENTER_CD||'_'||WORK_ORG_CD||'_'||SDATE IN (  NULL
+					                                                        	]]>
+<foreach item="rm" collection="deleteRows" >
+						,
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.workOrgCd})||'_'||TRIM(#{rm.sdate})
+</foreach>
+										)
+
+
+
+		</delete>
+
+		<update parameterType="map" id="updateMailSeqForTcpn203">
+
+				<![CDATA[
+   					UPDATE  TCPN203
+   					   SET	MAIL_SEQ  		= #{mailSeq}
+   					 WHERE 	ENTER_CD 		= #{ssnEnterCd}
+   					   AND	PAY_ACTION_CD 	= #{searchPayActionCd}
+   					   AND	SABUN		 	= #{receiverSabun}
+				]]>
+
+
+		</update>
+
+	</mapper>

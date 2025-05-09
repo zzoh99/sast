@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산 항목관리 쿼리
+ -->
+<root>
+
+	<query id="getTextFileMgrListFirst">
+		<![CDATA[
+			SELECT A.FILE_SEQ
+			     , A.WORK_YY
+			     , A.FILE_NM
+			     , A.FILE_DESC
+			     , A.FILE_LENGTH
+			     , CASE WHEN A.FILE_LENGTH <> (SELECT SUM(ELEMENT_LENGTH) FROM TYEA966 WHERE ENTER_CD = A.ENTER_CD AND FILE_SEQ = A.FILE_SEQ AND WORK_YY = A.WORK_YY) THEN '길이오류' ELSE '정상' END AS D_NOTE
+			     --, CASE WHEN (SELECT COUNT(*) FROM TYEA966 WHERE ENTER_CD = A.ENTER_CD AND FILE_SEQ = A.FILE_SEQ AND WORK_YY = A.WORK_YY) <> (SELECT COUNT(*) FROM TYEA966_221020 WHERE ENTER_CD = A.ENTER_CD AND FILE_SEQ = A.FILE_SEQ AND WORK_YY = A.WORK_YY) THEN '변경' ELSE '' END AS RCNT
+               FROM TYEA965 A
+               WHERE A.ENTER_CD = #ssnEnterCd#
+               $query$
+               ORDER BY A.WORK_YY, A.FILE_SEQ
+		]]>
+	</query>
+		
+<!--        조회 -->
+        <query id="getTextFileMgrListSecond">
+              <![CDATA[
+               SELECT FILE_SEQ
+			     , WORK_YY
+			     , FILE_ELEMENT_SEQ
+			     , ELEMENT_NM
+			     , ELEMENT_DESC
+			     , ELEMENT_LENGTH
+			     , ELEMENT_ALIGN
+			     , ALIGN_SEQ
+			     , EMPTY_CHARACTOR
+			FROM TYEA966
+			WHERE  ENTER_CD = #ssnEnterCd#
+			$query2$
+			ORDER BY ALIGN_SEQ
+			       , FILE_ELEMENT_SEQ
+              ]]>
+        </query>		
+		
+<!-- 		저장 -->	
+		<query id="saveTextFileMgrFirst">
+			
+				<![CDATA[
+					MERGE INTO TYEA965 T
+					USING	(
+							SELECT	  A.FILE_SEQ
+                                    , A.WORK_YY
+                                    , A.FILE_NM
+									, A.FILE_DESC
+									, A.FILE_LENGTH
+							FROM	(
+									SELECT	  NULL  AS FILE_SEQ
+                                            , NULL  AS WORK_YY
+                                            , NULL  AS FILE_NM
+                                            , NULL	AS FILE_DESC
+											, NULL	AS FILE_LENGTH
+									FROM	DUAL
+
+							UNION ALL
+									SELECT
+											$query3$
+											, TRIM( #file_nm# )	    AS FILE_NM
+											, TRIM( #file_desc# )	AS FILE_DESC
+											, TRIM( #file_length# )	AS FILE_LENGTH
+											FROM   DUAL
+
+									) A WHERE A.FILE_SEQ IS NOT NULL
+									      AND A.WORK_YY IS NOT NULL
+							) S
+					ON ( T.ENTER_CD  = #ssnEnterCd#
+					 AND T.FILE_SEQ  = S.FILE_SEQ
+					 AND T.WORK_YY  = S.WORK_YY
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.FILE_NM	    = S.FILE_NM
+									, T.FILE_DESC	= S.FILE_DESC
+									, T.FILE_LENGTH	= S.FILE_LENGTH
+									, T.CHKDATE	    = SYSDATE
+									, T.CHKID    	= #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.FILE_SEQ
+							, T.WORK_YY
+							, T.FILE_NM
+							, T.FILE_DESC
+							, T.FILE_LENGTH
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #ssnEnterCd#
+							, S.FILE_SEQ
+							, S.WORK_YY
+							, S.FILE_NM
+							, S.FILE_DESC
+							, S.FILE_LENGTH
+							, SYSDATE
+							, #ssnSabun#
+						)
+				]]>
+			
+		</query>
+		
+		<query id="saveTextFileMgrSecond">
+            
+                <![CDATA[
+                    MERGE INTO TYEA966 T
+                    USING   (
+                            SELECT  #ssnEnterCd# AS ENTER_CD
+                                    , A.FILE_ELEMENT_SEQ
+                                    , A.FILE_SEQ
+                                    , A.WORK_YY
+                                    , A.ELEMENT_NM
+									, A.ELEMENT_DESC
+									, A.ELEMENT_LENGTH
+									, A.ELEMENT_ALIGN
+									, A.ALIGN_SEQ
+									, A.EMPTY_CHARACTOR
+                            FROM    (
+                                    SELECT    NULL AS FILE_ELEMENT_SEQ
+                                            , NULL AS FILE_SEQ
+                                            , NULL AS WORK_YY
+                                            , NULL AS ELEMENT_NM
+											, NULL AS ELEMENT_DESC
+											, NULL AS ELEMENT_LENGTH
+											, NULL AS ELEMENT_ALIGN
+											, NULL AS ALIGN_SEQ
+											, NULL AS EMPTY_CHARACTOR
+                                    FROM    DUAL
+
+                            UNION ALL
+                                    SELECT
+                                            
+                                              $query4$ 
+                                            , TRIM( #file_seq# )        AS FILE_SEQ
+                                            , TRIM( #work_yy# )        AS WORK_YY
+                                            , TRIM( #element_nm# )      AS ELEMENT_NM
+                                            , TRIM( #element_desc# )    AS ELEMENT_DESC
+                                            , TRIM( #element_length# )  AS ELEMENT_LENGTH
+                                            , TRIM( #element_align# )   AS ELEMENT_ALIGN
+                                            , TRIM( #align_seq# )       AS ALIGN_SEQ
+                                            , TRIM( #empty_charactor# ) AS EMPTY_CHARACTOR
+                                            FROM   DUAL
+                                    ) A WHERE A.FILE_ELEMENT_SEQ IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD          = S.ENTER_CD
+                     AND T.FILE_SEQ          = S.FILE_SEQ
+                     AND T.WORK_YY          = S.WORK_YY
+                     AND T.FILE_ELEMENT_SEQ  = S.FILE_ELEMENT_SEQ
+                     )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.ELEMENT_NM      = S.ELEMENT_NM
+                                    , T.ELEMENT_DESC    = S.ELEMENT_DESC
+                                    , T.ELEMENT_LENGTH  = S.ELEMENT_LENGTH
+                                    , T.ELEMENT_ALIGN   = S.ELEMENT_ALIGN
+                                    , T.ALIGN_SEQ       = S.ALIGN_SEQ
+                                    , T.EMPTY_CHARACTOR = S.EMPTY_CHARACTOR
+                                    , T.CHKDATE         = SYSDATE
+                                    , T.CHKID           = #ssnSabun#
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                              T.ENTER_CD
+							, T.FILE_SEQ
+							, T.WORK_YY
+							, T.FILE_ELEMENT_SEQ
+							, T.ELEMENT_NM
+							, T.ELEMENT_DESC
+							, T.ELEMENT_LENGTH
+							, T.ELEMENT_ALIGN
+							, T.ALIGN_SEQ
+							, T.EMPTY_CHARACTOR
+							, T.CHKDATE
+							, T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #ssnEnterCd#
+                            , S.FILE_SEQ
+                            , S.WORK_YY
+							, S.FILE_ELEMENT_SEQ
+							, S.ELEMENT_NM
+							, S.ELEMENT_DESC
+							, S.ELEMENT_LENGTH
+							, S.ELEMENT_ALIGN
+							, S.ALIGN_SEQ
+							, S.EMPTY_CHARACTOR
+                            , SYSDATE
+                            , #ssnSabun#
+                        )
+                ]]>
+            
+        </query>
+
+
+        
+<!-- 		삭제 -->
+		<query id="deleteTextFileMgrFirst">
+		
+				<![CDATA[
+					DELETE FROM TYEA965 
+					WHERE 	(ENTER_CD, FILE_SEQ, WORK_YY) IN ((NULL, NULL, NULL),(#ssnEnterCd#, TRIM( #file_seq# ), TRIM( #work_yy# )))
+				]]>
+			
+		</query>
+        <query id="deleteTextFileMgrSecondAll">
+         
+                <![CDATA[
+
+	                    DELETE FROM TYEA966 
+	                    WHERE (ENTER_CD, FILE_SEQ, WORK_YY) IN ( (NULL, NULL, NULL), (#ssnEnterCd#, TRIM(#file_seq#), TRIM(#work_yy#)))
+
+                ]]>
+            
+        </query>
+        <query id="deleteTextFileMgrSecond">
+         
+                <![CDATA[
+
+                    DELETE FROM TYEA966 
+                    WHERE (ENTER_CD, FILE_SEQ, WORK_YY, FILE_ELEMENT_SEQ) IN ((NULL, NULL, NULL, NULL), (#ssnEnterCd#, TRIM( #file_seq# ), TRIM( #work_yy# ), TRIM(#file_element_seq#)))
+        
+                ]]>
+            
+        </query>
+<!-- 		생성 -->	
+		<query id="insertTextFileMgr">
+		
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, :ssnSabun
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+#set($icnt = 1)
+#foreach( $rm in $insertRows )
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + $icnt) FROM ZTST002) )	AS COL1
+										#set($icnt = $icnt + 1)
+										, TRIM('$rm.col2')	AS COL2
+										, TRIM('$rm.col3')	AS COL3
+										, TRIM('$rm.col4')	AS COL4
+										, TRIM('$rm.col5')	AS COL5
+										, TRIM('$rm.col6')	AS COL6
+								FROM   DUAL
+#end
+							) S
+						WHERE S.COL1 IS NOT NULL
+				]]>
+			
+		</query>
+<!-- 		수정 -->
+		<query id="updateTextFileMgr">
+			
+				<![CDATA[
+					UPDATE ZTST002 T SET 
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID 
+						) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #ssnSabun#
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+#foreach( $rm in $updateRows )
+					UNION ALL
+								SELECT   
+										  TRIM('$rm.col1')	AS COL1
+										, TRIM('$rm.col2')	AS COL2
+										, TRIM('$rm.col3')	AS COL3
+										, TRIM('$rm.col4')	AS COL4
+										, TRIM('$rm.col5')	AS COL5
+										, TRIM('$rm.col6')	AS COL6
+								FROM   DUAL
+#end
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+#foreach( $rm in $updateRows ) UNION ALL		SELECT	TRIM('$rm.col1')	AS COL1	FROM	DUAL  #end
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+				]]>
+			
+		</query>
+	
+</root>

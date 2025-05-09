@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 소급계산
+ * @author JM
+-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.payRetroact.retroCalcCre">
+    <select parameterType="map" resultType="cMap" id="getRetroCalcCreBasicMap">
+
+				<![CDATA[
+        SELECT DISTINCT A.PAY_ACTION_CD
+                      , TRIM(A.PAY_ACTION_NM)                                               AS PAY_ACTION_NM
+                      , SUBSTR(A.PAY_YM, 1, 4) || '-' || SUBSTR(A.PAY_YM, 5, 2)             AS PAY_YM
+                      , A.PAY_CD
+                      , TRIM(B.PAY_NM)                                                      AS PAY_NM
+                      , DECODE(TRIM(NVL(A.ORD_SYMD, '')), '', '',
+                               SUBSTR(A.ORD_SYMD, 1, 4) || '-' || SUBSTR(A.ORD_SYMD, 5, 2) || '-' ||
+                               SUBSTR(A.ORD_SYMD, 7, 2))
+            || '~' ||
+                        DECODE(TRIM(NVL(A.ORD_EYMD, '')), '', '',
+                               SUBSTR(A.ORD_EYMD, 1, 4) || '-' || SUBSTR(A.ORD_EYMD, 5, 2) || '-' ||
+                               SUBSTR(A.ORD_EYMD, 7, 2))                                    AS ORD_YMD
+                      , SUBSTR(A.PAYMENT_YMD, 1, 4) || '-' || SUBSTR(A.PAYMENT_YMD, 5, 2) || '-' ||
+                        SUBSTR(A.PAYMENT_YMD, 7, 2)                                         AS PAYMENT_YMD
+                      , SUBSTR(A.TIME_YM, 1, 4) || '-' || SUBSTR(A.TIME_YM, 5, 2)           AS TIME_YM
+                      , NVL(A.ADD_TAX_RATE, 0) || ' %'                                      AS ADD_TAX_RATE
+                      , TRIM(F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'C00110', A.CAL_TAX_METHOD)) AS CAL_TAX_METHOD
+                      , NVL(D.CLOSE_YN, 'N')                                                AS CLOSE_YN
+                      , F_CPN_GET_EMP_STATUS(A.ENTER_CD, A.PAY_ACTION_CD, 'ALL')               EMP_STATUS
+        FROM TCPN201 A
+           , TCPN051 B
+           , TCPN981 D
+        WHERE A.ENTER_CD = #{ssnEnterCd}
+          AND A.PAY_ACTION_CD = #{payActionCd}
+          AND A.ENTER_CD = B.ENTER_CD
+          AND A.PAY_CD = B.PAY_CD
+          AND A.ENTER_CD = D.ENTER_CD(+)
+          AND A.PAY_ACTION_CD = D.PAY_ACTION_CD(+)
+        ]]>
+
+
+		</select>
+    <select parameterType="map" resultType="cMap" id="getRetroCalcCrePeopleMap">
+
+        <![CDATA[
+					SELECT SUM(PEOPLE_TOT_CNT)	AS PEOPLE_TOT_CNT
+						 , SUM(PEOPLE_SUB_CNT)	AS PEOPLE_SUB_CNT
+						 , SUM(PEOPLE_P_CNT)	AS PEOPLE_P_CNT
+						 , SUM(PEOPLE_J_CNT)	AS PEOPLE_J_CNT
+					  FROM (
+					  SELECT COUNT(*) AS PEOPLE_TOT_CNT
+							 , 0	  AS PEOPLE_SUB_CNT
+							 , 0	  AS PEOPLE_P_CNT
+							 , 0	  AS PEOPLE_J_CNT
+								FROM TCPN203 A
+			                WHERE A.ENTER_CD         =  #{ssnEnterCd}
+			                  AND A.PAY_ACTION_CD      =  #{payActionCd}
+							UNION ALL
+							SELECT 0			AS PEOPLE_TOT_CNT
+								 , COUNT(TRG)	AS PEOPLE_SUB_CNT
+								 , SUM(CASE WHEN TRIM(UPPER(PAY_PEOPLE_STATUS)) = 'P' THEN 1
+								 		ELSE 0 END) PEOPLE_P_CNT
+								 , SUM(CASE WHEN TRIM(UPPER(PAY_PEOPLE_STATUS)) = 'J' THEN 1
+								 		ELSE 0 END) PEOPLE_J_CNT
+							  FROM (
+									SELECT '203'	AS TRG
+										 , PAY_PEOPLE_STATUS
+									  FROM TCPN203
+									 WHERE ENTER_CD			= #{ssnEnterCd}
+									   AND PAY_ACTION_CD	= #{payActionCd}
+									           				]]>
+        <if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+            AND BUSINESS_PLACE_CD= #{businessPlaceCd}
+        </if>
+        )
+        )
+
+
+    </select>
+    <select parameterType="map" resultType="cMap" id="getRetroCalcCreCloseList">
+
+        <![CDATA[
+					SELECT A.BUSINESS_PLACE_CD
+						 , C.BENEFIT_BIZ_CD
+						 , A.CLOSE_ST
+					  FROM TBEN991 A
+		                   INNER JOIN TCPN201 B ON ( A.ENTER_CD = B.ENTER_CD
+		                                         AND A.PAY_ACTION_CD = B.PAY_ACTION_CD )
+		                   INNER JOIN TCPN980 C ON ( A.ENTER_CD = B.ENTER_CD
+		                                         AND B.PAY_CD = C.PAY_CD
+		                                         AND A.CLOSE_CD = C.CLOSE_CD )
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					           			]]>
+        <if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+            AND A.BUSINESS_PLACE_CD = #{businessPlaceCd}
+        </if>
+        ORDER BY A.BUSINESS_PLACE_CD, C.BENEFIT_BIZ_CD
+
+
+    </select>
+    <select parameterType="map" resultType="cMap" id="getRetroCalcCrePeopleSetList">
+
+        <![CDATA[
+					SELECT ORG_NM
+						 , WORK_TYPE
+						 , JIKCHAK_CD
+						 , JIKWEE_CD
+						 , SABUN
+						 , NAME
+						 , MANAGE_CD
+						 , STATUS_CD
+						 , EMP_YMD
+						 , RES_NO
+						 , PAY_ACTION_CD
+						 , BUSINESS_PLACE_CD
+						 , PAY_PEOPLE_STATUS
+						 , PAY_PEOPLE_STATUS_TEXT
+						 , OLD_PAY_PEOPLE_STATUS
+						 , CC_CD
+					  FROM (
+							SELECT /*+ INDEX(TCPN203 IX_CPN203_1) */
+								   B.ORG_NM
+								 , B.WORK_TYPE
+								 , B.JIKCHAK_CD
+								 , B.JIKWEE_CD
+								 , B.SABUN
+								 , B.NAME
+								 , B.MANAGE_CD
+								 , B.STATUS_CD
+								 , B.EMP_YMD
+								 , B.RES_NO
+								 , A.PAY_ACTION_CD
+								 , A.BUSINESS_PLACE_CD
+								 , DECODE(A.PAY_PEOPLE_STATUS,'P','1','J','1','PM','1','M','1','0') PAY_PEOPLE_STATUS
+								 , DECODE(A.PAY_PEOPLE_STATUS,'J','완료','M','재계산',' ') AS PAY_PEOPLE_STATUS_TEXT
+								 , DECODE(A.PAY_PEOPLE_STATUS,'P','P','J','J','PM','PM','M','M','0') AS OLD_PAY_PEOPLE_STATUS
+								 , A.CC_CD
+							  FROM TCPN203 A
+								 , (
+									SELECT X.ENTER_CD
+										 , Y.ORG_CD
+										 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+										 , Y.WORK_TYPE
+										 , Y.JIKCHAK_CD
+										 , Y.JIKWEE_CD
+										 , Y.MANAGE_CD
+										 , Y.STATUS_CD
+										 , X.SABUN
+										 , TRIM(X.NAME) AS NAME
+										 , X.EMP_YMD
+										 , X.GEMP_YMD
+										 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+										 , X.RET_YMD
+									  FROM THRM100 X
+										 , THRM151 Y
+									 WHERE X.ENTER_CD	= Y.ENTER_CD
+									   AND X.SABUN		= Y.SABUN
+									   AND X.ENTER_CD	= #{ssnEnterCd}
+									           		]]>
+
+        <if test='sabunName != null and !sabunName.equals("")'>
+            AND X.SABUN||X.NAME LIKE '%'||trim(#{sabunName})||'%'
+        </if>
+        AND Y.SDATE = ( SELECT MAX(SDATE)
+        FROM THRM151
+        WHERE ENTER_CD = Y.ENTER_CD
+        AND SABUN = Y.SABUN
+        AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+        ) B
+        WHERE A.ENTER_CD = #{ssnEnterCd}
+        AND A.PAY_ACTION_CD = #{payActionCd}
+        <if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+            AND A.BUSINESS_PLACE_CD = #{businessPlaceCd}
+        </if>
+        AND A.ENTER_CD = B.ENTER_CD
+        AND A.SABUN = B.SABUN
+        )
+        ORDER BY PAY_PEOPLE_STATUS DESC,ORG_NM,WORK_TYPE,JIKCHAK_CD,JIKWEE_CD,NAME
+
+
+    </select>
+    <update parameterType="map" id="saveRetroCalcCrePeopleStatus">
+
+
+        UPDATE TCPN203
+        SET PAY_PEOPLE_STATUS= #{payPeopleStatus}
+        , CHKDATE = SYSDATE
+        , CHKID = #{ssnSabun}
+        WHERE ENTER_CD = #{ssnEnterCd}
+        AND PAY_ACTION_CD = #{payActionCd}
+        <if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+            AND BUSINESS_PLACE_CD= #{businessPlaceCd}
+        </if>
+
+
+    </update>
+    <update parameterType="map" id="saveRetroCalcCrePeopleSet">
+
+
+        MERGE INTO TCPN203 T
+        USING (
+        SELECT A.PAY_ACTION_CD
+        , A.SABUN
+        , A.PAY_PEOPLE_STATUS
+        , A.BUSINESS_PLACE_CD
+        , A.CC_CD
+        FROM (
+        SELECT NULL AS PAY_ACTION_CD
+        , NULL AS SABUN
+        , NULL AS PAY_PEOPLE_STATUS
+        , NULL AS BUSINESS_PLACE_CD
+        , NULL AS CC_CD
+        FROM DUAL
+        <foreach item="rm" collection="updateRows">
+            UNION ALL
+            SELECT TRIM(#{rm.payActionCd}) AS PAY_ACTION_CD
+            , TRIM(#{rm.sabun}) AS SABUN
+            , (CASE WHEN #{rm.payPeopleStatus} = '1' THEN
+            DECODE(#{rm.oldPayPeopleStatus},'0','P',#{rm.oldPayPeopleStatus})
+            ELSE DECODE(#{rm.oldPayPeopleStatus},'J',#{rm.oldPayPeopleStatus},'M',#{rm.oldPayPeopleStatus},'C') END) AS
+            PAY_PEOPLE_STATUS
+            , TRIM(#{rm.businessPlaceCd}) AS BUSINESS_PLACE_CD
+            , TRIM(#{rm.ccCd}) AS CC_CD
+            FROM DUAL
+        </foreach>
+        ) A
+        WHERE A.PAY_ACTION_CD IS NOT NULL
+        AND A.SABUN IS NOT NULL
+        ) S
+        ON ( T.ENTER_CD = #{ssnEnterCd}
+        AND T.PAY_ACTION_CD = S.PAY_ACTION_CD
+        AND T.SABUN = S.SABUN
+        )
+        WHEN MATCHED THEN
+        UPDATE SET T.PAY_PEOPLE_STATUS = S.PAY_PEOPLE_STATUS
+        , T.BUSINESS_PLACE_CD = S.BUSINESS_PLACE_CD
+        , T.CC_CD = S.CC_CD
+        , T.CHKDATE = SYSDATE
+        , T.CHKID = #{ssnSabun}
+
+
+    </update>
+    <update parameterType="map" statementType="CALLABLE" id="RetroCalcCreP_CPN_RE_PAY_CANCEL">
+
+				<![CDATA[
+        CALL P_CPN_RE_PAY_CANCEL(#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+            #{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+            #{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+            #{payActionCd,mode=IN,jdbcType=VARCHAR},
+            #{businessPlaceCd,mode=IN,jdbcType=VARCHAR},
+            #{sabun,mode=IN,jdbcType=VARCHAR},
+            #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+        ]]>
+
+
+    </update>
+    <update parameterType="map" statementType="CALLABLE" id="RetroCalcCreP_CPN_CAL_EMP_INS">
+
+        <![CDATA[
+        CALL P_CPN_CAL_EMP_INS(
+                #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+                #{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+                #{cnt,mode=OUT,jdbcType=VARCHAR},
+                #{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+                #{payActionCd,mode=IN,jdbcType=VARCHAR},
+                #{businessPlaceCd,mode=IN,jdbcType=VARCHAR},
+                0,
+                #{sabun,mode=IN,jdbcType=VARCHAR},
+                NULL,
+                #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+        ]]>
+
+		</update>
+</mapper>

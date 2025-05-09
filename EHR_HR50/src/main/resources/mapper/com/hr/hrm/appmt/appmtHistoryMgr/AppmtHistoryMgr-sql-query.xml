@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmt.appmtHistoryMgr">
+<!-- 발령내역수정(개인발령내역) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtHistoryMgrExecList">
+
+				<![CDATA[
+					SELECT F_COM_GET_JOB_NM(A.ENTER_CD,A.SABUN,A.ORD_YMD) AS JOB_NM
+						 , A.*
+					  FROM THRM191 A
+					 WHERE A.ENTER_CD= #{ssnEnterCd}
+					   AND A.SABUN   = #{sabun}
+					 ORDER BY A.SABUN, A.ORD_YMD DESC, A.APPLY_SEQ DESC
+				]]>
+
+
+		</select>
+		
+<!-- 발령내역수정(개인조직사항) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtHistoryMgrOrgList">
+
+				<![CDATA[
+					SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.WORKORG_CD, A.SDATE) AS WORKORG_NM
+					     , F_COM_GET_JOB_NM(A.ENTER_CD, A.SABUN, A.SDATE) AS JOB_NM
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.DISPATCH_ORG_CD, A.SDATE) AS DISPATCH_ORG_NM
+					     , A.*
+					  FROM THRM151 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN = #{sabun}
+					 ORDER BY A.SABUN, A.SDATE DESC
+				]]>
+
+
+		</select>
+<!-- 발령내역수정(개인발령내역) 저장 -->
+		<update parameterType="map" id="saveAppmtHistoryMgrExec">
+
+				<![CDATA[
+					MERGE INTO THRM191 T
+					USING	(
+									SELECT	${selectQuery}
+									  FROM	DUAL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.ORD_YMD = S.ORD_YMD AND T.APPLY_SEQ = S.APPLY_SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	 
+								${updateQuery}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							${insertQuery}
+						)
+						VALUES
+						(
+							${valuesQuery}
+						)
+				]]>
+
+
+		</update>
+		
+<!-- 발령내역수정(개인발령내역) 삭제 -->
+		<delete parameterType="map" id="deleteAppmtHistoryMgrExec">
+
+					DELETE FROM THRM191
+					WHERE  ENTER_CD||'_'||SABUN||'_'||ORD_YMD||'_'||APPLY_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sabun != null and !rm.sabun.equals("")
+											and rm.ordYmd != null and !rm.ordYmd.equals("")
+											and rm.applySeq and !rm.applySeq.equals("")'>
+
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.ordYmd} )||'_'||TRIM(#{rm.applySeq})
+										</if>
+</foreach>
+										)
+		</delete>
+		
+		<!-- 발령 정보 수정 후 THRM151 정리 프로시저 -->
+		<update parameterType="map" id="prcAppmtHistoryCreate" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_151_SABUN_CREATE(
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR},
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<!-- 발령 정보 수정 후 EDATE 정리 프로시저 -->
+		<update parameterType="map" id="prcAppmtHistoryEdateCreate" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_151_SABUN_EDATE_CREATE(
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<!-- 추후 [발령처리] THRM223의 직전 발령이 정상 참조되도록 발령처리 없이 [발령내역수정]에서 THRM191이 곧바로 수정되면 THRM223을 갱신하는 작업을 추가 진행함. 20220405 -->
+		<update parameterType="map" id="prcAppmtHistorySync" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_223_SABUN_SYNC(
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{ordYmd,mode=IN,jdbcType=VARCHAR},
+				#{applySeq,mode=IN,jdbcType=VARCHAR},
+				#{ordTypeCd,mode=IN,jdbcType=VARCHAR},
+				#{ordDetailCd,mode=IN,jdbcType=VARCHAR},
+				#{modifyCmt,mode=IN,jdbcType=VARCHAR},
+				#{modifyMode,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR},
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

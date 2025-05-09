@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayYearCompareTreeYears">
+
+<!-- 연봉비교내역(3개년) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerPayYearCompareTreeYearsList">
+			
+			<bind name="eleArray" value="searchElementCdHidden" />
+ 				<![CDATA[
+					/* PerPayYearCompareTreeYears-mapping-query.getPerPayYearCompareTreeYearsList */
+					WITH TEMP AS (
+					    SELECT *
+					      FROM (
+					             SELECT ENTER_CD, SABUN, SDATE, ELEMENT_CD, ELEMENT_MON, SUBSTR(SDATE, 1, 4) AS PAY_YEAR
+					               FROM TCPN404
+					              WHERE ENTER_CD = #{ssnEnterCd}
+					                AND SDATE BETWEEN TO_CHAR(ADD_MONTHS(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), -36), 'YYYYMMDD') AND TO_CHAR(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), 'YYYYMMDD')
+					           )
+					     PIVOT (
+					             SUM(ELEMENT_MON) FOR ELEMENT_CD IN
+					             										]]>
+										
+							<foreach collection="columnInfo" item="item" index="index" open="(" close=")" separator=",">
+									${item}
+							</foreach>
+												<![CDATA[
+					           )
+					)
+					SELECT T.ENTER_CD
+					     , T.SABUN
+					     , MAX(H.NAME) AS NAME
+					     , MAX(O.ORG_CD) AS ORG_CD
+					     , MAX(O.STATUS_NM) AS STATUS_NM
+					     , MAX(O.MANAGE_NM) AS MANAGE_NM
+					     , MAX(O.JIKCHAK_NM) AS JIKCHAK_NM
+					     , MAX(O.JIKWEE_NM) AS JIKWEE_NM
+					     , MAX(O.JIKGUB_NM) AS JIKGUB_NM
+					     , MAX(O.WORK_TYPE) AS WORK_TYPE
+					     , MAX(O.WORK_TYPE_NM) AS WORK_TYPE_NM
+					     , F_COM_GET_ORG_NM2( T.ENTER_CD, T.SABUN, TO_CHAR(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), 'YYYYMMDD')) AS ORG_NM
+					     , MAX(T.SDATE_2) AS SDATE_2
+					     , MAX(T.EDATE_2) AS EDATE_2
+					     , MAX(T.SDATE_1) AS SDATE_1
+					     , MAX(T.EDATE_1) AS EDATE_1
+					     , MAX(T.SDATE_0) AS SDATE_0
+					     , MAX(T.EDATE_0) AS EDATE_0 ]]>
+					<foreach item="item" collection="eleArray">
+					     , NVL(SUM(ELE_2_${item}), 0) AS ELE_2_${item}
+					     , NVL(SUM(ELE_1_${item}), 0) AS ELE_1_${item}
+					     , NVL(SUM(ELE_0_${item}), 0) AS ELE_0_${item}
+					</foreach>
+					  FROM (
+					            SELECT A.ENTER_CD
+					                 , A.SABUN
+					                 , '2' AS FLAG
+					                 , A.SDATE AS SDATE_2
+					                 , A.EDATE AS EDATE_2
+					                 , NULL AS SDATE_1
+					                 , NULL AS EDATE_1
+					                 , NULL AS SDATE_0
+					                 , NULL AS EDATE_0
+					<foreach item="item" collection="eleArray">
+					                 , B.ELE_${item} AS ELE_2_${item}
+					                 , 0 AS ELE_1_${item}
+					                 , 0 AS ELE_0_${item}
+					</foreach>
+					              FROM TCPN403 A
+					                 , TEMP B
+					             WHERE 1=1
+					               AND A.ENTER_CD = B.ENTER_CD
+					               AND A.SABUN    = B.SABUN
+					               AND A.SDATE    = B.SDATE
+					               AND A.ENTER_CD = #{ssnEnterCd}
+					               AND TO_CHAR(ADD_MONTHS(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), -24), 'YYYYMMDD') BETWEEN A.SDATE AND A.EDATE
+					             UNION ALL
+					            SELECT A.ENTER_CD
+					                 , A.SABUN
+					                 , '1' AS FLAG
+					                 , NULL AS SDATE_2
+					                 , NULL AS EDATE_2
+					                 , A.SDATE AS SDATE_1
+					                 , A.EDATE AS EDATE_1
+					                 , NULL AS SDATE_0
+					                 , NULL AS EDATE_0
+					<foreach item="item" collection="eleArray">
+					                 , 0 AS ELE_2_${item}
+					                 , B.ELE_${item} AS ELE_1_${item}
+					                 , 0 AS ELE_0_${item}
+					</foreach>
+					              FROM TCPN403 A
+					                 , TEMP B
+					             WHERE 1=1
+					               AND A.ENTER_CD = B.ENTER_CD
+					               AND A.SABUN    = B.SABUN
+					               AND A.SDATE    = B.SDATE
+					               AND A.ENTER_CD = #{ssnEnterCd}
+					               AND TO_CHAR(ADD_MONTHS(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), -12), 'YYYYMMDD') BETWEEN A.SDATE AND A.EDATE
+					             UNION ALL
+					            SELECT A.ENTER_CD
+					                 , A.SABUN
+					                 , '0' AS FLAG
+					                 , NULL AS SDATE_2
+					                 , NULL AS EDATE_2
+					                 , NULL AS SDATE_1
+					                 , NULL AS EDATE_1
+					                 , A.SDATE AS SDATE_0
+					                 , A.EDATE AS EDATE_0
+					<foreach item="item" collection="eleArray">
+					                 , 0 AS ELE_2_${item}
+					                 , 0 AS ELE_1_${item}
+					                 , B.ELE_${item} AS ELE_0_${item}
+					</foreach>
+					              FROM TCPN403 A
+					                 , TEMP B
+					             WHERE 1=1
+					               AND A.ENTER_CD = B.ENTER_CD
+					               AND A.SABUN    = B.SABUN
+					               AND A.SDATE    = B.SDATE
+					               AND A.ENTER_CD = #{ssnEnterCd}
+					               AND REPLACE(#{searchDate}, '-', '') BETWEEN A.SDATE AND A.EDATE
+					       ) T
+					     , THRM100 H
+					     , THRM151 O
+					 WHERE 1 = 1
+					   AND T.ENTER_CD = H.ENTER_CD
+					   AND T.SABUN    = H.SABUN
+					   AND T.ENTER_CD = O.ENTER_CD
+					   AND T.SABUN    = O.SABUN
+					   AND TO_CHAR(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), 'YYYYMMDD') BETWEEN O.SDATE AND O.EDATE
+<if test="searchNm != null and searchNm neq ''">
+					   AND (H.NAME LIKE '%' || #{searchNm} || '%' OR T.SABUN LIKE '%' || #{searchNm} || '%')
+</if>
+<if test="searchManageCdHidden != null and searchManageCdHidden neq ''">
+					   AND O.MANAGE_CD IN
+		<foreach collection="searchManageCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchStatusCdHidden != null and searchStatusCdHidden neq ''">
+					   AND O.STATUS_CD IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchJikchakCdHidden != null and searchJikchakCdHidden neq ''">
+					   AND O.JIKCHAK_CD IN
+		<foreach collection="searchJikchakCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchJikweeCdHidden != null and searchJikweeCdHidden neq ''">
+					   AND O.JIKWEE_CD IN
+		<foreach collection="searchJikweeCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchJikgubCdHidden != null and searchJikgubCdHidden neq ''">
+					   AND O.JIKGUB_CD IN
+		<foreach collection="searchJikgubCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchOrgCdHidden != null and searchOrgCdHidden neq ''">
+					   AND O.ORG_CD IN
+		<foreach collection="searchOrgCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+					 GROUP BY T.ENTER_CD, T.SABUN
+					 ORDER BY F_COM_JIKJE_SORT(T.ENTER_CD, T.SABUN, MAX(T.SDATE_0))
+		</select>
+
+</mapper>

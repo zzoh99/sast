@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.month.timeCardMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getTimeCardMgrList">
+
+				<![CDATA[
+		                 SELECT Z.ENTER_CD
+		                      , Z.YMD
+		                      , Z.SABUN
+		                      , Z.IN_YMD
+		                      , Z.IN_HM
+		                      , Z.OUT_YMD
+		                      , Z.OUT_HM
+		                      , Z.MEMO
+		                      , Z.PROTECT_YN
+		                      , Z.E_IN_YMD
+		                      , Z.E_IN_HM
+		                      , Z.E_OUT_YMD
+		                      , Z.E_OUT_HM
+		                      , Z.MEMO
+		                      
+		                      , F_COM_GET_NAMES(B.ENTER_CD,Z.SABUN,#{ssnLocaleCd}) AS NAME
+		                      , F_COM_GET_ORG_NM(B.ENTER_CD,B.ORG_CD, REPLACE( #{searchSymd},'-',''), #{ssnLocaleCd}) AS ORG_NM
+		                      
+		                      , B.JIKWEE_NM
+		                      , B.JIKCHAK_NM
+		                      , B.JIKGUB_NM
+		                      , B.MANAGE_NM
+		                      , B.STATUS_NM
+		                      , B.WORK_TYPE_NM
+		                      , B.PAY_TYPE_NM
+		                      , B.PAY_TYPE
+		                      , B.LOCATION_CD
+		                      , NVL(( SELECT HOLIDAY_NM FROM TTIM001 WHERE ENTER_CD = Z.ENTER_CD AND YY || MM || DD = Z.YMD AND BUSINESS_PLACE_CD = E.BUSINESS_PLACE_CD), TO_CHAR(TO_DATE(Z.YMD,'YYYYMMDD'),'DY')) AS DAY_NM
+		                      
+		                      , E.BUSINESS_PLACE_CD
+		                      
+		                      , DECODE( C.CLOSE_YN, 'Y', 'Y', '' ) AS CLOSE_YN
+		                      , CASE WHEN NVL( C.CLOSE_YN, 'N') = 'Y' THEN '0' ELSE '1' END AS SHEET_ROW_EDIT    
+		                  FROM  (
+								   SELECT ENTER_CD
+										, YMD
+										, SABUN
+										, MAX(IN_YMD) AS IN_YMD
+										, MAX(IN_HM) AS IN_HM
+										, MAX(OUT_YMD) AS OUT_YMD
+										, MAX(OUT_HM) AS OUT_HM
+										, MAX(MEMO) AS MEMO
+										, MAX(PROTECT_YN) AS PROTECT_YN
+										, MAX(E_IN_YMD) AS E_IN_YMD
+										, MAX(E_IN_HM) AS E_IN_HM
+										, MAX(E_OUT_YMD) AS E_OUT_YMD
+										, MAX(E_OUT_HM) AS E_OUT_HM
+								    FROM (     
+											SELECT ENTER_CD, YMD, SABUN, IN_YMD, IN_HM, OUT_YMD, OUT_HM, MEMO, PROTECT_YN, '' AS E_IN_YMD, '' AS E_IN_HM, '' AS E_OUT_YMD, '' AS  E_OUT_HM
+											  FROM TTIM330
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											 UNION ALL
+											SELECT ENTER_CD, YMD, SABUN, '' AS IN_YMD, '' AS IN_HM, '' AS OUT_YMD, '' AS OUT_HM, '' AS MEMO, '' AS PROTECT_YN, IN_YMD AS E_IN_YMD, IN_HM AS E_IN_HM, OUT_YMD AS E_OUT_YMD, OUT_HM AS  E_OUT_HM
+											  FROM TTIM730
+											 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									     ) 
+									 GROUP BY ENTER_CD, YMD, SABUN		                  
+		                        ) Z
+		                      , THRM100 A
+		                      , (SELECT B.*
+		                           FROM THRM151 B
+		                          WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+		                            AND SDATE    = (SELECT MAX(BB.SDATE)
+					                   				  FROM THRM151 BB
+					                   				 WHERE BB.ENTER_CD = B.ENTER_CD
+					                   				   AND BB.SABUN    = B.SABUN
+					                   				   AND REPLACE(#{searchEymd}, '-', '') BETWEEN BB.SDATE AND NVL(BB.EDATE, '99991231')
+				                                    ) 
+		                         ) B
+		                      , BP_V E
+		                      , TTIM335 C -- 일근무관리
+		                 WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} )
+		                   AND Z.YMD      BETWEEN  REPLACE( #{searchSymd},'-','') AND REPLACE( #{searchEymd},'-','')
+		                   AND Z.ENTER_CD = A.ENTER_CD
+		                   AND Z.SABUN    = A.SABUN
+		                   AND A.ENTER_CD = B.ENTER_CD
+		                   AND A.SABUN    = B.SABUN
+		                   
+		                   -- 일근무관리
+		                   AND Z.ENTER_CD = C.ENTER_CD(+)
+		                   AND Z.YMD      = C.YMD(+)
+		                   AND Z.SABUN    = C.SABUN(+)
+		                   
+
+                           AND A.ENTER_CD = E.ENTER_CD (+)
+                           AND A.SABUN    = E.SABUN    (+)
+                           AND REPLACE(#{searchEymd},'-','') BETWEEN  E.SDATE(+) AND NVL(E.EDATE(+), '99991231')
+                           ]]>
+<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+                           AND E.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+						   AND B.LOCATION_CD = #{searchLocationCd}
+</if>
+<if test=' searchWorkType != null and !searchWorkType.equals("")'>
+						   AND B.WORK_TYPE = #{searchWorkType}
+</if>
+
+<if test='searchTypeIn and searchTypeIn.equals("Y")'>
+						   AND ( Z.IN_HM  IS NULL AND Z.E_IN_HM IS NULL)
+</if>
+<if test='searchTypeOut and searchTypeOut.equals("Y")'>
+						   AND ( Z.OUT_HM IS NULL AND Z.E_OUT_HM IS NULL)
+</if>
+
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+		                   AND B.ORG_CD IN (SELECT #{searchOrgCd}
+                                              FROM DUAL
+
+	<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+                                              <![CDATA[
+                                            UNION
+                                            SELECT ORG_CD
+											  FROM (
+											      	SELECT *
+													  FROM TORG105
+													 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+													   AND SDATE    = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','') )
+											  	   )
+                                             START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+                                                 ]]>
+	</if>
+                                           )
+
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+						   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='multiPayType != null and !multiPayType.equals("")'>
+				   			AND NVL(B.PAY_TYPE,' ')	IN
+		<foreach collection="multiPayType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+				         ORDER BY F_COM_JIKJE_SORT(Z.ENTER_CD, Z.SABUN, Z.YMD),Z.YMD 
+
+		</select>
+
+<!-- 마감 체크  -->
+		<select parameterType="map" resultType="cMap" id="getTimeCardMgrCount">
+
+				<![CDATA[
+				SELECT NVL(MAX(A.SUM_YN),'N') AS SUM_YN
+				     , NVL(MAX(A.END_YN),'N') AS END_YN
+				  FROM (
+					    SELECT CASE WHEN B.WORK_DAY_TYPE = 1
+						            THEN TO_CHAR(ADD_MONTHS(TO_DATE(A.YM,'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+						            ELSE A.YM||STDW_S_DD
+						            END SYMD
+						     , A.YM||STDW_E_DD EYMD
+		                     , A.YM
+		                     , A.SUM_YN
+		                     , A.END_YN
+						  FROM TTIM004 B
+				             , TTIM999 A
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+		                   AND A.ENTER_CD = B.ENTER_CD
+		                   AND A.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+					   ) A
+				     , (SELECT SUN_DATE FROM TSYS007 A WHERE SUN_DATE BETWEEN #{searchSymd} AND #{searchEymd}) C
+				 WHERE SUN_DATE BETWEEN A.SYMD AND A.EYMD
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveTimeCardMgr">
+
+					MERGE INTO TTIM330 T
+					USING	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+							   SELECT #{ssnEnterCd}           		AS ENTER_CD
+									, TRIM( #{rm.ymd} )				AS YMD
+									, TRIM( #{rm.sabun} )			AS SABUN
+									, TRIM( #{rm.memo} )			AS MEMO
+									, TRIM( #{rm.protectYn} )		AS PROTECT_YN
+						   	     FROM DUAL
+</foreach>
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.YMD	        = S.YMD
+					AND  T.SABUN        = S.SABUN
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MEMO       =  S.MEMO
+									, T.PROTECT_YN =  S.PROTECT_YN
+									, T.CHKDATE	   = SYSDATE
+									, T.CHKID	   = #{ssnSabun}
+		</update>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveTimeCardMgr330">
+
+					MERGE INTO TTIM330 T
+					USING	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+	<![CDATA[
+							   SELECT #{ssnEnterCd}           		AS ENTER_CD
+									, TRIM( #{rm.ymd} )				AS YMD
+									, TRIM( #{rm.sabun} )			AS SABUN
+									, (CASE WHEN TRIM( #{rm.inYmd} ) IS NULL THEN TRIM( #{rm.ymd} ) ELSE TRIM( #{rm.inYmd} ) END) AS IN_YMD
+									, TRIM( #{rm.inHm} )			AS IN_HM
+									, (CASE WHEN TRIM( #{rm.outYmd} ) IS NOT NULL THEN TRIM( #{rm.outYmd} )
+										    ELSE (CASE WHEN TRIM( #{rm.inHm} ) > TRIM( #{rm.outHm} ) THEN TO_CHAR(TO_DATE( TRIM( #{rm.ymd} ) ,'YYYYMMDD')+1,'YYYYMMDD') ELSE TRIM( #{rm.ymd} ) END)
+									  END) AS OUT_YMD
+									, TRIM( #{rm.outHm} )			AS OUT_HM
+									, TRIM( #{rm.memo} )			AS MEMO
+									, TRIM( #{rm.protectYn} )		AS PROTECT_YN
+						   	     FROM DUAL
+]]>
+</foreach>
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.YMD	        = S.YMD
+					AND  T.SABUN        = S.SABUN
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.IN_YMD     =  S.IN_YMD
+									, T.IN_HM      =  S.IN_HM
+									, T.OUT_YMD    =  S.OUT_YMD
+									, T.OUT_HM     =  S.OUT_HM
+									, T.MEMO       =  S.MEMO
+									, T.PROTECT_YN =  S.PROTECT_YN
+									, T.CHKDATE	   = SYSDATE
+									, T.CHKID	   = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YMD
+							, T.SABUN
+							, T.IN_YMD
+							, T.IN_HM
+							, T.OUT_YMD
+							, T.OUT_HM
+							, T.MEMO
+							, T.PROTECT_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YMD
+							, S.SABUN
+							, S.IN_YMD
+							, S.IN_HM
+							, S.OUT_YMD
+							, S.OUT_HM
+							, S.MEMO
+							, S.PROTECT_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		저장 -->
+		<update parameterType="map" id="saveTimeCardMgr730">
+
+					MERGE INTO TTIM730 T
+					USING	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+							   SELECT #{ssnEnterCd}           		AS ENTER_CD
+									, TRIM( #{rm.ymd} )				AS YMD
+									, TRIM( #{rm.sabun} )			AS SABUN
+									, (CASE WHEN TRIM( #{rm.eInYmd} ) IS NULL THEN TRIM( #{rm.ymd} ) ELSE TRIM( #{rm.eInYmd} ) END) AS IN_YMD
+									, TRIM( #{rm.eInHm} )			AS IN_HM
+									, (CASE WHEN TRIM( #{rm.eOutYmd} ) IS NOT NULL THEN TRIM( #{rm.eOutYmd} )
+										    ELSE (CASE WHEN TRIM( #{rm.eInHm} ) > TRIM( #{rm.eOutHm} ) THEN TO_CHAR(TO_DATE( TRIM( #{rm.ymd} ) ,'YYYYMMDD')+1,'YYYYMMDD') ELSE TRIM( #{rm.ymd} ) END)
+									  END) AS OUT_YMD
+									, TRIM( #{rm.eOutHm} )			AS OUT_HM
+									, TRIM( #{rm.memo} )			AS MEMO
+									, TRIM( #{rm.protectYn} )		AS PROTECT_YN
+						   	     FROM DUAL
+</foreach>
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.YMD	        = S.YMD
+					AND  T.SABUN        = S.SABUN
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.IN_YMD     =  S.IN_YMD
+									, T.IN_HM      =  S.IN_HM
+									, T.OUT_YMD    =  S.OUT_YMD
+									, T.OUT_HM     =  S.OUT_HM
+									, T.CHKDATE	   = SYSDATE
+									, T.CHKID	   = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YMD
+							, T.SABUN
+							, T.IN_YMD
+							, T.IN_HM
+							, T.OUT_YMD
+							, T.OUT_HM
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YMD
+							, S.SABUN
+							, S.IN_YMD
+							, S.IN_HM
+							, S.OUT_YMD
+							, S.OUT_HM
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteTimeCardMgr330">
+
+					DELETE FROM TTIM330
+					WHERE 	(ENTER_CD, YMD, SABUN) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+											#{ssnEnterCd}
+											, TRIM( #{rm.ymd} )
+											, TRIM( #{rm.sabun} )
+										)
+</foreach>
+										)
+		</delete>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteTimeCardMgr730">
+
+					DELETE FROM TTIM730
+					WHERE 	(ENTER_CD, YMD, SABUN) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+											#{ssnEnterCd}
+											, TRIM( #{rm.ymd} )
+											, TRIM( #{rm.sabun} )
+										)
+</foreach>
+										)
+		</delete>
+
+		
+<!-- 근무이력반영 -->
+		<update parameterType="map" id="CallTimeCardMgrWorkHourChg">
+
+			<![CDATA[
+					CALL P_TIM_WORK_HOUR_CHG(#{sqlCode},#{sqlErrm},#{ssnEnterCd},REPLACE( #{searchSymd}, '-', ''),REPLACE( #{searchEymd}, '-', ''),#{sabun},#{searchBizPlaceCd},#{ssnSabun})
+			]]>
+		</update>
+
+</mapper>

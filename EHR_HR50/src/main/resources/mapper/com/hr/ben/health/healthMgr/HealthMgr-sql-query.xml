@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.health.healthMgr">
+		
+	<!-- 조회 -->
+	<select id="getHealthMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.YEAR
+		     , A.SABUN
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+			 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.YEAR||'1231', #{ssnLocaleCd}) AS ORG_NM
+			 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, A.YEAR||'1231', #{ssnLocaleCd}) AS JIKCHAK_NM
+			 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.YEAR||'1231', #{ssnLocaleCd}) AS JIKWEE_NM
+			 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, A.YEAR||'1231', #{ssnLocaleCd}) AS JIKGUB_NM
+			 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, A.YEAR||'1231', #{ssnLocaleCd}) AS WORKTYPE_NM
+		     , A.GUBUN
+		     , SUBSTR(CRYPTIT.DECRYPT(A.RES_NO, A.ENTER_CD),1,7) AS V_RES_NO
+		     , A.RES_NO
+		     , CASE WHEN SUBSTR(CRYPTIT.DECRYPT(A.RES_NO, A.ENTER_CD), 7, 1) IN ('1', '3', '5') THEN '남'
+		            ELSE '여' END AS SEX_TYPE
+		     , A.NAME AS FAM_NM
+		     , A.AGE  
+		     , A.PAY_MON
+		     , A.CHK_YMD
+		     , A.HOSP_NM
+		     , A.UPD_MON
+		     , A.NOTE
+		  FROM TBEN712 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.YEAR     = TRIM(#{searchYear}) ]]>
+		<if test="searchHospNm != null and searchHospNm neq ''">
+		   AND A.HOSP_NM LIKE '%' || TRIM(#{searchHospNm}) || '%'
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+		   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+		</if>
+	     ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TRIM(#{searchYear}) || '1231'), A.GUBUN
+	</select>
+		
+	<!-- 대상저 선택 조회 (팝업) -->
+	<select id="getHealthMgrPopList" parameterType="map" resultType="cMap">
+	<![CDATA[ 
+		WITH TMP AS (
+                SELECT A.ENTER_CD 
+                     , A.SABUN
+                     , A.NAME
+                     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TRIM(#{searchYear}) || '1231' ) AS ORG_NM
+                     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TRIM(#{searchYear}) || '1231') AS JIKCHAK_NM
+                     , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TRIM(#{searchYear}) || '1231') AS JIKWEE_NM
+                     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TRIM(#{searchYear}) || '1231') AS JIKGUB_NM
+                     , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TRIM(#{searchYear}) || '1231') AS WORKTYPE_NM
+                     , A.RES_NO
+                     , A.BIR_YMD
+			         , SUBSTR(CRYPTIT.DECRYPT(A.RES_NO, A.ENTER_CD),1,7) AS V_RES_NO
+                           , F_COM_JIKJE_SORT(B.ENTER_CD, B.SABUN, '20201231') AS JIKJE_SORT     
+                  FROM THRM100 A, THRM151 B
+                 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                   AND A.ENTER_CD = B.ENTER_CD
+                   AND A.SABUN    = B.SABUN
+                   AND TRIM(#{searchYear}) || '1231' BETWEEN B.SDATE AND NVL(B.EDATE,'29991231')
+                   AND B.STATUS_CD IN ('AA', 'CA') ]]>
+                <if test="searchSabunName != null and searchSabunName neq ''">
+                   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+                </if>
+	<![CDATA[               
+		)
+		SELECT T.*
+		      , CASE WHEN SUBSTR(V_FAM_RES_NO, 7, 1) IN ('1', '3', '5') THEN '남'
+			    ELSE '여' END AS SEX_TYPE
+			  , '<a class=sbasic>선택</a>' AS BTN_SEL  
+		  FROM (
+                SELECT '0' AS GUBUN, A.SABUN, A.NAME, A.ORG_NM, A.JIKCHAK_NM, A.JIKWEE_NM, A.JIKJE_SORT
+                     , A.NAME AS FAM_NM, A.RES_NO AS FAM_RES_NO, A.V_RES_NO AS V_FAM_RES_NO
+                     , CASE WHEN A.BIR_YMD IS NOT NULL THEN TO_NUMBER(TRIM(#{searchYear}))- TO_NUMBER(SUBSTR(A.BIR_YMD,1,4)) + 1
+                            ELSE TO_NUMBER(TRIM(#{searchYear}))- TO_NUMBER(SUBSTR(V_RES_NO,1,4)) + 1 END AS AGE
+                  FROM TMP A
+                 UNION ALL
+                 SELECT '1' AS GUBUN, A.SABUN, A.NAME, A.ORG_NM, A.JIKCHAK_NM, A.JIKWEE_NM, A.JIKJE_SORT
+                     , A.FAM_NM, A.FAM_RES_NO, A.V_FAM_RES_NO
+                     , CASE WHEN A.FAM_YMD IS NOT NULL THEN TO_NUMBER(TRIM(#{searchYear}))- TO_NUMBER(SUBSTR(A.FAM_YMD,1,4)) + 1
+                            ELSE TO_NUMBER(TRIM(#{searchYear}))- TO_NUMBER(SUBSTR(V_FAM_RES_NO,1,4)) + 1 END AS AGE
+                   FROM (
+			                SELECT A.*, B.FAM_NM, B.FAMRES AS FAM_RES_NO, B.FAM_YMD
+			                     , SUBSTR(CRYPTIT.DECRYPT(B.FAMRES, B.ENTER_CD),1,7) AS V_FAM_RES_NO
+			                  FROM TMP A, THRM111 B
+			                 WHERE A.ENTER_CD = B.ENTER_CD
+			                   AND A.SABUN    = B.SABUN
+			                   AND B.FAM_CD   = '002'
+			            ) A       
+				) T
+		ORDER BY JIKJE_SORT, GUBUN    				
+	]]>
+	</select>
+		
+	<!-- 저장 -->
+	<update id="saveHealthMgr" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN712 T 
+		 USING (]]>
+        <foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+		       SELECT TRIM(#{ssnEnterCd})   AS  ENTER_CD 
+		            , TRIM(#{searchYear})   AS  YEAR
+		            , TRIM(#{rm.sabun})  	AS  SABUN
+		            , TRIM(#{rm.gubun})  	AS  GUBUN
+		            , TRIM(#{rm.resNo})  	AS  RES_NO
+		            , TRIM(#{rm.famNm})  	AS  NAME
+		            , TRIM(#{rm.age})  	    AS  AGE
+		            , TRIM(#{rm.payMon})  	AS  PAY_MON
+		            , TRIM(#{rm.chkYmd})  	AS  CHK_YMD
+		            , TRIM(#{rm.hospNm})  	AS  HOSP_NM
+		            , TRIM(#{rm.updMon})  	AS  UPD_MON
+		            , TRIM(#{rm.note})  	AS  NOTE
+		        FROM DUAL
+		</foreach>
+		<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.YEAR 		= S.YEAR 
+		     AND  T.SABUN 		= S.SABUN 
+		     AND  T.GUBUN 		= S.GUBUN 
+		     AND  T.RES_NO 		= S.RES_NO 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun}
+		            , T.PAY_MON = S.PAY_MON 
+		            , T.CHK_YMD = S.CHK_YMD 
+		            , T.HOSP_NM = S.HOSP_NM 
+		            , T.UPD_MON = S.UPD_MON 
+		            , T.NOTE 	= S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.YEAR
+		            , T.SABUN
+		            , T.GUBUN
+		            , T.RES_NO
+		            , T.NAME
+		            , T.AGE
+		            , T.PAY_MON
+		            , T.CHK_YMD
+		            , T.HOSP_NM
+		            , T.UPD_MON
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.YEAR
+		            , S.SABUN
+		            , S.GUBUN
+		            , S.RES_NO
+		            , S.NAME
+		            , S.AGE
+		            , S.PAY_MON
+		            , S.CHK_YMD
+		            , S.HOSP_NM
+		            , S.UPD_MON
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+
+	<!-- 엑셀업로드 후 저장 -->
+	<update id="saveHealthMgrExcel" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN712 T 
+		USING (]]>
+        <foreach item="rm" collection="mergeRows" separator=" UNION ALL " > 
+		       SELECT TRIM(#{ssnEnterCd})    AS  ENTER_CD 
+		            , TRIM(#{searchYear})    AS  YEAR
+		            , TRIM(#{rm.famNm})  	 AS  NAME
+		            , TRIM(#{rm.vResNo})  	 AS  RES_NO
+		            , TRIM(#{rm.chkYmd})  	 AS  CHK_YMD
+		            , TRIM(#{rm.hospNm})  	 AS  HOSP_NM
+		            , TRIM(#{rm.updMon})  	 AS  UPD_MON
+		            , TRIM(#{rm.note})  	 AS  NOTE
+		        FROM DUAL
+		</foreach>
+    <![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.YEAR 		= S.YEAR 
+		     AND  T.NAME 		= S.NAME 
+		     AND  SUBSTR(CRYPTIT.DECRYPT(T.RES_NO, T.ENTER_CD),1,7) = S.RES_NO 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun}
+                    , T.CHK_YMD = S.CHK_YMD 
+                    , T.HOSP_NM = S.HOSP_NM 
+                    , T.UPD_MON = S.UPD_MON 
+                    , T.NOTE    = S.NOTE 
+	]]>
+	</update>
+		
+	<!-- 삭제 -->
+	<delete id="deleteHealthMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN712
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND YEAR     = TRIM(#{searchYear})
+		   AND SABUN    = TRIM(#{sabun})
+		   AND GUBUN    = TRIM(#{gubun})
+	]]>
+	</delete>
+		
+	<!-- 대상자생성 프로시저 -->	
+	<update id="prcHealthMgr" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_HEALTH_EMP_CRE(
+			#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchYear,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+	
+</mapper>

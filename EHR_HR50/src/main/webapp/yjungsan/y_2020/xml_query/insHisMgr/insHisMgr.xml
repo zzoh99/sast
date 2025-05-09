@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	보험료내역관리
+ -->
+<root>
+
+	<!-- 보험료 내역 조회  -->
+	<query id="selectInsHisMgrList">
+		<![CDATA[
+			SELECT A.WORK_YY
+			     , A.ADJUST_TYPE
+			     , A.SABUN
+			     , B.NAME
+			     , A.SEQ
+			     , DECODE(A.INSURANCE_TYPE,'5','일반보장성보험료','장애인보장성보험료') AS INSURANCE_TYPE
+			     , (SELECT C.FAM_NM AS FAM_NM 
+			         FROM TCPN823 C ,(SELECT * FROM TSYS005 WHERE ENTER_CD = 'HR' AND GRCODE_CD='C00309') D
+			         WHERE C.ENTER_CD    = A.ENTER_CD
+                        AND C.WORK_YY     = A.WORK_YY
+                        AND C.ENTER_CD    = D.ENTER_CD
+                        AND C.FAM_CD      = D.CODE
+                        AND C.ADJUST_TYPE = A.ADJUST_TYPE
+                        AND C.SABUN       = A.SABUN        
+                        AND C.DPNDNT_YN LIKE 'Y' ||'%'                      
+                        AND C.FAM_CD NOT IN ('Z')
+                        AND F_COM_DECRYPT(C.FAMRES, C.ENTER_CD) = F_COM_DECRYPT(A.FAMRES_CONTRT, A.ENTER_CD)
+			       )AS FAMRES_CONTRT 
+			     ,(SELECT C.FAM_NM AS FAM_NM 
+			        FROM TCPN823 C ,(SELECT * FROM TSYS005 WHERE ENTER_CD = 'HR' AND GRCODE_CD='C00309') D
+			        WHERE C.ENTER_CD    = A.ENTER_CD
+			          AND C.WORK_YY     = A.WORK_YY
+			          AND C.ENTER_CD    = D.ENTER_CD
+					  AND C.FAM_CD      = D.CODE
+					  AND C.ADJUST_TYPE = A.ADJUST_TYPE
+					  AND C.SABUN       = A.SABUN        
+					  AND C.DPNDNT_YN LIKE 'Y' ||'%'                      
+					  AND C.FAM_CD NOT IN ('Z')
+					  AND F_COM_DECRYPT(C.FAMRES, C.ENTER_CD) = F_COM_DECRYPT(A.FAMRES_INSURED, A.ENTER_CD)
+			     )AS FAMRES_INSURED
+				, A.APPL_MON
+				, A.NTS_YN
+				, A.INPUT_MON
+				, A.ADJ_INPUT_TYPE
+				, A.FEEDBACK_TYPE
+				, A.DOC_SEQ
+				, A.DOC_SEQ_DETAIL
+			FROM TCPN828 A, THRM100 B
+			WHERE A.ENTER_CD     = B.ENTER_CD
+			  AND A.SABUN        = B.SABUN 
+              AND A.ENTER_CD     = #ssnEnterCd#
+              AND A.WORK_YY  	  = #searchWorkYy#
+              AND A.ADJUST_TYPE LIKE #searchAdjustType#||'%'
+              AND  A.ADJUST_TYPE  IN (SELECT CODE
+									  FROM TSYS005
+									  WHERE ENTER_CD = #ssnEnterCd#
+										AND GRCODE_CD = 'C00303'
+										AND USE_YN = 'Y')    
+              AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+              AND A.ADJ_INPUT_TYPE LIKE #searchInputType#||'%'
+              AND  ( A.SABUN LIKE '%'|| #searchSbNm# ||'%' OR B.NAME LIKE '%'|| #searchSbNm# ||'%' )
+              ORDER BY SEQ DESC					
+	   ]]> 
+	</query>
+</root>

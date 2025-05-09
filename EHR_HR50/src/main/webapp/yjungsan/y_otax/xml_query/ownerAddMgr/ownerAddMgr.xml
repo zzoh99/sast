@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천징수영수증
+ -->
+<root>
+
+	<!-- 사업자 조회  -->
+	<query id="selectOwnerAddMgrList">
+		<![CDATA[
+				SELECT A.SABUN
+				     , A.NAME
+				     , CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD)	AS RES_NO
+				     , A.SDATE
+				     , A.EDATE
+				     , A.EARNER_CD
+				     , A.BUSINESS_PLACE_CD
+				     , A.EARNER_TYPE
+				     , A.REGINO
+				     , A.EARNER_NM
+				     , A.EARNER_ENG_NM
+				     , A.CITIZEN_TYPE AS CITIZEN_TYPE
+				     , A.RESIDENCY_TYPE
+				     , A.RESIDENCE_CD
+				     , A.BI_NAME_YN
+				     , A.TEL_NO
+				     , A.ADDR
+				     , A.BANK_CD
+				     , (CASE WHEN A.ACCOUNT_NO IS NULL THEN ''
+				       ELSE CRYPTIT.DECRYPT (A.ACCOUNT_NO, A.ENTER_CD)
+				       END) AS ACCOUNT_NO
+				     , A.MEMO
+				     , '0' AS POP
+				     , A.NO_RESI_BIRTH
+				     , A.SINTAK_YN
+				     , A.LOCATION_CD
+				FROM TCPN903 A
+				WHERE A.ENTER_CD = #ssnEnterCd#
+				  AND (A.NAME LIKE '%'||#searchSbNm#||'%' OR A.SABUN LIKE '%'||#searchSbNm#||'%')
+				  AND A.EARNER_CD LIKE '%'||#searchEarnerCd#||'%'
+				  AND A.BUSINESS_PLACE_CD LIKE '%'||#searchBusinessPlaceCd#||'%'
+				  AND DECODE(#searchLocationCd#, NULL, '%', A.LOCATION_CD) = DECODE(#searchLocationCd#, NULL, '%', #searchLocationCd#)
+				ORDER BY EARNER_CD ASC, A.NAME ASC
+			]]>
+	</query>
+
+	<!-- 사업자 조회  -->
+	<query id="selectOwnerAddMgrCnt">
+		<![CDATA[
+				SELECT COUNT(*) AS CNT
+				FROM ( SELECT ENTER_CD, SABUN, NAME, EARNER_CD
+					   FROM TCPN903
+					   WHERE ENTER_CD = #ssnEnterCd#
+					   UNION ALL
+					   SELECT ENTER_CD, SABUN, NAME, NULL AS EARNER_CD
+					   FROM THRM100
+					   WHERE ENTER_CD = #ssnEnterCd#
+					 ) A
+				WHERE A.ENTER_CD = #ssnEnterCd#
+				  AND A.SABUN = #searchSbNm#
+				  AND A.EARNER_CD = #earnerCd#
+			]]>
+	</query>
+
+	<query id="deleteOwnerAddMgr">
+		<![CDATA[
+					DELETE FROM TCPN903
+					 WHERE ENTER_CD = #ssnEnterCd#
+					   AND SABUN = #sabun#
+					   AND EARNER_CD = #earner_cd#
+		]]>
+	</query>
+
+	<query id="mergeOwnerAddMgr">
+		<![CDATA[
+					MERGE INTO TCPN903 T
+					USING	(
+							SELECT A.SABUN
+								 , A.NAME
+								 , A.RES_NO
+								 , A.SDATE
+								 , A.EDATE
+								 , A.BUSINESS_PLACE_CD
+								 , A.EARNER_CD
+								 , A.EARNER_TYPE
+								 , A.REGINO
+								 , A.EARNER_NM
+								 , A.EARNER_ENG_NM
+								 , A.CITIZEN_TYPE
+								 , A.RESIDENCY_TYPE
+								 , A.RESIDENCE_CD
+								 , A.BI_NAME_YN
+								 , A.TEL_NO
+								 , A.ADDR
+								 , A.BANK_CD
+								 , A.ACCOUNT_NO
+								 , A.MEMO
+							     , A.NO_RESI_BIRTH
+							     , A.SINTAK_YN
+							     , A.LOCATION_CD
+							  FROM (
+									SELECT #sabun#			AS SABUN
+										 , #name#				AS NAME
+										 , CRYPTIT.ENCRYPT (#res_no#,  #ssnEnterCd#)			AS RES_NO
+										 , #sdate#			AS SDATE
+										 , #edate#			AS EDATE
+										 , #business_place_cd#	AS BUSINESS_PLACE_CD
+										 , #earner_cd#			AS EARNER_CD
+										 , #earner_type#		AS EARNER_TYPE
+										 , #regino#			AS REGINO
+										 , #earner_nm#			AS EARNER_NM
+										 , #earner_eng_nm#		AS EARNER_ENG_NM
+										 , #citizen_type#		AS CITIZEN_TYPE
+										 , #residency_type#	AS RESIDENCY_TYPE
+										 , #residence_cd#		AS RESIDENCE_CD
+										 , #bi_name_yn#			AS BI_NAME_YN
+										 , #tel_no#			AS TEL_NO
+										 , #addr#				AS ADDR
+										 , #bank_cd#			AS BANK_CD
+										 , CRYPTIT.ENCRYPT (#account_no#,  #ssnEnterCd#)		AS ACCOUNT_NO
+										 , #memo#			AS MEMO
+									     , #no_resi_birth#		AS NO_RESI_BIRTH
+									     , #sintak_yn#			AS SINTAK_YN
+									     , #location_cd#		AS LOCATION_CD
+									  FROM DUAL
+									) A
+							 WHERE A.SABUN	IS NOT NULL
+							) S
+					ON (	T.ENTER_CD	= #ssnEnterCd#
+						AND	T.SABUN		= S.SABUN
+						AND	T.EARNER_CD		= S.EARNER_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.NAME                = S.NAME
+								 , T.RES_NO              = S.RES_NO
+								 , T.SDATE               = S.SDATE
+								 , T.EDATE               = S.EDATE
+								 , T.BUSINESS_PLACE_CD   = S.BUSINESS_PLACE_CD
+								 , T.EARNER_TYPE         = S.EARNER_TYPE
+								 , T.REGINO              = S.REGINO
+								 , T.EARNER_NM           = S.EARNER_NM
+								 , T.EARNER_ENG_NM       = S.EARNER_ENG_NM
+								 , T.CITIZEN_TYPE        = S.CITIZEN_TYPE
+								 , T.RESIDENCY_TYPE      = S.RESIDENCY_TYPE
+								 , T.RESIDENCE_CD        = S.RESIDENCE_CD
+								 , T.BI_NAME_YN          = S.BI_NAME_YN
+								 , T.TEL_NO              = S.TEL_NO
+								 , T.ADDR                = S.ADDR
+								 , T.BANK_CD             = S.BANK_CD
+								 , T.ACCOUNT_NO          = S.ACCOUNT_NO
+								 , T.MEMO                = S.MEMO
+								 , T.NO_RESI_BIRTH       = S.NO_RESI_BIRTH
+								 , T.SINTAK_YN           = S.SINTAK_YN
+								 , T.LOCATION_CD         = S.LOCATION_CD
+								 , T.CHKDATE			 = SYSDATE
+								 , T.CHKID				 = #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SDATE
+							, T.BUSINESS_PLACE_CD
+							, T.EARNER_CD
+							, T.NAME
+							, T.RES_NO
+							, T.EDATE
+							, T.EARNER_TYPE
+							, T.REGINO
+							, T.EARNER_NM
+							, T.EARNER_ENG_NM
+							, T.CITIZEN_TYPE
+							, T.RESIDENCY_TYPE
+							, T.RESIDENCE_CD
+							, T.BI_NAME_YN
+							, T.TEL_NO
+							, T.ADDR
+							, T.BANK_CD
+							, T.ACCOUNT_NO
+							, T.MEMO
+							, T.NO_RESI_BIRTH
+							, T.SINTAK_YN
+							, T.LOCATION_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #ssnEnterCd#
+							, S.SABUN
+							, S.SDATE
+							, S.BUSINESS_PLACE_CD
+							, S.EARNER_CD
+							, S.NAME
+							, S.RES_NO
+							, S.EDATE
+							, S.EARNER_TYPE
+							, S.REGINO
+							, S.EARNER_NM
+							, S.EARNER_ENG_NM
+							, S.CITIZEN_TYPE
+							, S.RESIDENCY_TYPE
+							, S.RESIDENCE_CD
+							, S.BI_NAME_YN
+							, S.TEL_NO
+							, S.ADDR
+							, S.BANK_CD
+							, S.ACCOUNT_NO
+							, S.MEMO
+							, S.NO_RESI_BIRTH
+							, S.SINTAK_YN
+							, S.LOCATION_CD
+							, SYSDATE
+							, #ssnSabun#
+						)
+		]]>
+	</query>
+</root>

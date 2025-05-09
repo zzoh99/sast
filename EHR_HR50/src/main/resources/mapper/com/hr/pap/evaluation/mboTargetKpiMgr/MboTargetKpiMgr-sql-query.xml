@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.evaluation.mboTargetKpiMgr">
+<!-- 조직KPI관리 조직장 목표 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMboTargetKpiMgrList1">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPRAISAL_CD
+					     , A.APP_ORG_CD
+					     , A.SABUN
+					     , A.SEQ
+					     , A.MK_GUBUN_CD
+					     , A.APP_INDEX_GUBUN_CD
+					     , A.APP_INDEX_GUBUN_NM
+					     , A.MBO_TARGET
+					     , A.KPI_NM
+					     , A.FORMULA
+					     , A.WEIGHT
+					     , A.ORDER_SEQ
+					     , A.MBO_TYPE
+					  FROM
+					       ]]>
+<choose><when test='searchAppStepCd != null and searchAppStepCd.equals("1")'>
+					        TPAP351 A
+		</when><otherwise>
+					        TPAP352 A
+</otherwise>
+</choose>
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.SABUN = TRIM(#{searchSabun})
+					   AND A.APP_ORG_CD = TRIM(#{searchAppOrgCd})
+					 ORDER BY A.APP_INDEX_GUBUN_NM, A.ORDER_SEQ
+
+		</select>
+		
+<!-- 조직KPI관리 피평가자별 지정 목표 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMboTargetKpiMgrList2">
+
+				<![CDATA[
+					SELECT T.APP_ORG_NM
+					     , T.APP_ORG_CD
+					     , T.SABUN
+					     , T.NAME
+					     , T.JIKWEE_NM
+					     , T.JIKCHAK_NM
+					     , DECODE(C.SABUN, NULL, 'N', 'Y') AS DESIGNATE_YN
+					     ]]>
+<choose><when test='searchAppStepCd != null and searchAppStepCd.equals("1")'>
+					     , NVL(A.TARGET_STATUS_CD, '11') AS STATUS_CD
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10018' ,NVL(A.TARGET_STATUS_CD, '11')) AS STATUS_NM
+		</when><otherwise>
+					     , NVL(A.MIDDLE_STATUS_CD, '11') AS STATUS_CD
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10018' ,NVL(A.MIDDLE_STATUS_CD, '11')) AS STATUS_NM
+</otherwise>
+</choose>
+					<![CDATA[
+					  FROM TPAP350 A
+					     , (
+					        SELECT A.ENTER_CD
+					             , A.APPRAISAL_CD
+					             , A.APP_STEP_CD
+					             , A.APP_ORG_NM
+					             , A.APP_ORG_CD
+					             , A.SABUN
+					             , A.NAME
+					             , A.JIKWEE_NM
+					             , A.JIKCHAK_NM
+					          FROM TPAP201 A
+					             , TPAP202 B
+					         WHERE B.ENTER_CD     = A.ENTER_CD
+					           AND B.APPRAISAL_CD = A.APPRAISAL_CD
+					           AND B.APP_STEP_CD  = A.APP_STEP_CD
+					           AND B.SABUN        = A.SABUN
+					           AND B.APP_ORG_CD   = A.APP_ORG_CD
+					           AND A.APP_YN       = 'Y'
+					           AND A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					           AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					           AND A.APP_STEP_CD  = TRIM(#{searchAppStepCd} )
+					           AND B.APP_SABUN    = TRIM(#{searchAppSabun} )
+					           AND A.SABUN       <> TRIM(#{searchAppSabun} )
+					         GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_STEP_CD, A.APP_ORG_NM, A.APP_ORG_CD, A.SABUN, A.NAME, A.JIKWEE_NM, A.JIKCHAK_NM
+					       ) T
+					     , (
+					        SELECT SABUN
+					             , APP_ORG_CD
+					          FROM
+					               ]]>
+<choose><when test='searchAppStepCd != null and searchAppStepCd.equals("1")'>
+					               TPAP351 A
+		</when><otherwise>
+					               TPAP352 A
+</otherwise>
+</choose>
+					         WHERE ENTER_CD     = TRIM(#{ssnEnterCd})
+					           AND APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					           AND SEQ          = TRIM(#{searchSeq})
+					           AND MK_GUBUN_CD  = 'C'
+					         GROUP BY SABUN, APP_ORG_CD
+					       ) C
+					 WHERE A.ENTER_CD     = T.ENTER_CD
+					   AND A.APPRAISAL_CD = T.APPRAISAL_CD
+					   AND A.SABUN        = T.SABUN
+					   AND A.APP_ORG_CD   = T.APP_ORG_CD
+					   AND T.SABUN        = C.SABUN(+)
+					   AND T.APP_ORG_CD   = C.APP_ORG_CD(+)
+					ORDER BY F_COM_JIKJE_SORT(T.ENTER_CD, T.SABUN, NVL(F_PAP_GET_BASE_YMD(T.ENTER_CD, T.APPRAISAL_CD, T.APP_STEP_CD), '99991231'))
+
+
+		</select>
+		
+<!-- 조직KPI저장 프로시저 -->
+		<update parameterType="map" id="prcMboTargetKpiMgr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_MBOTARGET_KPI(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppStepCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchSeq,mode=IN,jdbcType=VARCHAR},
+				#{desigSabunsOrgs,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

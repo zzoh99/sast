@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.loan.loanApp">
+	
+	<!-- 신청내역 조회 -->
+	<select id="getLoanAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+		     , A.LOAN_CD
+		     , A.LOAN_REQ_PERIOD
+		     , A.LOAN_PERIOD
+		     , A.REQ_INT_RATE
+		     , A.INT_RATE
+		     , A.LOAN_REQ_YMD
+		     , A.LOAN_REQ_MON
+		     , A.BANK_CD
+		     , A.ACC_HOLDER
+		     , A.ACC_NO
+		     , A.NOTE
+		     , DECODE(B.APPL_STATUS_CD, '99', A.LOAN_YMD, NULL ) AS LOAN_YMD
+		     , DECODE(B.APPL_STATUS_CD, '99', A.LOAN_MON, NULL ) AS LOAN_MON
+		     , DECODE(B.APPL_STATUS_CD, '99', A.REP_MON, NULL ) AS REP_MON
+		     , DECODE( (SELECT MAX(LOAN_REM_MON) KEEP(DENSE_RANK FIRST ORDER BY REP_YMD DESC)
+				          FROM TBEN625 X
+				         WHERE X.ENTER_CD = A.ENTER_CD
+				           AND X.APPL_SEQ = A.APPL_SEQ
+				           AND X.CLOSE_YN = 'Y' ), 0, 'Y', '') AS FINISH_YN  
+					
+			 , B.APPL_YMD
+			 , B.APPL_STATUS_CD
+			 , B.AGREE_YMD
+			 , B.APPL_SABUN
+			 , B.APPL_IN_SABUN
+			 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+			 , 0 AS DETAIL
+		  FROM TBEN623 A , THRI103 B
+	 	 WHERE A.ENTER_CD = #{ssnEnterCd}
+ 		   AND A.SABUN    = #{searchSabun}
+		   AND A.ENTER_CD = B.ENTER_CD
+		   AND A.APPL_SEQ = B.APPL_SEQ
+		 ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+	]]>
+	</select>
+
+	<!-- 상환내역 조회 -->
+	<select id="getLoanAppRepList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+		     , A.LOAN_CD
+		     , A.REP_SEQ
+		     , A.REP_YMD
+		     , A.REPAY_TYPE
+		     , A.APPLY_SDATE
+		     , A.APPLY_EDATE
+		     , A.APPLY_DAY
+		     , A.LOAN_STD_MON
+		     , A.INT_RATE
+		     , A.REP_MON
+		     , A.INT_MON
+		     , A.LOAN_REM_MON
+		     , A.PAY_YM
+		     , A.CLOSE_YN
+		     , A.PAY_ACTION_CD
+		     , A.NOTE
+		  FROM TBEN625 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.SABUN    = TRIM(#{searchSabun})
+		   AND A.APPL_SEQ = TRIM(#{searchApplSeq})
+		 ORDER BY A.REP_YMD DESC  
+	]]>
+	</select>
+		
+	<!-- 임시저장 삭제 -->
+	<delete id="deleteLoanApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN623
+		 WHERE ENTER_CD = #{ssnEnterCd}	
+		   AND APPL_SEQ IN 	(  NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.applSeq != null and rm.applSeq neq ''">
+			, TRIM(#{rm.applSeq})	
+			</if>
+		</foreach>		
+			)
+	</delete>
+
+</mapper>

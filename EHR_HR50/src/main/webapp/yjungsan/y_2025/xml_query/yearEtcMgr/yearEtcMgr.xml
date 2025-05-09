@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산 기타소득 쿼리
+ -->
+<root>
+
+	<!-- 연말정산 기타소득 조회 -->
+	<query id="selectYearEtcMgr">
+		<![CDATA[
+		    SELECT *
+		      FROM (
+					SELECT A.ENTER_CD,
+					       A.WORK_YY, A.ADJUST_TYPE, A.SABUN, A.YM, A.ADJ_ELEMENT_CD
+					       , (SELECT ADJ_ELEMENT_NM FROM TCPN803 WHERE ENTER_CD = A.ENTER_CD AND WORK_YY =   #srchYear# AND ADJ_ELEMENT_CD = A.ADJ_ELEMENT_CD) AS ADJ_ELEMENT_NM,
+					       A.MON,
+					       DECODE(A.TAX_MON,NULL,'0','','0',A.TAX_MON) AS TAX_MON ,
+					       DECODE(A.NOTAX_MON,NULL,'0','','0',A.NOTAX_MON) AS NOTAX_MON
+					     , B.NAME
+					     , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+					     , A.MEMO
+			             , C.SEQ
+					  FROM TCPN815 A, THRM100 B, TCPN803 C
+					 WHERE A.ENTER_CD       = #ssnEnterCd#
+					   AND A.WORK_YY  	    = #srchYear#
+					   AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+		        	   AND ( #srchAdjustType# IS NULL OR A.ADJUST_TYPE = #srchAdjustType# ) -- 조회조건 : 작업구분
+					   AND ( A.SABUN LIKE '%' || TRIM(#srchSbNm#) || '%' OR B.NAME LIKE '%' || TRIM(#srchSbNm#) || '%' )
+					   AND A.ENTER_CD       = B.ENTER_CD
+					   AND A.SABUN          = B.SABUN
+		               AND A.ADJ_ELEMENT_CD LIKE '%' || #srchIncomeType# || '%'
+					   AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+			           AND A.ENTER_CD  = C.ENTER_CD
+ 			           AND A.WORK_YY   = C.WORK_YY
+ 			           AND A.ADJ_ELEMENT_CD = C.ADJ_ELEMENT_CD
+				   )  
+			  WHERE 1=1
+			    AND ( ADJ_ELEMENT_NM LIKE '%' || TRIM(#srchIncomeTypeTxt#) || '%')
+			  ORDER BY ADJUST_TYPE, SABUN, SEQ, YM
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 중복 조회 -->
+	<query id="selectYearEtcMgrCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TCPN815 A
+			 WHERE A.ENTER_CD			= #ssnEnterCd#
+			   AND A.WORK_YY  	     	= #work_yy#
+			   AND A.ADJUST_TYPE    	= #adjust_type#
+			   AND A.SABUN          	= #sabun#
+			   AND A.YM					= #ym#
+			   AND A.ADJ_ELEMENT_CD 	= #adj_element_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 입력 -->
+	<query id="insertYearEtcMgr">
+		<![CDATA[
+			INSERT INTO TCPN815
+			(
+			      ENTER_CD
+				, WORK_YY
+				, ADJUST_TYPE
+				, SABUN
+				, YM
+				, ADJ_ELEMENT_CD
+				, MON
+				, NOTAX_MON
+				, TAX_MON
+				, CHKDATE
+				, CHKID
+				, MEMO
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #ym#
+                , #adj_element_cd#
+				, #mon#
+				, DECODE(F_CPN_YEA_TAX_YN(#ssnEnterCd#,#work_yy#,#adj_element_cd#),'Y',0,#mon#)
+				, DECODE(F_CPN_YEA_TAX_YN(#ssnEnterCd#,#work_yy#,#adj_element_cd#),'Y',#mon#,0)
+				, SYSDATE
+				, #ssnSabun#
+				, #memo#
+			)
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 수정 -->
+	<query id="updateYearEtcMgr">
+		<![CDATA[
+			UPDATE TCPN815
+			SET MON					= #mon#
+				, NOTAX_MON			= #notax_mon#
+				, TAX_MON 			= #tax_mon#
+				, MEMO 				= #memo#
+				, CHKDATE 			= SYSDATE
+				, CHKID				= #ssnSabun#
+			WHERE ENTER_CD			= #ssnEnterCd#
+			  AND WORK_YY  	    	= #work_yy#
+			  AND ADJUST_TYPE   	= #adjust_type#
+			  AND SABUN         	= #sabun#
+			  AND YM				= #ym#
+			  AND ADJ_ELEMENT_CD 	= #adj_element_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 삭제 -->
+	<query id="deleteYearEtcMgr">
+		<![CDATA[
+			DELETE FROM TCPN815 A
+			 WHERE A.ENTER_CD			= #ssnEnterCd#
+				 AND A.WORK_YY  	    = #work_yy#
+			     AND A.ADJUST_TYPE    	= #adjust_type#
+			     AND A.SABUN          	= #sabun#
+			     AND A.YM				= #ym#
+			     AND A.ADJ_ELEMENT_CD 	= #adj_element_cd#
+		]]>
+	</query>
+
+	<!-- 중소기업 취업자감면 입력 값 Sum -->
+	<query id="selectYearIncomeEtcMgrEtcSum">
+		<![CDATA[
+			SELECT NVL(SUM(B010_30),0) AS B010_30, NVL(SUM(B010_31),0) AS B010_31, NVL(SUM(B010_32),0) AS B010_32, NVL(SUM(B010_33),0) AS B010_33,
+				   NVL(SUM(B010_40),0) AS B010_40, NVL(SUM(B010_42),0) AS B010_42, NVL(SUM(B010_43),0) AS B010_43, NVL(SUM(B010_46),0) AS B010_46,
+				   NVL(SUM(B010_47),0) AS B010_47
+			FROM (
+			  SELECT ADJ_ELEMENT_CD,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_110' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_30,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_111' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_31,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_112' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_32,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_113' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_33,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_140' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_40,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_142' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_42,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_143' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_43,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_145' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_46,
+			          (CASE WHEN ADJ_ELEMENT_CD = 'C010_144' THEN SUM(NOTAX_MON) ELSE 0 END) AS B010_47
+			    FROM (
+				  SELECT ENTER_CD,WORK_YY,ADJUST_TYPE,SABUN,ADJ_ELEMENT_CD,NOTAX_MON
+				    FROM TCPN815
+				   WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #work_yy# AND ADJUST_TYPE = #adjust_type# AND SABUN = #sabun# AND ADJ_ELEMENT_CD IN ('C010_110','C010_111','C010_112','C010_113','C010_140','C010_142','C010_143', 'C010_144', 'C010_145')
+				  UNION ALL
+				  SELECT ENTER_CD,WORK_YY,ADJUST_TYPE,SABUN,ADJ_ELEMENT_CD,NOTAX_MON
+				    FROM TCPN818
+				   WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #work_yy# AND ADJUST_TYPE = #adjust_type# AND SABUN = #sabun# AND ADJ_ELEMENT_CD IN ('C010_110','C010_111','C010_112','C010_113','C010_140','C010_142','C010_143', 'C010_144', 'C010_145')
+			  ) GROUP BY ADJ_ELEMENT_CD
+			)
+		]]>
+	</query>
+
+	<!-- 중소기업 취업자감면 입력 값 Sum 적용 -->
+	<query id="updateYearIncomeEtcMgrEtcSum">
+		<![CDATA[
+		MERGE INTO TCPN843 T
+		USING	(
+				SELECT #input_mon# AS INPUT_MON
+				  FROM	dual
+				) S
+		ON ( T.ENTER_CD   = #ssnEnterCd#
+		AND  T.WORK_YY = #work_yy#
+		AND  T.ADJUST_TYPE =  #adjust_type#
+		AND  T.SABUN = #sabun#
+		AND  T.ADJ_ELEMENT_CD = #adj_element_cd#
+		)
+		WHEN MATCHED THEN
+			UPDATE SET	  T.INPUT_MON               = S.INPUT_MON
+						, T.CHKDATE	= SYSDATE
+						, T.CHKID	= #ssnSabun#
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  T.ENTER_CD
+				, T.WORK_YY
+				, T.ADJUST_TYPE
+				, T.SABUN
+				, T.ADJ_ELEMENT_CD
+				, T.INPUT_MON
+                         , T.CHKDATE
+				, T.CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+                , #work_yy#
+                , #adjust_type#
+                , #sabun#
+                , #adj_element_cd#
+                , S.INPUT_MON
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+</root>

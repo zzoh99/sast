@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.empPictureMgr">
+
+<!-- 개인사진관리(조직도) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpPictureMgrOrgList">
+
+				<![CDATA[
+					SELECT LVL AS "_level"
+						 , ORG_CHART_NM
+						 , SDATE
+						 , PRIOR_ORG_CD
+						 , ORG_CD
+						 , ORG_NM
+					  FROM (
+					        SELECT LEVEL AS LVL, B.ORG_CHART_NM, A.SDATE, A.PRIOR_ORG_CD, A.ORG_CD
+					              , NVL(DECODE(#{ssnEnterCd}, null, C.ORG_NM, 'zh_CN', C.ORG_NM_CN, 'en_US', C.ORG_NM_US, 'ja_JP', C.ORG_NM_JP, C.ORG_NM ), C.ORG_NM) AS ORG_NM
+					          FROM TORG105 A,
+					            (
+					                SELECT SUB1.*
+					                  FROM TORG103 SUB1,
+					                    (
+					                        SELECT MAX(SDATE) AS SDATE, ENTER_CD, ORG_CHART_NM
+					                          FROM TORG103
+					                         WHERE ENTER_CD = #{ssnEnterCd}
+					                           AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                          GROUP BY ENTER_CD, ORG_CHART_NM
+					                    ) SUB2
+					                 WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+					                   AND SUB1.ENTER_CD = SUB2.ENTER_CD
+					                   AND SUB1.SDATE = SUB2.SDATE
+					            ) B,
+					            (
+					                SELECT  SUB1.*
+					                  FROM  TORG101 SUB1
+					                 WHERE  SUB1.ENTER_CD = #{ssnEnterCd}
+					                   AND  TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SUB1.SDATE AND NVL(SUB1.EDATE, '99991231')
+					            ) C
+					         WHERE A.ENTER_CD = #{ssnEnterCd}
+					           AND A.ENTER_CD = B.ENTER_CD
+					           AND A.SDATE = B.SDATE
+					           AND A.ENTER_CD = C.ENTER_CD
+					           AND A.ORG_CD = C.ORG_CD
+					         START WITH A.PRIOR_ORG_CD = '0'
+					        CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					        AND PRIOR A.SDATE = A.SDATE
+					        AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					        ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+					)
+				]]>
+
+
+		</select>
+
+<!-- 개인사진관리(조직원) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpPictureMgrUserList">
+
+				<![CDATA[
+					SELECT A.SABUN
+					     , (SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR (SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) FROM DUAL)  AS ORG_NM
+					     , (SELECT F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.JIKWEE_CD, #{ssnLocaleCd}) FROM DUAL)  AS JIKWEE_NM
+					     , (SELECT F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',A.JIKCHAK_CD, #{ssnLocaleCd}) FROM DUAL)  AS JIKCHAK_NM
+					     , (SELECT F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD, #{ssnLocaleCd}) FROM DUAL)  AS JIKGUB_NM
+					     , (SELECT F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H10050',A.WORK_TYPE, #{ssnLocaleCd}) FROM DUAL)  AS WORK_TYPE_NM
+					     , A.STATUS_CD
+					     , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS') AS ALIAS
+					     , A.JIKWEE_CD
+					     , A.JIKGUB_CD
+					     , A.JIKCHAK_CD
+					     , A.WORK_TYPE
+					     , A.JOB_CD
+					     , '' AS JOB_NM
+					     , (SELECT COUNT(1) FROM THRM911 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND IMAGE_TYPE = '1' ) AS FILE_YN
+						 , (SELECT COUNT(1) FROM THRM911 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND IMAGE_TYPE = '2' ) AS SIGN_YN
+						 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN ||  chr(38) || 'type=1' AS PHOTO
+						 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN ||  chr(38) || 'type=2' AS SIGN
+						 , C.FILE_SEQ
+						 , C.SEQ_NO
+					  FROM (
+					        SELECT SUB1.*
+					          FROM THRM151 SUB1
+					         WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+					           AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					       ) A
+					     , THRM100 B
+					     , THRM911 C
+					 WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+					<choose>
+						<when test='lower != null and lower.equals("1")'>
+					   AND A.ORG_CD IN (SELECT #{orgCd}
+										  FROM DUAL
+										 UNION
+										SELECT ORG_CD
+										  FROM (
+										      	SELECT *
+												  FROM TORG105
+												 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+												   AND SDATE = (SELECT MAX(SDATE)
+																  FROM TORG103
+																 WHERE ENTER_CD = #{ssnEnterCd}
+																   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231'))
+											   )
+										 START WITH PRIOR_ORG_CD = #{orgCd}
+										 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+											 AND PRIOR SDATE = SDATE
+											 AND PRIOR ORG_CD = PRIOR_ORG_CD
+										)
+						</when>
+						<otherwise>
+
+					   AND A.ORG_CD = #{orgCd}
+						</otherwise>
+					</choose>
+					<if test='statusCd != null and !statusCd.equals("")'>
+		              AND A.STATUS_CD != #{statusCd}
+					</if>
+	<![CDATA[
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN = B.SABUN
+					   AND A.STATUS_CD <> 'RAA'	
+					   AND B.ENTER_CD = C.ENTER_CD(+)
+					   AND B.SABUN = C.SABUN(+)
+					   AND C.IMAGE_TYPE(+) = '1'				   
+					 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.SDATE)
+				]]>
+
+
+		</select>
+
+
+</mapper>

@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.promotion.promStdMgr">
+
+<!-- 승진기준관리(코드형태) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPromStdCodeList">
+
+				<![CDATA[
+					SELECT PMT_CD AS CODE
+					     , PMT_NM AS CODE_NM
+					  FROM THRM440
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					 ORDER BY PMT_CD DESC
+				]]>
+
+
+		</select>
+
+<!-- 승진기준관리(기준일) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPromStdBaseYmdMap">
+
+				<![CDATA[
+					SELECT PMT_CD AS PMT_CD
+						 , PMT_YYYY AS PMT_YYYY
+					     , BASE_YMD AS BASE_YMD
+					  FROM THRM440
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND PMT_CD = #{pmtCd}
+				]]>
+
+
+		</select>
+
+
+<!-- 승진기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPromStdMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.PMT_CD
+					     , A.PMT_NM
+					     , A.PMT_YYYY
+					     , A.BASE_YMD
+					     , A.TAR_WORK_TYPE
+					     , ( SELECT COUNT(1) FROM THRM449 WHERE ENTER_CD = A.ENTER_CD AND PMT_CD = A.PMT_CD ) AS TARGET_NUM
+					     , A.PAP_YN
+					     , A.PRIZE_YN
+					     , A.PUNISH_YN
+					     , A.LICENSE_YN
+					     , A.TIM_YN
+					  FROM THRM440 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+				<if test='pmtNm != null and !pmtNm.equals("")'>
+					   AND LOWER(A.PMT_NM) LIKE '%'||LOWER(TRIM( #{pmtNm} ))||'%'
+				</if>
+					 ORDER BY A.PMT_CD DESC
+
+
+		</select>
+
+<!-- 승진기준관리 저장 -->
+		<update parameterType="map" id="savePromStdMgr">
+
+					MERGE INTO THRM440 T
+					USING (
+							SELECT A.ENTER_CD
+							     , A.PMT_CD
+							     , A.PMT_NM
+							     , A.PMT_YYYY
+							     , A.BASE_YMD
+							     , A.TAR_WORK_TYPE
+							     , A.TARGET_NUM
+							     , A.PAP_YN
+							     , A.PRIZE_YN
+							     , A.PUNISH_YN
+							     , A.LICENSE_YN
+							     , A.TIM_YN
+							  FROM (
+									SELECT NULL AS ENTER_CD
+									     , NULL AS PMT_CD
+									     , NULL AS PMT_NM
+									     , NULL AS PMT_YYYY
+									     , NULL AS BASE_YMD
+									     , NULL AS TAR_WORK_TYPE
+									     , NULL AS TARGET_NUM
+									     , NULL AS PAP_YN
+									     , NULL AS PRIZE_YN
+									     , NULL AS PUNISH_YN
+									     , NULL AS LICENSE_YN
+									     , NULL AS TIM_YN
+									  FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS ENTER_CD ,
+											<choose><when test='rm.pmtCd != null and !rm.pmtCd.equals("")'>
+												TRIM(#{rm.pmtCd}) 			AS PMT_CD
+											</when><otherwise>
+												TO_CHAR(SYSDATE,'YYYY')||TO_CHAR(
+																					(SELECT (NVL(MAX(TO_NUMBER(SUBSTR(PMT_CD,5))),0) + ${icnt})
+																					   FROM THRM440
+																					  WHERE ENTER_CD = #{ssnEnterCd}
+																					)
+																					,'FM0000'
+																				)	AS PMT_CD
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM( #{rm.pmtNm})		AS PMT_NM
+											, TRIM( #{rm.pmtYyyy})		AS PMT_YYYY
+											, TRIM( #{rm.baseYmd})		AS BASE_YMD
+											, TRIM( #{rm.tarWorkType})	AS TAR_WORK_TYPE
+											, TRIM( #{rm.targetNum})	AS TARGET_NUM
+											, TRIM( #{rm.papYn})		AS PAP_YN
+											, TRIM( #{rm.prizeYn})		AS PRIZE_YN
+											, TRIM( #{rm.punishYn})	AS PUNISH_YN
+											, TRIM( #{rm.licenseYn})	AS LICENSE_YN
+											, TRIM( #{rm.timYn})		AS TIM_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.PMT_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PMT_CD = S.PMT_CD )
+					WHEN MATCHED THEN
+						UPDATE SET T.PMT_NM			= S.PMT_NM
+						         , T.PMT_YYYY		= S.PMT_YYYY
+						         , T.BASE_YMD		= S.BASE_YMD
+						         , T.TAR_WORK_TYPE	= S.TAR_WORK_TYPE
+						         , T.TARGET_NUM		= S.TARGET_NUM
+						         , T.PAP_YN			= S.PAP_YN
+						         , T.PRIZE_YN		= S.PRIZE_YN
+						         , T.PUNISH_YN		= S.PUNISH_YN
+						         , T.LICENSE_YN		= S.LICENSE_YN
+						         , T.TIM_YN			= S.TIM_YN						         
+						         , T.CHKDATE		= SYSDATE
+						         , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PMT_CD
+							, T.PMT_NM
+							, T.PMT_YYYY
+							, T.BASE_YMD
+							, T.TAR_WORK_TYPE
+							, T.TARGET_NUM
+							, T.PAP_YN
+							, T.PRIZE_YN
+							, T.PUNISH_YN
+							, T.LICENSE_YN
+							, T.TIM_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.PMT_CD
+							, S.PMT_NM
+							, S.PMT_YYYY
+							, S.BASE_YMD
+							, S.TAR_WORK_TYPE
+							, S.TARGET_NUM
+							, S.PAP_YN
+							, S.PRIZE_YN
+							, S.PUNISH_YN
+							, S.LICENSE_YN
+							, S.TIM_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 승진기준관리 삭제 -->
+		<delete parameterType="map" id="deletePromStdMgr1">
+
+					DELETE FROM THRM440
+					 WHERE ENTER_CD||'_'||PMT_CD	 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.pmtCd != null and !rm.pmtCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.pmtCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!-- 승진년차 삭제 -->
+		<delete parameterType="map" id="deletePromStdMgr2">
+
+					DELETE FROM THRM441
+					 WHERE ENTER_CD||'_'||PMT_CD	 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.pmtCd != null and !rm.pmtCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.pmtCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 상벌(포상) 삭제 -->
+		<delete parameterType="map" id="deletePromStdMgr4">
+
+					DELETE FROM THRM445
+					 WHERE ENTER_CD||'_'||PMT_CD	 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.pmtCd != null and !rm.pmtCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.pmtCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 상벌(징계) 삭제 -->
+		<delete parameterType="map" id="deletePromStdMgr5">
+
+					DELETE FROM THRM447
+					 WHERE ENTER_CD||'_'||PMT_CD	 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.pmtCd != null and !rm.pmtCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.pmtCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 승진기준관리(과거기준복사) 프로시저 -->
+		<update parameterType="map" id="prcPromStdMgr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_PRM_STD_COPY(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{bPmtCd,mode=IN,jdbcType=VARCHAR},
+				#{tPmtCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

@@ -1,0 +1,241 @@
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="yjungsan.util.*"%>
+
+<%@ page import="java.util.List"%>
+<%@ page import="java.util.ArrayList"%>
+<%@ page import="java.util.Map"%>
+<%@ page import="java.util.HashMap"%>
+<%@ page import="com.hr.common.logger.Log" %>
+
+<%@ include file="../common/include/session.jsp"%>
+<%@ include file="../auth/saveLog.jsp"%>
+<%!
+//저축 내역 조회
+public List selectSavHisMgrList(Map paramMap, String locPath, String ssnYeaLogYn) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	//xml 파서를 이용한 방법;
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+	List listData = null;
+
+	int cnt = 0;
+	String searchYmd1 = String.valueOf(pm.get("searchYmd1"));
+	String searchYmd2 = String.valueOf(pm.get("searchYmd2"));
+
+	if(searchYmd1.trim().length() != 0){
+		cnt++;
+	}
+	if(searchYmd2.trim().length() != 0){
+		cnt++;
+	}
+
+	StringBuffer query   = new StringBuffer();
+	query.setLength(0);
+
+	if(cnt != 0){
+		query.append(" AND A.REG_DT BETWEEN NVL(REPLACE(#searchYmd1#, '-', ''), '00001231') AND NVL(REPLACE(#searchYmd2#, '-', ''), '99991231')");
+	}
+
+	pm.put("query", query.toString());
+
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectSavHisMgrList",pm);
+		saveLog(null, pm, ssnYeaLogYn);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+
+	return listData;
+}
+
+//저축 내역 조회
+public List selectSavHisMgrSavingDeductType(Map paramMap, String locPath) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	//xml 파서를 이용한 방법;
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+	List listData = null;
+
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectSavHisMgrSavingDeductType",pm);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+
+	return listData;
+}
+
+%>
+
+<%
+	String locPath = xmlPath+"/savHisMgr/savHisMgr.xml";
+
+	String ssnEnterCd = (String)session.getAttribute("ssnEnterCd");
+	String ssnSabun = (String)session.getAttribute("ssnSabun");
+	String ssnYeaLogYn = (String)session.getAttribute("ssnYeaLogYn");
+	String cmd = (String)request.getParameter("cmd");
+
+	if("selectSavHisMgrList".equals(cmd)) {
+		//저축 내역 조회
+
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		mp.put("cmd", cmd);
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+
+		try {
+			listData = selectSavHisMgrList(mp, locPath, ssnYeaLogYn);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("Data", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+
+	} else if("selectSavHisMgrSavingDeductType".equals(cmd)) {
+		//저축 내역 조회
+
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		mp.put("cmd", cmd);
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+
+		try {
+			listData = selectSavHisMgrSavingDeductType(mp, locPath);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code); //ajax 성공코드 1번, 그외 오류
+		mapCode.put("Message", message);
+
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("codeList", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+
+	} else if("saveSavHisMgr".equals(cmd)) {
+		//주택마련저축 저장.
+
+		Map paramMap = StringUtil.getRequestMap(request);
+		List saveList = StringUtil.getParamListData(paramMap);
+
+		String[] type =  new String[]{"OUT","OUT","STR","STR","STR"
+				,"STR","STR","STR","STR","STR"
+				,"STR","STR","STR","STR","STR","STR","STR","STR"};
+
+		String message = "";
+		String code = "1";
+		int cnt = 0;
+
+		try {
+
+			if(saveList != null && saveList.size() > 0) {
+				for(int i = 0; i < saveList.size(); i++) {
+					Map mp = (Map)saveList.get(i);
+					String sStatus = (String)mp.get("sStatus");
+					String workYy = (String)mp.get("work_yy");
+					String adjustType = (String)mp.get("adjust_type");
+					String sabun = (String)mp.get("sabun");
+					String savingDeductType = (String)mp.get("saving_deduct_type");
+					String financeOrgCd = (String)mp.get("finance_org_cd");
+					String accountNo = (String)mp.get("account_no");
+					String applMon = (String)mp.get("appl_mon");
+					String adjInputType = (String)mp.get("adj_input_type");
+					String ntsYn = (String)mp.get("nts_yn");
+					String feedbackType = (String)mp.get("feedback_type");
+					String regDt = (String)mp.get("reg_dt");
+					String docSeq = (String)mp.get("doc_seq");
+					String docSeqDetail = (String)mp.get("doc_seq_detail");
+					String mthPer = (String)mp.get("mth_per");
+					
+					
+
+					String[] param = new String[]{"","",sStatus,ssnEnterCd,workYy
+							,adjustType,sabun,savingDeductType,financeOrgCd,accountNo
+							,applMon,adjInputType,ntsYn,feedbackType,ssnSabun,regDt,docSeq,docSeqDetail};
+
+					
+					//55.중소기업창업투자조합(벤처등_직접)
+					//60.중소기업창업투자조합(조합1_간접)
+					//65.중소기업창업투자조합(조합2_간접)
+					//70.청년형장기집합투자증권저축 선택시
+					if (savingDeductType.equals("55") || savingDeductType.equals("60") || savingDeductType.equals("65") || savingDeductType.equals("70")){
+						
+						type =  new String[]{"OUT","OUT","STR","STR","STR"
+								,"STR","STR","STR","STR","STR"
+								,"STR","STR","STR","STR","STR","STR","STR","STR","STR","STR"};
+						 
+						param = new String[]{"","",sStatus,ssnEnterCd,workYy
+									,adjustType,sabun,savingDeductType,"",financeOrgCd,accountNo
+									,applMon,"",adjInputType,feedbackType,ssnSabun,regDt,docSeq,docSeqDetail,mthPer};
+
+						String[] rstStr = DBConn.executeProcedure("PKG_CPN_YEA_"+yeaYear+"_SYNC.PENSION_INS",type,param);
+	
+						if(rstStr[1] == null || rstStr[1].length() == 0) {
+							cnt++;
+						} else {
+							message = message + "\n\n" + rstStr[1];
+						}
+												
+					}else{
+						
+						String[] rstStr = DBConn.executeProcedure("PKG_CPN_YEA_"+yeaYear+"_SYNC.HOUSE_SAVING_INS",type,param);
+	
+						if(rstStr[1] == null || rstStr[1].length() == 0) {
+							cnt++;
+						} else {
+							message = message + "\n\n" + rstStr[1];
+						}
+						
+					}
+					
+				}
+			}
+
+			if(cnt > 0) {
+				message = cnt+"건이 처리되었습니다." + message;
+			} else {
+				code = "-1";
+				message = "처리된 내용이 없습니다." + message;
+			}
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+
+		out.print((new org.json.JSONObject(rstMap)).toString());
+	}
+%>

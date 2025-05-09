@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	기부금조정명세(개인별)
+ -->
+<root>
+
+	<!-- 기부금조정명세(개인별) 조회 -->
+	<query id="selectDonationAdjEmpList">
+		<![CDATA[
+			SELECT WORK_YY, ADJUST_TYPE, NAME, SABUN, ADJ_SABUN, DONATION_MON, PREV_DED_MON, CUR_DED_MON, DED_MON, EXTINCTION_MON, CARRIED_MON
+			  FROM 
+			     (SELECT B.WORK_YY
+			            ,B.ADJUST_TYPE
+			            ,B.SABUN
+			            ,A.SABUN AS ADJ_SABUN
+			            ,(SELECT C.NAME FROM THRM100 C WHERE C.ENTER_CD = B.ENTER_CD AND C.SABUN = B.SABUN) AS NAME
+			            ,SUM(NVL(A.DONATION_MON,0)) AS DONATION_MON -- 기부금액
+			            ,SUM(NVL(A.PREV_DED_MON,0)) AS PREV_DED_MON -- 전년까지 공제된 금액
+			            ,SUM(NVL(A.CUR_DED_MON,0))  AS CUR_DED_MON  -- 공제대상금액
+			            ,SUM(NVL(A.DED_MON,0))      AS DED_MON      -- 해당연도 공제금액
+			            ,SUM(NVL(A.EXTINCTION_MON,0)) AS EXTINCTION_MON -- 소멸금액
+			            ,SUM(NVL(A.CARRIED_MON,0))  AS CARRIED_MON  -- 이월금액
+			        FROM TCPN837 A, TCPN811 B
+			       WHERE A.ENTER_CD(+) = B.ENTER_CD
+			         AND A.WORK_YY(+)  = B.WORK_YY
+			         AND A.ADJUST_TYPE(+) = B.ADJUST_TYPE
+			         AND A.SABUN(+) = B.SABUN
+			         AND B.ENTER_CD = #ssnEnterCd#
+			         AND A.WORK_YY = #searchYear#
+			         AND B.ADJUST_TYPE =  #searchAdjustType#
+			      GROUP BY B.ENTER_CD, B.WORK_YY, B.ADJUST_TYPE, B.SABUN, A.SABUN
+			     )
+			 WHERE SABUN = #searchSabun#
+			UNION
+			SELECT WORK_YY, ADJUST_TYPE, NAME, SABUN, ADJ_SABUN, DONATION_MON, PREV_DED_MON, CUR_DED_MON, DED_MON, EXTINCTION_MON, CARRIED_MON
+			  FROM 
+			     (SELECT B.WORK_YY
+			            ,B.ADJUST_TYPE
+			            ,B.SABUN
+			            ,A.SABUN AS ADJ_SABUN
+			            ,(SELECT C.NAME FROM THRM100 C WHERE C.ENTER_CD = B.ENTER_CD AND C.SABUN = B.SABUN) AS NAME
+			            ,SUM(NVL(A.DONATION_MON,0)) AS DONATION_MON -- 기부금액
+			            ,SUM(NVL(A.PREV_DED_MON,0)) AS PREV_DED_MON -- 전년까지 공제된 금액
+			            ,SUM(NVL(A.CUR_DED_MON,0))  AS CUR_DED_MON  -- 공제대상금액
+			            ,SUM(NVL(A.DED_MON,0))      AS DED_MON      -- 해당연도 공제금액
+			            ,SUM(NVL(A.EXTINCTION_MON,0)) AS EXTINCTION_MON -- 소멸금액
+			            ,SUM(NVL(A.CARRIED_MON,0))  AS CARRIED_MON  -- 이월금액
+			        FROM TCPN837 A, TCPN811 B
+			       WHERE A.ENTER_CD(+) = B.ENTER_CD
+			         AND A.WORK_YY(+)  = B.WORK_YY
+			         AND A.ADJUST_TYPE(+) = B.ADJUST_TYPE
+			         AND A.SABUN(+) = B.SABUN
+			         AND B.ENTER_CD = #ssnEnterCd#
+			         AND B.ADJUST_TYPE =  #searchAdjustType#
+			         AND A.WORK_YY = #searchYear#
+			      GROUP BY B.ENTER_CD, B.WORK_YY, B.ADJUST_TYPE, B.SABUN, A.SABUN
+			      HAVING SUM(NVL(A.CARRIED_MON,0)) > 0
+			     )
+			 WHERE SABUN = #searchSabun#
+			ORDER BY CARRIED_MON DESC, DONATION_MON DESC, SABUN		
+		]]>
+	</query>
+	
+	<!-- 기부금조정명세(개인별) 상세 조회 -->
+	<query id="selectDonationAdjEmpDetailList">
+		<![CDATA[
+			SELECT A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN
+			      ,A.CONTRIBUTION_CD -- 기부금코드(C00307)
+			      ,A.DONATION_YY  -- 기부연도
+			      ,A.DONATION_MON -- 기부금액
+			      ,A.PREV_DED_MON -- 전년까지 공제된 금액
+			      ,A.CUR_DED_MON  -- 공제대상금액
+			      ,A.DED_MON      -- 해당연도 공제금액
+			      ,A.EXTINCTION_MON -- 소멸금액			      
+			      ,A.CARRIED_MON  -- 이월금액
+			      ,(CASE WHEN B.NOTE1 IS NOT NULL AND A.WORK_YY > A.DONATION_YY THEN 'Y' ELSE 'N' END) AS CHG_YN -- 입력,수정가능여부
+			  FROM TCPN837 A, TSYS005 B
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.WORK_YY  = #searchYear#
+			   AND A.ADJUST_TYPE =  #searchAdjustType#
+			   AND A.SABUN    = #searchSabun#
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND B.GRCODE_CD = 'C00307'
+			   AND A.CONTRIBUTION_CD = B.CODE
+			ORDER BY A.CONTRIBUTION_CD, A.DONATION_YY		
+		]]>
+	</query>	
+
+</root>

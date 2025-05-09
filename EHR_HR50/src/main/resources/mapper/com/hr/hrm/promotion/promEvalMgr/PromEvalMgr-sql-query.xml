@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.promotion.promEvalMgr">
+
+		<!-- 승진급심사관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPromEvalMgrList">
+				SELECT A.SABUN
+				     , A.NAME
+				     , A.EMP_YMD
+				     , A.JIKWEE_NM
+				     , A.PRO_YMD
+				     , NVL(LANG_POINT, 0) + NVL(COMP_APP_POINT1_DUM, 0) + NVL(EDU_POINT, 0) + NVL(BUS_POINT, 0) + NVL(REWARD_POINT, 0) + NVL(GUILT_POINT, 0) AS TOTAL
+				     , A.LANG_POINT
+				     , A.COMP_APP_POINT1_DUM -- 추천
+				     , A.EDU_POINT -- 교육
+				     , A.BUS_POINT -- 사업개발
+				     , A.REWARD_POINT -- 포상
+				     , A.GUILT_POINT -- 징계
+				     , A.PM_POINT -- 근태
+				     , A.TOT_POINT -- 종합점수
+				     , A.LAST_YN -- 최종승진대상여부
+				  FROM THRM460 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.ORG_CD = #{ssnOrgCd}
+		</select>
+
+		<!-- 승진기준관리 저장 -->
+		<update parameterType="map" id="savePromEvalMgr">
+			MERGE INTO THRM460 T
+			USING
+			    (
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.PRO_YMD
+					     , A.TOT_POINT
+					     , A.LAST_YN
+					     , A.CHKDATE
+					     , A.CHKID
+					  FROM (
+					  			SELECT NULL AS ENTER_CD
+					  			     , NULL AS SABUN
+					  			     , NULL AS PRO_YMD
+					  			     , NULL AS TOT_POINT
+					  			     , NULL AS LAST_YN
+					  			     , NULL AS CHKDATE
+					  			     , NULL AS CHKID
+								  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+					  			UNION ALL
+					  			SELECT TRIM( #{ssnEnterCd} )	AS ENTER_CD
+					  			     , TRIM( #{rm.sabun})		AS SABUN
+					  			     , TRIM( #{rm.proYmd})		AS PRO_YMD
+					  			     , TRIM( #{rm.totPoint})	AS TOT_POINT
+					  			     , TRIM( #{rm.lastYn})		AS LAST_YN
+					  			     , SYSDATE					AS CHKDATE
+					  			     , TRIM( #{ssnSabun})		AS CHKID
+								  FROM DUAL
+</foreach>
+							) A
+					  WHERE A.ENTER_CD IS NOT NULL
+					    AND A.SABUN IS NOT NULL
+						AND A.PRO_YMD IS NOT NULL
+				) S
+			ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.PRO_YMD = S.PRO_YMD )
+			WHEN MATCHED THEN
+				UPDATE SET T.TOT_POINT	= S.TOT_POINT
+				         , T.LAST_YN	= S.LAST_YN
+				         , T.CHKDATE	= S.CHKDATE
+				         , T.CHKID		= S.CHKID
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					  T.ENTER_CD
+					, T.SABUN
+					, T.PRO_YMD
+					, T.TOT_POINT
+					, T.LAST_YN
+					, T.CHKDATE
+					, T.CHKID
+				)
+				VALUES
+				(
+					  S.ENTER_CD
+					, S.SABUN
+					, S.PRO_YMD
+					, S.TOT_POINT
+					, S.LAST_YN
+					, S.CHKDATE
+					, S.CHKID
+				)
+		</update>
+</mapper>

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천징수영수증
+ -->
+<root>
+
+	<!-- 원천징수영수증 대상자 조회  -->
+	<query id="selectRetPensionStaList">
+		<![CDATA[
+		SELECT A.ENTER_CD
+				, A.PAY_ACTION_CD
+				, A.PAY_YM
+				, A.PAY_ACTION_NM
+				, A.PAYMENT_YMD
+				, F.PAY_CD
+				, F.PAY_NM
+				, C.NAME
+				, C.SABUN
+				, B.ORG_NM
+				, NVL(E.SEQ, 1) AS SEQ
+				, E.BANK_NM
+				, E.BANK_ENTER_NO
+				, F_COM_DECRYPT(E.BANK_ACCOUNT, E.ENTER_CD) AS BANK_ACCOUNT
+				, E.DEFER_YMD
+				, E.CUR_DEFER_MON
+				, G.ETC_010
+		FROM TCPN201 A, TCPN203 B, THRM100 C, TCPN777 E, TCPN051 F, TCPN771 G
+		WHERE A.ENTER_CD = #ssnEnterCd#
+			AND A.PAY_CD = #searchRetPayCd#
+			AND A.PAY_YM LIKE #searchWorkYy#||#searchWorkMm#||'%'  
+			AND A.PAYMENT_YMD >= NVL(replace(#searchSYmd#, '-', ''), '10000101')
+			AND A.PAYMENT_YMD <= NVL(replace(#searchEYmd#, '-', ''), '99991231')
+			AND B.ENTER_CD = A.ENTER_CD
+			AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			AND C.ENTER_CD = A.ENTER_CD
+			AND  ( C.SABUN LIKE '%'|| #searchSbNm# ||'%' OR C.NAME LIKE '%'|| #searchSbNm# ||'%' )
+			AND C.SABUN = B.SABUN
+			AND E.ENTER_CD(+) = B.ENTER_CD
+			AND E.PAY_ACTION_CD(+) = B.PAY_ACTION_CD
+			AND E.SABUN(+) = B.SABUN
+			AND F.ENTER_CD = A.ENTER_CD
+			AND F.PAY_CD = A.PAY_CD 
+			AND E.ENTER_CD = G.ENTER_CD(+)
+	        AND G.SABUN(+) = E.SABUN
+	        AND G.PAY_ACTION_CD(+) = E.PAY_ACTION_CD
+		ORDER BY PAY_YM DESC, PAYMENT_YMD DESC, PAY_CD ASC, NAME ASC			 
+			]]> 
+	</query>
+	
+	<query id="mergeRetPensionSta">
+		<![CDATA[
+			MERGE INTO TCPN777 AA
+			USING (
+				SELECT #ssnEnterCd# AS ENTER_CD,  
+						   #pay_action_cd# AS PAY_ACTION_CD, 
+						   #sabun# AS SABUN, 
+						   #cur_defer_mon# AS CUR_DEFER_MON, 
+						   #bank_nm# AS BANK_NM,
+						   #bank_account# AS BANK_ACCOUNT, 
+						   #defer_ymd# AS DEFER_YMD, 
+						   #bank_enter_no# AS BANK_ENTER_NO, 
+						   sysdate AS CHKDATE, 
+						   #ssnSabun# AS CHKID,
+						   #seq# AS SEQ
+				FROM DUAL
+			) BB
+				ON (AA.ENTER_CD = BB.ENTER_CD
+					  AND AA. PAY_ACTION_CD = BB.PAY_ACTION_CD
+					  AND AA.SABUN = BB.SABUN
+					  AND AA.SEQ = BB.SEQ
+					  )
+			WHEN MATCHED THEN
+				UPDATE SET 	AA.CUR_DEFER_MON	= #cur_defer_mon#, 
+						   			AA.BANK_NM = #bank_nm#,
+						   			AA.BANK_ACCOUNT = F_COM_ENCRYPT(#bank_account#, #ssnEnterCd#) , 
+						   			AA.DEFER_YMD = #defer_ymd#, 
+						   			AA.BANK_ENTER_NO = #bank_enter_no#, 
+						   			AA.CHKDATE = sysdate, 
+						   			AA.CHKID = #ssnSabun# 
+			WHEN NOT MATCHED THEN
+				INSERT 	(	AA.ENTER_CD, 
+								AA.PAY_ACTION_CD, 
+								AA.SABUN, 
+								AA.CUR_DEFER_MON,
+								AA.BANK_NM, 
+								AA.BANK_ACCOUNT, 
+								AA.DEFER_YMD, 
+								AA.BANK_ENTER_NO, 
+								AA.CHKDATE, 
+								AA.CHKID,
+								AA.SEQ
+						) 
+				VALUES	( #ssnEnterCd#
+							, #pay_action_cd#
+							, #sabun#
+							, #cur_defer_mon#
+							, #bank_nm#
+							, F_COM_ENCRYPT(#bank_account#, #ssnEnterCd#)
+							, #defer_ymd#
+							, #bank_enter_no#
+							, SYSDATE
+							, #ssnSabun#
+							, #seq#
+						)
+		]]> 
+	</query>
+	
+	<query id="deleteRetPensionSta">
+		<![CDATA[
+			DELETE FROM TCPN777 WHERE ENTER_CD = #ssnEnterCd# 
+												AND PAY_ACTION_CD = #pay_action_cd#
+												AND SABUN = #sabun#
+												AND SEQ = #seq#
+		]]> 
+	</query>
+	
+	<query id="selectRetPensionStaCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			FROM TCPN777 
+			WHERE ENTER_CD = #ssnEnterCd# 
+				AND PAY_ACTION_CD = #pay_action_cd#
+				AND SABUN = #sabun#
+				AND SEQ = #seq#
+		]]> 
+	</query>
+	
+	<query id="updateRetMoneyYnSta">
+		<![CDATA[
+			UPDATE TCPN771 
+			   SET ETC_010 = #etc_010#
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN = #sabun#
+			   AND PAY_ACTION_CD = #pay_action_cd#
+		]]> 
+	</query>
+</root>

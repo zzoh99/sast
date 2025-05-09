@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.applyApproval.appBeforeLst">
+		<select parameterType="map" resultType="cMap" id="getAppBeforeLstList">
+
+				<![CDATA[
+					SELECT DISTINCT RANK() OVER (ORDER BY A.APPL_SEQ DESC ) AS RK
+						   ,'1' AS DETAIL
+						   , A.ENTER_CD
+					       , A.APPL_SEQ
+					       , B.APPL_CD
+					       , C.APPL_NM
+					       , B.APPL_YMD
+					       
+					       /* 신청자 */
+					       , B.APPL_SABUN
+					       , F_COM_GET_NAMES(B.ENTER_CD,B.APPL_SABUN, #{ssnLocaleCd}) AS APPL_SABUN_NAME
+					       , F_COM_GET_ORG_NM2(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS APPL_ORG_NM
+					       , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS APPL_JIKGUB_NM
+						   , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS APPL_JIKWEE_NM
+					       
+					       /* 신청 입력자 */
+					       , B.APPL_IN_SABUN
+					       , F_COM_GET_NAMES(B.ENTER_CD,B.APPL_IN_SABUN, #{ssnLocaleCd}) AS APPL_IN_SABUN_NAME
+					       , F_COM_GET_ORG_NM2(B.ENTER_CD, B.APPL_IN_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS APPL_IN_ORG_NM
+					       , F_COM_GET_JIKGUB_NM(B.ENTER_CD, B.APPL_IN_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS APPL_IN_JIKGUB_NM
+						   , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.APPL_IN_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS APPL_IN_JIKWEE_NM
+						   
+						   /* 결재자 */
+					       , A.AGREE_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN, #{ssnLocaleCd}) AS AGREE_NAME
+					       
+					       , B.AGREE_YMD
+					       , A.AGREE_STATUS_CD
+					       , A.MEMO
+					       , A.PATH_SEQ
+					       , B.APPL_STATUS_CD
+					       , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10010',B.APPL_STATUS_CD, #{ssnLocaleCd}) APPL_STATUS_CD_NM
+					       , A.AGREE_SEQ
+					       , A.GUBUN
+					       
+					       , CASE WHEN B.APPL_CD = '22'  THEN  B.TITLE || ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ)
+					              WHEN B.APPL_CD = '104' THEN  B.TITLE || ' - ' || F_TIM_GET_APPL_OCC_NM(A.ENTER_CD, A.APPL_SEQ)
+					              ELSE B.TITLE END AS TITLE  
+                        FROM THRI107 A
+                       INNER JOIN THRI103 B
+                          ON B.ENTER_CD = A.ENTER_CD
+                         AND B.APPL_SEQ = A.APPL_SEQ
+                       INNER JOIN THRI101 C
+                          ON C.ENTER_CD = A.ENTER_CD
+                         AND C.APPL_CD = B.APPL_CD
+                         AND C.USE_YN = 'Y'
+                        LEFT OUTER JOIN THRI120 D
+                          ON A.ENTER_CD = D.ENTER_CD
+                         AND A.AGREE_SABUN = D.AGREE_SABUN
+                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+                       WHERE A.ENTER_CD = #{ssnEnterCd}
+                         AND A.AGREE_STATUS_CD = '10'
+                         AND B.APPL_STATUS_CD IN ('21','31')
+                         AND B.APPL_YMD BETWEEN NVL(TRIM( REPLACE( #{sdt} ,'-','') ), '00000000') AND NVL(TRIM( REPLACE(  #{edt} ,'-','')), '99991231')
+                         AND 'Y' = (CASE WHEN B.APPL_STATUS_CD = '31' AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+                                 ]]>
+				<if test='applCd != null and !applCd.equals("")'>
+						 AND    	B.APPL_CD 		= TRIM( #{applCd} )
+				</if>
+                         AND ((A.AGREE_SABUN = #{ssnSabun} OR F_COM_GET_ORG_CD(#{ssnEnterCd},#{ssnSabun},TO_CHAR(SYSDATE,'YYYYMMDD')) = A.AGREE_SABUN ) OR D.DEPUTY_SABUN = #{ssnSabun})
+                         ORDER BY B.APPL_YMD DESC, A.APPL_SEQ DESC
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAppBeforeLstApplCdList">
+
+				<![CDATA[
+					SELECT 	  APPL_CD AS CODE
+                            , APPL_NM AS CODE_NM
+					FROM THRI101
+					WHERE 1=1
+					AND 	ENTER_CD    	= #{ssnEnterCd}
+					         ]]>
+				<if test='applCd != null and !applCd.equals("") '>
+					AND 	APPL_CD			= TRIM( #{applCd})
+				</if>
+					AND USE_YN = 'Y'
+					ORDER BY SEQ
+
+
+		</select>
+		
+		<update parameterType="map" id="appBeforeLstProcCallNoCommit" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRI_APP_AGREE_INS2(
+				#{outCode,mode=OUT,jdbcType=VARCHAR},
+				#{outErrorMsg,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSeq,mode=IN,jdbcType=VARCHAR},
+				#{searchApplCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR},
+				#{agreeSeq,mode=IN,jdbcType=VARCHAR},
+				#{agreeGubun,mode=IN,jdbcType=VARCHAR},
+				#{agreeTime,mode=IN,jdbcType=VARCHAR},
+				#{agreeUserMemo,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+				
+		]]>
+		</update>
+		
+		<select parameterType="map" resultType="cMap" id="getAppBeforeLstList2">
+
+				<![CDATA[
+					SELECT   AA.*
+					       , F_COM_GET_NAMES(C.ENTER_CD,C.SABUN, #{ssnLocaleCd}) 	AS APPL_NAME
+					       , F_COM_GET_NAMES(F.ENTER_CD,F.SABUN, #{ssnLocaleCd}) 	AS AGREE_NAME
+					       , 'N' 									AS DEL_YN
+					       , '' 									AS BASE_APPL_SEQ
+					       , '' 									AS APPL_TYPE
+					       , (	SELECT RECEV_YN
+					          	FROM   THRI101
+					          	WHERE  ENTER_CD  = AA.ENTER_CD
+					          	AND    APPL_CD   = AA.APPL_CD
+					      	) 										AS RECEV_YN
+					       , (	SELECT DETAIL_PRG_CD
+					          	FROM   THRI101
+					          	WHERE  ENTER_CD  = AA.ENTER_CD
+					          	AND    APPL_CD   = AA.APPL_CD
+					      	) 										AS DETAIL_PRG_CD
+					FROM
+					      (
+					         SELECT  A.ENTER_CD
+					               , A.APPL_SEQ
+					               , B.APPL_CD
+					               , B.APPL_YMD
+					               , B.APPL_SABUN
+					               , A.AGREE_SABUN
+					               , A.APPL_IN_SABUN
+					               , B.AGREE_YMD
+					               , A.AGREE_STATUS_CD
+					               , A.MEMO
+					               , A.PATH_SEQ
+					               , B.APPL_STATUS_CD
+					               , A.AGREE_SEQ
+					               , B.TITLE
+					               , B.APPL_YMD
+					         FROM   THRI107 A
+					         INNER  JOIN THRI103 B
+					         ON     A.ENTER_CD    = B.ENTER_CD
+					         AND    A.APPL_SEQ    = B.APPL_SEQ
+					        WHERE   A.ENTER_CD    = #{ssnEnterCd}
+					         AND    A.AGREE_SABUN = #{ssnSabun}
+					         AND    B.APPL_YMD BETWEEN NVL(TRIM( #{sDate}), '00000000') AND NVL(TRIM( #{eDate}), '99991231')
+					         AND    B.APPL_CD LIKE '%'|| TRIM( #{applCd} ) ||'%'
+					         AND    A.AGREE_STATUS_CD = '10'
+					      ) AA
+					      INNER JOIN THRM100 C
+					      ON AA.ENTER_CD = C.ENTER_CD
+					      AND AA.APPL_SABUN = C.SABUN
+					      INNER JOIN THRM100 F
+					      ON  AA.ENTER_CD     = F.ENTER_CD
+					      AND AA.AGREE_SABUN  = F.SABUN
+					ORDER BY AA.APPL_YMD DESC
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveAppBeforeLst">
+
+   					MERGE INTO THRI101 TARGETTABLE
+                  	USING (
+               				SELECT    A.APPL_CD        	AS APPL_CD
+                                	, A.APPL_NM        	AS APPL_NM
+                                	, A.BIZ_CD         	AS BIZ_CD
+                                	, A.AGREE_YN       	AS AGREE_YN
+                                	, A.APPL_SMS_YN    	AS APPL_SMS_YN
+                                	, A.APPL_MAIL_YN   	AS APPL_MAIL_YN
+                                	, A.AGREE_SMS_YN   	AS AGREE_SMS_YN
+                                	, A.AGREE_MAIL_YN  	AS AGREE_MAIL_YN
+                                	, A.PRG_CD         	AS PRG_CD
+                                	, A.PRG_PATH       	AS PRG_PATH
+                                	, A.AGREE_PRG_CD   	AS AGREE_PRG_CD
+                                	, A.AGREE_PRG_PATH 	AS AGREE_PRG_PATH
+                                	, A.VISUAL_YN      	AS VISUAL_YN
+                                	, A.USE_YN         	AS USE_YN
+                                	, A.APPL_WIDTH     	AS APPL_WIDTH
+                                	, A.APPL_HEIGHT    	AS APPL_HEIGHT
+                                	, A.AGREE_WIDTH    	AS AGREE_WIDTH
+                                	, A.AGREE_HEIGHT   	AS AGREE_HEIGHT
+                                	, A.NOTE1          	AS NOTE1
+                                	, A.NOTE2          	AS NOTE2
+                                	, A.NOTE3          	AS NOTE3
+                                	, A.NUM_NOTE       	AS NUM_NOTE
+                                	, A.SEQ            	AS SEQ
+                                	, A.MEMO           	AS MEMO
+                                	, A.APPL_TITLE     	AS APPL_TITLE
+                                	, A.AGREE_TITLE    	AS AGREE_TITLE
+                                	, A.ALARM_YN       	AS ALARM_YN
+                                	, A.RECEV_YN       	AS RECEV_YN
+                                	, A.COMBO_VIEW_YN  	AS COMBO_VIEW_YN
+                                	, A.DETAIL_PRG_CD  	AS DETAIL_PRG_CD
+                                	, A.PERSON_PRINT_YN	AS PERSON_PRINT_YN
+                                	, A.PRINT_YN       	AS PRINT_YN
+                                	, A.FILE_YN        	AS FILE_YN
+                                	, A.DETAIL_PRG_PATH	AS DETAIL_PRG_PATH
+                                	, A.ORG_LEVEL_CD   	AS ORG_LEVEL_CD
+                     		FROM   (
+                               		SELECT    NULL			AS APPL_CD
+                                			, NULL			AS APPL_NM
+                                			, NULL			AS BIZ_CD
+                                			, NULL			AS AGREE_YN
+                                			, NULL			AS APPL_SMS_YN
+                                			, NULL			AS APPL_MAIL_YN
+                                			, NULL			AS AGREE_SMS_YN
+                                			, NULL			AS AGREE_MAIL_YN
+                                			, NULL			AS PRG_CD
+                                			, NULL			AS PRG_PATH
+                                			, NULL			AS AGREE_PRG_CD
+                                			, NULL			AS AGREE_PRG_PATH
+                                			, NULL			AS VISUAL_YN
+                                			, NULL			AS USE_YN
+                                			, NULL			AS APPL_WIDTH
+                                			, NULL			AS APPL_HEIGHT
+                                			, NULL			AS AGREE_WIDTH
+                                			, NULL			AS AGREE_HEIGHT
+                                			, NULL			AS NOTE1
+                                			, NULL			AS NOTE2
+                                			, NULL			AS NOTE3
+                                			, NULL			AS NUM_NOTE
+                                			, NULL			AS SEQ
+                                			, NULL			AS MEMO
+                                			, NULL			AS APPL_TITLE
+                                			, NULL			AS AGREE_TITLE
+                                			, NULL			AS ALARM_YN
+                                			, NULL			AS RECEV_YN
+                                			, NULL			AS COMBO_VIEW_YN
+                                			, NULL			AS DETAIL_PRG_CD
+                                			, NULL			AS PERSON_PRINT_YN
+                                			, NULL			AS PRINT_YN
+                                			, NULL			AS FILE_YN
+                                			, NULL			AS DETAIL_PRG_PATH
+                                			, NULL			AS ORG_LEVEL_CD
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT
+                                      		   TRIM(#{rm.applCd})  					AS APPL_CD
+                                			,  TRIM(#{rm.applNm})  					AS APPL_NM
+                                			,  TRIM(#{rm.bizCd})  					AS BIZ_CD
+                                			,  TRIM(#{rm.agreeYn})  				AS AGREE_YN
+                                			,  TRIM(#{rm.applSmsYn}) 				AS APPL_SMS_YN
+                                			,  TRIM(#{rm.applMailYn}) 				AS APPL_MAIL_YN
+                                			,  TRIM(#{rm.agreeSmsYn}) 				AS AGREE_SMS_YN
+                                			,  TRIM(#{rm.agreeMailYn}) 				AS AGREE_MAIL_YN
+                                			,  TRIM(#{rm.prgCd})  					AS PRG_CD
+                                			,  TRIM(#{rm.prgPath}) 					AS PRG_PATH
+                                			,  TRIM(#{rm.agreePrgCd})				AS AGREE_PRG_CD
+                                			,  TRIM(#{rm.agreePrgPath})				AS AGREE_PRG_PATH
+                                			,  TRIM(#{rm.visualYn}) 				AS VISUAL_YN
+                                			,  TRIM(#{rm.useYn}) 					AS USE_YN
+                                			,  TO_NUMBER( TRIM(#{rm.applWidth})   ) AS APPL_WIDTH
+                                			,  TO_NUMBER( TRIM(#{rm.applHeight})  ) AS APPL_HEIGHT
+                                			,  TO_NUMBER( TRIM(#{rm.agreeWidth})  ) AS AGREE_WIDTH
+                                			,  TO_NUMBER( TRIM(#{rm.agreeHeight}) ) AS AGREE_HEIGHT
+                                			,  TRIM(#{rm.note1})  					AS NOTE1
+                                			,  TRIM(#{rm.note2})  					AS NOTE2
+                                			,  TRIM(#{rm.note3})   					AS NOTE3
+                                			,  TO_NUMBER( TRIM(#{rm.numNote})  	)	AS NUM_NOTE
+                                			,  TO_NUMBER( TRIM(#{rm.seq})       )	AS SEQ
+                                			,  TRIM(#{rm.memo})   					AS MEMO
+                                			,  TRIM(#{rm.applTitle})  				AS APPL_TITLE
+                                			,  TRIM(#{rm.agreeTitle})  				AS AGREE_TITLE
+                                			,  TRIM(#{rm.alarmYn}) 					AS ALARM_YN
+                                			,  TRIM(#{rm.recevYn}) 					AS RECEV_YN
+                                			,  TRIM(#{rm.comboViewYn}) 				AS COMBO_VIEW_YN
+                                			,  TRIM(#{rm.detailPrgCd}) 				AS DETAIL_PRG_CD
+                                			,  TRIM(#{rm.personPrintYn})			AS PERSON_PRINT_YN
+                                			,  TRIM(#{rm.printYn}) 					AS PRINT_YN
+                                			,  TRIM(#{rm.fileYn})  					AS FILE_YN
+                                			,  TRIM(#{rm.detailPrgPath}) 			AS DETAIL_PRG_PATH
+                                			,  TRIM(#{rm.orgLevelCd}) 				AS ORG_LEVEL_CD
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.APPL_CD IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               	   TARGETTABLE.ENTER_CD = #{ssnEnterCd}
+                               AND TARGETTABLE.APPL_CD = SOURCETABLE.APPL_CD
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.APPL_NM         	= SOURCETABLE.APPL_NM
+									, TARGETTABLE.BIZ_CD          	= SOURCETABLE.BIZ_CD
+									, TARGETTABLE.AGREE_YN        	= SOURCETABLE.AGREE_YN
+									, TARGETTABLE.APPL_SMS_YN     	= SOURCETABLE.APPL_SMS_YN
+									, TARGETTABLE.APPL_MAIL_YN    	= SOURCETABLE.APPL_MAIL_YN
+									, TARGETTABLE.AGREE_SMS_YN    	= SOURCETABLE.AGREE_SMS_YN
+									, TARGETTABLE.AGREE_MAIL_YN   	= SOURCETABLE.AGREE_MAIL_YN
+									, TARGETTABLE.PRG_CD          	= SOURCETABLE.PRG_CD
+									, TARGETTABLE.PRG_PATH        	= SOURCETABLE.PRG_PATH
+									, TARGETTABLE.AGREE_PRG_CD    	= SOURCETABLE.AGREE_PRG_CD
+									, TARGETTABLE.AGREE_PRG_PATH  	= SOURCETABLE.AGREE_PRG_PATH
+									, TARGETTABLE.VISUAL_YN       	= SOURCETABLE.VISUAL_YN
+									, TARGETTABLE.USE_YN          	= SOURCETABLE.USE_YN
+									, TARGETTABLE.APPL_WIDTH      	= SOURCETABLE.APPL_WIDTH
+									, TARGETTABLE.APPL_HEIGHT     	= SOURCETABLE.APPL_HEIGHT
+									, TARGETTABLE.AGREE_WIDTH     	= SOURCETABLE.AGREE_WIDTH
+									, TARGETTABLE.AGREE_HEIGHT    	= SOURCETABLE.AGREE_HEIGHT
+									, TARGETTABLE.NOTE1           	= SOURCETABLE.NOTE1
+									, TARGETTABLE.NOTE2           	= SOURCETABLE.NOTE2
+									, TARGETTABLE.NOTE3           	= SOURCETABLE.NOTE3
+									, TARGETTABLE.NUM_NOTE        	= SOURCETABLE.NUM_NOTE
+									, TARGETTABLE.SEQ             	= SOURCETABLE.SEQ
+									, TARGETTABLE.MEMO            	= SOURCETABLE.MEMO
+									, TARGETTABLE.APPL_TITLE      	= SOURCETABLE.APPL_TITLE
+									, TARGETTABLE.AGREE_TITLE     	= SOURCETABLE.AGREE_TITLE
+									, TARGETTABLE.ALARM_YN        	= SOURCETABLE.ALARM_YN
+									, TARGETTABLE.RECEV_YN        	= SOURCETABLE.RECEV_YN
+									, TARGETTABLE.COMBO_VIEW_YN   	= SOURCETABLE.COMBO_VIEW_YN
+									, TARGETTABLE.DETAIL_PRG_CD  	= SOURCETABLE.DETAIL_PRG_CD
+									, TARGETTABLE.PERSON_PRINT_YN 	= SOURCETABLE.PERSON_PRINT_YN
+									, TARGETTABLE.PRINT_YN        	= SOURCETABLE.PRINT_YN
+									, TARGETTABLE.FILE_YN         	= SOURCETABLE.FILE_YN
+									, TARGETTABLE.DETAIL_PRG_PATH 	= SOURCETABLE.DETAIL_PRG_PATH
+									, TARGETTABLE.ORG_LEVEL_CD    	= SOURCETABLE.ORG_LEVEL_CD
+                                  	, TARGETTABLE.CHKDATE			= SYSDATE
+                                  	, TARGETTABLE.CHKID				= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.APPL_CD
+							, TARGETTABLE.APPL_NM
+							, TARGETTABLE.BIZ_CD
+							, TARGETTABLE.AGREE_YN
+							, TARGETTABLE.APPL_SMS_YN
+							, TARGETTABLE.APPL_MAIL_YN
+							, TARGETTABLE.AGREE_SMS_YN
+							, TARGETTABLE.AGREE_MAIL_YN
+							, TARGETTABLE.PRG_CD
+							, TARGETTABLE.PRG_PATH
+							, TARGETTABLE.AGREE_PRG_CD
+							, TARGETTABLE.AGREE_PRG_PATH
+							, TARGETTABLE.VISUAL_YN
+							, TARGETTABLE.USE_YN
+							, TARGETTABLE.APPL_WIDTH
+							, TARGETTABLE.APPL_HEIGHT
+							, TARGETTABLE.AGREE_WIDTH
+							, TARGETTABLE.AGREE_HEIGHT
+							, TARGETTABLE.NOTE1
+							, TARGETTABLE.NOTE2
+							, TARGETTABLE.NOTE3
+							, TARGETTABLE.NUM_NOTE
+							, TARGETTABLE.SEQ
+							, TARGETTABLE.MEMO
+							, TARGETTABLE.APPL_TITLE
+							, TARGETTABLE.AGREE_TITLE
+							, TARGETTABLE.ALARM_YN
+							, TARGETTABLE.RECEV_YN
+							, TARGETTABLE.COMBO_VIEW_YN
+							, TARGETTABLE.DETAIL_PRG_CD
+							, TARGETTABLE.PERSON_PRINT_YN
+							, TARGETTABLE.PRINT_YN
+							, TARGETTABLE.FILE_YN
+							, TARGETTABLE.DETAIL_PRG_PATH
+							, TARGETTABLE.ORG_LEVEL_CD
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, SOURCETABLE.APPL_CD
+							, SOURCETABLE.APPL_NM
+							, SOURCETABLE.BIZ_CD
+							, SOURCETABLE.AGREE_YN
+							, SOURCETABLE.APPL_SMS_YN
+							, SOURCETABLE.APPL_MAIL_YN
+							, SOURCETABLE.AGREE_SMS_YN
+							, SOURCETABLE.AGREE_MAIL_YN
+							, SOURCETABLE.PRG_CD
+							, SOURCETABLE.PRG_PATH
+							, SOURCETABLE.AGREE_PRG_CD
+							, SOURCETABLE.AGREE_PRG_PATH
+							, SOURCETABLE.VISUAL_YN
+							, SOURCETABLE.USE_YN
+							, SOURCETABLE.APPL_WIDTH
+							, SOURCETABLE.APPL_HEIGHT
+							, SOURCETABLE.AGREE_WIDTH
+							, SOURCETABLE.AGREE_HEIGHT
+							, SOURCETABLE.NOTE1
+							, SOURCETABLE.NOTE2
+							, SOURCETABLE.NOTE3
+							, SOURCETABLE.NUM_NOTE
+							, SOURCETABLE.SEQ
+							, SOURCETABLE.MEMO
+							, SOURCETABLE.APPL_TITLE
+							, SOURCETABLE.AGREE_TITLE
+							, SOURCETABLE.ALARM_YN
+							, SOURCETABLE.RECEV_YN
+							, SOURCETABLE.COMBO_VIEW_YN
+							, SOURCETABLE.DETAIL_PRG_CD
+							, SOURCETABLE.PERSON_PRINT_YN
+							, SOURCETABLE.PRINT_YN
+							, SOURCETABLE.FILE_YN
+							, SOURCETABLE.DETAIL_PRG_PATH
+							, SOURCETABLE.ORG_LEVEL_CD
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+
+		<delete parameterType="map" id="deleteAppBeforeLst">
+
+   					DELETE FROM THRI101
+					WHERE ( ENTER_CD,APPL_CD  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{rm.applCd})  )
+</foreach>
+							)
+		</delete>
+
+		<select parameterType="map" resultType="cMap" id="getAppBeforeLstPopupList">
+
+				<![CDATA[
+   					SELECT
+							  A.APPL_CD
+							, A.AGREE_SEQ AS OLD_AGREE_SEQ
+							, A.AGREE_SEQ
+							, A.APPL_TYPE_CD
+							, A.SABUN
+							, F_COM_GET_NAMES(ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD,A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+  					FROM THRI102 A
+ 					WHERE A.ENTER_CD 	= #{ssnEnterCd}
+ 					AND A.APPL_CD 		= TRIM( #{applCd} )
+ 					ORDER BY A.AGREE_SEQ ASC
+				]]>
+
+
+		</select>
+
+		<update parameterType="map" id="saveAppBeforeLstPopup">
+
+   					MERGE INTO THRI102 T
+                  	USING (
+               				SELECT    A.APPL_CD        	AS APPL_CD
+                                	, A.SABUN        	AS SABUN
+                                	, A.APPL_TYPE_CD    AS APPL_TYPE_CD
+                                	, A.AGREE_SEQ       AS AGREE_SEQ
+                     		FROM   (
+                               		SELECT    NULL			AS APPL_CD
+                                			, NULL			AS SABUN
+                                			, NULL			AS APPL_TYPE_CD
+                                			, NULL			AS AGREE_SEQ
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT
+                                      		   TRIM(#{rm.applCd})		AS APPL_CD
+                                			,  TRIM(#{rm.sabun})  		AS SABUN
+                                			,  TRIM(#{rm.applTypeCd})	AS APPL_TYPE_CD
+                                			,  TO_NUMBER( TRIM(#{rm.agreeSeq}) )  	AS AGREE_SEQ
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.APPL_CD IS NOT NULL
+                           ) S
+                        ON (
+                               	   T.ENTER_CD 	= #{ssnEnterCd}
+                               AND T.APPL_CD 	= S.APPL_CD
+                               AND T.SABUN 		= S.SABUN
+                           )
+           			WHEN MATCHED THEN
+						UPDATE SET	  T.APPL_TYPE_CD  	= S.APPL_TYPE_CD
+									, T.AGREE_SEQ    	= S.AGREE_SEQ
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  T.ENTER_CD
+               				, T.APPL_CD
+							, T.SABUN
+							, T.APPL_TYPE_CD
+							, T.AGREE_SEQ
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, S.APPL_CD
+							, S.SABUN
+							, S.APPL_TYPE_CD
+							, S.AGREE_SEQ
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+
+		<delete parameterType="map" id="deleteAppBeforeLstPopup">
+
+   					DELETE FROM THRI102
+					WHERE ( ENTER_CD,APPL_CD  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{rm.applCd})  )
+</foreach>
+							)
+		</delete>
+
+		<update parameterType="map" id="prcAppBeforeLstProcCall" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRI_APP_AGREE_INS2(
+				#{outCode,mode=OUT,jdbcType=VARCHAR},
+				#{outErrorMsg,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchApplSeq,mode=IN,jdbcType=VARCHAR},
+				#{searchApplCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR},
+				#{agreeSeq,mode=IN,jdbcType=VARCHAR},
+				#{agreeGubun,mode=IN,jdbcType=VARCHAR},
+				TO_CHAR(SYSDATE, 'YYYYMMDDHH24mmss'),
+				#{agreeUserMemo,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>
+

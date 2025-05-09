@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tim.workingType.workingTypeApr">
+	<!-- 근로시간단축 승인관리 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWorkingTypeAprList">
+		SELECT *
+		  FROM
+		  (
+			 SELECT  A.ENTER_CD
+					 , '0' AS IBS_IMAGE
+					 , B.APPL_YMD
+					 , B.APPL_STATUS_CD
+					 , B.APPL_SEQ
+					 , B.APPL_SABUN
+					 , B.APPL_IN_SABUN
+					 , C.ORG_CD
+					 , F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, C.SDATE) AS ORG_NM
+					 , C.JIKWEE_NM
+					 , A.SABUN
+					 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+					 , NVL(SWT_CA_STR_YMD, SWT_APPLY_STR_YMD) AS SWT_APPLY_STR_YMD
+					 , NVL(SWT_CA_END_YMD, SWT_APPLY_END_YMD) AS SWT_APPLY_END_YMD
+					 , SWT_STR_H AS SWT_STR_H
+					 , SWT_END_H AS SWT_END_H
+					 , (
+						 SELECT CODE_NM
+						   FROM TSYS005
+						  WHERE ENTER_CD = A.ENTER_CD
+							AND CODE = A.WT_CD
+							AND GRCODE_CD = 'WT9001'
+					   ) AS APPL_NM
+					 , B.APPL_CD
+					 , A.WT_CD
+					 , DECODE(SWT_CA_STR_YMD,NULL,0,1) AS CHK_COL
+					 , A.APP_WORK_HOUR
+			  FROM TTIM710 A,
+				   THRI103 B,
+				   THRM151 C
+			 WHERE A.ENTER_CD = B.ENTER_CD
+			   AND A.APPL_SEQ = B.APPL_SEQ
+			   AND A.ENTER_CD = C.ENTER_CD
+			   AND A.SABUN = C.SABUN
+			   AND A.ENTER_CD = #{ssnEnterCd}
+			<if test='applStatusCd != null and applStatusCd eq "11"'>
+			<![CDATA[
+			   AND B.APPL_STATUS_CD <> '11'
+			]]>
+			</if>
+			   AND A.APPL_YMD BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+			   AND A.APPL_YMD BETWEEN TRIM( #{applYmdFrom} ) AND TRIM( #{applYmdTo} )
+		  ) A
+		 WHERE 1=1
+		<if test='applCd != null and applCd neq ""'>
+		   AND A.WT_CD = #{applCd}
+		</if>
+		<if test='applStatusCd != null and applStatusCd neq ""'>
+		   AND A.APPL_STATUS_CD = #{applStatusCd}
+		</if>
+		   AND (A.NAME LIKE '%' || TRIM( #{name} ) || '%' OR A.SABUN LIKE '%' || TRIM( #{name} ) || '%')
+		 ORDER BY APPL_STATUS_CD, APPL_SEQ DESC, APPL_YMD DESC
+	</select>
+
+	<!-- 신청서마스터(TTIM710) 저장 -->
+	<update parameterType="map" id="updateWorkingTypeAprMaster">
+		UPDATE THRI103 A
+		   SET A.APPL_STATUS_CD	= TRIM( #{applStatusCd} )
+			 , A.CHKDATE = SYSDATE
+			 , A.CHKID = #{ssnSabun}
+	 	 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.APPL_SEQ = TRIM( #{applSeq} )
+	</update>
+</mapper>
+

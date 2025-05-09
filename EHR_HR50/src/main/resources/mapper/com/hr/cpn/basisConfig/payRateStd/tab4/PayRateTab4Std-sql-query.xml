@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.payRateStd.tab4">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayRateTab4StdList">
+
+				<![CDATA[
+					SELECT   PAY_CD
+                           , YEAR
+					       , ELEMENT_SET_CD
+					       , RATE
+					       , PERIOD_TYPE
+					       , REVERSE_PERIOD_YN
+					 FROM TCPN006       /* TCPN006  */
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					 ORDER BY PAY_CD
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePayRateTab4Std">
+
+					MERGE INTO TCPN006 T
+					USING	(
+							SELECT	 A.PAY_CD
+									, A.YEAR
+									, A.ELEMENT_SET_CD
+									, A.RATE
+									, A.PERIOD_TYPE
+									, A.REVERSE_PERIOD_YN
+							FROM	(
+									SELECT	  NULL      AS PAY_CD
+                                            , NULL		AS YEAR
+											, NULL		AS ELEMENT_SET_CD
+                                            , NULL      AS RATE
+                                            , NULL      AS PERIOD_TYPE
+                                            , NULL      AS REVERSE_PERIOD_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											 TRIM(#{rm.payCd})           AS PAY_CD
+                                            , TRIM(#{rm.year})    AS YEAR
+											, TRIM(#{rm.elementSetCd})    AS ELEMENT_SET_CD
+											, TRIM(#{rm.rate})            AS RATE
+											, TRIM(#{rm.periodType})      AS PERIOD_TYPE
+											, TRIM(#{rm.reversePeriodYn})      AS REVERSE_PERIOD_YN
+											FROM   DUAL
+</foreach>
+									) A
+							WHERE A.PAY_CD IS NOT NULL
+							  AND A.YEAR IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= #{ssnEnterCd}
+					AND  T.PAY_CD = S.PAY_CD
+					AND  T.YEAR = S.YEAR
+					)
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.ELEMENT_SET_CD    = S.ELEMENT_SET_CD
+                                    , T.RATE              = S.RATE
+                                    , T.PERIOD_TYPE       = S.PERIOD_TYPE
+                                    , T.REVERSE_PERIOD_YN       = S.REVERSE_PERIOD_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD -- KEY
+							, T.PAY_CD -- KEY
+							, T.YEAR -- KEY
+							, T.ELEMENT_SET_CD
+							, T.RATE
+							, T.CHKDATE
+							, T.CHKID
+							, T.PERIOD_TYPE
+							, T.REVERSE_PERIOD_YN
+						)
+						VALUES
+						(
+                              #{ssnEnterCd} -- KEY
+                            , S.PAY_CD -- KEY
+                            , S.YEAR -- KEY
+                            , S.ELEMENT_SET_CD
+                            , S.RATE
+							, SYSDATE
+							, #{ssnSabun}
+							, S.PERIOD_TYPE
+							, S.REVERSE_PERIOD_YN
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayRateTab4Std">
+					DELETE FROM TCPN006
+					WHERE 	(ENTER_CD, PAY_CD, YEAR) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test='rm.payCd != null and !rm.payCd.equals("")'>
+                                            <if test='rm.year != null and !rm.year.equals("")'>
+											   (#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.year} ) )
+											</if>
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+	</mapper>

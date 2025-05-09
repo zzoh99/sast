@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.exceAllowMgr">
+		<select parameterType="map" resultType="cMap" id="getExceAllowMgrMap">
+			
+				<![CDATA[
+	                 SELECT PAY_ACTION_CD
+	                     , PAY_ACTION_NM
+	                   FROM (
+	                        SELECT A.PAY_ACTION_CD
+	                              , A.PAY_ACTION_NM
+	                              , A.PAY_YM
+	                              , A.PAY_CD
+	                              , B.RUN_TYPE
+	                              , A.PAYMENT_YMD
+	                          FROM TCPN201 A
+	                               , TCPN051 B
+	                             , TCPN981 C
+	                             , TCPN203 D
+	                         WHERE A.ENTER_CD        = B.ENTER_CD
+	                           AND A.PAY_CD            = B.PAY_CD
+	                           AND A.ENTER_CD        = D.ENTER_CD(+)
+	                           AND A.PAY_ACTION_CD    = D.PAY_ACTION_CD(+)
+	                           AND A.ENTER_CD        = C.ENTER_CD(+)
+	                           AND A.PAY_ACTION_CD    = C.PAY_ACTION_CD(+)
+	                           AND A.ENTER_CD        = #{ssnEnterCd} ]]>
+	                           AND B.RUN_TYPE IN
+		<foreach collection="searchRunType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+<if test='ssnSearchType eq "O"'><![CDATA[
+					            AND (B.BUSINESS_PLACE_CD IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+					                                          FROM (SELECT F_COM_GET_AUTH_PARSE(TRIM(#{ssnEnterCd}),'C10',F_COM_GET_AUTH_VALUE(TRIM(#{ssnEnterCd}),TRIM(#{ssnSabun}),TRIM(#{ssnGrpCd}))) AS PARAM FROM dual) A
+					                                        CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) 
+								  OR B.BUSINESS_PLACE_CD IS NULL)]]>
+</if>
+<if test='mode != null and mode eq "retire"'>
+	                           AND B.PAY_CD IN ( '35','C5','CG', 'S6', 'S4')
+</if>
+	                      	 ORDER BY A.PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+	                    	 )
+	                   WHERE ROWNUM = 1
+		</select>
+
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getExceAllowMgrFirstList">
+				<![CDATA[
+                SELECT A.ENTER_CD
+                     , A.PAY_ACTION_CD
+                     , E.PAY_ACTION_NM
+                     , C.ELEMENT_CD
+                     , C.ELEMENT_NM
+                     , B.PAY_YM
+                     , B.PAY_CD
+                     , D.PAY_NM
+                     ,(SELECT CLOSE_YN
+                       FROM TCPN981
+                       WHERE ENTER_CD = A.ENTER_CD
+                       AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS CLOSE_YN
+                FROM TCPN109 A
+                   , TCPN201 B
+                   , TCPN011 C
+                   , TCPN051 D
+                   , TCPN201 E
+                WHERE A.ENTER_CD  = #{ssnEnterCd} ]]>
+                <if test="searchPayActionCdHidden and searchPayActionCdHidden neq ''">
+                   AND B.PAY_ACTION_CD = #{searchPayActionCdHidden}
+                </if>
+                <if test="searchElementNm != null and searchElementNm neq ''">
+                   AND C.ELEMENT_NM LIKE '%'|| #{searchElementNm} || '%'
+                </if>
+                <![CDATA[
+                   AND A.ENTER_CD  = B.ENTER_CD
+                   AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+                   AND A.ENTER_CD  = C.ENTER_CD
+                   AND A.ELEMENT_CD  = C.ELEMENT_CD
+                   AND C.ELEMENT_TYPE IN ('A', 'D')
+				   AND C.SDATE				= (SELECT MAX(SDATE)
+				     							 FROM TCPN011
+				     							WHERE ENTER_CD = A.ENTER_CD
+				     							  AND ELEMENT_CD = A.ELEMENT_CD
+				     							  AND B.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231'))
+                   AND B.ENTER_CD  = D.ENTER_CD
+                   AND B.PAY_CD = D.PAY_CD
+                   AND E.ENTER_CD(+)      = A.ENTER_CD
+                   AND E.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+                   ORDER BY ELEMENT_TYPE, PAY_ACTION_CD ASC
+				]]>
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveExceAllowMgrFirst">
+					MERGE INTO TCPN109 T
+					USING	(
+							SELECT	  PAY_ACTION_CD
+									, ELEMENT_CD
+							FROM	(
+									SELECT	  NULL		AS PAY_ACTION_CD
+											, NULL		AS ELEMENT_CD
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.payActionCd} )	AS PAY_ACTION_CD
+											, TRIM( #{rm.elementCd} )	AS ELEMENT_CD
+											FROM   DUAL
+</foreach>
+									) WHERE PAY_ACTION_CD IS NOT NULL
+										AND  ELEMENT_CD IS NOT NULL
+									GROUP BY  PAY_ACTION_CD, ELEMENT_CD
+							) S
+					ON ( T.ENTER_CD		= #{ssnEnterCd}
+					AND T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					AND T.ELEMENT_CD    = S.ELEMENT_CD
+					)
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteExceAllowMgrFirst">
+					DELETE FROM TCPN109
+					WHERE 	(ENTER_CD, PAY_ACTION_CD, ELEMENT_CD) IN 	(  (NULL,NULL,NULL) 
+<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+											<if test="rm.payActionCd != null and rm.payActionCd neq ''">
+												<if test="rm.elementCd != null and rm.elementCd neq ''">
+													(#{ssnEnterCd}, TRIM( #{rm.payActionCd} ), TRIM( #{rm.elementCd} ))
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+			
+		</delete>
+
+		<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteExceAllowMgrFirstDetail">
+			
+					DELETE FROM TCPN110
+					WHERE 	(ENTER_CD, PAY_ACTION_CD, ELEMENT_CD) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+											<if test="rm.payActionCd != null and rm.payActionCd neq ''">
+												<if test="rm.elementCd != null and rm.elementCd neq ''">
+													(#{ssnEnterCd}, TRIM( #{rm.payActionCd} ), TRIM( #{rm.elementCd} ))
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getExceAllowMgrSecondList">
+			
+				<![CDATA[
+
+				SELECT * FROM (
+					SELECT ROWNUM AS RNUM,
+					       ENTER_CD,
+					       SABUN,
+					       NAME,
+					       PAY_ACTION_CD,
+					       ELEMENT_CD,
+					       PAYMENT_MON,
+					       NOTE,
+					       NOTE_NOTIFY_YN,
+					       CLOSE_YN
+					  FROM (SELECT A.ENTER_CD,
+					               A.SABUN,
+					               B.NAME,
+					               A.PAY_ACTION_CD,
+					               A.ELEMENT_CD,
+					               A.PAYMENT_MON,
+					               A.NOTE,
+					               A.NOTE_NOTIFY_YN,
+					               (SELECT CLOSE_YN
+					                  FROM TCPN981
+					                 WHERE ENTER_CD = A.ENTER_CD
+					                       AND PAY_ACTION_CD = A.PAY_ACTION_CD)
+					                  AS CLOSE_YN
+					          FROM TCPN110 A
+					          LEFT OUTER JOIN THRM100 B
+					            ON A.ENTER_CD = B.ENTER_CD
+			                   AND A.SABUN = B.SABUN 
+					         WHERE     A.ENTER_CD = #{ssnEnterCd}
+		                       AND A.PAY_ACTION_CD = #{searchPayActionCd2}
+		                       AND A.ELEMENT_CD = #{searchElementCd2}
+			                 )
+			    ) WHERE 1=1 ]]>
+			    <if test="searchName != null and searchName neq ''">
+                   AND NAME LIKE '%' || #{searchName} || '%'
+                </if>
+		</select>
+
+
+		<!-- ElementCd List Combo  -->
+		<select parameterType="map" resultType="cMap" id="getElementCdList">
+			
+				<![CDATA[
+				SELECT ELEMENT_CD AS CODE,
+				       ELEMENT_NM AS CODE_NM
+				  FROM (SELECT ROWNUM AS RNUM,
+				               ELEMENT_TYPE,
+				               ELEMENT_CD,
+				               SDATE,
+				               EDATE,
+				               ELEMENT_NM,
+				               REPORT_NM,
+				               PRIORITY,
+				               UPDOWN_TYPE,
+				               UPDOWN_UNIT,
+				               CURRENCY_CD,
+				               ELEMENT_LINK_TYPE
+				          FROM (  SELECT ELEMENT_TYPE,
+				                         ELEMENT_CD,
+				                         SDATE,
+				                         EDATE,
+				                         ELEMENT_NM,
+				                         REPORT_NM,
+				                         PRIORITY,
+				                         UPDOWN_TYPE,
+				                         UPDOWN_UNIT,
+				                         CURRENCY_CD,
+				                         ELEMENT_LINK_TYPE
+				                    FROM TCPN011
+				                   WHERE ENTER_CD = #{ssnEnterCd}
+				                       AND NVL(EDATE,'99991231') >= TO_CHAR(SYSDATE,'YYYYMMDD')
+				                  ORDER BY PRIORITY, ELEMENT_NM))
+				  ORDER BY ELEMENT_TYPE, PRIORITY ASC
+				]]>
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveExceAllowMgrSecond">
+					MERGE INTO TCPN110 T
+					USING	(
+							SELECT	  SABUN
+									, PAY_ACTION_CD
+									, ELEMENT_CD
+									, PAYMENT_MON
+									, NOTE
+									,NOTE_NOTIFY_YN
+							FROM	(
+									SELECT	  NULL		AS SABUN
+											, NULL		AS PAY_ACTION_CD
+											, NULL		AS ELEMENT_CD
+											, NULL		AS PAYMENT_MON
+											, NULL		AS NOTE
+											, NULL		AS NOTE_NOTIFY_YN
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.sabun} )	    AS SABUN
+											, TRIM( #{rm.payActionCd} )	AS PAY_ACTION_CD
+											, TRIM( #{rm.elementCd} )	AS ELEMENT_CD
+											, TRIM( #{rm.paymentMon} )	AS PAYMENT_MON
+											, TRIM( #{rm.note} )	    AS NOTE
+											, TRIM( #{rm.noteNotifyYn}) AS NOTE_NOTIFY_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD      = #{ssnEnterCd}
+					AND  T.SABUN         = S.SABUN
+					AND  T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					AND  T.ELEMENT_CD    = S.ELEMENT_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAYMENT_MON	= S.PAYMENT_MON
+									, T.NOTE       	= S.NOTE
+									, T.NOTE_NOTIFY_YN  = S.NOTE_NOTIFY_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.PAYMENT_MON
+							, T.NOTE
+							, T.NOTE_NOTIFY_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.SABUN
+							, S.PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, S.PAYMENT_MON
+							, S.NOTE
+							, S.NOTE_NOTIFY_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteExceAllowMgrSecond">
+					DELETE FROM TCPN110
+					WHERE 	(ENTER_CD, SABUN, PAY_ACTION_CD, ELEMENT_CD) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+											<if test="rm.sabun != null and rm.sabun neq ''">
+												<if test="rm.payActionCd != null and rm.payActionCd neq ''">
+													<if test="rm.elementCd != null and rm.elementCd neq ''">
+														(#{ssnEnterCd}, TRIM( #{rm.sabun} ), TRIM( #{rm.payActionCd} ), TRIM( #{rm.elementCd} ))
+													</if>
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+			
+			
+		</delete>
+
+</mapper>

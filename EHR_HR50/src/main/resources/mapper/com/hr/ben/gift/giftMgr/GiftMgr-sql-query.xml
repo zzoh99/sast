@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.gift.giftMgr">
+
+	<!-- 선물신청구분 콤보  -->
+	<select id="getGiftMgrGiftSeqCombo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.GIFT_SEQ AS CODE
+		     , A.TITLE    AS CODE_NM
+		     , A.EDATE
+		     , A.SEARCH_SEQ
+		  FROM TBEN765 A  
+		 WHERE A.ENTER_CD =	#{ssnEnterCd}
+	     ORDER BY A.SDATE DESC, A.TITLE
+	]]>
+	</select>
+		
+	<!-- 선물명 콤보  -->
+	<select id="getGiftMgrGiftCdCombo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.GIFT_CD   AS CODE
+		     , A.GIFT_NM   AS CODE_NM
+		  FROM TBEN766 A  
+                  WHERE A.ENTER_CD =	#{ssnEnterCd}
+                    AND A.GIFT_SEQ =	TRIM(#{searchGiftSeq})
+	     ORDER BY A.GIFT_CD
+	]]>
+	</select>
+	
+	<!-- 조회  -->
+	<select id="getGiftMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.SABUN
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN ) AS NAME -- 성명
+			 , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE ) AS ORG_NM
+			 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030' , A.JIKWEE_CD ) AS JIKWEE_NM
+			 , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN,'HP') AS PHONE_NO
+			 , C.GIFT_CD
+			 , ( SELECT GIFT_NM
+			       FROM TBEN766 X
+			      WHERE X.ENTER_CD = C.ENTER_CD
+			        AND X.GIFT_SEQ = C.GIFT_SEQ
+			        AND X.GIFT_CD  = C.GIFT_CD ) AS GIFT_NM
+			 , C.APPL_YMD
+			 , C.REC_NAME
+			 , C.REC_PHONE
+			 , C.REC_ZIP 
+			 , C.REC_ADDR
+			 , C.NOTE
+		  FROM THRM151 A
+		     , TABLE(F_TABLE_SEARCH_SEQ(#{ssnEnterCd}, TRIM(#{searchSeq}), TRIM(#{searchEdate}))) B
+		     , TBEN767 C
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND TRIM(#{searchEdate}) BETWEEN A.SDATE AND NVL(A.EDATE, 'YYYYMMDD')
+		   AND A.STATUS_CD NOT LIKE 'RA%'
+		   AND A.SABUN = B.SABUN
+		   AND A.ENTER_CD = C.ENTER_CD(+)
+           AND TRIM(#{searchGiftSeq}) = C.GIFT_SEQ(+)  
+           AND A.SABUN = C.SABUN(+) ]]>
+    <if test="searchGiftCd != null and searchGiftCd neq ''">
+    	   AND C.GIFT_CD IS NOT NULL AND C.GIFT_CD = TRIM(#{searchGiftCd})
+    </if>
+    <if test='searchAppYn != null and searchAppYn eq "Y"'>
+    	   AND C.GIFT_CD IS NOT NULL
+    </if>
+    <if test='searchAppYn != null and searchAppYn eq "N"'>
+    	   AND C.GIFT_CD IS NULL
+    </if>
+    <if test="searchSabunName != null and searchSabunName neq ''">
+    	   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+    </if>
+		 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.SDATE) 
+	</select>
+		
+	<!-- 조회  -->
+	<select id="getGiftMgrTotalList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT COUNT(1) AS TOTAL
+             , SUM(DECODE(C.GIFT_CD, NULL, 0, 1)) AS Y_CNT
+             , SUM(DECODE(C.GIFT_CD, NULL, 1, 0)) AS N_CNT
+		  FROM THRM151 A
+		     , TABLE(F_TABLE_SEARCH_SEQ(#{ssnEnterCd}, TRIM(#{searchSeq}), TRIM(#{searchEdate}))) B
+		     , TBEN767 C
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND TRIM(#{searchEdate}) BETWEEN A.SDATE AND NVL(A.EDATE, 'YYYYMMDD')
+		   AND A.STATUS_CD NOT LIKE 'RA%'
+		   AND A.SABUN      = B.SABUN
+		   AND A.ENTER_CD   = C.ENTER_CD(+)
+           AND TRIM(#{searchGiftSeq}) = C.GIFT_SEQ(+)  
+           AND A.SABUN = C.SABUN(+)
+	]]>
+	</select>
+		
+	<!-- 저장  -->
+	<update id="saveGiftMgr" parameterType="map">
+	<![CDATA[			
+		 MERGE INTO TBEN767 T 
+		 USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT TRIM(#{ssnEnterCd})  			AS  ENTER_CD 
+	             , TRIM(#{searchGiftSeq})  		AS  GIFT_SEQ
+	             , TRIM(#{rm.sabun})  			AS  SABUN
+	             , TRIM(#{rm.giftCd})  			AS  GIFT_CD
+	             , TRIM(#{rm.applYmd})  			AS  APPL_YMD
+	             , TRIM(#{rm.recName})  			AS  REC_NAME
+	             , TRIM(#{rm.recPhone})  		AS  REC_PHONE
+	             , TRIM(#{rm.recZip})  			AS  REC_ZIP
+	             , TRIM(#{rm.recAddr})  			AS  REC_ADDR
+	             , TRIM(#{rm.note})  			AS  NOTE
+	          FROM DUAL
+		</foreach>
+	<![CDATA[					
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.GIFT_SEQ 	= S.GIFT_SEQ 
+		     AND  T.SABUN 		= S.SABUN 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE		= sysdate 
+		            , T.CHKID		= #{ssnSabun} 
+		            , T.GIFT_CD 	= S.GIFT_CD 
+		            , T.APPL_YMD 	= S.APPL_YMD 
+		            , T.REC_NAME 	= S.REC_NAME 
+		            , T.REC_PHONE 	= S.REC_PHONE 
+		            , T.REC_ZIP 	= S.REC_ZIP 
+		            , T.REC_ADDR 	= S.REC_ADDR 
+		            , T.NOTE 		= S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.GIFT_SEQ
+		            , T.SABUN
+		            , T.GIFT_CD
+		            , T.APPL_YMD
+		            , T.REC_NAME
+		            , T.REC_PHONE
+		            , T.REC_ZIP
+		            , T.REC_ADDR
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.GIFT_SEQ
+		            , S.SABUN
+		            , S.GIFT_CD
+		            , S.APPL_YMD
+		            , S.REC_NAME
+		            , S.REC_PHONE
+		            , S.REC_ZIP
+		            , S.REC_ADDR
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+	
+</mapper>

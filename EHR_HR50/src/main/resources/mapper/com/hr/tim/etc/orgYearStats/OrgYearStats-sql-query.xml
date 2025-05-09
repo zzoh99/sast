@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.etc.orgYearStats">
+
+<!-- 부서원연차사용현황 조직코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgYearStatsOrgList">
+
+					--조직가져오기
+<choose><when test='ssnSearchType != null and ssnSearchType.equals("A")'>
+						SELECT '전체' AS CODE_NM, '0' AS CODE FROM DUAL
+						UNION ALL
+						SELECT ORG_NM AS CODE_NM, ORG_CD AS CODE
+						FROM
+							(
+								SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM, A.ORG_CD
+								FROM TORG105 A, TORG101 B
+								WHERE A.ENTER_CD = B.ENTER_CD
+									AND A.ORG_CD = B.ORG_CD
+									AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+									AND A.ENTER_CD = #{ssnEnterCd}
+									AND A.SDATE = (SELECT MAX(SDATE) FROM TORG103
+									                WHERE ENTER_CD = A.ENTER_CD
+	<if test='searchYmd != null and !searchYmd.equals("")'>
+									                  AND CASE WHEN LENGTH(REPLACE(#{searchYmd},'-','')) = 6 THEN TO_CHAR(LAST_DAY(TO_DATE(REPLACE(#{searchYmd},'-',''),'YYYYMM')), 'YYYYMMDD')
+												               ELSE REPLACE(#{searchYmd},'-','') END BETWEEN SDATE AND NVL(EDATE,'29991231')
+	</if>
+												  )
+								START WITH A.PRIOR_ORG_CD = '0'
+								CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+									AND PRIOR A.SDATE = A.SDATE
+									AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+								ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+							)
+
+		</when><otherwise>
+						SELECT F_COM_GET_ORG_NM(ENTER_CD,SCOPE_VALUE,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CODE_NM, SCOPE_VALUE AS CODE
+						FROM TSYS319
+						WHERE ENTER_CD = #{ssnEnterCd}
+							AND AUTH_SCOPE_CD ='W10'
+							AND GRP_CD = #{ssnGrpCd}
+							AND SABUN = #{ssnSabun}
+</otherwise>
+</choose>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getOrgYearStatsOrgListAdmin">
+
+				<![CDATA[
+					--조직가져오기
+					SELECT '0' AS CODE , '전체' AS CODE_NM
+					FROM DUAL
+					UNION ALL
+					SELECT ORG_CD AS CODE, ORG_NM AS CODE_NM
+					  FROM (
+					      SELECT A.ORG_CD, F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					       FROM TORG111 A
+					      WHERE A.ENTER_CD = #{ssnEnterCd}
+					        AND A.SDATE = (SELECT MAX(B.SDATE)
+					                         FROM TORG111 B
+					                        WHERE B.ENTER_CD = A.ENTER_CD
+					                          AND B.ORG_CD = A.ORG_CD
+					                          AND B.SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD'))
+					      )
+				]]>
+
+
+		</select>
+<!-- 부서원연차사용현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgYearStatsList">
+
+				<![CDATA[
+					SELECT '0' AS IBS_IMAGE
+						 , SUBSTR(REPLACE(TRIM( #{sYmd} ),'-',''),1,6) AS S_YM
+						 , Z.LVL
+						 , Z.SEQ
+						 , X.SABUN
+						 , X.NAME
+						 , F_COM_GET_NAMES (X.ENTER_CD, X.SABUN, 'ALIAS') AS ALIAS
+						 , X.LOCATION_CD
+						 , Z.ORG_CD
+						 , Z.ORG_NM
+						 , X.EMP_YMD
+						 , X.YEAR_YMD
+						 , X.JIKGUB_CD
+						 , X.JIKGUB_NM
+						 , X.JIKWEE_CD
+						 , X.JIKWEE_NM
+						 , X.WORK_TYPE_NM
+						 , X.PAY_TYPE_NM
+					     , X.Y_CRE_CNT --발생일수
+					     , X.FRD_CNT --이월일수
+					     , X.Y_USE_CNT --사용가능일(당해년도발생일수)
+					     , X.Y_USED_CNT --사용일(당해년도사용일수)
+					     , X.Y_REST_CNT --현잔여일수
+					     , X.RET_YMD
+					     , Y.GNT_CD
+					     , (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD = X.ENTER_CD AND GNT_CD = NVL(Y.GNT_CD,'14')) AS GNT_NM
+					     , (CASE WHEN Y.Y_CNT1 = 0 THEN NULL ELSE Y.Y_CNT1 END) AS Y_CNT1
+					     , (CASE WHEN Y.Y_H1_CNT1 = 0 THEN NULL ELSE Y.Y_H1_CNT1 END) AS Y_H1_CNT1
+					     , (CASE WHEN Y.Y_CNT2 = 0 THEN NULL ELSE Y.Y_CNT2 END) AS Y_CNT2
+					     , (CASE WHEN Y.Y_H1_CNT2 = 0 THEN NULL ELSE Y.Y_H1_CNT2 END) AS Y_H1_CNT2
+					     , (CASE WHEN Y.Y_CNT3 = 0 THEN NULL ELSE Y.Y_CNT3 END) AS Y_CNT3
+					     , (CASE WHEN Y.Y_H1_CNT3 = 0 THEN NULL ELSE Y.Y_H1_CNT3 END) AS Y_H1_CNT3
+					     , (CASE WHEN Y.Y_CNT4 = 0 THEN NULL ELSE Y.Y_CNT4 END) AS Y_CNT4
+					     , (CASE WHEN Y.Y_H1_CNT4 = 0 THEN NULL ELSE Y.Y_H1_CNT4 END) AS Y_H1_CNT4
+					     , (CASE WHEN Y.Y_CNT5 = 0 THEN NULL ELSE Y.Y_CNT5 END) AS Y_CNT5
+					     , (CASE WHEN Y.Y_H1_CNT5 = 0 THEN NULL ELSE Y.Y_H1_CNT5 END) AS Y_H1_CNT5
+					     , (CASE WHEN Y.Y_CNT6 = 0 THEN NULL ELSE Y.Y_CNT6 END) AS Y_CNT6
+					     , (CASE WHEN Y.Y_H1_CNT6 = 0 THEN NULL ELSE Y.Y_H1_CNT6 END) AS Y_H1_CNT6
+					     , (CASE WHEN Y.Y_CNT7 = 0 THEN NULL ELSE Y.Y_CNT7 END) AS Y_CNT7
+					     , (CASE WHEN Y.Y_H1_CNT7 = 0 THEN NULL ELSE Y.Y_H1_CNT7 END) AS Y_H1_CNT7
+					     , (CASE WHEN Y.Y_CNT8 = 0 THEN NULL ELSE Y.Y_CNT8 END) AS Y_CNT8
+					     , (CASE WHEN Y.Y_H1_CNT8 = 0 THEN NULL ELSE Y.Y_H1_CNT8 END) AS Y_H1_CNT8
+					     , (CASE WHEN Y.Y_CNT9 = 0 THEN NULL ELSE Y.Y_CNT9 END) AS Y_CNT9
+					     , (CASE WHEN Y.Y_H1_CNT9 = 0 THEN NULL ELSE Y.Y_H1_CNT9 END) AS Y_H1_CNT9
+					     , (CASE WHEN Y.Y_CNT10 = 0 THEN NULL ELSE Y.Y_CNT10 END) AS Y_CNT10
+					     , (CASE WHEN Y.Y_H1_CNT10 = 0 THEN NULL ELSE Y.Y_H1_CNT10 END) AS Y_H1_CNT10
+					     , (CASE WHEN Y.Y_CNT11 = 0 THEN NULL ELSE Y.Y_CNT11 END) AS Y_CNT11
+					     , (CASE WHEN Y.Y_H1_CNT11 = 0 THEN NULL ELSE Y.Y_H1_CNT11 END) AS Y_H1_CNT11
+					     , (CASE WHEN Y.Y_CNT12 = 0 THEN NULL ELSE Y.Y_CNT12 END) AS Y_CNT12
+					     , (CASE WHEN Y.Y_H1_CNT12 = 0 THEN NULL ELSE Y.Y_H1_CNT12 END) AS Y_H1_CNT12
+					     , (Y_CNT1 + Y_CNT2 + Y_CNT3 + Y_CNT4 + Y_CNT5 + Y_CNT6 +
+					     		Y_CNT7 + Y_CNT8 + Y_CNT9 + Y_CNT10 + Y_CNT11 + Y_CNT12) AS SUM_Y_CNT
+					     , (Y_H1_CNT1 + Y_H1_CNT2 + Y_H1_CNT3 + Y_H1_CNT4 + Y_H1_CNT5 + Y_H1_CNT6 +
+					     		Y_H1_CNT7 + Y_H1_CNT8 + Y_H1_CNT9 + Y_H1_CNT10 + Y_H1_CNT11 + Y_H1_CNT12) AS SUM_Y_H1_CNT
+					  FROM (SELECT A.SABUN
+					  			  ,A.ENTER_CD
+					              ,C.NAME
+					              ,A.ORG_CD
+					              ,CASE WHEN F_COM_GET_STD_CD_VALUE(C.ENTER_CD, 'HRM_WKP_TYPE') = 'A' THEN NVL(C.EMP_YMD, C.GEMP_YMD)
+                           				ELSE NVL(C.GEMP_YMD, C.EMP_YMD) END AS EMP_YMD
+					              ,A.JIKGUB_CD
+					              ,A.JIKGUB_NM
+					              ,A.JIKWEE_CD
+					              ,A.JIKWEE_NM
+					              ,A.WORK_TYPE_NM
+					              ,A.PAY_TYPE_NM
+					              ,D.CRE_CNT  AS Y_CRE_CNT  -- 연차휴가(발생)
+					              ,D.USE_CNT AS Y_USE_CNT -- 사용가능일(당해년도발생일수)
+					              ,D.USED_CNT AS Y_USED_CNT -- 사용일(당해년도사용일수)
+					              ,D.REST_CNT AS Y_REST_CNT -- 현잔여일수
+					              ,D.FRD_CNT AS FRD_CNT --전년도이월일수
+					              ,C.YEAR_YMD AS YEAR_YMD --연차기산일
+					              ,C.RET_YMD
+					              ,A.LOCATION_CD
+					         FROM THRM151 A
+					             ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+					                 FROM THRM151
+					                WHERE ENTER_CD = #{ssnEnterCd}
+					                  AND REPLACE(TRIM( #{sYmd} ),'-','') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					               GROUP BY ENTER_CD, SABUN ) B
+					             ,THRM100 C
+					             ,(SELECT *
+					                 FROM TTIM511
+					                WHERE ENTER_CD = #{ssnEnterCd}
+					                  AND YY = SUBSTR(REPLACE(TRIM( #{sYmd} ),'-',''),1,4)
+					                  AND GNT_CD = '14') D
+					                  ]]>
+							<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+							   , BP_V F
+							</if>
+					        WHERE A.ENTER_CD = B.ENTER_CD
+					          AND A.SABUN    = B.SABUN
+					          AND A.SDATE    = B.SDATE
+					          AND A.ENTER_CD = C.ENTER_CD
+					          AND A.SABUN    = C.SABUN
+					          AND A.ENTER_CD = D.ENTER_CD(+)
+					          AND A.SABUN    = D.SABUN(+)
+				   			  AND A.SABUN IN (SELECT SABUN
+							   				   FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+							   				   )
+							<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+			                   AND A.ENTER_CD = F.ENTER_CD (+)
+			                   AND A.SABUN    = F.SABUN    (+)
+			                   AND REPLACE(TRIM( #{sYmd} ),'-','') BETWEEN  F.SDATE(+) AND NVL(F.EDATE(+), '99991231')
+			                   AND F.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+							</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+				   			  AND A.LOCATION_CD = #{searchLocationCd}
+</if>
+							<if test='retireYn != null and retireYn.equals("N")'>
+					          <![CDATA[
+					           AND (C.RET_YMD IS NULL OR C.RET_YMD > TO_CHAR(LAST_DAY(TO_DATE(REPLACE(TRIM( #{sYmd} ),'-',''),'YYYYMMDD')),'YYYYMMDD'))
+					                   ]]>
+							</if><if test='retireYn != null and retireYn.equals("Y")'>
+			<![CDATA[
+					           AND (C.RET_YMD IS NULL OR C.RET_YMD >= SUBSTR(REPLACE(TRIM( #{sYmd} ),'-',''),1,6) || '01' )
+					           ]]>
+		</if>
+					       ) X
+					      ,(
+					        SELECT A.SABUN
+					              , '14' GNT_CD
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '01' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT1 --~월 연차
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '01' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT1 --~월 오전반차
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '02' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT2
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '02' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT2
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '03' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT3
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '03' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT3
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '04' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT4
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '04' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT4
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '05' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT5
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '05' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT5
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '06' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT6
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '06' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT6
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '07' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT7
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '07' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT7
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '08' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT8
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '08' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT8
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '09' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT9
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '09' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT9
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '10' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT10
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '10' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT10
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '11' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT11
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '11' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT11
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '12' AND A.GNT_CD = '14' THEN A.APP_DAY ELSE 0 END) AS Y_CNT12
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '12' AND A.GNT_CD IN ('15', '16') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT12
+					          FROM TTIM405 A, THRI103 B
+					         WHERE A.ENTER_CD = B.ENTER_CD
+					           AND A.APPL_SEQ = B.APPL_SEQ
+					           AND A.ENTER_CD = #{ssnEnterCd}
+					           AND A.GNT_CD IN ('14','15','16')
+					           AND A.YMD LIKE SUBSTR(REPLACE(TRIM( #{sYmd} ),'-',''),1,4) || '%'
+					           AND B.APPL_STATUS_CD = '99'
+					        GROUP BY A.SABUN
+					        UNION ALL
+					        SELECT A.SABUN
+					              , '10' GNT_CD
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '01' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT1 --~월 연차
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '01' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT1 --~월 오전반차
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '02' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT2
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '02' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT2
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '03' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT3
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '03' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT3
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '04' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT4
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '04' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT4
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '05' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT5
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '05' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT5
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '06' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT6
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '06' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT6
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '07' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT7
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '07' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT7
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '08' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT8
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '08' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT8
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '09' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT9
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '09' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT9
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '10' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT10
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '10' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT10
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '11' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT11
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '11' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT11
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '12' AND A.GNT_CD = '10' THEN A.APP_DAY ELSE 0 END) AS Y_CNT12
+					              ,SUM(CASE WHEN SUBSTR(A.YMD,5,2) = '12' AND A.GNT_CD IN ('11', '12') THEN A.APP_DAY ELSE 0 END) AS Y_H1_CNT12
+					          FROM TTIM405 A, THRI103 B
+					         WHERE A.ENTER_CD = B.ENTER_CD
+					           AND A.APPL_SEQ = B.APPL_SEQ
+					           AND A.ENTER_CD = #{ssnEnterCd}
+					           AND A.GNT_CD IN ('10','11''12')
+					           AND A.YMD LIKE SUBSTR(REPLACE(TRIM( #{sYmd} ),'-',''),1,4) || '%'
+					           AND B.APPL_STATUS_CD = '99'
+					        GROUP BY A.SABUN
+					       ) Y
+					      ,(SELECT 0 LVL, 0 AS SEQ, '0' AS ORG_CD, F_COM_GET_ORG_NM(#{ssnEnterCd},'0', REPLACE(TRIM( #{sYmd} ),'-','')) AS ORG_NM
+					          FROM DUAL
+					        UNION ALL
+					        SELECT LVL, SEQ, ORG_CD, ORG_NM
+					          FROM (
+					          		/*
+					                SELECT LEVEL AS LVL, ORG_CD, SEQ, F_COM_GET_ORG_NM(#{ssnEnterCd}, ORG_CD, REPLACE(TRIM( #{sYmd} ),'-','')) AS ORG_NM
+					                  FROM TORG105
+					                 WHERE ENTER_CD = #{ssnEnterCd}
+					                   AND SDATE = (SELECT SDATE
+					                                                  FROM TORG103
+					                                                 WHERE ENTER_CD = #{ssnEnterCd}
+					                                                   AND SDATE = (SELECT MAX(SDATE)
+					                                                                  FROM TORG103
+					                                                                 WHERE ENTER_CD = #{ssnEnterCd}
+					                                                                  AND REPLACE(TRIM( #{sYmd} ),'-','') BETWEEN SDATE AND EDATE))
+					                START WITH PRIOR_ORG_CD = #{orgCd}
+					                CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					                       AND PRIOR SDATE = SDATE
+					                       AND PRIOR ORG_CD = PRIOR_ORG_CD
+					            	*/
+									SELECT 1 AS LVL, ORG_CD, SEQ, F_COM_GET_ORG_NM(#{ssnEnterCd},ORG_CD, TO_CHAR(LAST_DAY(TO_DATE(REPLACE(TRIM( #{sYmd} ),'-',''),'YYYYMMDD')),'YYYYMMDD')) AS ORG_NM
+					                  FROM TORG105
+					                 WHERE ENTER_CD = #{ssnEnterCd}
+					                   AND (SDATE) = (SELECT SDATE
+					                                                  FROM TORG103
+					                                                 WHERE ENTER_CD = #{ssnEnterCd}
+					                                                   AND SDATE = (SELECT MAX(SDATE)
+					                                                                  FROM TORG103
+					                                                                 WHERE ENTER_CD = #{ssnEnterCd}
+					                                                                  AND TO_CHAR(TO_DATE(REPLACE(TRIM( #{sYmd} ),'-',''),'YYYYMMDD'),'YYYYMMDD') BETWEEN SDATE AND EDATE))
+					         	)
+					         ) Z
+					 WHERE X.ORG_CD = Z.ORG_CD
+					   AND X.SABUN  = Y.SABUN(+)
+					    AND F_COM_GET_STATUS_CD( X.ENTER_CD, X.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) != 'RAA'
+					   AND (X.NAME LIKE '%'|| #{name} || '%' OR X.SABUN LIKE '%'|| #{name} || '%')
+					   AND Z.ORG_CD LIKE '%'|| #{orgCd} || '%'
+					ORDER BY F_COM_JIKJE_SORT(#{ssnEnterCd},X.SABUN,REPLACE(TRIM( #{sYmd} ),'-',''))
+					    , NVL(Y.GNT_CD, '14')
+
+		</select>
+
+
+</mapper>

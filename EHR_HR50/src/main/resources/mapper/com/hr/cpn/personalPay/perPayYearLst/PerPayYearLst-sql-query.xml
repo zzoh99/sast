@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayYearLst">
+					
+<!-- 연봉항목 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerPayYearLstEleList">
+			
+				<![CDATA[
+					SELECT ELEMENT_CD AS CODE
+					     , ELEMENT_NM AS CODE_NM
+					  FROM (
+					            SELECT C.ELEMENT_CD
+					                 , C.ELEMENT_NM
+					                 , NVL(MIN(B.SEQ), 999) AS SEQ
+					              FROM TCPN401 A
+					                 , TCPN402 B
+					                 , TCPN011 C
+					             WHERE A.ENTER_CD     = B.ENTER_CD
+					               AND A.PAY_GROUP_CD = B.PAY_GROUP_CD
+					               AND NVL(REPLACE(#{searchSDate}, '-', ''), '99991231') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					               AND B.ENTER_CD     = C.ENTER_CD
+					               AND B.ELEMENT_CD   = C.ELEMENT_CD
+					               AND NVL(REPLACE(#{searchSDate}, '-', ''), '99991231') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+					               AND A.ENTER_CD     = #{ssnEnterCd}
+					             GROUP BY C.ELEMENT_CD, C.ELEMENT_NM
+					       )
+					 ORDER BY SEQ
+				]]>
+			
+			
+		</select>
+
+<!-- 연봉내역조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerPayYearLstList">
+			
+				<![CDATA[
+					/* PerPayYearLst-mapping-query.getPerPayYearLstList */
+					SELECT T.*
+					  FROM (
+					            SELECT F_COM_GET_MANAGE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS MANAGE_NM
+					                 , A.EDATE
+					                 , F_COM_GET_ORG_CD ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_CD
+					                 , F_COM_GET_ORG_NM2 ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+					                 , F_COM_GET_JIKCHAK_NM( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+					                 , F_COM_GET_JIKWEE_NM ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+					                 , F_COM_GET_JIKGUB_NM ( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+					                 , F_COM_GET_WORKTYPE(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS WORK_TYPE
+					                 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS WORK_TYPE_NM
+					                 , F_COM_GET_STATUS_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_NM
+					                 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN ) AS NAME
+					                 , A.BIGO
+					                 , A.PAY_GROUP_CD
+					                 , B.*
+					              FROM TCPN403 A ]]>
+<if test='ssnSearchType eq "O"'>
+					                   INNER JOIN ${query} AUTH
+					                      ON AUTH.ENTER_CD = A.ENTER_CD
+					                    AND AUTH.SABUN    = A.SABUN 
+</if> <![CDATA[
+					                  , (
+					                         SELECT *
+					                           FROM (
+					                                     SELECT ENTER_CD, SABUN, SDATE, ELEMENT_CD, ELEMENT_MON
+					                                       FROM TCPN404
+					                                      WHERE ENTER_CD = #{ssnEnterCd}
+					                                )
+					                          PIVOT (
+					                                     SUM(ELEMENT_MON) FOR ELEMENT_CD IN ]]>
+						<foreach collection="columnInfo" item="item" index="index" open="(" close=")" separator=",">
+									${item}
+							</foreach>
+			<![CDATA[                 )
+					                    ) B
+					             WHERE A.ENTER_CD = B.ENTER_CD
+					               AND A.SABUN    = B.SABUN
+					               AND A.SDATE    = B.SDATE
+					               AND A.ENTER_CD = #{ssnEnterCd}
+					               AND (
+					                           NVL(REPLACE(#{searchSDate},'-',''), '00000000') BETWEEN  A.SDATE AND NVL(A.EDATE, '99991231')
+					                        OR NVL(REPLACE(#{searchEDate},'-',''), '99991231') BETWEEN  A.SDATE AND NVL(A.EDATE, '99991231')
+					                        OR ( NVL(REPLACE(#{searchSDate},'-',''), '00000000') <= A.SDATE AND NVL(REPLACE(#{searchEDate},'-',''), '99991231') >= A.EDATE )
+					                  ) ]]>
+<if test="searchNm != null and searchNm neq ''">
+					               AND (F_COM_GET_NAMES(A.ENTER_CD, A.SABUN ) LIKE '%' || #{searchNm} || '%' OR A.SABUN LIKE '%' || #{searchNm} || '%')
+</if>
+<if test="searchManageCdHidden != null and searchManageCdHidden neq ''">
+					               AND F_COM_GET_MANAGE_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchManageCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchStatusCdHidden != null and searchStatusCdHidden neq ''">
+					               AND F_COM_GET_STATUS_CD( A.ENTER_CD,A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchJikchakCdHidden != null and searchJikchakCdHidden neq ''">
+					               AND F_COM_GET_JIKCHAK_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchJikchakCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchJikweeCdHidden != null and searchJikweeCdHidden neq ''">
+					               AND F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchJikweeCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchJikgubCdHidden != null and searchJikgubCdHidden neq ''">
+					               AND F_COM_GET_JIKGUB_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchJikgubCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchPayGroupCd != null and searchPayGroupCd neq ''"> 
+					               AND PAY_GROUP_CD = #{searchPayGroupCd}
+</if>
+					       ) T
+					 WHERE 1 = 1
+<if test="searchOrgCdHidden != null and searchOrgCdHidden neq ''">
+					   AND T.ORG_CD IN
+		<foreach collection="searchOrgCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+					 ORDER	BY F_COM_JIKJE_SORT(T.ENTER_CD, T.SABUN, T.SDATE)
+		</select>
+
+</mapper>

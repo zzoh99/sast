@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.benefitBasis.retPenMgr">
+	
+	<!-- 퇴직전환금관리 다건 조회 -->
+	<select id="getRetPenMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	T2.SABUN			/*	사번			*/
+			,	T1.NAME				/*	성명			*/
+			,	T2.ACQ_YMD			/*	취득일			*/
+			,	T2.LOSS_YMD			/*	상실일			*/
+			,	T2.RETIRE_REMAIN_YN	/*	퇴직전환금공제여부	*/
+			,	T2.RETIRE_REMAIN_MON/*	퇴직전환금잔액	*/
+			,	T1.GEMP_YMD
+			,	T1.EMP_YMD
+			,	T1.RET_YMD
+			,	T3.STATUS_CD
+		FROM	THRM100	T1
+			,	TBEN101	T2
+			,	THRM151	T3
+		WHERE	T1.ENTER_CD	=	T2.ENTER_CD
+		AND		T1.SABUN	=	T2.SABUN
+		AND		T1.ENTER_CD	=	T3.ENTER_CD
+		AND		T1.SABUN	=	T3.SABUN
+		AND		REPLACE( #{searchYmd}, '-', '')	BETWEEN	T3.SDATE	AND	NVL(T3.EDATE,'99991231')
+		AND		T1.ENTER_CD	=	#{ssnEnterCd} ]]>
+		<if test="searchStatusCd != null and searchStatusCd neq ''">
+		AND		T3.STATUS_CD	=	#{searchStatusCd}
+		</if>
+		<if test="searchNm != null and searchNm neq ''">
+		AND		(
+						T1.SABUN	=	#{searchNm}
+					OR	T1.NAME		LIKE	'%'||TRIM(#{searchNm})||'%'
+				)
+		</if>
+		ORDER	BY
+				T1.NAME
+	</select>
+		
+	<!-- 퇴직전환금관리 저장 -->
+	<update id="saveRetPenMgr" parameterType="map">
+	<![CDATA[
+			MERGE INTO TBEN101	T
+			USING
+			(
+						SELECT	ENTER_CD
+							,	SABUN
+							,	ACQ_YMD
+							,	LOSS_YMD
+							,	RETIRE_REMAIN_YN
+							,	RETIRE_REMAIN_MON
+				FROM	(
+						SELECT	NULL		AS	ENTER_CD
+							,	NULL		AS	SABUN
+							,	NULL		AS	ACQ_YMD
+							,	NULL		AS	LOSS_YMD
+							,	NULL		AS	RETIRE_REMAIN_YN
+							,	NULL		AS	RETIRE_REMAIN_MON
+						FROM	DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+						UNION ALL
+						SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+							,	TRIM(#{rm.sabun})				AS	SABUN
+							,	TRIM(#{rm.acqYmd})				AS	ACQ_YMD
+							,	TRIM(#{rm.lossYmd})				AS	LOSS_YMD
+							,	TRIM(#{rm.retireRemainYn})		AS	RETIRE_REMAIN_YN
+							,	TRIM(#{rm.retireRemainMon})		AS	RETIRE_REMAIN_MON
+						FROM	DUAL
+		</foreach>
+		<![CDATA[
+						)	WHERE	ENTER_CD IS NOT NULL
+							AND		SABUN IS NOT NULL
+			) S
+		ON	(
+					T.ENTER_CD		=		S.ENTER_CD
+				AND	T.SABUN			=		S.SABUN
+			)
+		WHEN MATCHED THEN
+		UPDATE SET
+				T.ACQ_YMD			=	S.ACQ_YMD
+			,	T.LOSS_YMD			=	S.LOSS_YMD
+			,	T.RETIRE_REMAIN_YN	=	S.RETIRE_REMAIN_YN
+			,	T.RETIRE_REMAIN_MON	=	S.RETIRE_REMAIN_MON
+			,	T.CHKDATE			=	SYSDATE
+			,	T.CHKID				=	#{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				T.ENTER_CD
+			,	T.SABUN
+			,	T.ACQ_YMD
+			,	T.LOSS_YMD
+			,	T.RETIRE_REMAIN_YN
+			,	T.RETIRE_REMAIN_MON
+			,	T.CHKDATE
+			,	T.CHKID
+		)
+		VALUES
+		(
+				S.ENTER_CD
+			,	S.SABUN
+			,	S.ACQ_YMD
+			,	S.LOSS_YMD
+			,	S.RETIRE_REMAIN_YN
+			,	S.RETIRE_REMAIN_MON
+			,	SYSDATE
+			,	#{ssnSabun}
+		)
+	]]>
+	</update>
+		
+	<!-- 퇴직전환금관리 삭제 -->
+	<delete id="deleteRetPenMgr" parameterType="map">
+	<![CDATA[
+		DELETE	FROM TBEN101
+		WHERE	(ENTER_CD, SABUN) IN ((NULL, NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq ''">
+				( TRIM(#{ssnEnterCd}) , TRIM(#{rm.sabun}) )
+			</if>
+		</foreach>
+		)
+	</delete>
+	
+</mapper>

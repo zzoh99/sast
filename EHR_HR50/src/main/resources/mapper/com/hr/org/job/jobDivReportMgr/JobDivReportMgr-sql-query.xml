@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobDivReportMgr">
+	
+		<!-- 조직도 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobDivReportMgrList">
+
+				<![CDATA[
+					SELECT 	LEVEL AS "_level",
+					        A.PRIOR_ORG_CD,
+					        A.ORG_CD,
+					        F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(NVL(#{searchBaseDate},TO_CHAR(SYSDATE,'YYYYMMDD'))),'-') /*기준일자*/ ) AS ORG_NM,
+					        F_ORG_GET_CHIEF_SABUN(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(NVL(#{searchBaseDate},TO_CHAR(SYSDATE,'YYYYMMDD'))),'-')) AS CHIEF_SABUN,
+					        F_ORG_GET_CHIEF_NAME(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(NVL(#{searchBaseDate},TO_CHAR(SYSDATE,'YYYYMMDD'))),'-')/*기준일자*/) AS CHIEF_NAME ,
+					       (SELECT MAX(APPL_YMD) 
+					        FROM THRM175 AA, THRI103 BB 
+					        WHERE  AA.ENTER_CD = BB.ENTER_CD
+					            AND AA.APPL_SEQ = BB.APPL_SEQ
+					            AND AA.ORG_CD = A.ORG_CD
+					            AND BB.APPL_STATUS_CD = '99'
+					            AND BB.APPL_YMD <= REPLACE(TRIM(NVL(#{searchBaseDate},TO_CHAR(SYSDATE,'YYYYMMDD'))),'-') /*기준일자*/
+					        ) AS LAST_YMD
+					FROM TORG105 A, TORG101 B, TORG103 C
+					WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.ORG_CD = B.ORG_CD
+					   AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.SDATE = C.SDATE
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})/*회사코드*/
+					   AND REPLACE(TRIM(NVL(#{searchBaseDate},TO_CHAR(SYSDATE,'YYYYMMDD'))),'-') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+					START WITH A.PRIOR_ORG_CD = '0'
+					CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					   AND PRIOR A.SDATE = A.SDATE
+					   AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+				]]>
+
+
+		</select>
+		
+
+</mapper>

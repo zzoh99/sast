@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.exWorkDriverApp">
+		<!-- 시간외근무신청 내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverAppList">
+					SELECT  A.ENTER_CD
+						           ,A.APPL_SEQ
+						           ,B.APPL_YMD
+						           ,B.APPL_STATUS_CD
+						           ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD, #{ssnLocaleCd}) AS APPL_STATUS_NM
+						           ,A.SABUN
+						           , DECODE( A.WORK_GUBUN, 'S', F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tbl', 'searchWorkGubunS_V121', #{ssnLocaleCd})
+					           													, 'N', F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tbl', 'searchWorkGubunN_V121', #{ssnLocaleCd})) AS WORK_GUBUN
+						           ,A.SDATE
+						           ,A.REQ_S_HM
+						           ,A.REQ_E_HM
+						           ,A.WORK_HOUR
+						           ,A.MORNING_S_HM
+						           ,A.GOLF_YN
+						           ,A.REASON
+						           ,A.CHKDATE
+						           ,A.CHKID
+						           , '0' AS IBS_IMAGE
+						           , CASE WHEN B.APPL_STATUS_CD IN ('11', '12') THEN '1' ELSE '0' END AS S_DELETE_EDIT
+						  FROM TTIM711 A, THRI103 B
+						WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+						   AND B.ENTER_CD = A.ENTER_CD
+						   AND B.APPL_SEQ = A.APPL_SEQ
+						   AND A.SABUN     = TRIM( #{searchSabun} )
+						<if test="searchWorkGubun != null and searchWorkGubun neq ''">
+						   AND A.WORK_GUBUN = TRIM( #{searchWorkGubun} )
+						</if>
+						<if test="searchApplStatusCd != null and searchApplStatusCd neq ''">
+			                AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+			           </if>
+						   AND SDATE BETWEEN REPLACE(NVL(#{searchFromYmd}, '19000101'), '-', '') AND REPLACE(NVL(#{searchToYmd}, '99991231'), '-', '')
+						ORDER BY A.SDATE DESC, A.APPL_SEQ DESC
+		</select>
+
+<!-- 시간외근무신청 내역 삭제 -->
+		<delete parameterType="map" id="deleteExWorkDriverApp">
+					DELETE FROM TTIM711
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+					<foreach item="rm" collection="deleteRows">
+						,
+										<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.applSeq != null and rm.applSeq neq ''">
+									TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+					</foreach>
+										)
+		</delete>
+
+</mapper>

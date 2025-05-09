@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	소득공제서
+ -->
+<root>
+
+	<query id="selectNonPaperMgrStList">
+	   
+	   <![CDATA[
+			SELECT A.ENTER_CD
+			      , A.SABUN
+			      , A.WORK_YY			      
+			      , A.ADJUST_TYPE
+			      , A.ATTR1
+			      , A.ATTR2
+			      , A.ATTR3
+			      , A.ATTR4
+			      , A.CHKDATE
+			      , A.CHKID
+			      ,	F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME			     
+			      , 0 AS help_pic
+			      , 0 AS help_pic2
+			  FROM TYEA103 A
+			  WHERE 1=1
+			  AND A.ENTER_CD = #ssnEnterCd#
+			  AND A.ADJUST_TYPE    LIKE '%'|| #searchAdjustType#||'%'
+			  AND A.ADJUST_TYPE    IN (SELECT CODE
+			                          FROM TSYS005
+			                          WHERE ENTER_CD = #ssnEnterCd#
+			                            AND GRCODE_CD = 'C00303'
+			                            AND USE_YN = 'Y')
+			  AND A.WORK_YY = #srchYear#
+			  AND (A.SABUN LIKE '%'||#searchSbNm#||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) LIKE '%'||#searchSbNm#||'%')
+			  AND EXISTS ( SELECT 1
+			                 FROM TCPN121 B
+			                WHERE B.ENTER_CD = A.ENTER_CD
+			                  AND B.BUSINESS_PLACE_CD = F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)
+			                  AND TO_CHAR(SYSDATE,  'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+			                  AND NVL2(#searchBusinessPlaceCd#, B.BUSINESS_PLACE_CD, 'A') = NVL2(#searchBusinessPlaceCd#, #searchBusinessPlaceCd#, 'A')
+						 )
+			  
+	   ]]> 
+	</query>
+
+	<query id="selectNonPaperMgrStPopList">
+	   
+	   <![CDATA[
+			SELECT A.ENTER_CD
+			      , A.SABUN
+			      , A.WORK_YY			      
+			      , A.ADJUST_TYPE
+			      , A.FILE_SEQ
+			      , A.FILE_TYPE
+			      , A.FILE_PATH
+			      , A.FILE_NAME
+			      , A.UPLOAD_DATE
+			      , A.ATTR1
+			      , A.ATTR2
+			      , A.ATTR3
+			      , A.ATTR4
+			      , A.CHKDATE
+			      , A.CHKID
+			      ,	F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME	     
+			      , 0 AS help_pic2
+			  FROM TYEA105 A
+			  WHERE 1=1      
+          		AND A.ENTER_CD = #ssnEnterCd#
+			    AND A.SABUN    = #srchSabun#
+	            AND A.WORK_YY  = #srchYear#
+			    AND A.ADJUST_TYPE = #srchAdjustType#
+	   ]]> 
+	</query>
+	
+	<query id="getFilePathList">
+	<![CDATA[
+	SELECT FILE_PATH
+  	  FROM TYEA105
+	 WHERE ENTER_CD			= #ssnEnterCd#
+	   AND WORK_YY  	    = #work_yy#
+	   AND ADJUST_TYPE 		= #adjust_type#
+	   AND SABUN          	= #sabun#
+	]]> 
+	</query>
+	<!-- PDF파일정보 조회  -->
+	<query id="getFileInfo">
+		<![CDATA[
+				SELECT ENTER_CD
+				     , WORK_YY
+				     , ADJUST_TYPE
+				     , SABUN
+				     , DOC_TYPE
+				     , DOC_SEQ
+				     , FILE_PATH
+				     , FILE_NAME
+				     , TO_CHAR(CHKDATE, 'yyyymmddHH24miss') AS CHKDATE
+				     , '' AS FILE_LINK
+				FROM TCPN855
+				WHERE ENTER_CD = #ssnEnterCd#
+			   	AND WORK_YY = #searchWorkYy#
+			   	AND ADJUST_TYPE LIKE '%'|| #searchAdjustType# ||'%'
+			   	AND ADJUST_TYPE    IN (SELECT CODE
+						                     FROM TSYS005
+						                    WHERE ENTER_CD = #ssnEnterCd#
+						                      AND GRCODE_CD = 'C00303'
+						                      AND USE_YN = 'Y')
+			   	AND SABUN = #searchSabun#
+	   ]]> 
+	</query>
+	
+	<!-- 연말정산 항목관리 입력 -->
+	<query id="insertNonPaperMgr">
+		<![CDATA[
+			INSERT INTO TYEA103
+			(	
+				ENTER_CD
+		      , SABUN
+		      , WORK_YY
+		      , ADJUST_TYPE
+		      , ATTR1
+		      , ATTR2
+		      , ATTR3
+		      , ATTR4
+		      , CHKDATE
+		      , CHKID
+			)  
+			VALUES 
+			(
+				#ssnEnterCd#
+				, #sabun#
+				, #work_yy#
+				, #adjust_type#
+				, #attr1#
+				, #attr2#
+				, #attr3#
+				, #attr4#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]> 
+	</query>
+	
+	<!-- 연말정산 항목관리 입력 -->
+	<query id="insertNonPaperPopMgr">
+		<![CDATA[
+			INSERT INTO TYEA105
+			(	
+				ENTER_CD
+		      , SABUN
+		      , WORK_YY
+		      , ADJUST_TYPE
+		      , FILE_SEQ
+		      , FILE_TYPE
+		      , FILE_PATH
+		      , FILE_NAME
+		      , UPLOAD_DATE
+		      , ATTR1
+		      , ATTR2
+		      , ATTR3
+		      , ATTR4
+		      , CHKDATE
+		      , CHKID
+			)  
+			VALUES 
+			(
+				#ssnEnterCd#
+				, #sabun#
+				, #work_yy#
+				, #adjust_type#
+				,(SELECT (NVL(MAX(FILE_SEQ),0)+1) 
+				    FROM TYEA105
+				   WHERE 1=1
+				     AND ENTER_CD = #ssnEnterCd#
+				     AND SABUN = #sabun#
+				     AND WORK_YY = #work_yy#
+				     AND ADJUST_TYPE = #adjust_type#)			
+				, #file_type#
+				, #file_path#
+				, #file_name#
+				, SYSDATE
+				, #attr1#
+				, #attr2#
+				, #attr3#
+				, #attr4#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]> 
+	</query>
+	
+	
+	<!-- 증빙자료 프로세스 수정 -->
+	<query id="updateNonPaperPopMgr">
+		<![CDATA[
+			UPDATE TYEA105
+			   SET FILE_TYPE		= #file_type# 				 
+			 	 , ATTR1			= #attr1#
+			     , ATTR2			= #attr2# 
+			     , ATTR3			= #attr3# 
+			     , ATTR4			= #attr4# 
+			     , CHKDATE			= SYSDATE 
+			     , CHKID			= #ssnSabun# 
+			 WHERE 1=1
+			   AND ENTER_CD			= #ssnEnterCd#           
+			   AND SABUN			= #sabun#         
+			   AND WORK_YY			= #work_yy#     
+			   AND ADJUST_TYPE 		= #adjust_type# 
+			   AND FILE_SEQ			= #file_seq# 
+		]]> 
+	</query>
+	
+	<query id="updateNonPaperMgr">
+		<![CDATA[
+			UPDATE TYEA103
+			   SET ADJUST_TYPE 		= #adjust_type# 				 
+			 	 , ATTR1			= #attr1#
+			     , ATTR2			= #attr2# 
+			     , ATTR3			= #attr3# 
+			     , ATTR4			= #attr4# 
+			     , CHKDATE			= SYSDATE 
+			     , CHKID			= #ssnSabun# 
+			 WHERE 1=1
+			   AND ENTER_CD			= #ssnEnterCd#           
+			   AND SABUN			= #sabun#         
+			   AND WORK_YY			= #work_yy#     
+			   AND ADJUST_TYPE 		= #adjust_type# 
+			    
+		]]> 
+	</query>
+	
+	<!-- 증빙자료 데이터삭제 -->
+	<query id="deleteNonPaperMgr1">
+		<![CDATA[
+			DELETE FROM TYEA103
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND WORK_YY  	    = #work_yy#
+			   AND ADJUST_TYPE 		= #adjust_type#
+			   AND SABUN          	= #sabun#
+		]]> 
+	</query>
+	
+	<!-- 증빙자료 데이터 전체삭제 -->
+	<query id="deleteNonPaperChildMgr">
+		<![CDATA[
+			DELETE FROM TYEA105
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND WORK_YY  	    = #work_yy#
+			   AND ADJUST_TYPE 		= #adjust_type#
+			   AND SABUN          	= #sabun#
+		]]> 
+	</query>
+	
+	<!-- 증빙자료 파일 개별 삭제 -->
+	<query id="deleteNonPaperPopMgr">
+		<![CDATA[
+			DELETE FROM TYEA105
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND WORK_YY  	    = #work_yy#
+			   AND ADJUST_TYPE 		= #adjust_type#
+			   AND SABUN          	= #sabun#
+			   AND FILE_SEQ         = #file_seq#
+		]]> 
+	</query>
+	<!-- 증빙자료 항목 중복 조회 -->
+	<query id="selectNonPaperPopMgrCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TYEA105 A
+			 WHERE A.ENTER_CD		= #ssnEnterCd#
+			   AND A.WORK_YY  	    = #work_yy#
+			   AND A.ADJUST_TYPE 	= #adjust_type#	
+			   AND SABUN          	= #sabun#
+		]]> 
+	</query>	
+	
+	<query id="selectNonPaperMgrCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TYEA103 A
+			 WHERE A.ENTER_CD		= #ssnEnterCd#
+			   AND A.WORK_YY  	    = #work_yy#
+			   AND A.ADJUST_TYPE 	= #adjust_type#	
+			   AND SABUN          	= #sabun#
+		]]> 
+	</query>
+	<!-- 증빙자료 시퀀스조회 -->
+	<query id="getFileMaxSeq">
+		<![CDATA[
+			SELECT (NVL(MAX(FILE_SEQ),0)+1) AS MAXSEQ
+			  FROM TYEA105
+			 WHERE 1=1
+			   AND ENTER_CD = #entercd#
+			   AND SABUN = #uploadsabun#
+			   AND WORK_YY = #uploadyear#
+			   AND ADJUST_TYPE = #uploadadjusttype#
+	   ]]> 
+	</query>
+	
+	<!-- 증빙자료 최대파일사이즈 조회 -->
+	<query id="getFileLimitSize">
+		<![CDATA[
+			SELECT STD_CD_VALUE
+              FROM TSYS955
+              WHERE STD_CD = 'CPN_YEAREND_LIMIT_SIZE'
+	   ]]> 
+	</query>
+
+</root>

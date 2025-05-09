@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.resort.resortSeasonAppDet">
+	
+	<!-- 신청 가능한 성수기 리조트 리스트 조회 -->		
+	<select id="getResortSeasonAppDetResortList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		 SELECT
+			A.ENTER_CD		AS ENTER_CD
+			, A.PLAN_SEQ 	AS PLAN_SEQ 
+			, A.SEASON_CD 	AS SEASON_CD 
+			, A.APP_SDATE 	AS APP_SDATE 
+			, A.APP_EDATE 	AS APP_EDATE 
+			, A.TARGET_YN 	AS TARGET_YN 
+			, A.CLOSE_YN 	AS CLOSE_YN 
+			, B.RESORT_SEQ 	AS RESORT_SEQ
+			, B.COMPANY_CD 	AS COMPANY_CD
+			, (SELECT Z.CODE_NM FROM TSYS005 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.GRCODE_CD = 'B49530' AND Z.CODE = B.COMPANY_CD) AS COMPANY_CD_NM
+			, B.RESORT_NM 	AS RESORT_NM
+			, B.ROOM_TYPE 	AS ROOM_TYPE
+			, B.SDATE 		AS SDATE
+			, B.EDATE 		AS EDATE
+			, B.DAYS 		AS DAYS
+			, B.RSV_NO1 	AS RSV_NO1
+			, B.RSV_NO2 	AS RSV_NO2
+			, B.RESORT_MON 	AS RESORT_MON
+			, B.COM_MON 	AS COM_MON
+			, B.PSNAL_MON 	AS PSNAL_MON
+			, (
+				SELECT COUNT(1) AS CNT
+				  FROM TBEN491 X, THRI103 Y
+				 WHERE X.ENTER_CD = #{ssnEnterCd}
+				   AND X.APPL_SEQ = Y.APPL_SEQ
+				   AND X.ENTER_CD = Y.ENTER_CD
+				   AND Y.APPL_STATUS_CD != '11'
+				   AND X.PLAN_SEQ = A.PLAN_SEQ 
+				   AND X.RESORT_SEQ = B.RESORT_SEQ
+		      ) AS APPL_CNT
+		    , '<a class="btn filled">선택</a>' AS BTN_SEL
+		FROM TBEN492 A, TBEN494 B
+		WHERE A.ENTER_CD = #{ssnEnterCd}
+		  AND A.PLAN_SEQ = B.PLAN_SEQ 
+		  AND A.ENTER_CD = B.ENTER_CD ]]>
+	<if test="planSeq != null and planSeq neq ''">
+		  AND A.PLAN_SEQ = TRIM( #{planSeq} )
+	</if>
+	<if test="planSeqSheet != null and planSeqSheet neq ''">
+		  AND A.PLAN_SEQ = TRIM( #{planSeqSheet} )
+	</if>
+	<![CDATA[
+		  AND NVL(A.CLOSE_YN, 'N') = 'N'
+		  AND NOT EXISTS ( SELECT 1
+						   FROM TBEN491 Z
+						  WHERE Z.ENTER_CD = #{ssnEnterCd} 
+						    AND Z.PLAN_SEQ = B.PLAN_SEQ
+						    AND Z.RESORT_SEQ = B.RESORT_SEQ
+						    AND Z.STATUS_CD = 'Y' )
+		ORDER BY B.SDATE DESC, B.COMPANY_CD, B.RESORT_NM
+	]]>
+	</select>
+		
+	<!-- 이미 지원금을 받은 이력여부 체크 -->		
+	<select id="getResortSeasonAppDetChkComMon" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT COUNT(1) AS CNT
+		  FROM TBEN491 A, THRI103 B
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.SABUN    = #{searchApplSabun}
+		   AND SUBSTR(A.SDATE,1,4)  = SUBSTR(REPLACE(TRIM( #{sdate} ), '-', ''),1,4)
+		   AND A.ENTER_CD = B.ENTER_CD
+		   AND A.APPL_SEQ = B.APPL_SEQ
+		   AND B.APPL_STATUS_CD != '11'
+		   AND A.STATUS_CD = 'Y'
+		   AND NVL(A.COM_MON, 0) > 0
+	]]>
+	</select>
+	
+	<!-- 리조트명 콤보 -->		
+	<select id="getResortSeasonAppDetResortName" parameterType="map" resultType="cMap">
+	<![CDATA[
+		 SELECT SEQ AS CODE_REAL, RESORT_NM AS CODE_NM, RESORT_NM AS CODE
+		   FROM TBEN490
+		  WHERE ENTER_CD = #{ssnEnterCd}
+		    AND COMPANY_CD = TRIM(#{companyCd})
+		    AND NVL(USE_YN,'N') = 'Y'
+		  ORDER BY F_COM_GET_GRCODE_SEQ( #{ssnEnterCd}, 'B49530', COMPANY_CD)
+		         , F_COM_GET_GRCODE_SEQ( #{ssnEnterCd}, 'B49510', AREA_CD)
+		         , RESORT_NM
+	]]>
+	</select>
+		
+	<!-- 신청내용 조회 -->
+	<select id="getResortSeasonAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT  A.ENTER_CD
+				, A.APPL_SEQ
+				, A.SABUN
+				, A.COMPANY_CD
+				, (SELECT Z.CODE_NM FROM TSYS005 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.GRCODE_CD = 'B49530' AND Z.CODE = A.COMPANY_CD) AS COMPANY_CD_NM
+				, A.RESORT_NM
+				, A.ROOM_TYPE
+				, A.SDATE
+				, A.EDATE
+				, A.DAYS
+				, A.WAIT_YN
+				, A.CNT
+				, A.PHONE_NO
+				, A.MAIL_ID
+				, A.COM_MON_YN
+				, A.NOTE
+				, A.STATUS_CD
+				, A.PLAN_SEQ
+				, A.RESORT_SEQ
+				, A.HOPE_CD
+				, (SELECT NVL(MAX(Z.TARGET_YN),'') FROM TBEN492 Z WHERE Z.PLAN_SEQ = A.PLAN_SEQ AND Z.ENTER_CD = A.ENTER_CD) AS TARGET_YN
+				, A.RSV_NO1
+				, A.RSV_NO2
+				, A.RESORT_MON
+				, A.COM_MON
+				, A.PSNAL_MON
+             FROM TBEN491 A
+            WHERE A.ENTER_CD   = #{ssnEnterCd}
+              AND A.APPL_SEQ   = #{searchApplSeq}
+	]]>
+	</select>
+		
+	<!-- 개인연락처 조회 -->
+	<select id="getResortSeasonAppDetMap2" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_CONT_ADDRESS(#{ssnEnterCd}, TRIM(#{searchApplSabun}), 'HP') AS PHONE_NO
+                      , F_COM_GET_CONT_ADDRESS(#{ssnEnterCd}, TRIM(#{searchApplSabun}), 'IM') AS MAIL_ID
+                  FROM DUAL
+	]]>
+	</select>
+		
+	<!-- 신청 내용 저장 -->
+	<update id="saveResortSeasonAppDet" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN491 T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">					
+				SELECT	  TRIM( #{ssnEnterCd} ) 		AS ENTER_CD
+						, TRIM( #{rm.searchApplSeq} ) 	AS APPL_SEQ
+						, TRIM( #{rm.searchApplSabun} )	AS SABUN
+						, ( SELECT MAX(Z.COMPANY_CD) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS COMPANY_CD
+						, ( SELECT MAX(Z.RESORT_NM) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS RESORT_NM
+						, ( SELECT MAX(Z.SDATE) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 		AS SDATE
+						, ( SELECT MAX(Z.EDATE) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 		AS EDATE
+						, ( SELECT MAX(Z.ROOM_TYPE) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS ROOM_TYPE
+						, ( SELECT MAX(Z.DAYS) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 		AS DAYS
+						, TRIM( #{rm.phoneNo} ) 		AS PHONE_NO
+						, TRIM( #{rm.mailId}) 			AS MAIL_ID
+						, TRIM( #{rm.note} ) 			AS NOTE
+						, 'Y'					 		AS COM_MON_YN
+						, TRIM( #{rm.planSeq} ) 		AS PLAN_SEQ
+						, TRIM( #{rm.resortSeq} ) 		AS RESORT_SEQ
+						, TRIM( #{rm.hopeCd} ) 			AS HOPE_CD
+						, ( SELECT MAX(Z.RSV_NO1) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS RSV_NO1
+						, ( SELECT MAX(Z.RSV_NO2) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS RSV_NO2
+						, ( SELECT MAX(Z.RESORT_MON) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS RESORT_MON
+						, ( SELECT MAX(Z.COM_MON) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS COM_MON
+						, ( SELECT MAX(Z.PSNAL_MON) FROM TBEN494 Z WHERE Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.PLAN_SEQ = TRIM( #{rm.planSeq} ) AND Z.RESORT_SEQ = TRIM( #{rm.resortSeq} ) ) 	AS PSNAL_MON
+				 FROM   DUAL
+		</foreach>
+	<![CDATA[
+				) S
+		ON ( 		 T.ENTER_CD	= S.ENTER_CD
+				AND  T.APPL_SEQ	= S.APPL_SEQ
+		 )
+		WHEN MATCHED THEN
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun} 
+		            , T.COMPANY_CD = S.COMPANY_CD
+		            , T.RESORT_NM = S.RESORT_NM 
+		            , T.ROOM_TYPE = S.ROOM_TYPE 
+		            , T.SDATE = S.SDATE 
+		            , T.EDATE = S.EDATE 
+		            , T.DAYS = S.DAYS 
+		            , T.PHONE_NO = S.PHONE_NO 
+		            , T.MAIL_ID = S.MAIL_ID 
+		            , T.COM_MON_YN = S.COM_MON_YN 
+		            , T.NOTE = S.NOTE 
+		            , T.PLAN_SEQ = S.PLAN_SEQ 
+		            , T.RESORT_SEQ = S.RESORT_SEQ 
+		            , T.HOPE_CD = S.HOPE_CD 
+		            , T.RSV_NO1 = S.RSV_NO1 
+		            , T.RSV_NO2 = S.RSV_NO2 
+		            , T.RESORT_MON = S.RESORT_MON 
+		            , T.COM_MON = S.COM_MON 
+		            , T.PSNAL_MON = S.PSNAL_MON 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.APPL_SEQ
+		            , T.SABUN
+		            , T.COMPANY_CD
+		            , T.RESORT_NM
+		            , T.ROOM_TYPE
+		            , T.SDATE
+		            , T.EDATE
+		            , T.DAYS
+		            , T.PHONE_NO
+		            , T.MAIL_ID
+		            , T.COM_MON_YN
+		            , T.NOTE
+		            , T.PLAN_SEQ
+		            , T.RESORT_SEQ
+		            , T.HOPE_CD
+		            , T.RSV_NO1
+		            , T.RSV_NO2
+		            , T.RESORT_MON
+		            , T.COM_MON
+		            , T.PSNAL_MON
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.APPL_SEQ
+		            , S.SABUN
+		            , S.COMPANY_CD
+		            , S.RESORT_NM
+		            , S.ROOM_TYPE
+		            , S.SDATE
+		            , S.EDATE
+		            , S.DAYS
+		            , S.PHONE_NO
+		            , S.MAIL_ID
+		            , S.COM_MON_YN
+		            , S.NOTE
+		            , S.PLAN_SEQ
+		            , S.RESORT_SEQ
+		            , S.HOPE_CD
+		            , S.RSV_NO1
+		            , S.RSV_NO2
+		            , S.RESORT_MON
+		            , S.COM_MON
+		            , S.PSNAL_MON
+		            , sysdate
+		            , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<select id="getResortSeasonAppDetTargetYn" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT 
+			COUNT(1) AS CNT 
+		  FROM TBEN496 A
+		 WHERE A.ENTER_CD =	#{ssnEnterCd}
+	       AND A.YEAR 	  = SUBSTR(REPLACE(TRIM( #{sdate} ), '-', ''),1,4)
+	       AND A.SABUN	  = TRIM( #{searchApplSabun} )
+	]]>
+	</select>
+		
+	<!-- 중복 신청여부 조회  -->
+	<select id="getResortSeasonAppDetChkDupAppl" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT 
+			COUNT(1) AS CNT 
+		  FROM TBEN491 A
+		 WHERE A.ENTER_CD =	#{ssnEnterCd}
+	       AND A.SABUN	  = TRIM( #{searchApplSabun} )
+	       AND A.PLAN_SEQ = TRIM( #{planSeq} )
+	       AND A.HOPE_CD  = TRIM( #{hopeCd} )
+	       AND A.APPL_SEQ != TRIM( #{searchApplSeq} )
+	]]>
+	</select>
+		
+</mapper>

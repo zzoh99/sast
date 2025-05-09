@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.conv.convColMapMgr">
+
+<!-- 이관컬럼매핑관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getConvColMapMgrList">
+
+				<![CDATA[
+					SELECT A.OWNER
+						 , A.TAB_NM
+						 , A.SRC_COL_NM
+						 , A.SRC_COL_ID
+						 , A.SRC_COL_TYPE
+						 , A.SRC_COL_COMMENT
+						 , A.SRC_AVG_COL_LEN
+					     , B.DEST_TAB_NM
+						 , A.DEST_COL_NM
+						 , A.DEST_COL_TYPE
+						 , A.DEST_COL_COMMENT
+						 , A.CONV_TYPE
+					     , A.ATTR1
+					     , A.ATTR2
+					     , A.ATTR3
+					     , A.ATTR4
+					     , B.CONV_YN
+					     , B.COMP_YN
+					  FROM CONV002 A, CONV001 B
+					 WHERE A.OWNER = B.OWNER
+					   AND A.TAB_NM = B.TAB_NM
+					   AND A.OWNER = #{searchOwner} ]]>
+					<if test='searchTabNm != null and !searchTabNm.equals("")'>
+					   AND A.TAB_NM LIKE #{searchTabNm} ||'%'
+					</if>
+					<if test='searchSrcColNm != null and !searchSrcColNm.equals("")'>
+					   AND A.SRC_COL_NM LIKE #{searchSrcColNm} ||'%'
+					</if>
+					<if test='searchConvType != null and !searchConvType.equals("")'>
+					   AND A.CONV_TYPE = #{searchConvType}
+					</if>
+					<if test='searchTabConvType != null and !searchTabConvType.equals("")'>
+					   AND B.CONV_TYPE = #{searchTabConvType}
+					</if>
+					<if test='searchAttr1 != null and !searchAttr1.equals("")'>
+					   AND A.ATTR1 = #{searchAttr1}
+					</if>
+				     ORDER BY A.OWNER, A.TAB_NM, A.SRC_COL_ID
+
+
+
+		</select>
+
+<!-- 이관컬럼매핑관리 저장 -->
+		<update parameterType="map" id="saveConvColMapMgr">
+
+					MERGE INTO CONV002 T
+					USING	(
+							SELECT	A.OWNER
+								,	A.TAB_NM
+								,	A.SRC_COL_NM
+								,	A.SRC_COL_ID
+								,	A.SRC_COL_TYPE
+								,	A.SRC_COL_COMMENT
+								,	A.SRC_AVG_COL_LEN
+								,	A.DEST_COL_NM
+								,	A.DEST_COL_TYPE
+								,	A.DEST_COL_COMMENT
+								,	A.CONV_TYPE
+								,	A.ATTR1
+								,	A.ATTR2
+								,	A.ATTR3
+								,	A.ATTR4
+							FROM	(
+									SELECT NULL AS OWNER
+										 , NULL AS TAB_NM
+										 , NULL AS SRC_COL_NM
+										 , NULL AS SRC_COL_ID
+										 , NULL AS SRC_COL_TYPE
+									     , NULL AS SRC_COL_COMMENT
+									     , NULL AS SRC_AVG_COL_LEN
+									     , NULL AS DEST_COL_NM
+									     , NULL AS DEST_COL_TYPE
+									     , NULL AS DEST_COL_COMMENT
+									     , NULL AS CONV_TYPE
+									     , NULL AS ATTR1
+									     , NULL AS ATTR2
+									     , NULL AS ATTR3
+									     , NULL AS ATTR4
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											TRIM(#{rm.owner})			AS	OWNER
+										,	TRIM(#{rm.tabNm})			AS	TAB_NM
+										,	TRIM(#{rm.srcColNm})		AS	SRC_COL_NM
+										,	TRIM(#{rm.srcColId})		AS	SRC_COL_ID
+										,	TRIM(#{rm.srcColType})		AS	SRC_COL_TYPE
+										,	TRIM(#{rm.srcColComment})	AS	SRC_COL_COMMENT
+										,	TRIM(#{rm.srcAvgColLen})	AS	SRC_AVG_COL_LEN
+										,	TRIM(#{rm.destColNm})		AS	DEST_COL_NM
+										,	TRIM(#{rm.destColType})		AS	DEST_COL_TYPE
+										,	TRIM(#{rm.destColComment})	AS	DEST_COL_COMMENT
+										,	TRIM(#{rm.convType})		AS	CONV_TYPE
+										,	TRIM(#{rm.attr1})			AS	ATTR1
+										,	TRIM(#{rm.attr2})			AS	ATTR2
+										,	TRIM(#{rm.attr3})			AS	ATTR3
+										,	TRIM(#{rm.attr4})			AS	ATTR4
+									FROM	DUAL
+</foreach>
+									) A WHERE A.OWNER	IS NOT NULL
+										  AND A.TAB_NM	IS NOT NULL
+							) S
+					ON (
+								T.OWNER			=	S.OWNER
+							AND	T.TAB_NM		=	S.TAB_NM
+							AND	T.SRC_COL_NM	=	S.SRC_COL_NM
+						)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SRC_COL_ID    			=	S.SRC_COL_ID
+									, T.SRC_COL_TYPE    		=	S.SRC_COL_TYPE
+									, T.SRC_COL_COMMENT 		=	S.SRC_COL_COMMENT
+									, T.SRC_AVG_COL_LEN 		=	S.SRC_AVG_COL_LEN
+									, T.DEST_COL_NM     		=	S.DEST_COL_NM
+									, T.DEST_COL_TYPE   		=	S.DEST_COL_TYPE
+									, T.DEST_COL_COMMENT		=	S.DEST_COL_COMMENT
+									, T.CONV_TYPE       		=	S.CONV_TYPE
+									, T.ATTR1           		=	S.ATTR1
+									, T.ATTR2           		=	S.ATTR2
+									, T.ATTR3           		=	S.ATTR3
+									, T.ATTR4           		=	S.ATTR4
+									, T.CHKDATE					=	SYSDATE
+									, T.CHKID					=	#{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.OWNER
+							, T.TAB_NM
+							, T.SRC_COL_NM
+							, T.SRC_COL_ID
+							, T.SRC_COL_TYPE
+							, T.SRC_COL_COMMENT
+							, T.SRC_AVG_COL_LEN
+							, T.DEST_COL_NM
+							, T.DEST_COL_TYPE
+							, T.DEST_COL_COMMENT
+							, T.CONV_TYPE
+							, T.ATTR1
+							, T.ATTR2
+							, T.ATTR3
+							, T.ATTR4
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.OWNER
+							, S.TAB_NM
+							, S.SRC_COL_NM
+							, S.SRC_COL_ID
+							, S.SRC_COL_TYPE
+							, S.SRC_COL_COMMENT
+							, S.SRC_AVG_COL_LEN
+							, S.DEST_COL_NM
+							, S.DEST_COL_TYPE
+							, S.DEST_COL_COMMENT
+							, S.CONV_TYPE
+							, S.ATTR1
+							, S.ATTR2
+							, S.ATTR3
+							, S.ATTR4
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+<!-- 이관컬럼매핑관리 삭제 -->
+		<delete parameterType="map" id="deleteConvColMapMgr">
+
+					DELETE FROM CONV002
+					 WHERE OWNER||'_'||TAB_NM ||'_'||SRC_COL_NM	IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.owner != null and !rm.owner.equals("") and rm.tabNm != null and !rm.tabNm.equals("")
+												and rm.srcColNm != null and !rm.srcColNm.equals("")'>
+											TRIM( #{rm.owner} )||'_'||TRIM( #{rm.tabNm} )||'_'||TRIM( #{rm.srcColNm} )
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+
+
+<!-- 이관컬럼매핑관리(원본컬럼 생성) 프로시저 -->
+		<update parameterType="map" id="prcConvColMapMgr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL PRC_CONV_COLUMN_INS(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{searchOwner,mode=IN,jdbcType=VARCHAR},
+				#{searchTabNm,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+<!-- 복사본의 빈 칼럼을 원본의 칼럼으로 복사 프로시저 -->
+		<update parameterType="map" id="prcConvColMapMgr2" statementType="CALLABLE">
+		<![CDATA[
+			{CALL PRC_CONV_COLUMN_COPY(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{searchOwner,mode=IN,jdbcType=VARCHAR},
+				#{searchTabNm,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+
+</mapper>

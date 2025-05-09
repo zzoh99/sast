@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepRmidMgr">
+
+		<select parameterType="map" resultType="cMap" id="getSepRmidMgrList">
+
+
+					SELECT X1.SABUN, X1.RMID_YMD, X1.PAYMENT_YMD, X1.WKP_YM, X1.AVG_MON, X1.EARNING_MON, X1.T_ITAX_MON,
+					       F_COM_GET_GRCODE_NAME(X1.ENTER_CD, 'H10010', X1.STATUS_CD) AS STATUS_NM,
+					       X1.T_RTAX_MON, X1.T_STAX_MON, X1.ETC_ALLOW_MON, X1.ETC_DED_MON, X1.RMID_MON, X1.CUMULATIVE_CNT, X1.NAME, X1.STATUS_CD
+					  FROM
+					       (SELECT T1.ENTER_CD,
+					               T1.SABUN,
+					               T1.RMID_YMD,
+					               T1.PAYMENT_YMD,
+					               T1.WKP_YM,
+					               T1.AVG_MON,
+					               T1.EARNING_MON,
+					               T1.T_ITAX_MON,
+					               T1.T_RTAX_MON,
+					               T1.T_STAX_MON,
+					               T1.ETC_ALLOW_MON,
+					               T1.ETC_DED_MON,
+					               T1.RMID_MON,
+					               T1.CUMULATIVE_CNT,
+					               T2.NAME,
+					               F_COM_GET_STATUS_CD(T1.ENTER_CD, T1.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_CD
+					          FROM TCPN769 T1,
+					               THRM100 T2
+					         WHERE T1.ENTER_CD = #{ssnEnterCd}
+					           AND T2.ENTER_CD = T1.ENTER_CD
+					           AND ( T1.SABUN = TRIM(#{searchNm}) OR    T2.NAME LIKE  '%'||TRIM(#{searchNm})||'%' )
+
+							<if test='searchEdate != null and !searchEdate.equals("")'>
+								<![CDATA[
+								AND		T1.RMID_YMD	<=	REPLACE(#{searchEdate}, '-', '')
+								         ]]>
+							</if>
+
+							<if test='searchSdate != null and !searchSdate.equals("")'>
+							<![CDATA[
+								AND		NVL(T1.RMID_YMD,'99991231')	>=	REPLACE(#{searchSdate}, '-', '')
+								         ]]>
+							</if>
+					           AND T2.SABUN = T1.SABUN) X1
+					WHERE 1=1
+				<if test='searchStatusCdHidden != null and !searchStatusCdHidden.equals("")'>
+					AND		X1.STATUS_CD IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				</if>
+					ORDER	BY
+							X1.RMID_YMD	DESC
+
+
+
+		</select>
+
+		<update parameterType="map" id="saveSepRmidMgr">
+
+
+						MERGE INTO TCPN769	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	SABUN
+										,	RMID_YMD
+										,	PAYMENT_YMD
+										,	WKP_YM
+										,	AVG_MON
+										,	EARNING_MON
+										,	T_ITAX_MON
+										,	T_RTAX_MON
+										,	T_STAX_MON
+										,	ETC_ALLOW_MON
+										,	ETC_DED_MON
+										,	RMID_MON
+										,	CHKDATE
+										,	CHKID
+										,	CUMULATIVE_CNT
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	SABUN
+										,	NULL		AS	RMID_YMD
+										,	NULL		AS	PAYMENT_YMD
+										,	NULL		AS	WKP_YM
+										,	NULL		AS	AVG_MON
+										,	NULL		AS	EARNING_MON
+										,	NULL		AS	T_ITAX_MON
+										,	NULL		AS	T_RTAX_MON
+										,	NULL		AS	T_STAX_MON
+										,	NULL		AS	ETC_ALLOW_MON
+										,	NULL		AS	ETC_DED_MON
+										,	NULL		AS	RMID_MON
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+										,	NULL		AS	CUMULATIVE_CNT
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+										,	TRIM(#{rm.sabun})				AS	SABUN
+										,	TRIM(#{rm.rmidYmd})				AS	RMID_YMD
+										,	TRIM(#{rm.paymentYmd})			AS	PAYMENT_YMD
+										,	TRIM(#{rm.wkpYm})				AS	WKP_YM
+										,	TRIM(#{rm.avgMon})				AS	AVG_MON
+										,	TRIM(#{rm.earningMon})			AS	EARNING_MON
+										,	TRIM(#{rm.tItaxMon})			AS	T_ITAX_MON
+										,	TRIM(#{rm.tRtaxMon})			AS	T_RTAX_MON
+										,	TRIM(#{rm.tStaxMon})			AS	T_STAX_MON
+										,	TRIM(#{rm.etcAllowMon})			AS	ETC_ALLOW_MON
+										,	TRIM(#{rm.etcDedMon})			AS	ETC_DED_MON
+										,	TRIM(#{rm.rmidMon})				AS	RMID_MON
+										,	SYSDATE							AS	CHKDATE
+										,	#{ssnSabun}						AS	CHKID
+										,	TRIM(#{rm.cumulativeCnt})				AS	CUMULATIVE_CNT
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		SABUN IS NOT NULL
+										AND		RMID_YMD IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.SABUN					=		S.SABUN
+							AND	T.RMID_YMD				=		S.RMID_YMD
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.PAYMENT_YMD			=	S.PAYMENT_YMD
+						,	T.WKP_YM				=	S.WKP_YM
+						,	T.AVG_MON				=	S.AVG_MON
+						,	T.EARNING_MON			=	S.EARNING_MON
+						,	T.T_ITAX_MON			=	S.T_ITAX_MON
+						,	T.T_RTAX_MON			=	S.T_RTAX_MON
+						,	T.T_STAX_MON			=	S.T_STAX_MON
+						,	T.ETC_ALLOW_MON			=	S.ETC_ALLOW_MON
+						,	T.ETC_DED_MON			=	S.ETC_DED_MON
+						,	T.RMID_MON				=	S.RMID_MON
+						,	T.CHKDATE				=	S.CHKDATE
+						,	T.CHKID					=	S.CHKID
+						,	T.CUMULATIVE_CNT		=	S.CUMULATIVE_CNT
+					WHEN NOT MATCHED THEN
+					INSERT
+					(
+							T.ENTER_CD
+						,	T.SABUN
+						,	T.RMID_YMD
+						,	T.PAYMENT_YMD
+						,	T.WKP_YM
+						,	T.AVG_MON
+						,	T.EARNING_MON
+						,	T.T_ITAX_MON
+						,	T.T_RTAX_MON
+						,	T.T_STAX_MON
+						,	T.ETC_ALLOW_MON
+						,	T.ETC_DED_MON
+						,	T.RMID_MON
+						,	T.CHKDATE
+						,	T.CHKID
+						,	T.CUMULATIVE_CNT
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.SABUN
+						,	S.RMID_YMD
+						,	S.PAYMENT_YMD
+						,	S.WKP_YM
+						,	S.AVG_MON
+						,	S.EARNING_MON
+						,	S.T_ITAX_MON
+						,	S.T_RTAX_MON
+						,	S.T_STAX_MON
+						,	S.ETC_ALLOW_MON
+						,	S.ETC_DED_MON
+						,	S.RMID_MON
+						,	S.CHKDATE
+						,	S.CHKID
+						,	S.CUMULATIVE_CNT
+					)
+
+
+
+		</update>
+
+		<delete parameterType="map" id="deleteSepRmidMgr">
+
+
+					DELETE	FROM TCPN769
+					WHERE	(ENTER_CD, SABUN, RMID_YMD) IN ((NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+										<if test='rm.rmidYmd != null and !rm.rmidYmd.equals("")'>
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.sabun} ) , TRIM( #{rm.rmidYmd} ) )
+										</if>
+										</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+	</mapper>

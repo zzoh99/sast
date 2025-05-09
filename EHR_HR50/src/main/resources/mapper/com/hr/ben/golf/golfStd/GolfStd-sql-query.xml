@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+회의실 기준관리
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.golf.golfStd">
+
+	<select id="getGolfStdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.GOLF_CD
+		     , A.SDATE
+		     , A.EDATE
+		     , A.GOLF_ADDR
+			 , A.GOLF_MON
+		     , A.NOTE
+		     , A.SEQ
+		     , A.USE_YN
+		  FROM TBEN510 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd}) ]]>
+		<if test="searchYmd != null and searchYmd neq ''">
+		   AND REPLACE(TRIM(#{searchYmd}), '-','') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+		</if>
+	     ORDER BY A.SEQ
+	</select>
+		
+	<update id="saveGolfStd" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN510 T 
+		 USING (  ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			   SELECT TRIM(#{ssnEnterCd}) 	AS  ENTER_CD 
+		            , TRIM(#{rm.golfCd})  	AS  GOLF_CD
+		            , TRIM(#{rm.sdate})  	AS  SDATE
+		            , TRIM(#{rm.edate})  	AS  EDATE
+		            , TRIM(#{rm.golfAddr}) 	AS  GOLF_ADDR
+		            , TRIM(#{rm.golfMon})  	AS  GOLF_MON
+		            , TRIM(#{rm.note})  	AS  NOTE
+		            , TRIM(#{rm.seq})  		AS  SEQ
+		            , TRIM(#{rm.useYn})  	AS  USE_YN
+		        FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.GOLF_CD 	= S.GOLF_CD 
+		     AND  T.SDATE 		= S.SDATE 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE		= sysdate 
+		            , T.CHKID		= #{ssnSabun} 
+		            , T.EDATE 		= S.EDATE 
+		            , T.NOTE 		= S.NOTE 
+		            , T.GOLF_ADDR 	= S.GOLF_ADDR 
+		            , T.GOLF_MON 	= S.GOLF_MON 
+		            , T.USE_YN 		= S.USE_YN
+		            , T.SEQ 		= S.SEQ 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.GOLF_CD
+		            , T.SDATE
+		            , T.EDATE
+		            , T.GOLF_ADDR
+		            , T.GOLF_MON
+		            , T.NOTE
+		            , T.SEQ
+		            , T.USE_YN
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.GOLF_CD
+		            , S.SDATE
+		            , S.EDATE
+		            , S.GOLF_ADDR
+		            , S.GOLF_MON
+		            , S.NOTE
+		            , S.SEQ
+		            , S.USE_YN
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+		
+	<delete id="deleteGolfStd" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN510
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( GOLF_CD ) IN ( ( NULL) ]]> 
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.golfCd != null and rm.golfCd neq ''">
+				, ( TRIM( #{rm.golfCd} ) ) 
+			</if>
+		</foreach>
+		)
+	</delete>
+</mapper>

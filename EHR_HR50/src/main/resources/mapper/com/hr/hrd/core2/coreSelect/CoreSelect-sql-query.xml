@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrd.core2.coreSelect">
+	<select parameterType="map" resultType="cMap" id="getCoreSelectOrgList">
+		SELECT ORG_CD AS CODE
+			 , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS CODE_NM
+		FROM TCDP990
+		WHERE ENTER_CD = #{ssnEnterCd}
+		  AND MGR_TYPE = '2' -- 승인자
+		  AND SABUN = #{ssnSabun}
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getCoreSelectList">
+		<![CDATA[
+				SELECT A.ENTER_CD
+					 , A.ORG_CD
+					 , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+					 , A.SABUN
+					 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+				     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+					 , A.CORE_TYPE
+					 , A.RCMD_SABUN
+					 , F_COM_GET_NAMES(A.ENTER_CD, A.RCMD_SABUN) AS RCMD_NAME
+					 , A.RCMD_YMD
+					 , A.RCMD_REASON
+					 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO
+					 , 0 AS BTN_PRT
+					 , 0 AS BTN_PRT2
+				  FROM TCDP991 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.ORG_CD = #{searchCoreOrgCd}
+		]]>
+		<if test="searchCoreTypeCd != null and searchCoreTypeCd neq '' ">
+				   AND A.CORE_TYPE = #{searchCoreTypeCd}
+		</if>
+				   AND NOT EXISTS
+				       (
+				           SELECT 1
+				             FROM TCDP992
+				            WHERE ENTER_CD = A.ENTER_CD
+				              AND ORG_CD = A.ORG_CD
+				              AND SABUN = A.SABUN
+				              AND CORE_TYPE = A.CORE_TYPE
+				              AND POOL_IN_YMD IS NOT NULL
+				              AND POOL_OUT_YMD IS NULL
+					   )
+	</select>
+
+	<update parameterType="map" id="saveCoreSelectPoolIn">
+		MERGE INTO TCDP992 T
+		USING
+		    (
+				SELECT A.ENTER_CD
+					, A.ORG_CD
+					, A.SABUN
+					, A.CORE_TYPE
+					, A.SEQ
+					, A.POOL_IN_YMD
+					, A.CHKDATE
+					, A.CHKID
+				FROM (
+					SELECT NULL AS ENTER_CD
+						, NULL AS ORG_CD
+						, NULL AS SABUN
+						, NULL AS CORE_TYPE
+						, NULL AS SEQ
+						, NULL AS POOL_IN_YMD
+						, NULL AS CHKDATE
+						, NULL AS CHKID
+					FROM DUAL
+<bind name="icnt" value="1"/>
+<foreach item="rm" collection="mergeRows" >
+					UNION ALL
+					SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+						, TRIM(#{searchCoreOrgCd}) AS ORG_CD
+						, TRIM(#{rm.sabun}) AS SABUN
+						, TRIM(#{rm.coreType}) AS CORE_TYPE
+	<choose>
+		<when test="rm.seq != null and rm.seq neq ''">
+						, TRIM(#{rm.seq}) AS SEQ
+		</when>
+		<otherwise>
+						, ( SELECT NVL(MAX(SEQ), 0) + ${icnt}
+						      FROM TCDP992
+							 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+							   AND ORG_CD = TRIM(#{searchCoreOrgCd})
+							   AND SABUN = TRIM(#{rm.sabun})
+							   AND CORE_TYPE = TRIM(#{rm.coreType}) ) AS SEQ
+			<bind name="icnt" value="icnt+1"/>
+		</otherwise>
+	</choose>
+						, TO_CHAR(SYSDATE, 'YYYYMMDD') AS POOL_IN_YMD
+						, SYSDATE AS CHKDATE
+						, TRIM(#{ssnSabun}) AS CHKID
+					FROM DUAL
+</foreach>
+					) A
+				WHERE A.ENTER_CD IS NOT NULL
+				AND A.ORG_CD IS NOT NULL
+				AND A.SABUN IS NOT NULL
+				AND A.CORE_TYPE IS NOT NULL
+				AND A.SEQ IS NOT NULL
+			) S
+		ON (
+				T.ENTER_CD = S.ENTER_CD
+				AND T.ORG_CD = S.ORG_CD
+				AND T.SABUN = S.SABUN
+				AND T.CORE_TYPE = S.CORE_TYPE
+				AND T.SEQ = S.SEQ
+		)
+		WHEN MATCHED THEN
+			UPDATE SET T.POOL_IN_YMD = S.POOL_IN_YMD
+					, T.CHKDATE = SYSDATE
+					, T.CHKID = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT (
+				T.ENTER_CD
+				, T.ORG_CD
+				, T.SABUN
+				, T.CORE_TYPE
+				, T.SEQ
+				, T.POOL_IN_YMD
+				, T.CHKDATE
+				, T.CHKID
+			)
+			VALUES (
+				S.ENTER_CD
+				, S.ORG_CD
+				, S.SABUN
+				, S.CORE_TYPE
+				, S.SEQ
+				, S.POOL_IN_YMD
+				, S.CHKDATE
+				, S.CHKID
+			)
+	</update>
+
+	<select parameterType="map" resultType="cMap" id="getCoreSelectList2">
+		<![CDATA[
+			SELECT ORG_CD
+				 , SABUN
+				 , F_COM_GET_NAMES(ENTER_CD, SABUN) AS NAME
+				 , F_COM_GET_ORG_NM2(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+				 , F_COM_GET_JIKCHAK_NM(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+				 , F_COM_GET_JIKGUB_NM(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+				 , CORE_TYPE
+			     , F_COM_GET_GRCODE_NAME(ENTER_CD, 'CD1301', CORE_TYPE, #{ssnLocaleCd}) AS CORE_TYPE_NM
+				 , SEQ
+				 , POOL_IN_YMD
+				 , RANK
+				 , POOL_OUT_YMD
+				 , POOL_OUT_REASON_CD
+				 , POOL_OUT_REASON_DETAIL
+				 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || ENTER_CD || chr(38) || 'searchKeyword=' || SABUN || chr(38) || 'type=1' AS PHOTO
+				 , 0 AS BTN_PRT
+				 , 0 AS BTN_PRT2
+			  FROM TCDP992
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			   AND ORG_CD = TRIM(#{searchCoreOrgCd})
+		]]>
+<if test="searchCoreTypeCd != null and searchCoreTypeCd neq ''">
+			   AND CORE_TYPE = TRIM(#{searchCoreTypeCd})
+</if>
+			   AND POOL_IN_YMD IS NOT NULL
+			   AND POOL_OUT_YMD IS NULL
+			 ORDER BY SABUN, POOL_IN_YMD DESC, SEQ
+	</select>
+
+	<update parameterType="map" id="saveCoreSelectPoolOut">
+		MERGE INTO TCDP992 T
+		USING
+		(
+			SELECT A.ENTER_CD
+				, A.ORG_CD
+				, A.SABUN
+				, A.CORE_TYPE
+				, A.SEQ
+				, A.POOL_OUT_YMD
+				, A.POOL_OUT_REASON_CD
+				, A.POOL_OUT_REASON_DETAIL
+				, A.CHKDATE
+				, A.CHKID
+			FROM (
+				SELECT NULL AS ENTER_CD
+					, NULL AS ORG_CD
+					, NULL AS SABUN
+					, NULL AS CORE_TYPE
+					, NULL AS SEQ
+					, NULL AS POOL_OUT_YMD
+					, NULL AS POOL_OUT_REASON_CD
+					, NULL AS POOL_OUT_REASON_DETAIL
+					, NULL AS CHKDATE
+					, NULL AS CHKID
+				FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+				UNION ALL
+				SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					, TRIM(#{searchCoreOrgCd}) AS ORG_CD
+					, TRIM(#{rm.sabun}) AS SABUN
+					, TRIM(#{rm.coreType}) AS CORE_TYPE
+					, TRIM(#{rm.seq}) AS SEQ
+					, TO_CHAR(SYSDATE, 'YYYYMMDD') AS POOL_OUT_YMD
+					, TRIM(#{rm.poolOutReasonCd}) AS POOL_OUT_REASON_CD
+					, TRIM(#{rm.poolOutReasonDetail}) AS POOL_OUT_REASON_DETAIL
+					, SYSDATE AS CHKDATE
+					, TRIM(#{ssnSabun}) AS CHKID
+				FROM DUAL
+</foreach>
+			) A
+			WHERE A.ENTER_CD IS NOT NULL
+			AND A.ORG_CD IS NOT NULL
+			AND A.SABUN IS NOT NULL
+			AND A.CORE_TYPE IS NOT NULL
+			AND A.SEQ IS NOT NULL
+	) S
+	ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.ORG_CD = S.ORG_CD
+			AND T.SABUN = S.SABUN
+			AND T.CORE_TYPE = S.CORE_TYPE
+			AND T.SEQ = S.SEQ
+	)
+	WHEN MATCHED THEN
+		UPDATE SET T.POOL_OUT_YMD = S.POOL_OUT_YMD
+				, T.POOL_OUT_REASON_CD = S.POOL_OUT_REASON_CD
+				, T.POOL_OUT_REASON_DETAIL = S.POOL_OUT_REASON_DETAIL
+				, T.CHKDATE = S.CHKDATE
+				, T.CHKID = S.CHKID
+	</update>
+
+	<update parameterType="map" id="saveCoreSelect2">
+		MERGE INTO TCDP992 T
+		USING
+		(
+			SELECT A.ENTER_CD
+				, A.ORG_CD
+				, A.SABUN
+				, A.CORE_TYPE
+				, A.SEQ
+				, A.RANK
+				, A.POOL_OUT_REASON_CD
+				, A.POOL_OUT_REASON_DETAIL
+				, A.CHKDATE
+				, A.CHKID
+			FROM (
+					SELECT NULL AS ENTER_CD
+						, NULL AS ORG_CD
+						, NULL AS SABUN
+						, NULL AS CORE_TYPE
+						, NULL AS SEQ
+						, NULL AS RANK
+						, NULL AS POOL_OUT_REASON_CD
+						, NULL AS POOL_OUT_REASON_DETAIL
+						, NULL AS CHKDATE
+						, NULL AS CHKID
+					FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+					UNION ALL
+					SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+						, TRIM(#{searchCoreOrgCd}) AS ORG_CD
+						, TRIM(#{rm.sabun}) AS SABUN
+						, TRIM(#{rm.coreType}) AS CORE_TYPE
+						, TRIM(#{rm.seq}) AS SEQ
+						, TRIM(#{rm.rank}) AS RANK
+						, TRIM(#{rm.poolOutReasonCd}) AS POOL_OUT_REASON_CD
+						, TRIM(#{rm.poolOutReasonDetail}) AS POOL_OUT_REASON_DETAIL
+						, SYSDATE AS CHKDATE
+						, TRIM(#{ssnSabun}) AS CHKID
+					FROM DUAL
+</foreach>
+				) A
+				WHERE A.ENTER_CD IS NOT NULL
+				AND A.ORG_CD IS NOT NULL
+				AND A.SABUN IS NOT NULL
+				AND A.CORE_TYPE IS NOT NULL
+				AND A.SEQ IS NOT NULL
+		) S
+		ON (
+				T.ENTER_CD = S.ENTER_CD
+				AND T.ORG_CD = S.ORG_CD
+				AND T.SABUN = S.SABUN
+				AND T.CORE_TYPE = S.CORE_TYPE
+				AND T.SEQ = S.SEQ
+		)
+		WHEN MATCHED THEN
+			UPDATE SET T.RANK = S.RANK
+					, T.POOL_OUT_REASON_CD = S.POOL_OUT_REASON_CD
+					, T.POOL_OUT_REASON_DETAIL = S.POOL_OUT_REASON_DETAIL
+					, T.CHKDATE = S.CHKDATE
+					, T.CHKID = S.CHKID
+	</update>
+
+	<select parameterType="map" resultType="cMap" id="getCoreSelectIsExistsList">
+			SELECT 'Y' AS IS_EXISTS
+			  FROM DUAL
+			 WHERE EXISTS
+                   (
+                       SELECT 1
+                         FROM TCDP992
+                        WHERE (ENTER_CD, ORG_CD, SABUN, CORE_TYPE) IN
+                              (
+                                  SELECT NULL AS ENTER_CD
+                                       , NULL AS ORG_CD
+                                       , NULL AS SABUN
+                                       , NULL AS CORE_TYPE
+                                    FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+                                  UNION ALL
+                                  SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                                       , TRIM(#{searchCoreOrgCd}) AS ORG_CD
+                                       , TRIM(#{rm.sabun}) AS SABUN
+                                       , TRIM(#{rm.coreType}) AS CORE_TYPE
+                                    FROM DUAL
+</foreach>
+							)
+				   )
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getCoreSelectList3">
+		SELECT ORG_CD
+			 , SABUN
+		     , F_COM_GET_NAMES(ENTER_CD, SABUN) AS NAME
+			 , F_COM_GET_ORG_NM2(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+			 , F_COM_GET_JIKCHAK_NM(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+			 , F_COM_GET_JIKGUB_NM(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+			, CORE_TYPE
+			, SEQ
+			, POOL_IN_YMD
+			, POOL_OUT_YMD
+			, F_COM_GET_GRCODE_NAME(ENTER_CD, 'CD1302', POOL_OUT_REASON_CD) AS POOL_OUT_REASON_NM
+			, POOL_OUT_REASON_DETAIL
+			, '/EmpPhotoOut.do'||chr(63)||'enterCd=' || ENTER_CD || chr(38) || 'searchKeyword=' || SABUN || chr(38) || 'type=1' AS PHOTO
+		FROM TCDP992
+		WHERE ENTER_CD = #{ssnEnterCd}
+		AND ORG_CD = TRIM(#{searchCoreOrgCd})
+		<if test="searchCoreTypeCd != null and searchCoreTypeCd neq ''">
+			AND CORE_TYPE = TRIM(#{searchCoreTypeCd})
+		</if>
+		AND POOL_IN_YMD IS NOT NULL
+		AND POOL_OUT_YMD IS NOT NULL
+	</select>
+
+</mapper>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayPartiTermUSta">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiTermUStaList">
+			 
+				<![CDATA[
+				SELECT '0' AS DETAIL,
+				       A.PAY_ACTION_CD,
+				       A.PAYMENT_YMD,
+				       A.PAY_ACTION_NM,
+				       A.PAY_CD,
+				       D.SABUN,
+				       D.TOT_EARNING_MON,
+				       D.TOT_DED_MON,
+				       D.PAYMENT_MON,
+				       D.ITAX_MON,
+				       D.EI_EE_MON,
+				       D.NP_EE_MON,
+				       D.HI_EE_MON,
+				       D.RTAX_MON,
+				       D.NOTAX_TOT_MON,
+				       D.TAXIBLE_EARN_MON,				       
+				       NVL(D.TOT_DED_MON,0) - NVL(D.ITAX_MON,0) - NVL(D.RTAX_MON,0) - NVL(D.NP_EE_MON,0) - NVL(D.HI_EE_MON,0) - NVL(D.EI_EE_MON,0) - 
+                       (SELECT SUM(RESULT_MON)
+                        FROM TCPN205 X
+                        WHERE ENTER_CD = D.ENTER_CD
+                          AND PAY_ACTION_CD = D.PAY_ACTION_CD
+                          AND SABUN = D.SABUN
+                          AND ELEMENT_CD IN ('DA103','DA104')) AS MON1,
+                      (SELECT SUM(RESULT_MON)
+                        FROM TCPN205 X
+                        WHERE ENTER_CD = D.ENTER_CD
+                          AND PAY_ACTION_CD = D.PAY_ACTION_CD
+                          AND SABUN = D.SABUN
+                          AND ELEMENT_CD IN (SELECT ELEMENT_CD
+                                             FROM TCPN072
+                                             WHERE ENTER_CD = X.ENTER_CD
+                                               AND ELEMENT_SET_CD = '30')) AS MON2,
+                      (SELECT SUM(RESULT_MON)
+                        FROM TCPN205 X
+                        WHERE ENTER_CD = D.ENTER_CD
+                          AND PAY_ACTION_CD = D.PAY_ACTION_CD
+                          AND SABUN = D.SABUN
+                          AND ELEMENT_CD IN (SELECT ELEMENT_CD
+                                             FROM TCPN072
+                                             WHERE ENTER_CD = X.ENTER_CD
+                                               AND ELEMENT_SET_CD = '70')) AS MON3
+				  FROM TCPN201 A, TCPN051 B, TCPN981 C, TCPN303 D , TCPN991 E
+				 WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+				   <if test="searchPayCd != null and searchPayCd neq ''"> 
+				   AND A.PAY_CD = #{searchPayCd}
+				   </if>
+				   <choose><when test="tmpPayYmFrom != null and tmpPayYmFrom neq '' and tmpPayYmTo != null and tmpPayYmTo neq ''"> 
+			   			AND A.PAY_YM BETWEEN REPLACE(#{tmpPayYmFrom}, '-', '') AND REPLACE(#{tmpPayYmTo}, '-', '')
+				   </when><otherwise>
+				   		AND A.PAY_YM BETWEEN '00000101' AND '99991231'
+				   </otherwise></choose> <![CDATA[
+				   AND D.SABUN= #{searchSabun}
+				   AND B.ENTER_CD = A.ENTER_CD
+				   AND B.PAY_CD   = A.PAY_CD
+				   AND C.ENTER_CD(+)      = A.ENTER_CD
+				   AND C.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+				   AND D.ENTER_CD = A.ENTER_CD
+				   AND D.PAY_ACTION_CD = A.PAY_ACTION_CD
+				   AND NVL(C.CLOSE_YN, 'N') LIKE 'Y'
+				   AND E.PAY_CD(+)   = A.PAY_CD
+				   AND E.ENTER_CD(+) = A.ENTER_CD 
+				   -- 퇴직금,연말정산 제외
+				   AND B.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+				   AND (
+				          CASE WHEN B.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+				               ELSE
+				                  CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') THEN -1
+				                       WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') THEN
+				                           CASE WHEN E.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+				                       ELSE 0
+				                  END
+				          END
+				          ) < 0
+				   ORDER BY PAYMENT_YMD DESC, PAY_ACTION_CD DESC, PAY_CD
+				]]>
+		</select>
+</mapper>

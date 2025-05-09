@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.psnalSchedualMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnalSchedualMgrList">
+
+
+						SELECT A.ENTER_CD
+						     , A.SEQ
+						     , A.TITLE
+						     , A.LINK_URL
+						     , A.SEARCH_SEQ
+						     , ( SELECT B.SEARCH_DESC 
+							       FROM THRI201 B
+							      WHERE B.ENTER_CD   = A.ENTER_CD
+							        AND B.SEARCH_SEQ = A.SEARCH_SEQ
+							        AND ROWNUM = 1
+							    ) AS SEARCH_DESC
+							 , A.USE_YN
+						     , A.NOTE
+						  FROM TSYS813 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+<if test='searchUseYn != null and !searchUseYn.equals("")'>
+  					 	   AND A.USE_YN = TRIM( #{searchUseYn} )
+</if>
+		      		    ORDER BY A.SEQ
+
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePsnalSchedualMgr">
+
+
+					 MERGE INTO TSYS813 T 
+					 USING 
+					( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD
+	<choose><when test=" rm.seq != null and !rm.seq.equals('') ">
+			              	 	, TRIM(#{rm.seq})     AS SEQ
+	</when><otherwise>
+			               		, TO_CHAR( (SELECT (NVL(MAX(SEQ),0) + ${icnt}) FROM TSYS813 WHERE ENTER_CD = #{ssnEnterCd} ))  AS SEQ
+	<bind name="icnt" value="icnt + 1" />
+	</otherwise>
+	</choose>
+					            , TRIM(#{rm.title})  AS  TITLE
+					            , TRIM(#{rm.linkUrl})  AS  LINK_URL
+					            , TRIM(#{rm.searchSeq})  AS  SEARCH_SEQ
+					            , TRIM(#{rm.useYn})  AS  USE_YN
+					            , TRIM(#{rm.note})  AS  NOTE
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.SEQ 	 = S.SEQ 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE		= sysdate 
+					            , T.CHKID		= #{ssnSabun}
+					            , T.TITLE 		= S.TITLE 
+					            , T.LINK_URL 	= S.LINK_URL 
+					            , T.SEARCH_SEQ 	= S.SEARCH_SEQ 
+					            , T.USE_YN 		= S.USE_YN 
+					            , T.NOTE 		= S.NOTE 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.SEQ
+					            , T.TITLE
+					            , T.LINK_URL
+					            , T.SEARCH_SEQ
+					            , T.USE_YN
+					            , T.NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.SEQ
+					            , S.TITLE
+					            , S.LINK_URL
+					            , S.SEARCH_SEQ
+					            , S.USE_YN
+					            , S.NOTE
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePsnalSchedualMgr">
+
+
+					DELETE FROM TSYS813
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND ( SEQ ) IN ( ( NULL) 
+<foreach item="rm" collection="deleteRows" >
+    <if test="  rm.seq != null and !rm.seq.equals('') ">
+		     						, ( TRIM( #{rm.seq} ) )
+	</if>
+</foreach>
+		       				)
+
+
+</delete>
+
+
+</mapper>

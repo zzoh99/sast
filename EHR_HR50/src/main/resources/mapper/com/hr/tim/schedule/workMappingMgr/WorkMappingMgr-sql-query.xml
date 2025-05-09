@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.workMappingMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkMappingMgrList">
+
+				<![CDATA[
+					SELECT MAP_TYPE_CD
+						 , MAP_CD
+						 , MAP_NM
+						 , ERP_EMP_CD
+						 , SDATE
+						 , EDATE
+						 , CC_TYPE
+						 , SORT
+						 , NOTE
+					  FROM TORG109 A
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					           ]]>
+				<if test='searchYmd != null and !searchYmd.equals("")'>
+					   AND REPLACE(TRIM(#{searchYmd}),'-','') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+				</if>
+				<if test='searchMapTypeCd != null and !searchMapTypeCd.equals("")'>
+					AND MAP_TYPE_CD LIKE '%'||TRIM(#{searchMapTypeCd})||'%'
+				</if>
+				<if test='searchMapNm != null and !searchMapNm.equals("")'>
+					AND UPPER(MAP_NM) LIKE UPPER('%'||TRIM(#{searchMapNm})||'%')
+				</if>
+					ORDER BY MAP_TYPE_CD, SORT, MAP_CD, SDATE DESC
+
+
+		</select>
+<!-- 		저장 -->
+		<update parameterType="map" id="saveWorkMappingMgrFirst">
+
+					MERGE INTO TORG109 T
+					USING	(
+							SELECT	  A.MAP_TYPE_CD
+									, A.MAP_CD
+									, A.MAP_NM
+									, A.ERP_EMP_CD
+									, A.SDATE
+									, A.EDATE
+									, A.CC_TYPE
+									, A.SORT
+									, A.NOTE
+							FROM	(
+									SELECT	  NULL		AS MAP_TYPE_CD
+											, NULL		AS MAP_CD
+											, NULL		AS MAP_NM
+											, NULL		AS ERP_EMP_CD
+											, NULL      AS SDATE
+											, NULL      AS EDATE
+											, NULL		AS CC_TYPE
+											, NULL		AS SORT
+											, NULL		AS NOTE
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM(#{rm.mapTypeCd})		AS MAP_TYPE_CD
+											, TRIM(#{rm.mapCd})			AS MAP_CD
+											, TRIM(#{rm.mapNm})			AS MAP_NM
+											, TRIM(#{rm.erpEmpCd})		AS ERP_EMP_CD
+											, TRIM(#{rm.sdate})		    AS SDATE
+											, TRIM(#{rm.edate})	    	AS EDATE
+											, TRIM(#{rm.ccType})		AS CC_TYPE
+											, TRIM(#{rm.sort})			AS SORT
+											, TRIM(#{rm.note})			AS NOTE
+											FROM   DUAL
+</foreach>
+									) A WHERE A.MAP_TYPE_CD IS NOT NULL
+										AND A.MAP_CD IS NOT NULL
+							) S
+            ON ( T.ENTER_CD = #{ssnEnterCd}
+            	AND T.MAP_TYPE_CD		= S.MAP_TYPE_CD
+				AND T.MAP_CD		= S.MAP_CD
+				AND T.SDATE			= S.SDATE)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MAP_NM    	= S.MAP_NM
+									, T.ERP_EMP_CD	= S.ERP_EMP_CD
+									, T.EDATE       = S.EDATE
+									, T.CC_TYPE		= S.CC_TYPE
+									, T.SORT      	= S.SORT
+									, T.NOTE      	= S.NOTE
+									, T.CHKDATE	    = SYSDATE
+									, T.CHKID	    = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+                			  T.ENTER_CD
+							, T.MAP_TYPE_CD
+							, T.MAP_CD
+							, T.MAP_NM
+							, T.ERP_EMP_CD
+							, T.SDATE
+							, T.EDATE
+							, T.CC_TYPE
+							, T.SORT
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+                			  #{ssnEnterCd}
+							, S.MAP_TYPE_CD
+							, S.MAP_CD
+							, S.MAP_NM
+							, S.ERP_EMP_CD
+							, S.SDATE
+							, S.EDATE
+							, S.CC_TYPE
+							, S.SORT
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveWorkMappingMgrSecond">
+
+					MERGE INTO TORG109 T
+					USING	(
+							SELECT	  A.MAP_TYPE_CD
+									, A.MAP_CD
+									, A.SDATE
+									, A.EDATE
+							FROM	(
+									SELECT	  NULL		AS MAP_TYPE_CD
+											, NULL		AS MAP_CD
+											, NULL      AS SDATE
+											, NULL      AS EDATE
+									FROM	DUAL
+	<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									   SELECT MAP_TYPE_CD, MAP_CD, SDATE
+									    , NVL( TO_CHAR(TO_DATE ( LAG(SDATE) OVER ( ORDER BY MAP_TYPE_CD, MAP_CD, SDATE DESC), 'YYYYMMDD') -1, 'YYYYMMDD'), '99991231') AS EDATE
+									     FROM TORG109
+									   WHERE ENTER_CD = #{ssnEnterCd}
+									   	 AND MAP_TYPE_CD = TRIM(#{rm.mapTypeCd})
+										 AND MAP_CD      = TRIM(#{rm.mapCd})
+	</foreach>
+	<foreach item="rm" collection="deleteRows" >
+								UNION ALL
+									   SELECT MAP_TYPE_CD, MAP_CD, SDATE
+									    , NVL( TO_CHAR(TO_DATE ( LAG(SDATE) OVER ( ORDER BY MAP_TYPE_CD, MAP_CD, SDATE DESC), 'YYYYMMDD') -1, 'YYYYMMDD'), '99991231') AS EDATE
+									     FROM TORG109
+									   WHERE ENTER_CD = #{ssnEnterCd}
+									   	 AND MAP_TYPE_CD = TRIM(#{rm.mapTypeCd})
+										 AND MAP_CD      = TRIM(#{rm.mapCd})
+	</foreach>
+									) A WHERE A.MAP_TYPE_CD IS NOT NULL
+										AND A.MAP_CD IS NOT NULL
+							) S
+           			 ON (
+	           			 		T.ENTER_CD 		= #{ssnEnterCd}
+			            	AND T.MAP_TYPE_CD	= S.MAP_TYPE_CD
+							AND T.MAP_CD		= S.MAP_CD
+							AND T.SDATE			= S.SDATE
+						)
+					WHEN MATCHED THEN
+					UPDATE SET	  T.EDATE       = S.EDATE
+								, T.CHKDATE	    = SYSDATE
+								, T.CHKID	    = #{ssnSabun}
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteWorkMappingMgr">
+
+					DELETE FROM TORG109
+					WHERE 	ENTER_CD||'_'||MAP_TYPE_CD||'_'||MAP_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test=' ssnEnterCd != null and !ssnEnterCd.equals("") and rm.mapTypeCd != null and !rm.mapTypeCd.equals("")and rm.mapCd != null and !rm.mapCd.equals("")and rm.sdate != null and !rm.sdate.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.mapTypeCd})||'_'||TRIM(#{rm.mapCd})||'_'||TRIM(#{rm.sdate})
+							</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

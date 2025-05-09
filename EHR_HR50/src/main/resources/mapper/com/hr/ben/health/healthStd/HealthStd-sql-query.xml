@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.health.healthStd">
+		
+	<!-- 조회 -->
+	<select id="getHealthStdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		  	SELECT A.ENTER_CD
+			     , A.SEQ
+			     , A.SDATE
+			     , A.EDATE
+			     , A.ORDER_SEQ
+			     , A.JIKCHAK_CD
+			     , A.FAM_CD
+			     , A.ST_AGE
+			     , A.ED_AGE
+			     , A.PAY_MON
+			     , A.NOTE
+			  FROM TBEN710 A 
+			 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd}) ]]>
+		<if test="searchYmd != null and searchYmd neq ''">
+			   AND REPLACE(#{searchYmd},'-','') BETWEEN A.SDATE AND NVL(A.EDATE,'29991231')
+		</if>
+		     ORDER BY A.ORDER_SEQ, A.FAM_CD, A.SEQ
+	</select>
+		
+	<!-- 저장 -->
+	<update id="saveHealthStd" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN710 T 	
+		 USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			   SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD
+		            , TRIM(#{rm.seq})  			AS  SEQ	
+		            , TRIM(#{rm.sdate})  		AS  SDATE	
+		            , TRIM(#{rm.edate})  		AS  EDATE	
+		            , TRIM(#{rm.orderSeq})  	AS  ORDER_SEQ	
+		            , TRIM(#{rm.jikchakCd})  	AS  JIKCHAK_CD	
+		            , TRIM(#{rm.famCd})  		AS  FAM_CD
+		            , TRIM(#{rm.stAge})  		AS  ST_AGE	
+		            , TRIM(#{rm.edAge})  		AS  ED_AGE	
+		            , TRIM(#{rm.payMon})  		AS  PAY_MON	
+		            , TRIM(#{rm.note})  		AS  NOTE	
+		        FROM DUAL	
+		</foreach>
+	<![CDATA[		
+		) S 	
+		ON ( 	
+		          T.ENTER_CD 	= S.ENTER_CD 	
+		     AND  T.SEQ 		= S.SEQ 	
+		) 	
+		WHEN MATCHED THEN 	
+		   UPDATE SET T.SDATE 		= S.SDATE 	
+		            , T.EDATE 		= S.EDATE 	
+		            , T.ORDER_SEQ 	= S.ORDER_SEQ 	
+		            , T.JIKCHAK_CD 	= S.JIKCHAK_CD 	
+		            , T.FAM_CD 	    = S.FAM_CD 	
+		            , T.ST_AGE 		= S.ST_AGE 	
+		            , T.ED_AGE 		= S.ED_AGE 	
+		            , T.PAY_MON  	= S.PAY_MON	
+		            , T.NOTE 		= S.NOTE 
+		            , T.CHKDATE		= sysdate
+					, T.CHKID 		= #{ssnSabun}	
+		WHEN NOT MATCHED THEN 	
+		   INSERT 	
+		   ( 	
+		              T.ENTER_CD	
+		            , T.SEQ	
+		            , T.SDATE	
+		            , T.EDATE	
+		            , T.ORDER_SEQ	
+		            , T.JIKCHAK_CD	
+		            , T.FAM_CD
+		            , T.ST_AGE	
+		            , T.ED_AGE	
+		            , T.PAY_MON	
+		            , T.NOTE	
+		            , T.CHKDATE	
+		            , T.CHKID	
+		   ) 	
+		   VALUES 	
+		   ( 	
+		              S.ENTER_CD	
+		            , S_TBEN710.NEXTVAL	
+		            , S.SDATE	
+		            , S.EDATE	
+		            , S.ORDER_SEQ	
+		            , S.JIKCHAK_CD	
+		            , S.FAM_CD
+		            , S.ST_AGE	
+		            , S.ED_AGE	
+		            , S.PAY_MON	
+		            , S.NOTE	
+		            , sysdate	
+		            , #{ssnSabun}	
+		   ) 	
+	]]>
+	</update>
+		
+	<!-- 삭제 -->
+	<delete id="deleteHealthStd" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN710
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( SEQ ) IN ( ( NULL) ]]> 
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.seq != null and rm.seq neq ''">
+					, ( TRIM( #{rm.seq} ) )
+			</if>
+		</foreach>
+		 )
+	</delete>
+</mapper>

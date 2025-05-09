@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    정산계산내역조회
+ -->
+<root>
+                        
+    <!-- 정산계산내역조회 조회 -->
+    <query id="selectCalcMedical">
+        <![CDATA[
+            SELECT A.ENTER_CD
+                 , A.WORK_YY
+                 , A.ADJUST_TYPE
+                 , B.SABUN
+                 , B.NAME
+                 , A.ORG_NM
+                 , D.BUSINESS_PLACE_NM
+                 , B.EMP_YMD
+                 , B.RET_YMD
+                 , C.TAXABLE_PAY_MON                                        -- 총급여
+                 , Y.APPL_MON                                               -- 의료비 입금금액
+                 , Y.A050_01_STD                                            -- 의료비공제_공제대상금액
+                 , Y.A050_01                                                -- 의료비공제
+                 FROM  TCPN811 A
+                      ,THRM100 B
+                      ,TCPN841 C
+                      ,TCPN121 D
+                      ,( SELECT   E.ENTER_CD
+                                , E.WORK_YY
+                                , E.ADJUST_TYPE
+                                , E.SABUN
+                                , E.A050_01_STD    -- 의료비공제_공제대상금액
+                                , E.A050_01        -- 의료비공제
+                                , SUM(NVL(F.APPL_MON,0)) AS APPL_MON       -- 의료비 입력금액
+                           FROM (SELECT   ENTER_CD
+                                        , WORK_YY
+                                        , ADJUST_TYPE
+                                        , SABUN
+                                        , MAX (DECODE (ADJ_ELEMENT_CD, 'A050_01', STD_MON , '0')) AS A050_01_STD    -- 의료비공제_공제대상금액
+                                        , MAX (DECODE (ADJ_ELEMENT_CD, 'A050_01', DATA_MON, '0')) AS A050_01        -- 의료비공제
+                                   FROM TCPN843
+                                  GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN) E
+                               , TCPN825 F
+                           WHERE E.ENTER_CD    = F.ENTER_CD
+                             AND E.WORK_YY     = F.WORK_YY
+                             AND E.ADJUST_TYPE = F.ADJUST_TYPE
+                             AND E.SABUN       = F.SABUN
+                             AND NVL(F.RESTRICT_CD,'^') <> '30' /* 실손의료비 제외 - 2020.02.11 */
+                             AND F.SEQ > -1 /* 24.03.09 공제한도차감관리 등록건 제외 */
+                           GROUP BY E.ENTER_CD, E.WORK_YY, E.ADJUST_TYPE, E.SABUN, E.A050_01_STD, E.A050_01
+                       ) Y
+                WHERE A.ENTER_CD          = #ssnEnterCd#
+                  AND A.WORK_YY           = #searchWorkYy#
+                  AND A.ADJUST_TYPE       = #searchAdjustType#
+                  AND A.ENTER_CD          = B.ENTER_CD
+                  AND A.SABUN             = B.SABUN
+                  AND ( A.SABUN LIKE '%' || TRIM(#searchSbNm#) || '%' OR B.NAME LIKE '%' || TRIM(#searchSbNm#) || '%' )
+                  AND (#searchBizLoc# IS NULL OR C.BUSINESS_PLACE_CD = #searchBizLoc#)
+                  AND A.ENTER_CD          = C.ENTER_CD
+                  AND A.WORK_YY           = C.WORK_YY
+                  AND A.ADJUST_TYPE       = C.ADJUST_TYPE
+                  AND A.SABUN             = C.SABUN
+                  AND C.ENTER_CD          = D.ENTER_CD
+                  AND C.BUSINESS_PLACE_CD = D.BUSINESS_PLACE_CD
+                  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+                  AND A.ENTER_CD          = Y.ENTER_CD(+)
+                  AND A.WORK_YY           = Y.WORK_YY(+)
+                  AND A.ADJUST_TYPE       = Y.ADJUST_TYPE(+)
+                  AND A.SABUN             = Y.SABUN(+)
+                  $query$
+        ]]> 
+    </query>
+    
+    <!-- 퇴직소득 대상자 조회 -->
+    <query id="selectCalcRetiree">
+        <![CDATA[
+            SELECT PAY_ACTION_CD
+                 , PAY_ACTION_NM
+                 , SABUN
+                 , NAME
+                 , ORG_CD
+                 , ORG_NM
+                 , EMP_YMD
+                 , RET_YMD
+                 , JIKWEE_CD
+                 , JIKWEE_NM
+                 , JIKGUB_CD
+                 , JIKGUB_NM
+                 , BUSINESS_PLACE_NM
+                 , ACCOUNT_CNT
+                 , CONFIRM_TEXT
+                 , TOT_RET_MON
+            FROM (
+	            SELECT A.PAY_ACTION_CD /* 급여계산코드 */
+				     , B.PAY_ACTION_NM /* 급여계산명 */
+				     , A.SABUN /* 사번 */
+				     , A.NAME /* 성명 */
+				     , C.ORG_CD /* 조직코드 */
+				     /* F_COM_GET_ORG_NM() 사용해서 가져오니 에러가 나는 회사가 있어서 따로 조회 - 2020.02.18 */
+				     , ( SELECT Z.ORG_NM
+		                 FROM TORG101 Z
+		                 WHERE Z.ENTER_CD = A.ENTER_CD
+		                   AND Z.ORG_CD   = C.ORG_CD
+		                   AND Z.SDATE    = (SELECT MAX(X.SDATE) FROM TORG101 X
+		                                     WHERE X.ENTER_CD = Z.ENTER_CD
+		                                       AND X.ORG_CD   = Z.ORG_CD
+		                                       AND X.SDATE <= #searchWorkYy#||'1231')) AS ORG_NM /* 부서명 */
+				     , A.EMP_YMD /* 입사일 */
+				     , A.RET_YMD /* 퇴직일 */
+				     , C.JIKWEE_CD /* 직위코드 */
+				     , C.JIKWEE_NM /* 직위명 */
+				     , C.JIKGUB_CD /* 직급코드 */
+				     , C.JIKGUB_NM /* 직급명 */
+				     , A.BUSINESS_PLACE_NM /* 사업자명 */
+				     , (SELECT COUNT(1) FROM TCPN777 T WHERE T.ENTER_CD = A.ENTER_CD AND T.PAY_ACTION_CD = A.PAY_ACTION_CD AND T.SABUN = A.SABUN) AS ACCOUNT_CNT /* 연금계좌건수 */			     
+				     , CASE
+				         WHEN (SELECT COUNT(1) FROM TCPN777 T WHERE T.ENTER_CD = A.ENTER_CD AND T.PAY_ACTION_CD = A.PAY_ACTION_CD AND T.SABUN = A.SABUN AND T.BANK_NM IS NULL) > 0 THEN '사업자명누락'
+				         WHEN (SELECT COUNT(1) FROM TCPN777 T WHERE T.ENTER_CD = A.ENTER_CD AND T.PAY_ACTION_CD = A.PAY_ACTION_CD AND T.SABUN = A.SABUN AND F_COM_DECRYPT(T.BANK_ACCOUNT,T.ENTER_CD) = '00000000000') > 0 THEN '계좌번호누락'
+				         ELSE '정상'
+				       END AS CONFIRM_TEXT
+				     , A.TOT_RET_MON /*퇴직급여*/
+				FROM TCPN771 A /* 퇴직금실적 */
+				   , TCPN201 B /* 급여계산관리 */
+				   , THRM151 C /* 개인조직사항 */
+				WHERE A.ENTER_CD = B.ENTER_CD /* 회사구분 */
+				  AND A.PAY_ACTION_CD = B.PAY_ACTION_CD /* 급여계산코드 */
+				  AND A.ENTER_CD = C.ENTER_CD /* 회사구분 */
+				  AND A.SABUN = C.SABUN /* 급여계산코드 */
+				  AND C.SDATE = ( SELECT MAX(Z.SDATE)
+				                  FROM THRM151 Z
+				                  WHERE Z.ENTER_CD = A.ENTER_CD
+				                    AND Z.SABUN = A.SABUN
+									AND #searchWorkYy#||'1231' BETWEEN Z.SDATE AND NVL(Z.EDATE,'99991231')
+				                )
+				  AND A.ENTER_CD = #ssnEnterCd#
+				  AND DECODE(F_CPN_YEA_PAY_CD(#ssnEnterCd#,A.PAY_CD),'S1',B.PAY_YM,B.PAYMENT_YMD) LIKE #searchWorkYy# || '%' /* 급여년월 */
+				  AND DECODE(#searchBizLoc#, NULL, '%', A.BUSINESS_PLACE_CD) = DECODE(#searchBizLoc#, NULL, '%', #searchBizLoc#) /* 사업장코드 */
+				  AND (A.NAME LIKE '%' || #searchSbNm# || '%' OR A.SABUN LIKE '%' || #searchSbNm# || '%')  /* 성명/사번 */
+				  AND F_CPN_YEA_PAY_CD(#ssnEnterCd#,A.PAY_CD) IN ('S1','S2') /* 급여구분코드(S1-퇴직금, S2-퇴직금중간정산) */
+				  AND NVL(A.TOT_EARNING_MON,0) <> 0 /* 총퇴직소득(법정) */
+				  AND (A.ETC_010 IS NULL OR A.ETC_010 <> '1') /* 퇴직소득신고제외여부 */
+				  AND A.BUSINESS_PLACE_CD IN (SELECT Z.BUSINESS_PLACE_CD
+				                              FROM TCPN121 Z /* 급여사업장관리 */
+				                              WHERE Z.ENTER_CD = A.ENTER_CD
+				                                AND Z.SDATE = (SELECT MAX(ZZ.SDATE)
+				                                               FROM TCPN121 ZZ
+				                                               WHERE ZZ.ENTER_CD = Z.ENTER_CD
+				                                                 AND ZZ.BUSINESS_PLACE_CD = Z.BUSINESS_PLACE_CD
+				                                                 AND #searchWorkYy#||'1231' BETWEEN ZZ.SDATE AND NVL(ZZ.EDATE,'99991231'))
+				                                )
+			      $query2$	                                
+            ) WHERE 1=1
+                $query$
+        ]]> 
+    </query>
+
+</root>

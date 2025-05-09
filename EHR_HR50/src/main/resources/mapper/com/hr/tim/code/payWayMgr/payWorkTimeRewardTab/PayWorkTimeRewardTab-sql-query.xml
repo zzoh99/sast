@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.payWayMgr.payWorkTimeRewardTab">
+
+	<!-- 근무보상기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayWorkTimeRewardTabList">
+
+				<![CDATA[
+						SELECT
+								A.ENTER_CD					/*회사구분(TORG900)*/
+								, A.REWARD_NM				/*보상명*/
+								, A.SDATE					/*유효시작일*/
+								, A.EDATE					/*유효종료일*/
+								, A.REWARD_MAX_TIME			/*최대급여보상시간*/
+								, A.REWARD_EXP_TIME			/*보상제외시간*/
+								, A.REWARD_YN				/*보상지급여부*/
+								, A.REWARD_VACATION_YN		/*보상휴가생성여부*/
+								, A.SCOPE_GUBUN				/*범위구분(A:전체, O:범위적용)*/
+								, A.NOTE					/*비고*/
+								, '0' AS SCOPE
+						FROM	TTIM012 A
+						WHERE	1=1
+						  AND	A.ENTER_CD = TRIM(#{ssnEnterCd})
+				]]>
+
+
+		</select>
+
+<select parameterType="map" resultType="cMap" id="getPayWorkTimeRewardTabTblNm">
+
+				<![CDATA[
+				SELECT A.SCOPE_CD, B. AUTH_SCOPE_NM, B.TABLE_NM
+				  FROM (
+						SELECT ENTER_CD, SCOPE_CD
+						FROM  TTIM223
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND USE_GUBUN = 'C'
+						AND ITEM_VALUE1 =  TRIM(#{rewardNm})
+						AND ITEM_VALUE2 =  TRIM(#{sdate})
+						AND ITEM_VALUE3 =  10
+						GROUP BY ENTER_CD,SCOPE_CD
+						) A, TSYS315 B
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+				]]>
+
+
+		</select>
+
+<select parameterType="map" resultType="cMap" id="getPayWorkTimeRewardTabScopeCd">
+
+				<![CDATA[
+
+				SELECT A.SCOPE_CD, A.SCOPE_VALUE, A.SCOPE_VALUE_NM
+				  FROM TTIM223 A
+				 WHERE ENTER_CD =TRIM(#{ssnEnterCd})
+				   AND USE_GUBUN = 'C'
+				   AND ITEM_VALUE1 = TRIM(#{rewardNm})
+				   AND ITEM_VALUE2 = TRIM(#{sdate})
+				   AND ITEM_VALUE3 = 10
+				   AND SCOPE_CD = TRIM(#{scopeCd})
+				ORDER BY 1,2,3
+				]]>
+
+
+		</select>
+
+<!-- 근무보상기준관리 삭제 -->
+		<delete parameterType="map" id="deletePayWorkTimeRewardTab">
+
+					DELETE FROM TTIM012
+					 WHERE (ENTER_CD, REWARD_NM, SDATE) IN 	((NULL,NULL,NULL)
+									<foreach item="rm" collection="deleteRows" >
+										,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+										and rm.rewardNm != null and !rm.rewardNm.equals("")
+										and rm.sdate != null and !rm.sdate.equals("")
+										'>
+										(TRIM( #{ssnEnterCd} ), TRIM( #{rm.rewardNm} ), TRIM( #{rm.sdate} ))
+										</if>
+									</foreach>
+					)
+		</delete>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayWorkTimeRewardTabDetail">
+
+					DELETE FROM TTIM223
+					WHERE 	(ENTER_CD,USE_GUBUN,ITEM_VALUE1,ITEM_VALUE2,ITEM_VALUE3,SCOPE_CD) IN 	(  (NULL,NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										, 'C'
+										, TRIM( #{rm.rewardNm})
+										, TRIM( #{rm.sdate})
+										, '10'
+										, 'W10'
+										)
+</foreach>
+										)
+		</delete>
+		
+		
+<!-- 근무보상기준관리 저장 -->
+		<update parameterType="map" id="savePayWorkTimeRewardTab">
+
+					MERGE INTO TTIM012 T
+					USING	(
+							SELECT
+									  A.ENTER_CD
+									, A.REWARD_NM
+									, A.SDATE
+									, A.EDATE
+									, A.REWARD_MAX_TIME
+									, A.REWARD_EXP_TIME
+									, A.REWARD_YN
+									, A.REWARD_VACATION_YN
+									, A.SCOPE_GUBUN
+									, A.NOTE
+							FROM	(
+									SELECT
+											  NULL		AS ENTER_CD
+											, NULL		AS REWARD_NM
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS REWARD_MAX_TIME
+											, NULL		AS REWARD_EXP_TIME
+											, NULL		AS REWARD_YN
+											, NULL		AS REWARD_VACATION_YN
+											, NULL		AS SCOPE_GUBUN
+											, NULL		AS NOTE
+									FROM	DUAL
+						<bind name="icnt" value="1" />
+						<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}               	  	AS ENTER_CD
+											, TRIM( #{rm.rewardNm})				AS REWARD_NM
+											, TRIM( #{rm.sdate})				AS SDATE
+											, TRIM( #{rm.edate})				AS EDATE
+											, TRIM( #{rm.rewardMaxTime})		AS REWARD_MAX_TIME
+											, TRIM( #{rm.rewardExpTime})		AS REWARD_EXP_TIME
+											, TRIM( #{rm.rewardYn})				AS REWARD_YN
+											, TRIM( #{rm.rewardVacationYn})		AS REWARD_VACATION_YN
+											, TRIM( #{rm.scopeGubun})			AS SCOPE_GUBUN
+											, TRIM( #{rm.note})					AS NOTE
+									FROM   DUAL
+						</foreach>
+									) A WHERE
+											A.ENTER_CD IS NOT NULL
+										  AND A.REWARD_NM IS NOT NULL
+										  AND A.SDATE IS NOT NULL
+							) S
+					ON (
+									T.ENTER_CD					= S.ENTER_CD
+									AND	T.REWARD_NM				= S.REWARD_NM
+									AND	T.SDATE					= S.SDATE
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET
+									T.EDATE						= S.EDATE
+									, T.REWARD_MAX_TIME			= S.REWARD_MAX_TIME
+									, T.REWARD_EXP_TIME			= S.REWARD_EXP_TIME
+									, T.REWARD_YN				= S.REWARD_YN
+									, T.REWARD_VACATION_YN		= S.REWARD_VACATION_YN
+									, T.SCOPE_GUBUN				= S.SCOPE_GUBUN
+									, T.NOTE					= S.NOTE
+									, T.CHKDATE					= SYSDATE
+									, T.CHKID					= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+									T.ENTER_CD
+									, T.REWARD_NM
+									, T.SDATE
+									, T.EDATE
+									, T.REWARD_MAX_TIME
+									, T.REWARD_EXP_TIME
+									, T.REWARD_YN
+									, T.REWARD_VACATION_YN
+									, T.SCOPE_GUBUN
+									, T.NOTE
+									, T.CHKDATE
+									, T.CHKID
+						)
+						VALUES
+						(
+									S.ENTER_CD
+									, S.REWARD_NM
+									, S.SDATE
+									, S.EDATE
+									, S.REWARD_MAX_TIME
+									, S.REWARD_EXP_TIME
+									, S.REWARD_YN
+									, S.REWARD_VACATION_YN
+									, S.SCOPE_GUBUN
+									, S.NOTE
+									, SYSDATE
+									, #{ssnSabun}
+						)
+		</update>
+
+
+</mapper>

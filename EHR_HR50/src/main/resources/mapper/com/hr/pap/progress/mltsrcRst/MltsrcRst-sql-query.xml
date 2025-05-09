@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="pap.progress.mltsrcRst">
+<!--        조회 -->
+        <select parameterType="map" resultType="cMap" id="getMltsrcRstList">
+
+
+                    SELECT *
+				 FROM (
+				       SELECT T1.APP_SEQ_CD || T1.SABUN || T1.APP_SABUN AS MERGE_GUBUN /* 셀병합 구분자 */
+				             , T1.ENTER_CD AS ENTER_CD                                        /*-- 회사구분(TORG900)*/
+				             , T1.COMP_APPRAISAL_CD AS COMP_APPRAISAL_CD                      /*-- 역량진단ID*/
+				             , T1.SABUN AS SABUN                                              /*-- 사원번호*/
+				             , (SELECT F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN) FROM DUAL) AS NAME
+				             , T3.ORG_NM AS SABUN_ORG_NM
+				             , T3.JIKCHAK_NM AS SABUN_JIKCHAK_NM
+				             , T3.JIKGUB_NM AS SABUN_JIKGUB_NM
+				             , T3.JIKWEE_NM AS SABUN_JIKWEE_NM
+				             , T1.APP_SABUN AS APP_SABUN                                      /*-- 진단자사번*/
+				             , (SELECT F_COM_GET_NAMES(T1.APP_ENTER_CD, T1.APP_SABUN) FROM DUAL) AS APP_NAME
+				             , T1.APP_SEQ_CD AS APP_SEQ_CD                                    /*-- 차수*/
+				             , (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = T1.ENTER_CD AND CODE = T1.APP_SEQ_CD AND GRCODE_CD = 'P00004') AS APP_SEQ_NM /*-- 차수명 */
+				             , T1.ORG_CD AS ORG_CD                                            /*-- 조직코드(TORG101)*/
+				             , T1.ORG_NM AS ORG_NM                                            /*-- 조직명*/
+				             , T1.JIKWEE_CD AS JIKWEE_CD                                      /*-- 직위(H20030)*/
+				             , T1.JIKWEE_NM AS JIKWEE_NM                                      /*-- 직위명*/
+				             , T1.JIKCHAK_CD AS JIKCHAK_CD                                    /*-- 직책(H20020)*/
+				             , T1.JIKCHAK_NM AS JIKCHAK_NM                                    /*-- 직책명*/
+				             , T1.JIKGUB_CD AS JIKGUB_CD                                      /*-- 직급(H20010)*/
+				             , T1.JIKGUB_NM AS JIKGUB_NM                                      /*-- 직급명*/
+				             , T1.LDS_APP_STATUS_CD AS LDS_APP_STATUS_CD                      /*-- 진단상태코드:  03:완료, 01: 임시저장  NULL이면  00: 미진행*/
+				             , T1.A_COMMENT /*-- 강점*/
+				             , T1.C_COMMENT /*-- 개선점*/
+				             , T5.SEQ AS T5SEQ /*-- 문항번호 */
+				             , T5.LDS_COMPETENCY_CD /*-- 역량명*/
+				             , T5.LDS_COMPETENCY_NM /*-- 역량명*/
+				             , T5.LDS_COMP_BENM /*-- 문항*/
+				             , (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = T1.ENTER_CD AND CODE = T5.APP_RESULT AND GRCODE_CD = 'P90002') AS LDS_RESULT /*-- 결과*/
+				       FROM   TPAP527 T1     /*-- 역량진단자관리(TPAP527)(TABLE)*/
+				            , TPAP525 T3     /*-- 역량진단대상자관리(TPAP525)(TABLE)*/
+				            , (
+				                SELECT A.ENTER_CD
+				                     , A.LDS_COMPETENCY_CD
+				                     , (SELECT F_COM_GET_COMPETENCY_NM( #{ssnEnterCd},A.LDS_COMPETENCY_CD,TO_CHAR( SYSDATE, 'YYYYMMDD')) FROM DUAL) AS LDS_COMPETENCY_NM
+				                     , A.SEQ
+				                     , A.COMP_APPRAISAL_CD
+				                     , A.SABUN
+				                     , A.APP_ENTER_CD
+				                     , A.APP_SABUN
+				                     , A.W_ENTER_CD
+				                     , B.LDS_COMP_BENM
+				                     , A.APP_RESULT
+				                     , '0' AS LDS_COMMENT
+				                 FROM TPAP529 A
+				                    , TPAP533 B
+				                WHERE A.ENTER_CD = B.ENTER_CD
+				                  AND A.LDS_COMPETENCY_CD = B.LDS_COMPETENCY_CD
+				                  AND A.SEQ = B.SEQ
+				               ) T5 /*-- 다면평가 상세  */
+				       WHERE  T1.ENTER_CD   = #{ssnEnterCd}
+				         AND  T1.W_ENTER_CD = T3.W_ENTER_CD
+				         AND  T1.ENTER_CD   = T3.ENTER_CD
+				         AND  T1.COMP_APPRAISAL_CD = T3.COMP_APPRAISAL_CD
+				         AND  T1.SABUN    = T3.SABUN
+				         AND  T1.ENTER_CD = T5.ENTER_CD
+				         AND  T1.COMP_APPRAISAL_CD = T5.COMP_APPRAISAL_CD
+				         AND  T1.SABUN    = T5.SABUN
+				         AND  T1.W_ENTER_CD = T5.W_ENTER_CD
+				         AND  T1.APP_ENTER_CD = T5.APP_ENTER_CD
+				         AND  T1.APP_SABUN = T5.APP_SABUN
+				     <if test='searchAppraisalCd != null and !searchAppraisalCd.equals("")'>
+				         AND  T1.COMP_APPRAISAL_CD  = TRIM(#{searchAppraisalCd})
+				     </if>
+				     )
+				 WHERE 1=1
+				<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+                   AND APP_SEQ_CD = TRIM(#{searchAppSeqCd})
+                </if>
+				<if test='searchNameSabun != null and !searchNameSabun.equals("")'>
+                   AND (SABUN  LIKE '%'|| TRIM(#{searchNameSabun}) ||'%' OR NAME  LIKE '%'|| TRIM(#{searchNameSabun}) ||'%')
+				</if>
+                <if test='searchAppSabunName != null and !searchAppSabunName.equals("")'>
+				   AND (APP_SABUN LIKE TRIM(#{searchAppSabunName} ) || '%' OR APP_NAME LIKE TRIM(#{searchAppSabunName} ) || '%')
+				</if>
+				<if test='searchAppSabunName != null and !searchAppSabunName.equals("")'>
+				   AND (SABUN_ORG_NM LIKE TRIM(#{searchAppOrgNm} ) || '%')
+				</if>
+				ORDER BY ENTER_CD, SABUN, APP_SEQ_CD, APP_SABUN, T5SEQ	
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getMltsrcRstMap">
+
+                <![CDATA[
+                    SELECT COL1
+                         , COL2
+                         , COL3
+                         , COL4
+                         , COL5
+                    FROM   ZTST002
+                    WHERE  1 = 1
+                    AND    ROWNUM = 1
+                ]]>
+
+
+        </select>
+
+<!--        저장 -->
+        <update parameterType="map" id="saveMltsrcRst">
+
+                    MERGE INTO ZTST002 T
+                    USING   (
+                            SELECT    A.COL1
+                                    , A.COL2
+                                    , A.COL3
+                                    , A.COL4
+                                    , A.COL5
+                                    , A.COL6
+                                    , A.COL7
+                            FROM    (
+                                    SELECT    NULL      AS COL1
+                                            , NULL      AS COL2
+                                            , NULL      AS COL3
+                                            , NULL      AS COL4
+                                            , NULL      AS COL5
+                                            , NULL      AS COL6
+                                            , NULL      AS COL7
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT
+                                            , TRIM( #{rm.col1} ) AS COL1
+                                            --증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+                                            <choose><when test='rm.col2 != null and !rm.col2.equals("")'>
+                                            ,   TRIM(#{rm.col2})            AS COL2
+                                            --증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+                                            </when><otherwise>
+                                            ,   TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(COL2)),0) + ${icnt}) FROM ZTST002) )  AS COL2
+                                                --icnt 증가
+                                                <bind name="icnt" value="icnt + 1" />
+                                            </otherwise>
+                                            </choose>
+                                            , TRIM( #{rm.col3} )    AS COL3
+                                            , TRIM( #{rm.col4} )    AS COL4
+                                            , TRIM( #{rm.col5} )    AS COL5
+                                            , TRIM( #{rm.col6} )    AS COL6
+                                            , TRIM( #{rm.col7} )    AS COL7
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.COL1 IS NOT NULL
+                            ) S
+                    ON ( T.COL1     = S.COL1 )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.COL2    = S.COL2
+                                    , T.COL3    = S.COL3
+                                    , T.COL4    = S.COL4
+                                    , T.COL5    = S.COL5
+                                    , T.COL6    = S.COL6
+                                    , T.COL7    = S.COL7
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.COL1
+                            , T.COL2
+                            , T.COL3
+                            , T.COL4
+                            , T.COL5
+                            , T.COL6
+                            , T.COL7
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.COL1
+                            , S.COL2
+                            , S.COL3
+                            , S.COL4
+                            , S.COL5
+                            , S.COL6
+                            , S.COL7
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+        </update>
+<!--        삭제 -->
+        <delete parameterType="map" id="deleteMltsrcRst">
+
+                    DELETE FROM ZTST002
+                    WHERE   COL1 IN     (  NULL
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='rm.col1 != null and !rm.col1.equals("")'>
+                                            TRIM( #{rm.col1} )
+                                        </if>
+</foreach>
+                                        )
+        </delete>
+<!--        생성 -->
+        <insert parameterType="map" id="insertMltsrcRst">
+
+                        INSERT INTO MainMnMgrTable
+                        (
+                              COL1
+                            , COL2
+                            , COL3
+                            , COL4
+                            , COL5
+                            , COL6
+                            , CHKDATE
+                            , CHKID
+                        )
+                        SELECT    S.COL1
+                                , S.COL2
+                                , S.COL3
+                                , S.COL4
+                                , S.COL5
+                                , S.COL6
+                                , sysdate
+                                , #{ssnSabun}
+                        FROM (
+                                SELECT    NULL  AS COL1
+                                        , NULL  AS COL2
+                                        , NULL  AS COL3
+                                        , NULL  AS COL4
+                                        , NULL  AS COL5
+                                        , NULL  AS COL6
+                                FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+                    UNION ALL
+                                SELECT    TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )  AS COL1
+                                        <bind name="icnt" value="icnt + 1" />
+                                        , TRIM(#{rm.col2})  AS COL2
+                                        , TRIM(#{rm.col3})  AS COL3
+                                        , TRIM(#{rm.col4})  AS COL4
+                                        , TRIM(#{rm.col5})  AS COL5
+                                        , TRIM(#{rm.col6})  AS COL6
+                                FROM   DUAL
+</foreach>
+                            ) S
+                        WHERE S.COL1 IS NOT NULL
+        </insert>
+<!--        수정 -->
+        <update parameterType="map" id="updateMltsrcRst">
+
+                    UPDATE ZTST002 T SET
+                    (     COL1
+                        , COL2
+                        , COL3
+                        , COL4
+                        , CHKDATE
+                        , CHKID
+                        )
+                    =
+                    (   SELECT    S.COL1
+                                , S.COL2
+                                , S.COL3
+                                , S.COL4
+                                , S.COL5
+                                , S.COL6
+                                , SYSDATE
+                                , #{ssnSabun}
+                        FROM (
+                            SELECT    NULL  AS COL1
+                                    , NULL  AS COL2
+                                    , NULL  AS COL3
+                                    , NULL  AS COL4
+                                    , NULL  AS COL5
+                                    , NULL  AS COL6
+                                    FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+                    UNION ALL
+                                SELECT
+                                          TRIM(#{rm.col1})  AS COL1
+                                        , TRIM(#{rm.col2})  AS COL2
+                                        , TRIM(#{rm.col3})  AS COL3
+                                        , TRIM(#{rm.col4})  AS COL4
+                                        , TRIM(#{rm.col5})  AS COL5
+                                        , TRIM(#{rm.col6})  AS COL6
+                                FROM   DUAL
+</foreach>
+                            ) S
+                        WHERE S.COL1 IS NOT NULL
+                    )
+                    WHERE EXISTS (
+                                    SELECT S.COL1
+                                    FROM (
+                                            SELECT  S.COL1
+                                            FROM (
+                                                SELECT  NULL                AS COL1 FROM    DUAL
+                <foreach item="rm" collection="updateRows" > UNION ALL        SELECT  TRIM(#{rm.col1})    AS COL1 FROM    DUAL  </foreach>
+                                                ) S
+                                            WHERE S.COL1 IS NOT NULL
+                                        )S
+                                    WHERE T.COL1 = S.COL1
+                                )
+        </update>
+
+</mapper>

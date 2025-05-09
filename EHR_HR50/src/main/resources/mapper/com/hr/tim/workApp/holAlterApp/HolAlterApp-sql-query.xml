@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.holAlterApp">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolAlterAppList">
+
+				<![CDATA[
+
+					    SELECT A.ENTER_CD
+						     , A.APPL_SEQ 		AS BF_APPL_SEQ
+						     , A.SABUN
+						     , A.YMD
+						     , A.REQ_TIME_CD
+						     , A.REQ_S_HM
+						     , A.REQ_E_HM
+						     , A.REQUEST_HOUR
+						     , A.REASON
+						     , A.NOTE
+						     
+						     , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '1' ) AS S_HM
+						     , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '2' ) AS E_HM
+						     
+							 , (SELECT LPAD(X.WORK_HH,2,0)||LPAD(X.WORK_MM,2,0) 
+							      FROM TTIM337 X 
+							     WHERE X.ENTER_CD = A.ENTER_CD
+							       AND X.YMD      = A.YMD
+							       AND X.SABUN    = A.SABUN
+							       AND X.WORK_CD  = '0070' ) AS WORK_TIME -- 휴일 인정 근무시간
+							 
+						 	 , D.S_YMD          AS YMD2 -- 대체휴가일자
+						 	 , ( SELECT X.GNT_NM
+						 	       FROM TTIM014 X
+						 	      WHERE X.ENTER_CD = D.ENTER_CD
+						 	        AND X.GNT_CD   = D.GNT_CD ) AS GNT_NM
+							 , D.APPL_SEQ
+							 , D.APPL_YMD
+							 , D.APPL_SABUN
+							 , D.APPL_IN_SABUN
+							 , D.APPL_STATUS_CD
+							
+							
+						 	 , CASE WHEN D.APPL_SEQ IS NULL THEN '1' ELSE '0' END AS DETAIL
+						 	 , DECODE(D.APPL_STATUS_CD, '11', '<a class="sbasic">' || NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', '113460', #{ssnLocaleCd}), '삭제') || '</a>', '') AS BTN_DEL
+						 	 
+							 , CASE WHEN D.APPL_SEQ IS NULL THEN '<a class="sbasic">' || NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', 'appComLayout', #{ssnLocaleCd}), '신청') || '</a>'
+									    ELSE '' END AS BTN_APP
+								    
+						  FROM TTIM601 A, THRI103 B
+					        , ( SELECT X.BF_APPL_SEQ, X.S_YMD, X.GNT_CD, Y.*  --대체휴가신청
+					              FROM TTIM301 X, THRI103 Y
+					             WHERE X.ENTER_CD     = #{ssnEnterCd}
+					               AND X.ENTER_CD     = Y.ENTER_CD
+					               AND X.APPL_SEQ     = Y.APPL_SEQ
+					               AND X.SABUN        = TRIM( #{searchSabun} )
+					               AND X.GNT_CD       IN ('90', '91', '92')  
+					          ) D
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND A.SABUN    = #{searchSabun}
+						   AND A.ENTER_CD = B.ENTER_CD
+						   AND A.APPL_SEQ = B.APPL_SEQ
+						   AND B.APPL_STATUS_CD = '99'
+						   AND A.REQ_TIME_CD <> '0'
+				]]>
+<if test='searchAppSYmd != null and searchAppSYmd neq ""'>
+	<![CDATA[
+						   AND A.YMD >= REPLACE(#{searchAppSYmd}, '-','')
+	]]>
+</if>
+<if test='searchAppEYmd != null and searchAppEYmd neq ""'>
+	<![CDATA[
+						   AND A.YMD <= REPLACE(#{searchAppEYmd}, '-','')
+	]]>
+</if>
+				<![CDATA[
+	                       AND A.ENTER_CD   = D.ENTER_CD(+)
+	                       AND A.APPL_SEQ   = D.BF_APPL_SEQ(+)
+						 ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+				]]>
+
+
+		</select>
+
+<!-- 	 임시저장 삭제 -->
+		<delete parameterType="map" id="deleteHolAlterApp">
+
+					DELETE FROM TTIM301
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test=' rm.applSeq != null and !rm.applSeq.equals("")'>
+									     , TRIM(#{rm.applSeq})
+	</if>
+</foreach>
+									   )				
+		</delete>
+
+			
+
+</mapper>

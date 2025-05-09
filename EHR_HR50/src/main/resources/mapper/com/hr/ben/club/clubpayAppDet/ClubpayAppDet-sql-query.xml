@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubpayAppDet">
+	
+	<!-- 동호회명 콤보 -->		
+	<select id="getClubpayAppDetClubCode" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT CLUB_SEQ AS CODE
+		     , (DECODE( NVL(TEMP_YN,'N'), 'Y', '(임시)', '') || CLUB_NM) AS CODE_NM
+		  FROM TBEN500
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+	<if test='searchAllYn == null or searchAllYn neq "Y"'>
+		  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE
+		  AND ( SABUN_A = #{searchApplSabun} OR SABUN_B = #{searchApplSabun} OR SABUN_C = #{searchApplSabun} )
+	</if>
+		  ORDER BY CLUB_NM
+	</select>
+		
+	<!-- 신청내용 조회 -->
+	<select id="getClubpayAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+		     , A.CLUB_SEQ
+		     , A.YEAR
+		     , A.DIV_CD
+		     , A.APP_MON
+		     , A.BANK_CD
+		     , A.ACC_HOLDER
+		     , CRYPTIT.DECRYPT(A.ACC_NO, A.ENTER_CD) AS ACC_NO
+		     , A.ACT_PLAN
+		     , A.ETC_NOTE
+		     , A.NOTE
+		     , C.SABUN_A
+		     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_VIEW -- 성명
+		     , C.SABUN_B
+		     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_VIEW -- 성명
+		     , C.SABUN_C
+		     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_VIEW -- 성명
+		     , (
+			       SELECT COUNT(1) AS CNT
+					 FROM TBEN502 Z
+					WHERE Z.ENTER_CD 	 = A.ENTER_CD
+					  AND Z.CLUB_SEQ 	 = A.CLUB_SEQ
+					  AND B.APPL_YMD BETWEEN Z.SDATE AND Z.EDATE
+					  AND NVL(Z.AGREE_YN,'N') = 'Y'
+		     	)||'명' AS MEMER_CNT
+          FROM TBEN507 A, THRI103 B, TBEN500 C
+         WHERE A.ENTER_CD   = #{ssnEnterCd}
+           AND A.APPL_SEQ   = #{searchApplSeq}
+           AND A.ENTER_CD   = B.ENTER_CD
+           AND A.APPL_SEQ   = B.APPL_SEQ
+           AND A.ENTER_CD   = C.ENTER_CD(+)
+           AND A.CLUB_SEQ   = C.CLUB_SEQ(+)
+	]]>
+	</select>
+		
+	<!-- 동호회 정보 조회 -->
+	<select id="getClubpayAppDetClubMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.CLUB_SEQ
+		     , A.CLUB_NM
+		     , A.BANK_CD
+		     , A.ACC_HOLDER
+		     , A.BANK_CD
+		     , CRYPTIT.DECRYPT(A.ACC_NO, A.ENTER_CD) AS ACC_NO
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_VIEW -- 회장 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_A, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_A_NM
+		     , A.SABUN_B
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_VIEW -- 고문 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_B, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_B_NM
+		     , A.SABUN_C
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_VIEW -- 총무 성명
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN_C, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_C_NM
+		     , (
+			       SELECT COUNT(1) AS CNT
+					 FROM TBEN502 Z
+					WHERE Z.ENTER_CD 	 = A.ENTER_CD
+					  AND Z.CLUB_SEQ 	 = A.CLUB_SEQ
+					  AND #{searchApplYmd} BETWEEN Z.SDATE AND Z.EDATE
+					  AND NVL(Z.AGREE_YN,'N') = 'Y'
+		     	)||'명' AS MEMER_CNT
+			, ( 
+				  SELECT NOTE2
+					FROM TSYS005 Z
+				   WHERE Z.ENTER_CD  = #{ssnEnterCd}
+					 AND Z.GRCODE_CD = 'B50710'
+					 AND Z.USE_YN = 'Y'
+					 AND Z.CODE = #{divCd}
+					 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Z.S_YMD AND Z.E_YMD
+				) AS APP_MON
+                  FROM TBEN500 A
+                 WHERE A.ENTER_CD   = #{ssnEnterCd}
+                   AND A.CLUB_SEQ   = #{clubSeq}
+	]]>
+	</select>
+		
+	<!-- 지원금활동사항 조회 -->
+	<select id="getClubpayAppDetaActInfo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT A.ENTER_CD AS ENTER_CD_SHEET
+                , A.APPL_SEQ AS APPL_SEQ_SHEET
+				, A.SEQ AS SEQ_SHEET
+				, A.ACT_TYPE_CD AS ACT_TYPE_CD_SHEET
+				, A.YMD AS YMD_SHEET
+				, A.LOCATION AS LOCATION_SHEET
+				, A.ACT_NOTE AS ACT_NOTE_SHEET
+				, A.ACT_MON AS ACT_MON_SHEET
+				, A.NOTE AS NOTE_SHEET
+				, '<a class="sbasic">삭제</a>' AS BTN_DEL
+			 FROM TBEN508 A
+			WHERE A.ENTER_CD 	 = #{ssnEnterCd}
+			  AND A.APPL_SEQ 	 = #{searchApplSeq} 
+            ORDER BY A.SEQ
+	]]>
+	</select>
+		
+	<!-- 지원금활동사항 저장 -->
+	<update id="saveClubpayAppDetaActInfo" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN508 T 
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+		    SELECT TRIM(#{ssnEnterCd})  		AS ENTER_CD 
+		         , TRIM(#{searchApplSeq}) 	    AS APPL_SEQ
+		         , TRIM(#{rm.seqSheet}) 		AS SEQ
+		         , TRIM(#{rm.actTypeCdSheet})   AS ACT_TYPE_CD
+		         , TRIM(#{rm.ymdSheet}) 		AS YMD
+		         , TRIM(#{rm.locationSheet})	AS LOCATION
+		         , TRIM(#{rm.actNoteSheet}) 	AS ACT_NOTE
+		         , TRIM(#{rm.actMonSheet}) 	    AS ACT_MON
+		         , TRIM(#{rm.noteSheet}) 	    AS NOTE
+		      FROM DUAL
+		</foreach>
+	<![CDATA[
+			) S 
+	      ON ( 
+		         T.ENTER_CD = S.ENTER_CD 
+		    AND  T.APPL_SEQ = S.APPL_SEQ 
+		    AND  T.SEQ 	    = S.SEQ 
+		     ) 
+			WHEN MATCHED THEN 
+			   UPDATE SET T.CHKDATE		= sysdate 
+			            , T.CHKID   	= #{ssnSabun} 
+			            , T.ACT_TYPE_CD	= S.ACT_TYPE_CD 
+			            , T.YMD 		= S.YMD 
+			            , T.LOCATION 	= S.LOCATION 
+			            , T.ACT_NOTE 	= S.ACT_NOTE 
+			            , T.ACT_MON 	= S.ACT_MON 
+			            , T.NOTE 		= S.NOTE 
+			WHEN NOT MATCHED THEN 
+			   INSERT 
+			   ( 
+			              T.ENTER_CD
+			            , T.APPL_SEQ
+			            , T.SEQ
+			            , T.ACT_TYPE_CD
+			            , T.YMD
+			            , T.LOCATION
+			            , T.ACT_NOTE
+			            , T.ACT_MON
+			            , T.NOTE
+			            , T.CHKDATE
+			            , T.CHKID
+			   ) 
+			   VALUES 
+			   ( 
+			              S.ENTER_CD
+			            , S.APPL_SEQ
+			            , S.SEQ
+			            , S.ACT_TYPE_CD
+			            , S.YMD
+			            , S.LOCATION
+			            , S.ACT_NOTE
+			            , S.ACT_MON
+			            , S.NOTE
+			            , sysdate
+			            , #{ssnSabun}
+			   )
+	]]>
+	</update>
+		
+	<!-- 지원금활동사항 삭제 -->
+	<delete id="deleteClubpayAppDetaActInfo" parameterType="map">
+	<![CDATA[
+	    DELETE FROM TBEN508
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND APPL_SEQ = TRIM(#{searchApplSeq})
+	]]>
+	</delete>
+		
+	<!-- 신청 내용 저장 -->
+	<update id="saveClubpayAppDet" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN507 T
+		USING (
+				SELECT	  TRIM( #{ssnEnterCd} ) 				AS ENTER_CD
+						, TRIM( #{searchApplSeq}) 				AS APPL_SEQ
+						, TRIM( #{searchApplSabun} ) 			AS SABUN
+			            , TRIM( #{clubSeq} ) 					AS CLUB_SEQ
+			            , TRIM( #{year} ) 						AS YEAR
+			            , TRIM( #{divCd} ) 						AS DIV_CD
+			            , REPLACE(TRIM(#{appMon}),',','')		AS APP_MON
+			            , TRIM( #{bankCd} ) 					AS BANK_CD
+			            , TRIM( #{accHolder} ) 					AS ACC_HOLDER
+			            , CRYPTIT.ENCRYPT(TRIM(#{accNo}), TRIM(#{ssnEnterCd})) AS ACC_NO
+			            , TRIM( #{actPlan} ) 					AS ACT_PLAN
+			            , TRIM( #{etcNote} )					AS ETC_NOTE
+			            , TRIM( #{note} ) 						AS NOTE
+				 FROM   DUAL
+			 ) S
+		ON ( 		 T.ENTER_CD	= S.ENTER_CD
+				AND  T.APPL_SEQ	= S.APPL_SEQ
+		 )
+		WHEN MATCHED THEN
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun} 
+		            , T.CLUB_SEQ = S.CLUB_SEQ 
+	           		, T.YEAR = S.YEAR 
+		            , T.DIV_CD = S.DIV_CD 
+		            , T.APP_MON = S.APP_MON 
+		            , T.BANK_CD = S.BANK_CD 
+		            , T.ACC_HOLDER = S.ACC_HOLDER 
+		            , T.ACC_NO = S.ACC_NO 
+		            , T.ACT_PLAN = S.ACT_PLAN 
+		            , T.ETC_NOTE = S.ETC_NOTE 
+		            , T.NOTE = S.NOTE
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.APPL_SEQ
+		            , T.SABUN
+		            , T.CLUB_SEQ
+		            , T.YEAR
+		            , T.DIV_CD
+		            , T.APP_MON
+		            , T.BANK_CD
+		            , T.ACC_HOLDER
+		            , T.ACC_NO
+		            , T.ACT_PLAN
+		            , T.ETC_NOTE
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.APPL_SEQ
+		            , S.SABUN
+		            , S.CLUB_SEQ
+		            , S.YEAR
+		            , S.DIV_CD
+		            , S.APP_MON
+		            , S.BANK_CD
+		            , S.ACC_HOLDER
+		            , S.ACC_NO
+		            , S.ACT_PLAN
+		            , S.ETC_NOTE
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<!-- 중복신청 조회 -->
+	<select id="getClubpayAppDetDupChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+	   SELECT COUNT(1) AS CNT
+	     FROM TBEN507 A
+	    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+	      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+          AND A.CLUB_SEQ    = TRIM( #{clubSeq} )
+          AND A.YEAR   		= TRIM( #{year} )
+          AND A.DIV_CD 		= TRIM( #{divCd} )
+          AND EXISTS ( SELECT 1
+                        FROM THRI103 X
+                       WHERE X.ENTER_CD = A.ENTER_Cd
+                         AND X.APPL_SEQ = A.APPL_SEQ
+                         AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+                     )                                             
+	]]>
+	</select>
+</mapper>

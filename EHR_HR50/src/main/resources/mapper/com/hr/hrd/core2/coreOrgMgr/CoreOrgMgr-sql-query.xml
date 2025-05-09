@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.core2.coreOrgMgr">
+
+		<!-- 		핵심인재선발조직관리 조직도 MAX 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCoreOrgMgrMaxOrgChartMap">
+			<![CDATA[
+				SELECT	A.SDATE
+						,	'[' || TO_CHAR( TO_DATE(A.SDATE,'YYYYMMDD'), 'YYYY-MM-DD' ) || '] ' || A.ORG_CHART_NM AS ORG_CHART_NM
+					FROM	TORG103 A
+					WHERE	A.ENTER_CD	=	#{ssnEnterCd}
+					AND		A.SDATE		=	( SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = A.ENTER_CD )
+			]]>
+		</select>
+
+		<!-- 		핵심인재선발조직관리 조직도 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCoreOrgMgrList">
+		    <![CDATA[
+			    SELECT LEVEL AS "_level",
+				       A.PRIOR_ORG_CD,
+				       A.ORG_CD,
+				       F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, #{searchSdate}, #{ssnLocaleCd}) AS ORG_NM,
+					   F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'W20010', B.ORG_TYPE, #{ssnLocaleCd}) AS ORG_TYPE_NM,
+					   F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'W20050', B.INOUT_TYPE, #{ssnLocaleCd}) AS INOUT_TYPE_NM,
+				       F_COM_GET_LOCATION_NM(B.ENTER_CD, B.LOCATION_CD, #{ssnLocaleCd}) AS LOCATION_NM,
+				       F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'W20030', B.OBJECT_TYPE, #{ssnLocaleCd}) AS OBJECT_TYPE_NM,
+				       B.SDATE,
+				       B.EDATE,
+				       B.MEMO,
+				       F_ORG_GET_CHIEF_SABUN(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(#{baseDate}),'-','')) AS CHIEF_SABUN,
+				       F_ORG_GET_CHIEF_NAME(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(#{baseDate}),'-',''), #{ssnLocaleCd} ) AS CHIEF_NAME
+			    , B.TARGET_YN
+				      FROM ( SELECT T.ENTER_CD, T.SDATE, T.ORG_CD, T.PRIOR_ORG_CD, T.SEQ, T.ORG_LEVEL
+				               FROM TORG105 T
+				              WHERE T.ENTER_CD = TRIM(#{ssnEnterCd})
+				                AND T.SDATE = TRIM(#{searchSdate}) ) A
+				         , TORG101 B
+				     WHERE A.ENTER_CD = B.ENTER_CD
+			           AND A.ORG_CD = B.ORG_CD
+			           AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+				     START WITH A.PRIOR_ORG_CD = '0'
+				   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					   AND PRIOR A.SDATE = A.SDATE
+					   AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+			]]>
+		</select>
+
+		<!-- 		핵심인재선발조직관리 저장 -->
+		<update parameterType="map" id="saveCoreOrgMgr">
+					MERGE INTO TORG101 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.ORG_CD
+									, A.SDATE
+									, A.TARGET_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORG_CD
+											, NULL		AS SDATE
+											, NULL		AS TARGET_YN
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.orgCd} )	AS ORG_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.targetYn} )	AS TARGET_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+									      AND A.ORG_CD IS NOT NULL
+									      AND A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.ORG_CD = S.ORG_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.TARGET_YN	= S.TARGET_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+		</update>
+
+
+		<!-- 핵심인재선발조직원 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCoreOrgManagerList1">
+			<![CDATA[
+				SELECT '0' AS DETAIL
+				     , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,#{ssnLocaleCd})||DECODE(GUBUN,'01','(파견)','02','(겸직)','') AS NAME
+				     , A.ENTER_CD
+				     , A.SABUN
+				     , A.ORG_CD
+				     , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS') AS ALIAS
+				     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+				     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020', B.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+				     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+				     , F_COM_GET_ORG_NM(B.ENTER_CD,B.ORG_CD,  REPLACE(TRIM(#{baseDate}),'-',''), #{ssnLocaleCd}) AS ORG_NM
+				     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010', B.STATUS_CD) AS STATUS_NM
+				     , B.W_ENTER_CD
+				     , A.MGR_TYPE
+				  FROM TCDP990 A
+				     , (SELECT X.ENTER_CD, F_COM_GET_NAMES(Y.ENTER_CD,Y.SABUN) NAME, X.SABUN, X.JIKWEE_CD,X.JIKCHAK_CD,X.JIKGUB_CD,X.STATUS_CD ,X.ORG_CD,X.SAL_CLASS , '' AS GUBUN, X.ENTER_CD AS W_ENTER_CD
+				          FROM THRM151 X, THRM100 Y
+				         WHERE X.ENTER_CD =  TRIM(#{ssnEnterCd})
+				           AND REPLACE(TRIM(#{baseDate}),'-','') BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+				           AND X.ENTER_CD = Y.ENTER_CD
+				           AND X.SABUN = Y.SABUN
+				         UNION ALL
+				         SELECT X.WORK_ENTER_CD, F_COM_GET_NAMES(Y.ENTER_CD,Y.SABUN) NAME, X.SABUN, X.WORK_JIKWEE_CD, X.WORK_JIKCHAK_CD,X.WORK_JIKGUB_CD, Z.STATUS_CD , X.ORG_CD  ,' ' AS SAL_CLASS,  GUBUN, X.ENTER_CD AS W_ENTER_CD
+				           FROM THRM126 X, THRM100 Y, THRM151 Z
+				          WHERE X.WORK_ENTER_CD =  TRIM(#{ssnEnterCd})
+				            AND X.ENTER_CD = TRIM(#{ssnEnterCd})
+				            AND X.ENTER_CD = Y.ENTER_CD
+				            AND X.SABUN = Y.SABUN
+				            AND  REPLACE(TRIM(#{baseDate}),'-','') BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+				            AND X.ENTER_CD = Z.ENTER_CD
+				            AND X.SABUN = Z.SABUN
+				            AND REPLACE(TRIM(#{baseDate}),'-','') BETWEEN Z.SDATE AND NVL(Z.EDATE, '99991231') )  B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN = B.SABUN
+					   AND B.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.ORG_CD = #{searchOrgCd}
+					   AND B.STATUS_CD NOT IN ('RA','RAA')
+		      		 ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD, B.SABUN, #{searchSdate})
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getCoreOrgManagerList2">
+			<![CDATA[
+				SELECT '0' AS DETAIL
+					 , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,#{ssnLocaleCd})||DECODE(GUBUN,'01','(파견)','02','(겸직)','') AS NAME
+					 , A.ENTER_CD
+					 , A.SABUN
+				     , A.ORG_CD
+					 , F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS') AS ALIAS
+					 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+					 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020', B.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+					 , F_COM_GET_ORG_NM(B.ENTER_CD,B.ORG_CD,  REPLACE(TRIM(#{baseDate}),'-',''), #{ssnLocaleCd}) AS ORG_NM
+					 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010', B.STATUS_CD) AS STATUS_NM
+					 , B.W_ENTER_CD
+					 , A.MGR_TYPE
+				FROM TCDP990 A
+				   , (SELECT X.ENTER_CD, F_COM_GET_NAMES(Y.ENTER_CD,Y.SABUN) NAME, X.SABUN, X.JIKWEE_CD,X.JIKCHAK_CD,X.JIKGUB_CD,X.STATUS_CD ,X.ORG_CD,X.SAL_CLASS , '' AS GUBUN, X.ENTER_CD AS W_ENTER_CD
+					  FROM THRM151 X, THRM100 Y
+					  WHERE X.ENTER_CD =  TRIM(#{ssnEnterCd})
+						AND REPLACE(TRIM(#{baseDate}),'-','') BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+						AND X.ENTER_CD = Y.ENTER_CD
+						AND X.SABUN = Y.SABUN
+					  UNION ALL
+					  SELECT X.WORK_ENTER_CD, F_COM_GET_NAMES(Y.ENTER_CD,Y.SABUN) NAME, X.SABUN, X.WORK_JIKWEE_CD, X.WORK_JIKCHAK_CD,X.WORK_JIKGUB_CD, Z.STATUS_CD , X.ORG_CD  ,' ' AS SAL_CLASS,  GUBUN, X.ENTER_CD AS W_ENTER_CD
+					  FROM THRM126 X, THRM100 Y, THRM151 Z
+					  WHERE X.WORK_ENTER_CD =  TRIM(#{ssnEnterCd})
+						AND X.ENTER_CD = TRIM(#{ssnEnterCd})
+						AND X.ENTER_CD = Y.ENTER_CD
+						AND X.SABUN = Y.SABUN
+						AND  REPLACE(TRIM(#{baseDate}),'-','') BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+						AND X.ENTER_CD = Z.ENTER_CD
+						AND X.SABUN = Z.SABUN
+						AND REPLACE(TRIM(#{baseDate}),'-','') BETWEEN Z.SDATE AND NVL(Z.EDATE, '99991231') )  B
+				WHERE A.ENTER_CD = B.ENTER_CD
+				  AND A.SABUN = B.SABUN
+				  AND B.ENTER_CD = TRIM(#{ssnEnterCd})
+				  AND B.ORG_CD IN (SELECT #{searchOrgCd}
+								   FROM DUAL
+								   UNION
+								   SELECT ORG_CD
+								     FROM ( SELECT ENTER_CD, SDATE, ORG_CD, PRIOR_ORG_CD
+								              FROM TORG105
+								             WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+								               AND SDATE = #{searchSdate} )
+								   START WITH PRIOR_ORG_CD = #{searchOrgCd}
+								   CONNECT BY PRIOR ENTER_CD = ENTER_CD
+										  AND PRIOR SDATE = SDATE
+										  AND PRIOR ORG_CD = PRIOR_ORG_CD )
+				  AND B.STATUS_CD NOT IN ('RA','RAA')
+				ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD, B.SABUN, #{searchSdate})
+			]]>
+		</select>
+
+		<update parameterType="map" id="saveCoreOrgManagerList">
+					MERGE INTO TCDP990 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.ORG_CD
+									, A.SABUN
+									, A.MGR_TYPE
+									, A.CHKDATE
+									, A.CHKID
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORG_CD
+											, NULL		AS SABUN
+											, NULL		AS MGR_TYPE
+											, NULL		AS CHKDATE
+											, NULL		AS CHKID
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.orgCd} )		AS ORG_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+											, TRIM( #{rm.mgrType} )		AS MGR_TYPE
+											, SYSDATE					AS CHKDATE
+											, TRIM( #{ssnSabun})		AS CHKID
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.ORG_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.MGR_TYPE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.ORG_CD = S.ORG_CD AND T.SABUN = S.SABUN AND T.MGR_TYPE = S.MGR_TYPE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CHKDATE		= S.CHKDATE
+									, T.CHKID		= S.CHKID
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.ORG_CD
+							, T.SABUN
+							, T.MGR_TYPE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.ORG_CD
+							, S.SABUN
+							, S.MGR_TYPE
+							, S.CHKDATE
+							, S.CHKID
+						)
+		</update>
+
+		<delete parameterType="map" id="deleteCoreOrgManagerList">
+				 	DELETE FROM TCDP990
+					WHERE (ENTER_CD, ORG_CD, SABUN) IN
+					      (
+					          SELECT NULL AS ENTER_CD
+					               , NULL AS ORG_CD
+					               , NULL AS SABUN
+					            FROM DUAL
+<foreach item="rm" collection="deleteRows" >
+	<if test="ssnEnterCd != null and ssnEnterCd neq ''
+			  and rm.orgCd != null and rm.orgCd neq ''
+			  and rm.sabun != null and rm.sabun neq ''">
+					          UNION ALL
+					          SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+		                           , TRIM(#{rm.orgCd}) AS ORG_CD
+								   , TRIM(#{rm.sabun}) AS SABUN
+				 	            FROM DUAL
+	</if>
+</foreach>
+
+					      )
+		</delete>
+
+		<!-- 조직도 조직개편 코드 + 메모 -->
+		<select parameterType="map" resultType="cMap" id="getCoreOrgMgrMemoTORG103">
+		   <![CDATA[
+	 	       SELECT DISTINCT A.SDATE AS CODE
+	 	                      , A.MEMO AS CODE_NM
+				  FROM TORG103 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				 ORDER BY A.SDATE DESC
+	 	   ]]>
+
+
+		</select>
+
+</mapper>

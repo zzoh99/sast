@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 소급결과급여반영
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetroact.retroToPayMgr">
+		<select parameterType="map" resultType="cMap" id="getRetroToPayMgrPriorList">
+
+				<![CDATA[
+					SELECT DISTINCT
+						  A.ENTER_CD
+						, A.RE_PAY_ACTION_CD
+						, A.ELEMENT_CD
+						, A.APP_ELEMENT_CD
+						, B.ELEMENT_NM
+						, C.ELEMENT_NM AS APP_ELEMENT_NM
+					FROM TCPN510 A, TCPN011 B, TCPN011 C
+					WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.ELEMENT_CD = B.ELEMENT_CD
+					AND A.ENTER_CD = C.ENTER_CD(+)
+					AND A.APP_ELEMENT_CD = C.ELEMENT_CD(+)
+					AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND RE_PAY_ACTION_CD = #{searchRePayActionCd}
+				]]>
+
+
+		</select>
+	
+		<select parameterType="map" resultType="cMap" id="getRetroToPayMgrList">
+
+				<![CDATA[
+					SELECT A.SABUN
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , F_COM_GET_JIKCHAK_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+						 , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+						 , A.PAY_ACTION_CD
+						 , A.ELEMENT_CD
+						 , (SELECT ELEMENT_NM FROM TCPN011 WHERE TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE AND ELEMENT_CD = A.ELEMENT_CD) AS ELEMENT_NM
+						 , (SELECT CLOSE_YN FROM TCPN981 WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS CLOSE_YN
+						 , A.PAYMENT_MON
+						 , A.CHKDATE
+						 , F_COM_GET_NAMES(#{ssnEnterCd}, #{ssnSabun}, #{ssnLocaleCd}, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS CHKNM
+					  FROM TCPN508 A
+						 , THRM100 B
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.SABUN			= B.SABUN
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.RE_PAY_ACTION_CD	= #{searchRePayActionCd}
+					   AND A.PAY_ACTION_CD	= #{searchPayActionCd}
+					   AND A.ELEMENT_CD		= #{searchElementCd}
+				]]>
+
+
+		</select>
+		
+		
+		<update parameterType="map" id="saveRetroToPayMgrPriorList">
+
+
+					 MERGE INTO TCPN510 T 
+					 USING 
+					( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					            , TRIM(#{rm.rePayActionCd}) AS RE_PAY_ACTION_CD
+					            , TRIM(#{rm.elementCd}) AS ELEMENT_CD
+					            , TRIM(#{rm.appElementCd}) AS APP_ELEMENT_CD
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.RE_PAY_ACTION_CD = S.RE_PAY_ACTION_CD 
+					     AND  T.ELEMENT_CD = S.ELEMENT_CD 
+					) 
+					WHEN MATCHED THEN 
+					    UPDATE SET T.CHKDATE	= sysdate 
+					             , T.CHKID	    = #{ssnSabun}
+					             , T.APP_ELEMENT_CD = S.APP_ELEMENT_CD 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.RE_PAY_ACTION_CD
+					            , T.ELEMENT_CD
+					            , T.APP_ELEMENT_CD
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.RE_PAY_ACTION_CD
+					            , S.ELEMENT_CD
+					            , S.APP_ELEMENT_CD
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+
+
+		</update>
+		
+
+		<update parameterType="map" statementType="CALLABLE" id="RetroToPayMgrP_CPN_RE_CAL_TO_PAY_APPLY">
+
+				<![CDATA[
+					CALL P_CPN_RE_CAL_TO_PAY_APPLY(
+					    #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+                        #{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+                        #{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+                        #{searchRePayActionCd,mode=IN,jdbcType=VARCHAR},
+                        #{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+                        #{rate,mode=IN,jdbcType=VARCHAR},
+                        #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+
+
+		</update>
+		<update parameterType="map" statementType="CALLABLE" id="RetroToPayMgrP_CPN_RE_CAL_TO_PAY_CANCEL">
+
+				<![CDATA[
+					CALL P_CPN_RE_CAL_TO_PAY_CANCEL(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{searchRePayActionCd,mode=IN,jdbcType=VARCHAR},
+						#{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+		</update>
+		
+
+		<update parameterType="map" statementType="CALLABLE" id="prcP_CPN_RE_CAL_TO_PAY_CREATE">
+
+				<![CDATA[
+					CALL P_CPN_RE_CAL_TO_PAY_CREATE(
+					    #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+                        #{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+                        #{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+                        #{searchRePayActionCd,mode=IN,jdbcType=VARCHAR},
+                        #{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+                        #{rate,mode=IN,jdbcType=VARCHAR},
+                        #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+		</update>
+		
+	</mapper>

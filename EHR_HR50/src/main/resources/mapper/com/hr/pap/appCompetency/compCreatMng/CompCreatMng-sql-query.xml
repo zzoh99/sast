@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appCompetency.compCreatMng">
+<!-- 		리더십진단표관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCompCreatMngList">
+
+				<![CDATA[
+				SELECT	T1.ENTER_CD AS ENTER_CD , T1.W_ENTER_CD
+						, (SELECT ENTER_NM FROM TORG900 WHERE ENTER_CD = T1.W_ENTER_CD ) AS W_ENTER_NM
+						, F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN) AS NAME
+						, F_COM_GET_NAMES (T1.W_ENTER_CD, T1.SABUN, 'ALIAS') AS ALIAS
+						, T1.SABUN AS SABUN
+						, T1.COMP_APPRAISAL_CD AS COMP_APPRAISAL_CD
+						, T3.ORG_NM AS SABUN_ORG_NM
+						, T3.JIKCHAK_NM AS SABUN_JIKCHAK_NM
+						, T3.JIKGUB_NM AS SABUN_JIKGUB_NM
+						, T3.JIKWEE_NM AS SABUN_JIKWEE_NM
+						, T1.APP_ENTER_CD AS APP_ENTER_CD
+						, (SELECT ENTER_NM FROM TORG900 WHERE ENTER_CD = T1.APP_ENTER_CD ) AS APP_ENTER_NM
+						, F_COM_GET_NAMES(T1.APP_ENTER_CD, T1.APP_SABUN) AS APP_NAME
+						, F_COM_GET_NAMES (T1.APP_ENTER_CD, T1.APP_SABUN, 'ALIAS') AS APP_ALIAS
+						, T1.APP_SABUN
+						, F_COM_GET_ORG_NM2(T1.APP_ENTER_CD,T1.APP_SABUN,TO_CHAR (SYSDATE, 'YYYYMMDD')) AS APP_ORG_NM
+						, F_COM_GET_JIKGUB_NM (T1.APP_ENTER_CD,T1.APP_SABUN,TO_CHAR (SYSDATE, 'YYYYMMDD')) AS APP_JIKGUB_NM
+						, F_COM_GET_JIKWEE_NM (T1.APP_ENTER_CD,T1.APP_SABUN,TO_CHAR (SYSDATE, 'YYYYMMDD')) AS APP_JIKWEE_NM
+						, F_COM_GET_JIKCHAK_NM (T1.APP_ENTER_CD,T1.APP_SABUN,TO_CHAR (SYSDATE, 'YYYYMMDD')) AS APP_JIKCHAK_NM
+						, T1.LDS_COMPETENCY_CD AS LDS_COMPETENCY_CD
+						, (SELECT LDS_COMPETENCY_NM FROM TPAP531 WHERE ENTER_CD = T1.ENTER_CD AND LDS_COMPETENCY_CD = T1.LDS_COMPETENCY_CD) AS LDS_COMPETENCY_NM
+						, (SELECT LDS_COMP_BENM FROM TPAP533 WHERE ENTER_CD = T1.ENTER_CD AND LDS_COMPETENCY_CD = T1.LDS_COMPETENCY_CD AND SEQ = T1.SEQ) AS LDS_COMP_BENM
+						, T1.SEQ
+					-- , T3.COMPETENCY_NM AS LDS_COMPETENCY_NM
+						, T1.APP_RESULT
+						, T1.NOTE AS NOTE
+						, (SELECT DECODE(COUNT(*),0,'Y','N')
+						 FROM TPAP529
+						 WHERE ENTER_CD = T1.ENTER_CD
+							 AND COMP_APPRAISAL_CD = T1.COMP_APPRAISAL_CD
+							 AND W_ENTER_CD = T1.W_ENTER_CD
+							 AND APP_ENTER_CD = T1.APP_ENTER_CD
+							 AND APP_SABUN = T1.APP_SABUN
+							 AND LDS_COMPETENCY_CD = T1.LDS_COMPETENCY_CD
+							 AND APP_RESULT IS NOT NULL
+							GROUP BY LDS_COMPETENCY_CD	 )	AS DEL_YN
+				FROM	TPAP529 T1
+					, TPAP525 T3
+				WHERE	T1.ENTER_CD = #{ssnEnterCd}
+					AND	T1.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+					]]>
+					<if test='searchConditionType != null and searchConditionType.equals("SABUN")'>
+						<if test='searchCondition  != null and !searchCondition.equals("") ' >
+						AND	T1.SABUN LIKE '%'|| #{searchCondition} ||'%'
+						</if>
+					</if>
+					
+					<if test='searchConditionType != null and searchConditionType.equals("NAME")'>
+						<if test='searchCondition  != null and !searchCondition.equals("") ' >
+						AND	F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN) LIKE '%'|| #{searchCondition} ||'%'
+						</if>
+					</if>
+					
+				 -- AND	T1.ENTER_CD = T2.ENTER_CD
+				 -- AND	T1.SABUN = T2.SABUN
+					AND	T1.ENTER_CD = T3.ENTER_CD
+					AND	T1.W_ENTER_CD = T3.W_ENTER_CD
+					AND	T1.COMP_APPRAISAL_CD = T3.COMP_APPRAISAL_CD
+					AND	T1.SABUN = T3.SABUN
+				ORDER BY T1.W_ENTER_CD, T1.SABUN, T1.APP_ENTER_CD, T1.APP_SABUN, T1.SEQ, T1.LDS_COMPETENCY_CD
+
+		</select>
+
+<!-- 		리더십진단표관리 삭제 -->
+		<delete parameterType="map" id="deleteCompCreatMng">
+
+				<![CDATA[
+					DELETE FROM TPAP529 
+					WHERE (ENTER_CD, COMP_APPRAISAL_CD, W_ENTER_CD, SABUN, APP_ENTER_CD, APP_SABUN, LDS_COMPETENCY_CD, SEQ) IN 	(  (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+				]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{rm.compAppraisalCd},  #{rm.wEnterCd},  #{rm.sabun},  #{rm.appEnterCd},  #{rm.appSabun},  #{rm.ldsCompetencyCd},  #{rm.seq})
+</foreach>
+						)
+		</delete>
+<!-- 		리더십진단표관리 프로시저 -->
+		<update parameterType="map" statementType="CALLABLE" id="prcCompCreatMng">
+
+				<![CDATA[
+					{CALL P_PAPN_COMP_LDS_COMP_DIC_INS(
+					#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+					#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+					#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					#{searchCompAppraisalCd,mode=IN,jdbcType=VARCHAR},
+					#{searchSabun,mode=IN,jdbcType=VARCHAR},
+					#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+				]]>
+		</update>
+</mapper>

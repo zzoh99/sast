@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	pdf 파일
+ -->
+<root>
+	<!-- pdf 파일 조회 -->
+	<query id="selectYeaDataPdfInfo">
+		<![CDATA[
+				SELECT  WORK_YY,
+						ADJUST_TYPE,
+						SABUN ,
+						COUNT(*) AS CNT,
+						MAX(CHKDATE) AS CHKDATE
+				  FROM TCPN855
+				 WHERE ENTER_CD = #ssnEnterCd#
+				   AND WORK_YY = #searchWorkYy#
+				   AND ADJUST_TYPE = #searchAdjustType#
+				   AND SABUN = #searchSabun#
+				 GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+
+		]]>
+	</query>
+
+	<!-- pdf 파일 조회 -->
+	<query id="selectYeaDataPdfList">
+		<![CDATA[
+			SELECT A.WORK_YY
+			     , A.ADJUST_TYPE
+			     , A.SABUN
+			     , A.DOC_TYPE
+			     , A.DOC_SEQ
+			     , A.FILE_PATH
+			     , A.FILE_NAME
+			     , TO_CHAR(A.CHKDATE, 'yyyymmddHH24miss') AS CHKDATE
+			     , '' AS FILE_LINK
+			     , CASE WHEN SUM (CASE WHEN STATUS_CD ='S'  AND FORM_CD <> '0000' THEN 1 ELSE 0 END ) > 0
+			            THEN 'Y' ELSE 'N'
+			        END AS FILEAPPLY
+			  FROM TCPN855 A, TCPN851 B
+			 WHERE A.ENTER_CD    = B.ENTER_CD(+)
+			   AND A.WORK_YY     = B.WORK_YY(+)
+			   AND A.ADJUST_TYPE = B.ADJUST_TYPE(+)
+			   AND A.SABUN       = B.SABUN(+)
+			   AND A.DOC_SEQ     = B.DOC_SEQ(+)
+			   AND A.ENTER_CD    = #ssnEnterCd#
+			   AND A.WORK_YY     = #searchWorkYy#
+			   AND A.ADJUST_TYPE = #searchAdjustType#
+			   AND A.SABUN       = #searchSabun#
+			 GROUP BY A.ENTER_CD
+			        , A.WORK_YY
+			        , A.ADJUST_TYPE
+			        , A.SABUN
+			        , A.DOC_TYPE
+			        , A.DOC_SEQ
+			        , A.FILE_PATH
+			        , A.FILE_NAME
+			        , A.CHKDATE
+			 ORDER BY A.CHKDATE DESC
+		]]>
+	</query>
+
+	<!-- pdf 파일 상세 조회 -->
+	<query id="selectYeaDataPdfDetailList">
+		<![CDATA[
+			SELECT *
+			  FROM
+			  (
+				SELECT A.WORK_YY
+				     , A.ADJUST_TYPE
+				     , A.SABUN
+				     , A.SEQ
+				     , A.DOC_TYPE
+				     , A.DOC_SEQ
+				     , A.FORM_CD
+				     , F_CPN_PDF_DATASPEC_NM(A.FORM_CD) AS FORM_NM
+				     --dynamic query 보안 이슈 수정
+				     , F_CPN_GET_851_DESC_2021(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN,A.SEQ) AS CONTENTS
+				     , A.EXCEPT_GUBUN
+				     , A.STATUS_CD
+				     , A.ERROR_LOG
+				  FROM TCPN851 A
+				 WHERE A.ENTER_CD = #ssnEnterCd#
+				   AND A.SABUN = #searchSabun#
+				   AND A.ADJUST_TYPE = #searchAdjustType#
+				   AND A.WORK_YY = #searchWorkYy#
+				   AND F_YEA_GET_EX_DECRYPT(A.A1, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(NVL(#searchA1#, A.A1), A.ENTER_CD)
+				   AND A.FORM_CD NOT IN ('P102M', 'O101M','0000')
+				 ORDER BY DECODE(FORM_CD,'0000','FFFF',FORM_CD), SEQ
+			  )
+			 WHERE NVL(STATUS_CD,'N') LIKE '%'||#searchStatusCd#||'%'
+			   AND CONTENTS LIKE '%'||#searchContents#||'%'
+			   AND FORM_CD IN (NVL(#searchFormCd0#, FORM_CD), #searchFormCd1#, #searchFormCd2#, #searchFormCd3#, #searchFormCd4#, #searchFormCd5#
+			   			, #searchFormCd6#, #searchFormCd7#, #searchFormCd8#, #searchFormCd9#
+			   		)
+		]]>
+	</query>
+
+	<!-- pdf 파일 저장 -->
+	<query id="updateYeaDataPdf">
+		<![CDATA[
+			UPDATE TCPN851
+			SET STATUS_CD = DECODE(#del_check#,'Y','D','')
+			  , EXCEPT_GUBUN = DECODE(#del_check#,'Y',#exceptCheck#,'')
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND SABUN = #sabun#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND WORK_YY = #work_yy#
+			  AND SEQ = #seq#
+		]]>
+	</query>
+
+	<!-- pdf 파일 상세 건수 조회 -->
+	<query id="selectYeaDataPdfDetailCount">
+		<![CDATA[
+			SELECT SUM (CASE WHEN STATUS_CD ='S' THEN 1 ELSE 0 END ) AS STATUS_A,
+				SUM (CASE WHEN NVL(STATUS_CD,'N') ='N' THEN 1 ELSE 0 END ) AS STATUS_B,
+				SUM (CASE WHEN STATUS_CD ='D' THEN 1 ELSE 0 END ) AS STATUS_C,
+				SUM (CASE WHEN STATUS_CD ='E' THEN 1 ELSE 0 END ) AS STATUS_D
+			FROM TCPN851 A
+			WHERE A.ENTER_CD      = #ssnEnterCd#
+				AND A.WORK_YY     = #searchWorkYy#
+				AND A.ADJUST_TYPE = #searchAdjustType#
+				AND A.SABUN       = #searchSabun#
+				AND F_YEA_GET_EX_DECRYPT(A.A1, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(NVL(#searchA1#, A.A1), A.ENTER_CD)
+			    AND FORM_CD IN (NVL(#searchFormCd0#, FORM_CD), #searchFormCd1#, #searchFormCd2#, #searchFormCd3#, #searchFormCd4#, #searchFormCd5#
+			   			, #searchFormCd6#, #searchFormCd7#, #searchFormCd8#, #searchFormCd9#
+			   		)
+			   	AND FORM_CD NOT IN ('P102M', 'O101M','0000') --추가된 국민연금/건강보험료는 제외한다. by JSG 20160116
+			   	AND F_CPN_GET_851_DESC_2021(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN,A.SEQ) IS NOT NULL
+		]]>
+	</query>
+
+	<!-- pdf 업로드 분류별 건수 조회 -->
+	<query id="selectYeaDataPdfFormCdCount">
+		<![CDATA[
+			WITH T AS (
+				SELECT A.ENTER_CD
+					,A.WORK_YY
+					,A.ADJUST_TYPE
+					,A.SABUN
+					,A.SEQ
+					,A.DOC_TYPE
+					,A.DOC_SEQ
+					,A.FORM_CD
+					,A.STATUS_CD
+					,A.ERROR_LOG
+					, F_COM_DECRYPT(A.A1 ,ENTER_CD) AS A1
+					, F_COM_DECRYPT(A.A2 ,ENTER_CD) AS A2
+					, F_COM_DECRYPT(A.A3 ,ENTER_CD) AS A3
+					, F_COM_DECRYPT(A.A4 ,ENTER_CD) AS A4
+					, F_COM_DECRYPT(A.A5 ,ENTER_CD) AS A5
+					, F_COM_DECRYPT(A.A6 ,ENTER_CD) AS A6
+					, F_COM_DECRYPT(A.A7 ,ENTER_CD) AS A7
+					, F_COM_DECRYPT(A.A8 ,ENTER_CD) AS A8
+					, F_COM_DECRYPT(A.A9 ,ENTER_CD) AS A9
+					, F_COM_DECRYPT(A.A10,ENTER_CD) AS A10
+					, F_COM_DECRYPT(A.A11,ENTER_CD) AS A11
+					, F_COM_DECRYPT(A.A12,ENTER_CD) AS A12
+					, F_COM_DECRYPT(A.A13,ENTER_CD) AS A13
+					, F_COM_DECRYPT(A.A14,ENTER_CD) AS A14
+					, F_COM_DECRYPT(A.A15,ENTER_CD) AS A15
+					, F_COM_DECRYPT(A.A16,ENTER_CD) AS A16
+					, F_COM_DECRYPT(A.A17,ENTER_CD) AS A17
+					, F_COM_DECRYPT(A.A18,ENTER_CD) AS A18
+					, F_COM_DECRYPT(A.A19,ENTER_CD) AS A19
+					, F_COM_DECRYPT(A.A20,ENTER_CD) AS A20
+					, F_COM_DECRYPT(A.A21,ENTER_CD) AS A21
+					, F_COM_DECRYPT(A.A22,ENTER_CD) AS A22
+					, F_COM_DECRYPT(A.A23,ENTER_CD) AS A23
+					, F_COM_DECRYPT(A.A24,ENTER_CD) AS A24
+					, F_COM_DECRYPT(A.A25,ENTER_CD) AS A25
+					, F_COM_DECRYPT(A.A26,ENTER_CD) AS A26
+					, F_COM_DECRYPT(A.A27,ENTER_CD) AS A27
+					, F_COM_DECRYPT(A.A28,ENTER_CD) AS A28
+					, F_COM_DECRYPT(A.A29,ENTER_CD) AS A29
+					, F_COM_DECRYPT(A.A30,ENTER_CD) AS A30
+
+					, DECODE(A.FORM_CD
+						,'A102Y', 'INS'
+						,'B101Y', 'MED'
+						,'C102Y', 'EDU'
+						,'C202Y', 'EDU'
+						,'C301Y', 'EDU'
+						,'C401Y', 'EDU'
+						--,'G107Y', 'CREDIT_CARD' /* 2019.신용카드 */
+						--,'G307Y', 'CHECK_CARD'  /* 2019.직불카드 */
+						--,'G207M', 'CASH'        /* 2019.현금영수증 */
+						--,'G407Y', 'CHECK_CARD'  /* 2019.12.09.제로페이 */
+						--,'G108M', 'CREDIT_CARD' /* 2020.신용카드 */
+						--,'G308M', 'CHECK_CARD'  /* 2020.직불카드 */
+						--,'G208M', 'CASH'        /* 2020.현금영수증 */
+						--,'G408M', 'CHECK_CARD'/* 2020.제로페이 */
+						,'G109Y', 'CREDIT_CARD' /* 2021.신용카드 */
+						,'G309Y', 'CHECK_CARD'  /* 2021.직불카드 */
+						,'G209M', 'CASH'        /* 2021.현금영수증 */
+						,'G409Y', 'CHECK_CARD'  /* 2021.제로페이 */
+						,'E103Y', 'PEN'
+						,'E101Y', 'PEN'
+						,'F101Y', 'PEN'
+						,'F103Y', 'PEN'
+						,'D101Y', 'PEN'
+						,'J101Y', 'HOU'
+						,'J203Y', 'HOU'
+						,'J401Y', 'HOU'
+						,'J301Y', 'HOU_SAV'
+						,'N101Y', 'LONG_SAV'
+						,'K101M', 'ETC'
+						,'L102Y', 'DONG'
+						,'Q101Y', 'VENTURE' /* 2019.11.28.벤처기업투자신탁 (당해년도)*/
+						,'Q201Y', 'VENTURE' /* 2019.11.28.벤처기업투자신탁 (이전년도)*/
+						,'Q301Y', 'VENTURE' /* 2019.11.28.벤처기업투자신탁 (전전년도)*/
+						,'B201Y', 'MED'/* 2020.12.03.실손의료보험금 */
+						,'J501Y', 'HOU' /* 2020.12.03.월세액 */
+						) AS FORM_TYPE
+
+					, TO_NUMBER(NVL(DECODE(A.FORM_CD
+						,'A102Y', F_COM_DECRYPT(A16,ENTER_CD)
+						,'B101Y', F_COM_DECRYPT(A6,ENTER_CD)
+						,'C102Y', F_COM_DECRYPT(A8,ENTER_CD)
+						,'C202Y', F_COM_DECRYPT(A8,ENTER_CD)
+						,'C301Y', F_COM_DECRYPT(A6,ENTER_CD)
+						,'C401Y', F_COM_DECRYPT(A6,ENTER_CD)
+						--,'G107Y', F_COM_DECRYPT(A7,ENTER_CD)/*2019년 신용카드*/
+						--,'G307Y', F_COM_DECRYPT(A7,ENTER_CD)/*2019년 직불카드*/
+						--,'G207M', F_COM_DECRYPT(A5,ENTER_CD)/*2019년 현금영수증*/
+						--,'G407Y', F_COM_DECRYPT(A7,ENTER_CD)/* 2019.12.09.제로페이 */
+						--,'G108M', F_COM_DECRYPT(A7,ENTER_CD)  /*2020년 신용카드*/
+						--,'G308M', F_COM_DECRYPT(A7,ENTER_CD)  /*2020년 직불카드*/
+						--,'G208M', F_COM_DECRYPT(A5,ENTER_CD)  /*2020년 현금영수증*/
+						--,'G408M', F_COM_DECRYPT(A7,ENTER_CD)  /* 2020.제로페이 */
+						,'G109Y', F_COM_DECRYPT(A7,ENTER_CD)  /*2021년 신용카드*/
+						,'G309Y', F_COM_DECRYPT(A7,ENTER_CD)  /*2021년 직불카드*/
+						,'G209M', F_COM_DECRYPT(A5,ENTER_CD)  /*2021년 현금영수증*/
+						,'G409Y', F_COM_DECRYPT(A7,ENTER_CD)  /*2021년 제로페이*/
+						,'E103Y', F_COM_DECRYPT(A10,ENTER_CD)
+						,'E101Y', F_COM_DECRYPT(A10,ENTER_CD)
+						,'F101Y', F_COM_DECRYPT(A11,ENTER_CD)
+						,'F103Y', F_COM_DECRYPT(A11,ENTER_CD)
+						,'J101Y', F_COM_DECRYPT(A9,ENTER_CD)
+						,'J203Y', F_COM_DECRYPT(A18,ENTER_CD)
+						,'J401Y', F_COM_DECRYPT(A9,ENTER_CD)
+						,'D101Y', F_COM_DECRYPT(A10,ENTER_CD)
+						,'J301Y', F_COM_DECRYPT(A11,ENTER_CD)
+						,'N101Y', F_COM_DECRYPT(A11,ENTER_CD)
+						,'K101M', F_COM_DECRYPT(A9,A.ENTER_CD)
+						,'L102Y', F_COM_DECRYPT(A7,ENTER_CD)
+						,'Q101Y', F_COM_DECRYPT(A11,ENTER_CD) /* 2019.11.28.벤처기업투자신탁 (당해년도) */
+						,'Q201Y', F_COM_DECRYPT(A11,ENTER_CD) /* 2019.11.28.벤처기업투자신탁 (이전년도) */
+						,'Q301Y', F_COM_DECRYPT(A11,ENTER_CD) /* 2019.11.28.벤처기업투자신탁 (전전년도) */
+						,'B201Y', F_COM_DECRYPT(A10,ENTER_CD)  /* 2020.12.03.실손의료보험금*/
+						,'J501Y', F_COM_DECRYPT(A11,ENTER_CD) /* 2020.12.03.월세액 */
+						), '0')) AS AMT
+				FROM TCPN851 A
+				WHERE A.ENTER_CD      = #ssnEnterCd#
+					AND A.WORK_YY     = #searchWorkYy#
+					AND A.ADJUST_TYPE = #searchAdjustType#
+					AND A.SABUN       = #searchSabun#
+					AND F_YEA_GET_EX_DECRYPT(A.A1, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(NVL(#searchA1#, A.A1), A.ENTER_CD)
+			)
+			SELECT
+				(SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'INS' AND STATUS_CD = 'S') AS INS_AMT	/* 보험료 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'MED' AND STATUS_CD = 'S') AS MED_AMT	/* 의료비,실손의료보험 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'EDU' AND STATUS_CD = 'S') AS EDU_AMT	/* 교육비 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'CREDIT_CARD' AND STATUS_CD = 'S') AS CREDIT_CARD_AMT	/* 신용카드 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'CHECK_CARD' AND STATUS_CD = 'S') AS CHECK_CARD_AMT	/* 직불카드,제로페이 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'CASH' AND STATUS_CD = 'S') AS CASH_AMT	/* 현금영수증 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'PEN' AND STATUS_CD = 'S') AS PEN_AMT	/* 연금계좌 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'HOU' AND STATUS_CD = 'S') AS HOU_AMT	/* 주택자금,월세액 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'HOU_SAV' AND STATUS_CD = 'S') AS HOU_SAV_AMT	/* 저축 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'LONG_SAV' AND STATUS_CD = 'S') AS LONG_SAV_AMT	/* 장기집합투자증권저축 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'ETC' AND STATUS_CD = 'S') AS ETC_AMT	/* 소기업/소상공인 공제부금 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'DONG' AND STATUS_CD = 'S') AS DONG_AMT	/* 기부금 */
+				, (SELECT NVL(SUM(AMT),0) FROM T WHERE FORM_TYPE = 'VENTURE' AND STATUS_CD = 'S') AS VENTURE_AMT	/* 벤처기업투자신탁 */
+
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'INS' AND STATUS_CD = 'S') AS INS_CNT	/* 보험료 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'MED' AND STATUS_CD = 'S') AS MED_CNT	/* 의료비,실손의료보험 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'EDU' AND STATUS_CD = 'S') AS EDU_CNT	/* 교육비 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'CREDIT_CARD' AND STATUS_CD = 'S') AS CREDIT_CARD_CNT	/* 신용카드 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'CHECK_CARD' AND STATUS_CD = 'S') AS CHECK_CARD_CNT	/* 직불카드,제로페이 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'CASH' AND STATUS_CD = 'S') AS CASH_CNT	/* 현금영수증 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'PEN' AND STATUS_CD = 'S') AS PEN_CNT	/* 연금계좌 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'HOU' AND STATUS_CD = 'S') AS HOU_CNT	/* 주택자금,월세액 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'HOU_SAV' AND STATUS_CD = 'S') AS HOU_SAV_CNT	/* 저축 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'LONG_SAV' AND STATUS_CD = 'S') AS LONG_SAV_CNT	/* 장기집합투자증권저축 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'ETC' AND STATUS_CD = 'S') AS ETC_CNT	/* 소기업/소상공인 공제부금 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'DONG' AND STATUS_CD = 'S') AS DONG_CNT	/* 기부금 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'VENTURE' AND STATUS_CD = 'S') AS VENTURE_CNT	/* 벤처기업투자신탁 */
+
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'INS' AND STATUS_CD <> 'S') AS INS_CNT_ERR	/* 보험료 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'MED' AND STATUS_CD <> 'S') AS MED_CNT_ERR	/* 의료비,실손의료보험 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'EDU' AND STATUS_CD <> 'S') AS EDU_CNT_ERR	/* 교육비 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'CREDIT_CARD' AND STATUS_CD <> 'S') AS CREDIT_CARD_CNT_ERR	/* 신용카드 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'CHECK_CARD' AND STATUS_CD <> 'S') AS CHECK_CARD_CNT_ERR	/* 직불카드,제로페이 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'CASH' AND STATUS_CD <> 'S') AS CASH_CNT_ERR	/* 현금영수증 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'PEN' AND STATUS_CD <> 'S') AS PEN_CNT_ERR	/* 개인연금저축/연금계좌 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'HOU' AND STATUS_CD <> 'S') AS HOU_CNT_ERR	/* 주택자금,월세액 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'HOU_SAV' AND STATUS_CD <> 'S') AS HOU_SAV_CNT_ERR	/* 주택마련저축 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'LONG_SAV' AND STATUS_CD <> 'S') AS LONG_SAV_CNT_ERR	/* 장기집합투자증권저축 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'ETC' AND STATUS_CD <> 'S') AS ETC_CNT_ERR	/* 소기업/소상공인 공제부금 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'DONG' AND STATUS_CD <> 'S') AS DONG_CNT_ERR	/* 기부금 */
+				, (SELECT COUNT(*) FROM T WHERE FORM_TYPE = 'VENTURE' AND STATUS_CD <> 'S') AS VENTURE_CNT_ERR	/* 벤처기업투자신탁 */
+			FROM DUAL
+		]]>
+	</query>
+
+	<!-- 인적공제 인원조회 -->
+	<query id="selectYeaDataPdfA1">
+		<![CDATA[
+			SELECT A.A1 AS CODE
+				, F_COM_DECRYPT(A.A2 ,A.ENTER_CD) AS CODE_NM
+			FROM TCPN851 A, TCPN823 B
+			WHERE A.ENTER_CD      = #ssnEnterCd#
+				AND A.WORK_YY     = #searchWorkYy#
+				AND A.ADJUST_TYPE = #searchAdjustType#
+				AND A.SABUN       = #searchSabun#
+				AND A.FORM_CD = '0000'
+				AND A.ENTER_CD = B.ENTER_CD
+	            AND A.WORK_YY = B.WORK_YY
+	            AND A.ADJUST_TYPE = B.ADJUST_TYPE
+	            AND A.SABUN = B.SABUN
+	            AND F_YEA_GET_EX_DECRYPT(A.A1, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+		]]>
+	</query>
+
+	<!-- PDF 파일 정보 삭제 -->
+	<query id="deleteYeaDataPdfFile">
+		<![CDATA[
+			DELETE FROM TCPN855
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND WORK_YY  	    	= #work_yy#
+			   AND ADJUST_TYPE   		= #adjust_type#
+			   AND SABUN   				= #searchSabun#
+			   AND DOC_TYPE   			= #doc_type#
+			   AND DOC_SEQ   			= #doc_seq#
+		]]>
+	</query>
+
+	<!-- PDF 파일 정보 삭제 -->
+	<query id="deleteYeaDataPdfData">
+		<![CDATA[
+			DELETE FROM TCPN851
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND WORK_YY  	    	= #work_yy#
+			   AND ADJUST_TYPE   		= #adjust_type#
+			   AND SABUN   				= #searchSabun#
+			   AND DOC_TYPE   			= #doc_type#
+			   AND DOC_SEQ   			= #doc_seq#
+		]]>
+	</query>
+</root>

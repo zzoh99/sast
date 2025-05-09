@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천징수부
+ -->
+<root>
+
+	<!-- 원천징수부 대상자 조회  -->
+	<query id="selectWithHoldRcptBkStaList">
+		<![CDATA[
+			SELECT A.ENTER_CD
+			      , A.NAME
+			      , A.SABUN
+			      , F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD,A.WORK_YY || '1231') AS ORG_NM
+			      , ROWNUM AS SORT_NO
+			      , A.MANAGE_NM
+			      , A.RET_YMD
+			      , A.ADJUST_TYPE
+			  FROM (
+					SELECT A.ENTER_CD
+					     , B.NAME
+					     , A.SABUN
+					     , A.ORG_NM
+					     , 1 AS SORT_NO
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10030', C.MANAGE_CD, NULL, #searchWorkYy# || '1231') AS MANAGE_NM
+					     , B.RET_YMD
+					     , A.ADJUST_TYPE
+					     , A.WORK_YY
+					     , C.ORG_CD
+					  FROM TCPN811 A
+					     , THRM100 B
+					     ,(SELECT X.SABUN, X.MANAGE_CD, X.ORG_CD
+					       FROM   THRM151 X
+					              ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+					                  FROM THRM151
+					                 WHERE ENTER_CD = #ssnEnterCd#
+					                   AND #searchWorkYy# || '1231' BETWEEN SDATE AND NVL(EDATE,'99991231')
+					                GROUP BY ENTER_CD, SABUN
+					               ) Y
+					         WHERE X.ENTER_CD = Y.ENTER_CD
+					           AND X.SABUN    = Y.SABUN
+					           AND X.SDATE    = Y.SDATE
+					       ) C
+					      , TCPN201 D
+					 WHERE  A.ENTER_CD            = #ssnEnterCd#    -- 'ISU_CM' 회사코드    
+					   AND  A.WORK_YY             = #searchWorkYy#    -- '2005'   귀속년도    
+					   AND  A.ADJUST_TYPE         LIKE '%'|| #searchAdjustType#||'%'    -- '1'      정산구분    
+					   AND  A.ADJUST_TYPE    IN (SELECT CODE
+							                     FROM TSYS005
+							                    WHERE ENTER_CD = #ssnEnterCd#
+							                      AND GRCODE_CD = 'C00303'
+							                      AND USE_YN = 'Y'
+							                      AND #searchWorkYy#||'1231' BETWEEN S_YMD AND E_YMD)    
+					   AND  A.BUSINESS_PLACE_CD   LIKE #searchBusinessPlaceCd#||'%'    -- 'CM10'  
+					   AND  ( A.SABUN LIKE '%'|| #searchSbNm# ||'%' OR B.NAME LIKE '%'|| #searchSbNm# ||'%' )
+					   AND  NVL(A.ORG_NM, ' ') LIKE '%' || #searchOrgNm# || '%'
+					   AND  B.ENTER_CD = A.ENTER_CD
+					   AND  B.SABUN    = A.SABUN
+					   AND  B.SABUN    = C.SABUN(+)
+				       AND  A.ENTER_CD = D.ENTER_CD
+				       AND  A.PAY_ACTION_CD = D.PAY_ACTION_CD
+				       AND  D.PAY_YM LIKE #searchWorkYy# || #searchWorkMm# ||'%'
+					 ORDER BY DECODE(#searchSort#, NULL, B.NAME, '1', B.NAME, '2', A.SABUN, '3', A.ORG_NM, B.NAME)
+					        , C.ORG_CD, SABUN
+				   ) A
+	   ]]> 
+	</query>
+
+	<!-- 원천징수부 업로드시 사원정보 조회  -->
+	<query id="selectEmpInfoUsingSabun">
+		<![CDATA[
+			SELECT A.NAME, A.SABUN, C.ORG_NM, B.MANAGE_NM 
+			  FROM THRM100 A, THRM151 B, TORG101 C
+			 WHERE A.ENTER_CD = #ssnEnterCd# 
+			   AND A.SABUN =  #searchSabun#
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.SABUN = B.SABUN
+			   AND B.ENTER_CD = C.ENTER_CD
+			   AND B.ORG_CD = C.ORG_CD 
+		     ORDER BY A.NAME
+	   ]]> 
+	</query>
+
+</root>

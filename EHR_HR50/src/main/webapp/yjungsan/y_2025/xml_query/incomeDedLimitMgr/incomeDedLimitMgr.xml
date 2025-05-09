@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	소득공제 한도차감관리(관리자)
+ -->
+<root>
+
+	<!-- 소득공제 한도차감관리(관리자) 조회 -->
+	<query id="selectIncomeDedLimitUploadList">
+		<![CDATA[
+		SELECT WORK_YY, ADJUST_TYPE, SABUN, NAME, DEDUCTION_CD, ADJ_ELEMENT_CD, FAM_NM, FAM_YN, DED_MON, MEMO
+		   FROM
+		   (SELECT A.WORK_YY
+			  , A.ADJUST_TYPE
+			  , A.SABUN
+			  , (SELECT NAME FROM THRM100 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN) AS NAME
+			  --, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN,'','') AS NAME
+			  , A.DEDUCTION_CD
+			  , A.ADJ_ELEMENT_CD
+			  ,(SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE 'N' END 
+			         FROM TCPN823
+				 	WHERE ENTER_CD = A.ENTER_CD
+				 	  AND WORK_YY = A.WORK_YY 
+				 	  AND ADJUST_TYPE = A.ADJUST_TYPE
+				 	  AND SABUN = A.SABUN
+				 	  AND FAM_NM = A.FAM_NM
+				   ) AS FAM_YN
+			  , FAM_NM
+			  , A.DED_MON
+			  , A.MEMO
+		   FROM TYEA303 A
+		   WHERE A.ENTER_CD = #ssnEnterCd#
+			  AND A.WORK_YY = #searchYear#
+			  AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+        	  AND ( #searchAdjustType# IS NULL OR A.ADJUST_TYPE = #searchAdjustType# ) -- 조회조건 : 작업구분
+			  AND DECODE('',#searchGubunCd#,'A',A.DEDUCTION_CD) = DECODE('',#searchGubunCd#,'A',#searchGubunCd#)
+			  )
+		   WHERE (SABUN LIKE '%'||#searchSbNm#||'%' OR NAME LIKE '%'||#searchSbNm#||'%')
+		   ORDER BY ADJUST_TYPE, SABUN
+		]]>
+	</query>
+	
+	<!-- 소득공제 한도차감관리(관리자) 상세 중복 체크 -->
+	<query id="selectIncomeDedLimitUploadDetailCnt">
+		<![CDATA[
+			 SELECT COUNT(1) AS CNT 
+			  FROM TYEA303
+			 WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun# 
+			  AND DEDUCTION_CD = #deduction_cd# 
+			  AND ADJ_ELEMENT_CD = #adj_element_cd#
+			  AND FAM_NM = #fam_nm#
+		]]>
+	</query>	
+	
+	<!-- 소득공제 한도차감관리(관리자) 상세 입력 -->
+	<query id="insertIncomeDedLimitUploadDetail">
+		<![CDATA[
+			INSERT INTO TYEA303
+			(
+				ENTER_CD
+				, WORK_YY
+				, ADJUST_TYPE
+				, SABUN
+				, DEDUCTION_CD
+				, ADJ_ELEMENT_CD
+				, FAM_NM
+				, DED_MON
+				, MEMO
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #deduction_cd#
+				, #adj_element_cd#
+				, #fam_nm#
+				, #ded_mon#
+				, #memo#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+	
+	<!-- 소득공제 한도차감관리(관리자) 상세 수정 -->
+	<query id="updateIncomeDedLimitUploadDetail">
+		<![CDATA[
+			UPDATE TYEA303
+			SET DED_MON    = #ded_mon#
+				, MEMO     = #memo#
+				, CHKDATE  = SYSDATE
+				, CHKID    = #ssnSabun#
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun# 
+			  AND DEDUCTION_CD = #deduction_cd# 
+			  AND ADJ_ELEMENT_CD = #adj_element_cd#
+			  AND FAM_NM = #fam_nm#
+		]]>
+	</query>
+	
+	<!-- 소득공제 한도차감관리(관리자) 상세 삭제 -->
+	<query id="deleteIncomeDedLimitUploadDetail">
+		<![CDATA[
+			DELETE FROM TYEA303
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun# 
+			  AND DEDUCTION_CD = #deduction_cd# 
+			  AND ADJ_ELEMENT_CD = #adj_element_cd#
+			  AND FAM_NM = #fam_nm#
+		]]>
+	</query>	
+	
+	<!-- 임직원 조회 -->
+	<query id="selectIncomeDedEmployeeList">
+		<![CDATA[
+			SELECT A.ENTER_CD
+			     	 , A.SABUN
+			     	 , A.NAME
+			     	 , B.ORG_CD
+			     	 , F_COM_GET_ORG_NM(A.ENTER_CD,B.ORG_CD,TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+			     	 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',B.JIKCHAK_CD, NULL, #searchYear#||'1231') AS JIKCHAK_NM
+			     	 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',B.JIKWEE_CD, NULL, #searchYear#||'1231') AS JIKWEE_NM
+			     	 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10010' , B.STATUS_CD, NULL, #searchYear#||'1231') AS STATUS_NM
+			   FROM THRM100 A
+					 , THRM151 B
+					 , TCPN811 C
+			 WHERE A.ENTER_CD = B.ENTER_CD
+			     AND A.ENTER_CD = C.ENTER_CD
+			     AND A.SABUN = B.SABUN
+			     AND A.SABUN = C.SABUN
+			     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+			     AND A.ENTER_CD = #ssnEnterCd#
+			     AND ( UPPER(A.SABUN) LIKE '%'|| UPPER(TRIM(#searchKeyword#)) ||'%' OR  UPPER(A.NAME) LIKE '%'|| UPPER(TRIM(#searchKeyword#)) ||'%')
+			     AND C.WORK_YY = #searchYear#
+			     AND C.ADJUST_TYPE = #searchAdjustType#
+			  ORDER BY A.NAME
+		]]>
+	</query>	
+	
+	<!-- 임직원 상세 조회 -->
+	<query id="getIncomeDedEmployeeDetailList">
+		<![CDATA[
+			SELECT ENTER_CD                        --회사코드
+					 , JIKWEE_CD                        	--직위코드(H20030)
+					 , JIKGUB_CD                        	--직급코드(H20010)
+					 , JIKCHAK_CD                        	--직책코드(H20020)
+					 , JOB_CD                           	--직무코드
+					 , '' AS LOCATION_CD                    --근무지코드
+					 , MANAGE_CD                        	--사원구분코드(H10030)
+					 , NAME                            		--성명
+					 , ORG_CD                            	--조직코드
+					 , F_COM_DECRYPT(RES_NO, ENTER_CD) AS RES_NO --주민등록 번호
+					 , SABUN                            		--사번
+					 , STATUS_CD                        	--재직상태코드(H10010)
+					 , WORK_TYPE                        	--직군코드(H10050)
+					 , '' AS WORKORG_CD                      	--근무소속조직코드
+					 , TO_CHAR(TO_DATE(EMP_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS EMP_YMD
+					 , TO_CHAR(TO_DATE(RET_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS RET_YMD
+					 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H20030' , JIKWEE_CD, NULL, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+					 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H20010' , JIKGUB_CD, NULL, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_NM
+					 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H20020' , JIKCHAK_CD, NULL, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKCHAK_NM
+					 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10030' , MANAGE_CD, NULL, TO_CHAR(SYSDATE,'YYYYMMDD')) AS MANAGE_NM
+					 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10010' , STATUS_CD, NULL, TO_CHAR(SYSDATE,'YYYYMMDD')) AS STATUS_NM
+					 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10050' , WORK_TYPE, NULL, TO_CHAR(SYSDATE,'YYYYMMDD')) AS WORK_TYPE_NM
+					 , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD') ) AS ORG_NM
+					 , NVL(F_COM_GET_BP_CD(ENTER_CD, SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')),'') AS BUSINESS_PLACE_CD
+			  FROM (
+					SELECT A.NAME		--성명
+							 , A.RES_NO	--주민번호
+							 , A.EMP_YMD	--입사일
+							 , A.RET_YMD  --퇴사일
+							 , C.*
+			      	  FROM THRM100 A, THRM151 C
+			        WHERE A.ENTER_CD = #ssnEnterCd#
+			             AND A.SABUN = #searchUserId#
+			             AND A.ENTER_CD = C.ENTER_CD
+			             AND A.SABUN = C.SABUN
+			             AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+			             AND ROWNUM = 1
+			      )
+		]]>
+	</query>	
+	
+	<!-- 연말정산 항목 -->
+	<query id="getDedItemList">
+	   <![CDATA[
+			SELECT ADJ_ELEMENT_CD AS CODE, ADJ_ELEMENT_NM AS CODE_NM, MAX(LEN) OVER() AS MAX_LEN
+			  FROM (
+					SELECT ADJ_ELEMENT_CD, ADJ_ELEMENT_NM, LENGTH(ADJ_ELEMENT_CD||' ('||ADJ_ELEMENT_NM||')') AS LEN
+					  FROM TCPN803
+					 WHERE ENTER_CD       	 		= #ssnEnterCd#
+					     AND WORK_YY            = #searchWorkYy#
+					     AND NVL(DED_DATA_YN, 'N') = 'Y'
+					     $query$
+					ORDER BY SEQ
+			  )
+	   ]]>
+	</query>
+
+</root>

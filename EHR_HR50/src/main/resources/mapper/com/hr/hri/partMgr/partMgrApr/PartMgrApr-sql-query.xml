@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.partMgr.partMgrApr">
+
+<!-- 서무권한변경관리 List 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPartMgrAprList">
+
+				<![CDATA[				
+			SELECT A.ENTER_CD, A.APPL_SEQ, A.APPL_ORG_CD 
+			          ,B.APPL_YMD --신청일자
+			          ,B.APPL_STATUS_CD --신청상태
+			          , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM --신청상태명
+			          ,B.APPL_SABUN AS APPL_SABUN --신청자
+			          ,C.NAME AS APPL_NAME
+			          ,F_COM_GET_ORG_NM2(A.ENTER_CD, B.APPL_SABUN, APPL_YMD) AS APPL_ORG_NM
+			          ,A.APPL_TYPE_CD --변경구분 
+			          ,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H90501', A.APPL_TYPE_CD) AS APPL_TYPE_NM --변경구분명
+			          ,A.S_YMD --적용시작일
+			          ,A.CUR_SABUN --기존서무 
+			          ,F_COM_GET_NAMES(A.ENTER_CD, A.CUR_SABUN) AS CUR_NAME
+			          ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.CUR_SABUN, APPL_YMD) AS CUR_ORG_NM
+			          ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.CUR_SABUN, APPL_YMD) AS CUR_JIKWEE_NM
+			          ,F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.CUR_SABUN, APPL_YMD) AS CUR_JIKCHAK_NM                       
+			          ,A.NEW_SABUN  --신규서무
+			          ,F_COM_GET_NAMES(A.ENTER_CD, A.NEW_SABUN) AS NEW_NAME
+			          ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.NEW_SABUN, APPL_YMD) AS NEW_ORG_NM
+			          ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.NEW_SABUN, APPL_YMD) AS NEW_JIKWEE_NM
+			          ,F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.NEW_SABUN, APPL_YMD) AS NEW_JIKCHAK_NM             
+			          ,A.BIGO
+			          , '0' AS DETAIL
+			  FROM TSYS351 A, THRI103 B, THRM100 C
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			    AND C.ENTER_CD = A.ENTER_CD
+			    AND C.SABUN     = B.APPL_SABUN ]]>
+			<if test='searchSabunName != null and !searchSabunName.equals("")'>
+			    AND (B.APPL_SABUN LIKE '%'||#{searchSabunName} ||'%' OR C.NAME LIKE '%'||#{searchSabunName} ||'%')
+			</if>
+			<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+				     AND F_COM_GET_ORG_NM2(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD) LIKE '%'|| #{searchOrgNm} ||'%'
+			</if> <![CDATA[
+			    AND B.ENTER_CD = A.ENTER_CD
+			    AND B.APPL_SEQ = A.APPL_SEQ
+			    AND B.APPL_STATUS_CD <> '11'
+			    AND B.APPL_YMD BETWEEN REPLACE(NVL(TRIM(#{searchFromYmd}),'19000101'), '-', '') AND REPLACE(NVL(TRIM(#{searchToYmd}),'99991231'), '-', '') ]]>
+		           <if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+		                AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+		           </if>
+		           <if test='searchApplTypeCd != null and !searchApplTypeCd.equals("")'>
+		                AND A.APPL_TYPE_CD = #{searchApplTypeCd}
+		           </if>
+			    ORDER BY B.APPL_YMD DESC ,A.APPL_SEQ DESC
+		</select>
+
+		<!-- 서무권한변경관리 결재정보 갱신  -->
+		<update parameterType="map" id="updatePartMgrAprThri">
+
+						MERGE INTO THRI103	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	APPL_SEQ
+										,	APPL_STATUS_CD
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	APPL_SEQ
+										,	NULL		AS	APPL_STATUS_CD
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+					<bind name="icnt" value="1" />
+					<foreach item="rm" collection="updateRows" >
+													UNION ALL
+														SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+															,	TRIM(#{rm.applSeq})			AS	APPL_SEQ
+															,	TRIM(#{rm.applStatusCd})	AS	APPL_STATUS_CD
+															,	SYSDATE						AS	CHKDATE
+															,	#{ssnSabun}					AS	CHKID
+														FROM	DUAL
+					</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		APPL_SEQ IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.APPL_SEQ				=		S.APPL_SEQ
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.APPL_STATUS_CD	=	S.APPL_STATUS_CD
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+		</update>
+		
+
+	<!-- 서무권한그룹 업데이트 -->
+		<update parameterType="map" id="prcPartMgrApr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_SYS_SEOMU_AUTH_CREATE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+
+</mapper>

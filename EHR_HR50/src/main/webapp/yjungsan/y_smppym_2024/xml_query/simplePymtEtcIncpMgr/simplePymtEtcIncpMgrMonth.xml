@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	기타소득업로드
+ -->
+<root>
+    <!-- 조회 -->
+    <query id="getsimplePymtEtcIncpMgr">
+        <![CDATA[
+                SELECT  A.ENTER_CD
+                      , A.WORK_YY
+                      , A.WORK_MM
+                      , A.CRE_WORK_YY
+                      , A.SEND_TYPE
+                      , A.HALF_TYPE
+                      , A.INCOME_TYPE
+                      , A.SABUN
+                      , B.NAME
+                      , A.ADJ_S_YMD
+                      , A.MONTH_SEQ
+                      , A.TAX_MON
+                      , A.ETC_BONUS_MON
+                      , A.BIGO
+                FROM TYEA827 A, THRM100 B
+                WHERE A.ENTER_CD    = #ssnEnterCd#
+                  AND A.WORK_YY     = #searchYear#
+                  AND A.WORK_MM     = #searchWorkMm#
+                  AND A.SEND_TYPE   = #searchSendType#
+                  AND A.INCOME_TYPE = '55'
+                  AND A.ENTER_CD    = B.ENTER_CD(+)
+                  AND A.SABUN       = B.SABUN(+)
+                  $query$
+            ]]>
+    </query>
+    <!-- 저장 -->
+    <query id="saveSimplePymtEtcIncpMgr">
+            <![CDATA[
+                MERGE INTO TYEA827 T
+                USING   (
+                        SELECT    ENTER_CD
+                                , WORK_YY
+                                , WORK_MM
+                                , CRE_WORK_YY
+                                , SEND_TYPE
+                                , HALF_TYPE
+                                , INCOME_TYPE
+                                , SABUN
+                                , ADJ_S_YMD
+                                , MONTH_SEQ
+                                , TAX_MON
+                                , ETC_BONUS_MON
+                                , BIGO
+                        FROM    (
+                                SELECT    TRIM(#ssnEnterCd#)                                                    AS ENTER_CD
+                                        , TRIM(#searchYear#)                                                    AS WORK_YY
+                                        , TRIM(#work_mm#)                                                  AS WORK_MM
+                                        , TO_CHAR(SYSDATE,'yyyy')                                               AS CRE_WORK_YY
+                                        , TRIM(#send_type#)                                                     AS SEND_TYPE
+                                        , TRIM(#searchHalfType#)                                                AS HALF_TYPE
+                                        , '55'                                                                  AS INCOME_TYPE
+                                        , TRIM(#sabun#)                                                         AS SABUN
+                                        , (SELECT ADJ_S_YMD
+                                           FROM TYEA821 A
+                                           WHERE A.ENTER_CD  = #ssnEnterCd#
+                                             AND A.SABUN     = #sabun#
+                                             AND A.ADJ_S_YMD = (SELECT MAX(B.ADJ_S_YMD)
+                                                                FROM TYEA821 B
+                                                                WHERE B.ENTER_CD = A.ENTER_CD
+                                                                  AND B.SABUN = A.SABUN
+                                                                  AND B.ADJ_S_YMD BETWEEN B.ADJ_S_YMD AND NVL(B.ADJ_E_YMD,'99991231'))
+                                        )                                                                       AS ADJ_S_YMD
+                                        , TRIM(#month_seq#)                                                     AS MONTH_SEQ
+                                        , TRIM(#tax_mon#)                                                       AS TAX_MON
+                                        , TRIM(#etc_bonus_mon#)                                                 AS ETC_BONUS_MON
+                                        , TRIM(#bigo#)                                                          AS BIGO
+                                        FROM   DUAL
+                                )  WHERE ENTER_CD       IS NOT NULL
+                                     AND WORK_YY        IS NOT NULL
+                                     AND WORK_MM        IS NOT NULL
+                                     AND CRE_WORK_YY    IS NOT NULL
+                                     AND SEND_TYPE      IS NOT NULL
+                                     AND INCOME_TYPE    IS NOT NULL
+                                     AND ADJ_S_YMD      IS NOT NULL
+                                     AND SABUN          IS NOT NULL
+                        ) S
+                ON ( T.ENTER_CD         = #ssnEnterCd#
+                 AND T.WORK_YY          = S.WORK_YY
+                 AND T.WORK_MM          = S.WORK_MM
+                 AND T.SEND_TYPE        = S.SEND_TYPE
+                 AND T.ADJ_S_YMD        = S.ADJ_S_YMD
+                 AND T.INCOME_TYPE      = S.INCOME_TYPE
+                 AND T.SABUN            = S.SABUN
+                 )
+                WHEN MATCHED THEN
+                    UPDATE SET    T.TAX_MON             = S.TAX_MON
+                                , T.ETC_BONUS_MON       = S.ETC_BONUS_MON
+                                , T.CRE_WORK_YY         = S.CRE_WORK_YY
+                                , T.BIGO                = S.BIGO
+                                , T.CHKDATE             = SYSDATE
+                                , T.CHKID               = #ssnSabun#
+                WHEN NOT MATCHED THEN
+                    INSERT
+                    (
+                          T.ENTER_CD
+                        , T.WORK_YY
+                        , T.WORK_MM
+                        , T.CRE_WORK_YY
+                        , T.SEND_TYPE
+                        , T.INCOME_TYPE
+                        , T.SABUN
+                        , T.ADJ_S_YMD
+                        , T.MONTH_SEQ
+                        , T.TAX_MON
+                        , T.ETC_BONUS_MON
+                        , T.BIGO        
+                        , T.CHKDATE
+                        , T.CHKID
+                    )
+                    VALUES
+                    (
+                          #ssnEnterCd#
+                        , S.WORK_YY
+                        , S.WORK_MM
+                        , S.CRE_WORK_YY
+                        , S.SEND_TYPE
+                        , S.INCOME_TYPE
+                        , S.SABUN
+                        , S.ADJ_S_YMD
+                        , S.MONTH_SEQ
+                        , S.TAX_MON
+                        , S.ETC_BONUS_MON
+                        , S.BIGO                        
+                        , SYSDATE
+                        , #ssnSabun#
+                    )
+            ]]>
+    </query>
+    <!-- 삭제 -->
+    <query id="deleteSimplePymtEtcIncpMgr">
+            <![CDATA[
+                DELETE FROM TYEA827
+                 WHERE ENTER_CD||'_'||WORK_YY||'_'||WORK_MM||'_'||INCOME_TYPE||'_'||SABUN||'_'||SEND_TYPE||'_'||ADJ_S_YMD IN
+                    (
+                        TRIM( #ssnEnterCd# )||'_'||
+                        TRIM( #work_yy# )||'_'||
+                        TRIM( #work_mm# )||'_'||
+                        TRIM( #income_type# )||'_'||
+                        TRIM( #sabun# )||'_'||
+                        TRIM( #send_type# )||'_'||
+                        TRIM( #adj_s_ymd# )
+                    )
+                    AND INCOME_TYPE = '55'
+            ]]>
+    </query>
+</root>

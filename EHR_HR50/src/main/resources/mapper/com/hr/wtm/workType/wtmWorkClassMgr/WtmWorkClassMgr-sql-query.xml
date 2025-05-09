@@ -1,0 +1,1645 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.workType.wtmWorkClassMgr">
+
+    <!-- 근무유형 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmWorkClassMgrList">
+        SELECT A.ENTER_CD
+             , A.WORK_CLASS_CD
+             , A.WORK_CLASS_NM
+             , TO_CHAR(TO_DATE(A.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD') AS SDATE
+             , TO_CHAR(TO_DATE(A.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD') AS EDATE
+             , A.WORK_TYPE_CD
+             , A.WORK_CLASS_DEF_YN
+             , A.WORK_DAY
+             , A.WEEK_REST_DAY
+             , A.WEEK_BEGIN_DAY
+             , A.WORK_HOURS
+             , A.WORK_TIME_F
+             , A.WORK_TIME_T
+             , A.CORE_TIME_F
+             , A.CORE_TIME_T
+             , A.SAME_DAY_CHG_YN
+             , A.START_WORK_TIME_F
+             , A.START_WORK_TIME_T
+             , A.BREAK_TIME_TYPE
+             , A.BREAK_TIME_DET
+             , A.BREAK_TIME_T
+             , A.BREAK_TIME_R
+             , A.OT_BREAK_TIME_T
+             , A.OT_BREAK_TIME_R
+             , A.INTERVAL_CD
+             , A.INTERVAL_BEGIN_TYPE
+             , A.DAY_WK_LMT
+             , A.DAY_OT_LMT
+             , A.WEEK_WK_LMT
+             , A.WEEK_OT_LMT
+             , A.AVG_WEEK_WK_LMT
+             , A.AVG_WEEK_OT_LMT
+             , A.HOL_INCL_YN
+             , A.REAL_BREAK_TIME_YN
+             , A.AUTO_WORK_START_YN
+             , A.AUTO_WORK_END_YN
+             , A.LATE_USE_YN
+             , A.EARLY_LEAVE_USE_YN
+             , A.ABSENCE_USE_YN
+             , A.DEEMED_TIME_F
+             , A.DEEMED_TIME_T
+             , A.BASE_WORK_PRE_USE_YN
+             , A.NO_WORK_PLAN_YN
+             , A.WORK_BEGIN_PRE_YN
+             , A.WORK_ENABLE_RANGE
+             , A.AUTO_OT_TIME_YN
+             , A.FIX_OT_USE_YN
+             , A.FIX_OT_TIME
+             , A.USE_YN
+             , A.APPL_CD
+             , (SELECT COUNT(*)
+                  FROM TWTM031
+                 WHERE ENTER_CD = #{ssnEnterCd}
+                   AND WORK_CLASS_CD = A.WORK_CLASS_CD
+                   AND SYSTEM_CD_YN = 'N'
+                   AND SYSDATE BETWEEN TO_DATE(SDATE, 'YYYYMMDD') AND TO_DATE(EDATE, 'YYYYMMDD')) AS WORK_SCH_CNT
+             , (SELECT COUNT(*)
+                  FROM TWTM032
+                 WHERE ENTER_CD = #{ssnEnterCd}
+                   AND WORK_CLASS_CD = A.WORK_CLASS_CD) AS WORK_GROUP_CNT
+          FROM TWTM021 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND SYSDATE BETWEEN TO_DATE(A.SDATE, 'YYYYMMDD') AND TO_DATE(A.EDATE, 'YYYYMMDD')
+        <if test='workClassCd != null and !workClassCd.equals("")'>
+           AND A.WORK_CLASS_CD = #{workClassCd}
+        </if>
+         ORDER BY WORK_CLASS_CD
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkClassCdList">
+        SELECT A.WORK_CLASS_CD, A.WORK_CLASS_NM, A.WORK_TYPE_CD
+          FROM TWTM021 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+<choose>
+    <when test='searchSdate != null and !"".equals(searchSdate) and searchEdate != null and !"".equals(searchEdate)'>
+        <![CDATA[
+            AND REPLACE(TRIM(#{searchSdate}), '-', '') <= NVL(A.EDATE, '99991231')
+            AND REPLACE(TRIM(#{searchEdate}), '-', '') >= A.SDATE
+        ]]>
+    </when>
+    <otherwise>
+        AND SYSDATE BETWEEN TO_DATE(A.SDATE, 'YYYYMMDD') AND TO_DATE(A.EDATE, 'YYYYMMDD')
+    </otherwise>
+</choose>
+        ORDER BY WORK_CLASS_CD
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkClassCd">
+        SELECT A.WORK_CLASS_CD
+             , A.WORK_CLASS_NM
+             , A.WORK_TYPE_CD
+             , A.DAY_WK_LMT
+             , A.DAY_OT_LMT
+             , A.WEEK_WK_LMT
+             , A.WEEK_OT_LMT
+             , A.AVG_WEEK_WK_LMT
+             , A.AVG_WEEK_OT_LMT
+             , A.WORK_HOURS
+             , A.WORK_TIME_F
+             , A.WORK_TIME_T
+             , A.CORE_TIME_F
+             , A.CORE_TIME_T
+             , A.START_WORK_TIME_F
+             , A.START_WORK_TIME_T
+             , A.INTERVAL_CD
+             , A.INTERVAL_BEGIN_TYPE
+             , A.WORK_DAY
+             , A.WEEK_BEGIN_DAY
+             , B.NOTE2 AS APPL_UNIT
+             , B.NOTE3 AS APPL_MIN_UNIT
+          FROM TWTM021 A
+          LEFT JOIN TSYS005 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.INTERVAL_CD = B.CODE
+           AND B.GRCODE_CD = 'T90200'
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+    <if test='workClassCd != null and !workClassCd.equals("")'>
+           AND A.WORK_CLASS_CD = #{workClassCd}
+    </if>
+        ORDER BY A.WORK_CLASS_CD
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getMaxWorkClassCd">
+        SELECT MAX(WORK_CLASS_CD) AS WORK_CLASS_CD
+        FROM TWTM021
+        WHERE WORK_TYPE_CD = #{workTypeCd}
+          AND ENTER_CD = #{ssnEnterCd}
+    </select>
+
+    <update parameterType="map" id="saveWtmWorkClassMgr">
+        MERGE INTO TWTM021 T
+            USING (SELECT #{ssnEnterCd}                                        AS ENTER_CD,
+                          #{workClassCd}                                       AS WORK_CLASS_CD,
+                          #{workClassNm}                                       AS WORK_CLASS_NM,
+                          TO_CHAR(TO_DATE(#{sdate}, 'yyyy-MM-dd'), 'yyyyMMdd') AS SDATE,
+                          TO_CHAR(TO_DATE(#{edate}, 'yyyy-MM-dd'), 'yyyyMMdd') AS EDATE,
+                          #{workTypeCd}                                        AS WORK_TYPE_CD,
+                          CASE
+                              WHEN (SELECT COUNT(*)
+                                    FROM TWTM021 A
+                                    WHERE A.WORK_CLASS_DEF_YN = 'Y'
+                                      AND SYSDATE BETWEEN TO_DATE(A.SDATE, 'YYYYMMDD') AND TO_DATE(A.EDATE, 'YYYYMMDD')
+                                      AND A.ENTER_CD = #{ssnEnterCd}
+                                      AND A.WORK_CLASS_CD != #{workClassCd}
+                                    ) =
+                                   0 THEN 'Y'
+                              ELSE 'N'
+                              END                                              AS WORK_CLASS_DEF_YN,
+                          #{workDay}                                           AS WORK_DAY,
+                          #{weekRestDay}                                       AS WEEK_REST_DAY,
+                          #{weekBeginDay}                                      AS WEEK_BEGIN_DAY,
+                          #{workHours}                                         AS WORK_HOURS,
+                          REPLACE(#{workTimeF}, ':', '')                       AS WORK_TIME_F,
+                          REPLACE(#{workTimeT}, ':', '')                       AS WORK_TIME_T,
+                          REPLACE(#{coreTimeF}, ':', '')                       AS CORE_TIME_F,
+                          REPLACE(#{coreTimeT}, ':', '')                       AS CORE_TIME_T,
+                          #{sameDayChgYn}                                      AS SAME_DAY_CHG_YN,
+                          REPLACE(#{startWorkTimeF}, ':', '')                  AS START_WORK_TIME_F,
+                          REPLACE(#{startWorkTimeT}, ':', '')                  AS START_WORK_TIME_T,
+                          #{breakTimeType}                                     AS BREAK_TIME_TYPE,
+                          REPLACE(#{breakTimeDet}, ':', '')                    AS BREAK_TIME_DET,
+                          #{breakTimeT}                                        AS BREAK_TIME_T,
+                          #{breakTimeR}                                        AS BREAK_TIME_R,
+                          #{otBreakTimeT}                                      AS OT_BREAK_TIME_T,
+                          #{otBreakTimeR}                                      AS OT_BREAK_TIME_R,
+                          #{intervalCd}                                        AS INTERVAL_CD,
+                          #{intervalBeginType}                                 AS INTERVAL_BEGIN_TYPE,
+                          #{dayWkLmt}                                          AS DAY_WK_LMT,
+                          #{dayOtLmt}                                          AS DAY_OT_LMT,
+                          #{weekWkLmt}                                         AS WEEK_WK_LMT,
+                          #{weekOtLmt}                                         AS WEEK_OT_LMT,
+                          #{avgWeekWkLmt}                                      AS AVG_WEEK_WK_LMT,
+                          #{avgWeekOtLmt}                                      AS AVG_WEEK_OT_LMT,
+                          #{holInclYn}                                         AS HOL_INCL_YN,
+                          #{realBreakTimeYn}                                   AS REAL_BREAK_TIME_YN,
+                          #{autoWorkStartYn}                                   AS AUTO_WORK_START_YN,
+                          #{autoWorkEndYn}                                     AS AUTO_WORK_END_YN,
+                          #{lateUseYn}                                         AS LATE_USE_YN,
+                          #{earlyLeaveUseYn}                                   AS EARLY_LEAVE_USE_YN,
+                          #{absenceUseYn}                                      AS ABSENCE_USE_YN,
+                          REPLACE(#{deemedTimeF}, ':', '')                     AS DEEMED_TIME_F,
+                          REPLACE(#{deemedTimeT}, ':', '')                     AS DEEMED_TIME_T,
+                          #{baseWorkPreUseYn}                                  AS BASE_WORK_PRE_USE_YN,
+                          #{noWorkPlanYn}                                      AS NO_WORK_PLAN_YN,
+                          #{workBeginPreYn}                                    AS WORK_BEGIN_PRE_YN,
+                          #{workEnableRange}                                   AS WORK_ENABLE_RANGE,
+                          #{autoOtTimeYn}                                      AS AUTO_OT_TIME_YN,
+                          #{fixOtUseYn}                                        AS FIX_OT_USE_YN,
+                          #{fixOtTime}                                         AS FIX_OT_TIME,
+                          #{useYn}                                             AS USE_YN,
+                          #{applCd}                                            AS APPL_CD
+                   FROM dual) S
+            ON (T.ENTER_CD = S.ENTER_CD
+                AND T.WORK_CLASS_CD = S.WORK_CLASS_CD)
+            WHEN MATCHED THEN
+                UPDATE SET
+                    T.WORK_CLASS_NM = S.WORK_CLASS_NM,
+                    T.SDATE = S.SDATE,
+                    T.EDATE = S.EDATE,
+                    T.WORK_TYPE_CD = S.WORK_TYPE_CD,
+                    T.WORK_CLASS_DEF_YN = S.WORK_CLASS_DEF_YN,
+                    T.WORK_DAY = S.WORK_DAY,
+                    T.WEEK_REST_DAY = S.WEEK_REST_DAY,
+                    T.WEEK_BEGIN_DAY = S.WEEK_BEGIN_DAY,
+                    T.WORK_HOURS = S.WORK_HOURS,
+                    T.WORK_TIME_F = S.WORK_TIME_F,
+                    T.WORK_TIME_T = S.WORK_TIME_T,
+                    T.CORE_TIME_F = S.CORE_TIME_F,
+                    T.CORE_TIME_T = S.CORE_TIME_T,
+                    T.SAME_DAY_CHG_YN = S.SAME_DAY_CHG_YN,
+                    T.START_WORK_TIME_F = S.START_WORK_TIME_F,
+                    T.START_WORK_TIME_T = S.START_WORK_TIME_T,
+                    T.BREAK_TIME_TYPE = S.BREAK_TIME_TYPE,
+                    T.BREAK_TIME_DET = S.BREAK_TIME_DET,
+                    T.BREAK_TIME_T = S.BREAK_TIME_T,
+                    T.BREAK_TIME_R = S.BREAK_TIME_R,
+                    T.OT_BREAK_TIME_T = S.OT_BREAK_TIME_T,
+                    T.OT_BREAK_TIME_R = S.OT_BREAK_TIME_R,
+                    T.INTERVAL_CD = S.INTERVAL_CD,
+                    T.INTERVAL_BEGIN_TYPE = S.INTERVAL_BEGIN_TYPE,
+                    T.DAY_WK_LMT = S.DAY_WK_LMT,
+                    T.DAY_OT_LMT = S.DAY_OT_LMT,
+                    T.WEEK_WK_LMT = S.WEEK_WK_LMT,
+                    T.WEEK_OT_LMT = S.WEEK_OT_LMT,
+                    T.AVG_WEEK_WK_LMT = S.AVG_WEEK_WK_LMT,
+                    T.AVG_WEEK_OT_LMT = S.AVG_WEEK_OT_LMT,
+                    T.HOL_INCL_YN = S.HOL_INCL_YN,
+                    T.REAL_BREAK_TIME_YN = S.REAL_BREAK_TIME_YN,
+                    T.AUTO_WORK_START_YN = S.AUTO_WORK_START_YN,
+                    T.AUTO_WORK_END_YN = S.AUTO_WORK_END_YN,
+                    T.LATE_USE_YN = S.LATE_USE_YN,
+                    T.EARLY_LEAVE_USE_YN = S.EARLY_LEAVE_USE_YN,
+                    T.ABSENCE_USE_YN = S.ABSENCE_USE_YN,
+                    T.DEEMED_TIME_F = S.DEEMED_TIME_F,
+                    T.DEEMED_TIME_T = S.DEEMED_TIME_T,
+                    T.BASE_WORK_PRE_USE_YN = S.BASE_WORK_PRE_USE_YN,
+                    T.NO_WORK_PLAN_YN = S.NO_WORK_PLAN_YN,
+                    T.WORK_BEGIN_PRE_YN = S.WORK_BEGIN_PRE_YN,
+                    T.WORK_ENABLE_RANGE = S.WORK_ENABLE_RANGE,
+                    T.AUTO_OT_TIME_YN = S.AUTO_OT_TIME_YN,
+                    T.FIX_OT_USE_YN = S.FIX_OT_USE_YN,
+                    T.FIX_OT_TIME = S.FIX_OT_TIME,
+                    T.APPL_CD = S.APPL_CD,
+                    T.CHKDATE = SYSDATE,
+                    T.CHKID = #{ssnSabun}
+            WHEN NOT MATCHED THEN
+                INSERT (T.ENTER_CD, T.WORK_CLASS_CD, T.WORK_CLASS_NM, T.SDATE, T.EDATE, T.WORK_TYPE_CD,
+                        T.WORK_CLASS_DEF_YN, T.WORK_DAY, T.WEEK_REST_DAY, T.WEEK_BEGIN_DAY, T.WORK_HOURS, T.WORK_TIME_F, T.WORK_TIME_T,
+                        T.CORE_TIME_F, T.CORE_TIME_T, T.SAME_DAY_CHG_YN, T.START_WORK_TIME_F, T.START_WORK_TIME_T,
+                        T.BREAK_TIME_TYPE, T.BREAK_TIME_DET, T.BREAK_TIME_T, T.BREAK_TIME_R, T.OT_BREAK_TIME_T,
+                        T.OT_BREAK_TIME_R, T.INTERVAL_CD, T.INTERVAL_BEGIN_TYPE,
+                        T.DAY_WK_LMT, T.DAY_OT_LMT, T.WEEK_WK_LMT, T.WEEK_OT_LMT, T.AVG_WEEK_WK_LMT, T.AVG_WEEK_OT_LMT,
+                        T.HOL_INCL_YN, T.REAL_BREAK_TIME_YN, T.AUTO_WORK_START_YN,
+                        T.AUTO_WORK_END_YN, T.LATE_USE_YN, T.EARLY_LEAVE_USE_YN, T.ABSENCE_USE_YN, T.DEEMED_TIME_F,
+                        T.DEEMED_TIME_T,
+                        T.BASE_WORK_PRE_USE_YN, T.NO_WORK_PLAN_YN, T.WORK_BEGIN_PRE_YN, T.WORK_ENABLE_RANGE,
+                        T.AUTO_OT_TIME_YN, T.FIX_OT_USE_YN, T.FIX_OT_TIME, T.USE_YN, T.CHKDATE, T.CHKID)
+                    VALUES (S.ENTER_CD, S.WORK_CLASS_CD, S.WORK_CLASS_NM, S.SDATE, S.EDATE, S.WORK_TYPE_CD,
+                            S.WORK_CLASS_DEF_YN, S.WORK_DAY, S.WEEK_REST_DAY, S.WEEK_BEGIN_DAY, S.WORK_HOURS,
+                            S.WORK_TIME_F, S.WORK_TIME_T, S.CORE_TIME_F, S.CORE_TIME_T, S.SAME_DAY_CHG_YN, S.START_WORK_TIME_F,
+                            S.START_WORK_TIME_T, S.BREAK_TIME_TYPE, S.BREAK_TIME_DET, S.BREAK_TIME_T, S.BREAK_TIME_R,
+                            S.OT_BREAK_TIME_T, S.OT_BREAK_TIME_R, S.INTERVAL_CD, S.INTERVAL_BEGIN_TYPE,
+                            S.DAY_WK_LMT, S.DAY_OT_LMT, S.WEEK_WK_LMT, S.WEEK_OT_LMT, S.AVG_WEEK_WK_LMT, S.AVG_WEEK_OT_LMT,
+                            S.HOL_INCL_YN,S.REAL_BREAK_TIME_YN, S.AUTO_WORK_START_YN, S.AUTO_WORK_END_YN, S.LATE_USE_YN,
+                            S.EARLY_LEAVE_USE_YN, S.ABSENCE_USE_YN, S.DEEMED_TIME_F, S.DEEMED_TIME_T,
+                            S.BASE_WORK_PRE_USE_YN,
+                            S.NO_WORK_PLAN_YN, S.WORK_BEGIN_PRE_YN, S.WORK_ENABLE_RANGE, S.AUTO_OT_TIME_YN,
+                            S.FIX_OT_USE_YN, S.FIX_OT_TIME, S.USE_YN, SYSDATE, #{ssnSabun})
+    </update>
+
+    <update parameterType="map" id="saveWtmWorkClassDefaultSchCd">
+        MERGE INTO TWTM031 T
+            USING (SELECT #{ssnEnterCd}     AS ENTER_CD,
+                          #{workClassCd}    AS WORK_CLASS_CD,
+                          'SYS_NH'           AS WORK_SCH_CD,
+                          '휴무'             AS WORK_SCH_NM,
+                          '19000101'        AS SDATE,
+                          '29991231'        AS EDATE,
+                          '휴무'             AS WORK_SCH_SRT_NM,
+                          'red'             AS COLOR,
+                          'Y'               AS SYSTEM_CD_YN,
+                          SYSDATE           AS CHKDATE,
+                          'system'          AS CHKID
+                     FROM DUAL
+                    UNION ALL
+                   SELECT #{ssnEnterCd}     AS ENTER_CD,
+                          #{workClassCd}    AS WORK_CLASS_CD,
+                          'SYS_H'          AS WORK_SCH_CD,
+                          '주휴일'           AS WORK_SCH_NM,
+                          '19000101'        AS SDATE,
+                          '29991231'        AS EDATE,
+                          '주휴'             AS WORK_SCH_SRT_NM,
+                          'red'             AS COLOR,
+                          'Y'               AS SYSTEM_CD_YN,
+                          SYSDATE           AS CHKDATE,
+                          'system'          AS CHKID
+                     FROM DUAL
+                  ) S
+            ON (T.ENTER_CD = S.ENTER_CD AND T.WORK_CLASS_CD = S.WORK_CLASS_CD AND T.WORK_SCH_CD = S.WORK_SCH_CD)
+            WHEN NOT MATCHED THEN
+                INSERT (ENTER_CD, WORK_CLASS_CD, WORK_SCH_CD, WORK_SCH_NM, SDATE, EDATE, WORK_SCH_SRT_NM, COLOR, SYSTEM_CD_YN, CHKDATE, CHKID)
+                    VALUES (S.ENTER_CD, S.WORK_CLASS_CD, S.WORK_SCH_CD,
+                            S.WORK_SCH_NM, S.SDATE, S.EDATE, S.WORK_SCH_SRT_NM, S.COLOR, S.SYSTEM_CD_YN, S.CHKDATE, S.CHKID)
+    </update>
+
+    <update parameterType="map" id="saveWtmWorkClassUseYn">
+        UPDATE TWTM021
+        SET USE_YN = #{useYn}
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+    </update>
+
+    <delete parameterType="map" id="deleteWtmWorkClassMgr">
+        DELETE
+        FROM TWTM021
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+    </delete>
+
+    <update parameterType="map" id="saveWorkClassDefY">
+        UPDATE TWTM021
+        SET WORK_CLASS_DEF_YN = 'Y'
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+    </update>
+
+    <update parameterType="map" id="saveWorkClassDefN">
+        UPDATE TWTM021
+        SET WORK_CLASS_DEF_YN = 'N'
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_DEF_YN = 'Y'
+    </update>
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassEmpList">
+        SELECT A.ENTER_CD
+             , A.SABUN AS TARGET_CD
+             , NVL(C.WORK_CLASS_CD, A.WORK_CLASS_CD) AS WORK_CLASS_CD
+             , NVL(D.WORK_CLASS_NM, A.WORK_CLASS_NM) AS WORK_CLASS_NM
+             , TO_CHAR(TO_DATE(NVL(C.SDATE, A.EMP_YMD)), 'YYYY.MM.DD') AS SDATE
+             , TO_CHAR(TO_DATE(NVL(C.EDATE, '29991231')), 'YYYY.MM.DD') AS EDATE
+             , TO_CHAR(TO_DATE(NVL(C.SDATE, A.EMP_YMD)), 'YYYY.MM.DD') || '~' || TO_CHAR(TO_DATE(NVL(C.EDATE, '29991231')), 'YYYY.MM.DD') AS PERIOD
+          FROM (
+                SELECT AA.NAME, AA.EMP_YMD, BB.*, CC.WORK_CLASS_CD, CC.WORK_CLASS_NM
+                  FROM THRM100 AA
+                  JOIN THRM151 BB
+                    ON AA.ENTER_CD = BB.ENTER_CD
+                   AND AA.SABUN = BB.SABUN
+                   AND NVL(REPLACE(#{searchDate},'-',''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN BB.SDATE AND BB.EDATE
+                  LEFT JOIN TWTM021 CC
+                    ON AA.ENTER_CD = CC.ENTER_CD
+                   AND CC.WORK_CLASS_DEF_YN = 'Y'
+                 WHERE AA.ENTER_CD = #{ssnEnterCd}
+                   AND BB.STATUS_CD NOT IN ('RA', 'RAA')
+               ) A
+          LEFT JOIN TWTM022 C
+            ON A.ENTER_CD = C.ENTER_CD
+           AND A.SABUN = C.SABUN
+           AND NVL(REPLACE(#{searchDate},'-',''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN C.SDATE AND C.EDATE
+        LEFT JOIN TWTM021 D
+            ON C.ENTER_CD = D.ENTER_CD
+           AND C.WORK_CLASS_CD = D.WORK_CLASS_CD
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+    <if test='targetCd != null and !targetCd.equals("")'>
+           AND A.SABUN = #{targetCd}
+    </if>
+           AND (C.WORK_CLASS_CD = #{workClassCd} OR (C.WORK_CLASS_CD IS NULL AND A.WORK_CLASS_CD = #{workClassCd}))
+    </select>
+
+    <delete parameterType="map" id="deleteWtmWorkClassEmp">
+        DELETE
+        FROM TWTM022
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+    </delete>
+
+    <select parameterType="map" resultType="cMap" id="getWorkScheduleList">
+        SELECT ENTER_CD
+             , WORK_CLASS_CD
+             , WORK_SCH_CD
+             , WORK_SCH_NM
+             , TO_CHAR(TO_DATE(SDATE, 'YYYYMMDD'), 'YYYY-MM-DD') AS SDATE
+             , TO_CHAR(TO_DATE(EDATE, 'YYYYMMDD'), 'YYYY-MM-DD') AS EDATE
+             , WORK_SCH_SRT_NM
+             , COLOR
+             , WORK_TIME_F
+             , WORK_TIME_T
+             , BREAK_TIMES
+             , SHORTCUT
+             , SYSTEM_CD_YN
+             , NOTE
+             , CHKID
+          FROM TWTM031
+         WHERE WORK_CLASS_CD = #{workClassCd}
+           AND ENTER_CD = #{ssnEnterCd}
+        <if test='workSchCd != null and !workSchCd.equals("")'>
+           AND WORK_SCH_CD = #{workSchCd}
+        </if>
+           AND SYSDATE BETWEEN TO_DATE(SDATE, 'YYYYMMDD') AND TO_DATE(EDATE, 'YYYYMMDD')
+         ORDER BY SYSTEM_CD_YN DESC, WORK_SCH_CD
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWorkGroupList">
+        SELECT A.*
+             , ( SELECT COUNT(1)
+                   FROM TWTM033
+                  WHERE ENTER_CD = A.ENTER_CD
+                    AND WORK_CLASS_CD = A.WORK_CLASS_CD
+                    AND WORK_GROUP_CD = A.WORK_GROUP_CD
+                    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231') ) AS CNT
+        FROM TWTM032 A
+        WHERE WORK_CLASS_CD = #{workClassCd}
+        AND ENTER_CD = #{ssnEnterCd}
+        <if test='workGroupCd != null and !workGroupCd.equals("")'>
+            AND WORK_GROUP_CD = #{workGroupCd}
+        </if>
+        ORDER BY WORK_GROUP_CD
+    </select>
+
+    <update parameterType="map" id="saveWtmWorkSchedule">
+        MERGE INTO TWTM031 T
+            USING (SELECT #{ssnEnterCd}                                        AS ENTER_CD,
+                          #{workClassCd}                                       AS WORK_CLASS_CD,
+                          #{workSchCd}                                         AS WORK_SCH_CD,
+                          #{workSchNm}                                         AS WORK_SCH_NM,
+                          TO_CHAR(TO_DATE(#{sdate}, 'yyyy-MM-dd'), 'yyyyMMdd') AS SDATE,
+                          TO_CHAR(TO_DATE(#{edate}, 'yyyy-MM-dd'), 'yyyyMMdd') AS EDATE,
+                          #{workSchSrtNm}                                      AS WORK_SCH_SRT_NM,
+                          #{schColor}                                          AS COLOR,
+                          REPLACE(#{workTimeF}, ':', '')                       AS WORK_TIME_F,
+                          REPLACE(#{workTimeT}, ':', '')                       AS WORK_TIME_T,
+                          REPLACE(#{breakTimes}, ':', '')                      AS BREAK_TIMES,
+                          #{shortcut}                                          AS SHORTCUT,
+                          #{note}                                              AS NOTE,
+                          SYSDATE                                              AS CHKDATE,
+                          #{ssnSabun}                                          AS CHKID
+                   FROM DUAL) S
+            ON (T.ENTER_CD = S.ENTER_CD AND T.WORK_CLASS_CD = S.WORK_CLASS_CD AND T.WORK_SCH_CD = S.WORK_SCH_CD)
+            WHEN MATCHED THEN
+                UPDATE SET T.WORK_SCH_NM = S.WORK_SCH_NM,
+                    T.SDATE = S.SDATE,
+                    T.EDATE = S.EDATE,
+                    T.WORK_SCH_SRT_NM = S.WORK_SCH_SRT_NM,
+                    T.COLOR = S.COLOR,
+                    T.WORK_TIME_F = S.WORK_TIME_F,
+                    T.WORK_TIME_T = S.WORK_TIME_T,
+                    T.BREAK_TIMES = S.BREAK_TIMES,
+                    T.SHORTCUT = S.SHORTCUT,
+                    T.NOTE = S.NOTE,
+                    T.CHKDATE = S.CHKDATE,
+                    T.CHKID = S.CHKID
+            WHEN NOT MATCHED THEN
+                INSERT (ENTER_CD, WORK_CLASS_CD, WORK_SCH_CD, WORK_SCH_NM, SDATE, EDATE, WORK_SCH_SRT_NM, COLOR,
+                        WORK_TIME_F, WORK_TIME_T, BREAK_TIMES, SHORTCUT, NOTE, CHKDATE, CHKID)
+                    VALUES (S.ENTER_CD, S.WORK_CLASS_CD, S.WORK_SCH_CD,
+                            S.WORK_SCH_NM, S.SDATE, S.EDATE, S.WORK_SCH_SRT_NM, S.COLOR, S.WORK_TIME_F, S.WORK_TIME_T,
+                            S.BREAK_TIMES, S.SHORTCUT, S.NOTE, S.CHKDATE, S.CHKID)
+    </update>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkSchCd">
+        SELECT NVL(MAX(WORK_SCH_CD), 0) + 1 AS WORK_SCH_CD
+        FROM TWTM031
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+          AND SYSTEM_CD_YN = 'N'
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkGroupCd">
+        SELECT NVL(MAX(WORK_GROUP_CD), 0) + 1 AS WORK_GROUP_CD
+          FROM TWTM032
+         WHERE ENTER_CD = #{ssnEnterCd}
+           AND WORK_CLASS_CD = #{workClassCd}
+           AND REGEXP_REPLACE(WORK_GROUP_CD, '[0-9]') IS NULL
+    </select>
+
+    <update parameterType="map" id="saveWtmWorkGroup">
+        MERGE INTO TWTM032 T
+            USING (SELECT #{ssnEnterCd}  AS ENTER_CD,
+                          #{workClassCd} AS WORK_CLASS_CD,
+                          #{workGroupCd} AS WORK_GROUP_CD,
+                          #{workGroupNm} AS WORK_GROUP_NM,
+                          REPLACE(#{grpSdate}, '-' ,'')    AS SDATE,
+                          #{note}        AS NOTE,
+                          SYSDATE        AS CHKDATE,
+                          #{ssnSabun}    AS CHKID
+                   FROM DUAL) S
+            ON (
+                T.ENTER_CD = S.ENTER_CD
+                    AND T.WORK_CLASS_CD = S.WORK_CLASS_CD
+                    AND T.WORK_GROUP_CD = S.WORK_GROUP_CD
+                )
+            WHEN MATCHED THEN
+                UPDATE SET
+                    T.WORK_GROUP_NM = S.WORK_GROUP_NM,
+                    T.SDATE = S.SDATE,
+                    T.NOTE = S.NOTE,
+                    T.CHKDATE = S.CHKDATE,
+                    T.CHKID = S.CHKID
+            WHEN NOT MATCHED THEN
+                INSERT (
+                        ENTER_CD,
+                        WORK_CLASS_CD,
+                        WORK_GROUP_CD,
+                        WORK_GROUP_NM,
+                        SDATE,
+                        NOTE,
+                        CHKDATE,
+                        CHKID
+                    ) VALUES (S.ENTER_CD,
+                              S.WORK_CLASS_CD,
+                              S.WORK_GROUP_CD,
+                              S.WORK_GROUP_NM,
+                              S.SDATE,
+                              S.NOTE,
+                              S.CHKDATE,
+                              S.CHKID)
+    </update>
+
+    <update parameterType="map" id="saveWtmWorkGroupPatterns">
+        INSERT ALL
+        <foreach collection="patterns" item="pattern" index="idx" separator="">
+            INTO TWTM034 (ENTER_CD, WORK_CLASS_CD, WORK_GROUP_CD, SDATE, WORK_SCH_CD, ORDER_SEQ, CHKDATE, CHKID)
+            VALUES (#{ssnEnterCd}, #{workClassCd}, #{workGroupCd}, #{sdate}, #{pattern}, (#{idx} + 1), SYSDATE,
+            #{ssnSabun})
+        </foreach>
+        SELECT 1 FROM DUAL
+    </update>
+
+    <delete parameterType="map" id="deleteWtmWorkSchedule">
+        DELETE
+        FROM TWTM031
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+          AND WORK_SCH_CD = #{workSchCd}
+    </delete>
+
+    <delete parameterType="map" id="deleteAllWtmWorkSchedule">
+        DELETE
+        FROM TWTM031
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+    </delete>
+
+    <delete parameterType="map" id="deleteWtmWorkGroup">
+        DELETE
+        FROM TWTM032
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+          AND WORK_GROUP_CD = #{workGroupCd}
+    </delete>
+
+    <delete parameterType="map" id="deleteWtmWorkGroupPatterns">
+        DELETE
+        FROM TWTM034
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+          <if test='workGroupCd != null and !workGroupCd.equals("")'>
+              AND WORK_GROUP_CD = #{workGroupCd}
+          </if>
+    </delete>
+
+    <delete parameterType="map" id="deleteWtmWorkGroupEmp">
+        DELETE
+        FROM TWTM034
+        WHERE ENTER_CD = #{ssnEnterCd}
+        AND WORK_CLASS_CD = #{workClassCd}
+        <if test='workGroupCd != null and !workGroupCd.equals("")'>
+            AND WORK_GROUP_CD = #{workGroupCd}
+        </if>
+        <if test='workSchCd != null and !workSchCd.equals("")'>
+            AND WORK_SCH_CD = #{workSchCd}
+        </if>
+    </delete>
+
+    <select parameterType="map" resultType="cMap" id="getWorkGroupEmpList">
+        SELECT *
+        FROM TWTM033
+        WHERE WORK_CLASS_CD = #{workClassCd}
+          AND ENTER_CD = #{ssnEnterCd}
+          <if test='workGroupCd != null and !workGroupCd.equals("")'>
+              AND WORK_GROUP_CD = #{workGroupCd}
+          </if>
+        <if test='sabun != null and !sabun.equals("")'>
+            AND SABUN = #{sabun}
+        </if>
+        ORDER BY WORK_GROUP_CD
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWorkGroupPatternList">
+        SELECT A.ENTER_CD
+             , A.WORK_CLASS_CD
+             , A.WORK_GROUP_CD
+             , X.SDATE
+             , A.WORK_SCH_CD
+             , A.ORDER_SEQ
+             , B.WORK_SCH_SRT_NM
+             , B.WORK_SCH_NM
+             , B.SYSTEM_CD_YN
+             , B.COLOR
+             , X.WEEK_BEGIN_DAY
+             , '' AS WRK_DTL_ID
+             , 'N' AS POST_YN
+             , A.CHKDATE
+             , A.CHKID
+          FROM TWTM021 X
+          JOIN TWTM032 Y
+            ON X.ENTER_CD = Y.ENTER_CD
+           AND X.WORK_CLASS_CD = Y.WORK_CLASS_CD
+          JOIN TWTM034 A
+            ON Y.ENTER_CD = A.ENTER_CD
+           AND Y.WORK_CLASS_CD = A.WORK_CLASS_CD
+           AND Y.WORK_GROUP_CD = A.WORK_GROUP_CD
+          LEFT JOIN TWTM031 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+           AND A.WORK_SCH_CD = B.WORK_SCH_CD
+         WHERE A.WORK_CLASS_CD = #{workClassCd}
+           AND A.ENTER_CD = #{ssnEnterCd}
+           AND A.WORK_GROUP_CD = #{workGroupCd}
+         ORDER BY A.ORDER_SEQ
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkClassUnassignedEmpList">
+        WITH total_count AS
+        (
+            SELECT COUNT(*) AS total
+              FROM THRM100 A
+              LEFT JOIN THRM151 B
+                ON A.ENTER_CD = B.ENTER_CD
+               AND A.SABUN = B.SABUN
+             WHERE SYSDATE BETWEEN TO_DATE(B.SDATE, 'YYYYMMDD') AND TO_DATE(B.EDATE, 'YYYYMMDD')
+               AND A.ENTER_CD = #{ssnEnterCd}
+               AND B.STATUS_CD = 'AA' -- 재직자
+        ),
+        detailed_data AS (SELECT A.ENTER_CD
+                               , A.SABUN
+                               , A.NAME
+                               , B.ORG_CD
+                               , F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+                               , B.JIKWEE_NM
+                          FROM THRM100 A
+                                   LEFT JOIN THRM151 B ON A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+                          WHERE SYSDATE BETWEEN TO_DATE(B.SDATE, 'YYYYMMDD') AND TO_DATE(B.EDATE, 'YYYYMMDD')
+                            AND A.ENTER_CD = #{ssnEnterCd}
+                            AND B.STATUS_CD = 'AA' -- 재직자
+                            AND NOT EXISTS
+                                  (SELECT 1 FROM TWTM022 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = A.SABUN))
+        SELECT tc.total,
+               dd.ENTER_CD,
+               dd.SABUN,
+               dd.NAME,
+               dd.ORG_CD,
+               dd.ORG_NM,
+               dd.JIKWEE_NM
+        FROM total_count tc,
+             detailed_data dd
+    </select>
+
+    <!-- 근무유형 대상자 리스트 조회-->
+    <select parameterType="map" resultType="cMap" id="getWtmWorkTargetList">
+        SELECT A.ENTER_CD
+             , A.SABUN AS TARGET_CD
+             , A.NAME AS TARGET_NM
+             , A.JIKWEE_NM AS NOTE1
+             , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS NOTE2
+             , A.SABUN AS SABUN
+             , A.NAME AS NAME
+             , A.JIKWEE_NM AS JIKWEE_NM
+             , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+             , NVL(C.WORK_CLASS_CD, A.WORK_CLASS_CD) AS WORK_CLASS_CD
+             , NVL(D.WORK_CLASS_NM, A.WORK_CLASS_NM) AS WORK_CLASS_NM
+             , TO_CHAR(TO_DATE(NVL(C.SDATE, A.EMP_YMD)), 'YYYY.MM.DD') AS SDATE
+             , TO_CHAR(TO_DATE(NVL(C.EDATE, '29991231')), 'YYYY.MM.DD') AS EDATE
+             , NVL2(C.WORK_CLASS_CD, 'Y' , 'N') AS CHECK_YN
+          FROM (
+                SELECT AA.NAME, AA.EMP_YMD, BB.*, CC.WORK_CLASS_CD, CC.WORK_CLASS_NM
+                  FROM THRM100 AA
+                  JOIN THRM151 BB
+                    ON AA.ENTER_CD = BB.ENTER_CD
+                   AND AA.SABUN = BB.SABUN
+                   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN BB.SDATE AND BB.EDATE
+                  LEFT JOIN TWTM021 CC
+                    ON AA.ENTER_CD = CC.ENTER_CD
+                   AND CC.WORK_CLASS_DEF_YN = 'Y'
+                 WHERE AA.ENTER_CD = #{ssnEnterCd}
+                   AND BB.STATUS_CD NOT IN ('RA', 'RAA')
+               ) A
+          LEFT JOIN TWTM022 C
+            ON A.ENTER_CD = C.ENTER_CD
+           AND A.SABUN = C.SABUN
+           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND C.EDATE
+          LEFT JOIN TWTM021 D
+            ON C.ENTER_CD = D.ENTER_CD
+           AND C.WORK_CLASS_CD = D.WORK_CLASS_CD
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND (C.WORK_CLASS_CD = #{workClassCd} OR (C.WORK_CLASS_CD IS NULL AND A.WORK_CLASS_CD = #{workClassCd}))
+         ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+    </select>
+
+    <!-- 근무유형 근무조 대상자 리스트 조회-->
+    <select parameterType="map" resultType="cMap" id="getWtmWorkGroupTargetList">
+        SELECT A.ENTER_CD
+            , 'EMP' AS TYPE
+            , A.SABUN AS TARGET_CD
+            , A.NAME AS TARGET_NM
+            , B.JIKWEE_NM AS NOTE1
+            , F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS NOTE2
+            , A.SABUN AS SABUN
+            , A.NAME AS NAME
+            , B.JIKWEE_NM AS JIKWEE_NM
+            , F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+            , C.WORK_CLASS_CD AS WORK_CLASS_CD
+            , C.WORK_CLASS_NM AS WORK_CLASS_NM
+            , E.WORK_GROUP_CD AS WORK_GROUP_CD
+            , E.WORK_GROUP_NM AS WORK_GROUP_NM
+            --              , C.SDATE
+            --              , C.EDATE
+            , TO_CHAR(TO_DATE(C.SDATE), 'YYYY.MM.DD') AS SDATE
+            , TO_CHAR(TO_DATE(C.EDATE), 'YYYY.MM.DD') AS EDATE
+            , NVL2(C.WORK_CLASS_CD, 'Y' , 'N') AS CHECK_YN
+        FROM THRM100 A
+        JOIN THRM151 B
+            ON A.ENTER_CD = B.ENTER_CD
+            AND A.SABUN = B.SABUN
+            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+        JOIN TWTM021 C
+            ON B.ENTER_CD = C.ENTER_CD
+            AND C.WORK_CLASS_CD = #{workClassCd}
+        JOIN TWTM022 D
+            ON A.ENTER_CD = D.ENTER_CD
+            AND A.SABUN = D.SABUN
+            AND D.WORK_CLASS_CD = #{workClassCd}
+            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND D.EDATE
+        JOIN (
+            SELECT
+            AA.ENTER_CD, AA.SABUN, AA.SDATE, BB.WORK_GROUP_CD, BB.WORK_GROUP_NM
+            FROM TWTM033 AA
+            JOIN TWTM032 BB
+            ON AA.ENTER_CD = BB.ENTER_CD
+            AND AA.WORK_CLASS_CD = BB.WORK_CLASS_CD
+            AND AA.WORK_GROUP_CD = BB.WORK_GROUP_CD
+            AND AA.WORK_CLASS_CD = #{workClassCd}
+            AND AA.WORK_GROUP_CD = #{workGroupCd}
+        ) E
+            ON E.ENTER_CD = A.ENTER_CD
+            AND E.SABUN = D.SABUN
+            AND E.SDATE = D.SDATE
+
+        WHERE A.ENTER_CD =  #{ssnEnterCd}
+        <if test='searchKey != null and !searchKey.equals("")'>
+            AND (A.SABUN LIKE '%' || #{searchKey} || '%' OR A.NAME LIKE '%' || #{searchKey} || '%')
+        </if>
+        ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkTargetList_BK">
+        -- 사업장
+        SELECT * FROM (
+                          SELECT DISTINCT A.ENTER_CD,
+                                 A.BUSINESS_PLACE_CD AS TARGET_CD,
+                                 A.BUSINESS_PLACE_NM AS TARGET_NM,
+                                 '' AS NOTE1,
+                                 '' AS NOTE2,
+                                 'BIZ' AS TYPE,
+                                 CASE WHEN T.TYPE = 'BIZ'
+                                     AND T.TARGET_CD = A.BUSINESS_PLACE_CD
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN 'Y' ELSE 'N' END AS CHECK_YN,
+                                 CASE WHEN T.TYPE = 'BIZ'
+                                     AND T.TARGET_CD = A.BUSINESS_PLACE_CD
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN TO_CHAR(TO_DATE(T.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD') ELSE '' END AS SDATE,
+                                 CASE WHEN T.TYPE = 'BIZ'
+                                     AND T.TARGET_CD = A.BUSINESS_PLACE_CD
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN TO_CHAR(TO_DATE(T.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD') ELSE '' END AS EDATE
+                          FROM TCPN121 A
+                                   LEFT JOIN TWTM022 T
+                                             ON  T.ENTER_CD = A.ENTER_CD
+                                                 AND T.TARGET_CD = A.BUSINESS_PLACE_CD
+                                                 AND T.TYPE = 'BIZ'
+                          WHERE A.ENTER_CD = #{ssnEnterCd}
+                            AND A.SDATE = (SELECT MAX(Y.SDATE)
+                                           FROM TCPN121 Y
+                                           WHERE Y.ENTER_CD = A.ENTER_CD
+                                             AND Y.BUSINESS_PLACE_CD = A.BUSINESS_PLACE_CD
+                                             AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'29991231'))
+                          <if test='searchKey != null and !searchKey.equals("")'>
+                              AND (A.BUSINESS_PLACE_CD LIKE '%' || #{searchKey} || '%'
+                              OR A.BUSINESS_PLACE_NM LIKE '%' || #{searchKey} || '%')
+                          </if>
+                          )
+        UNION ALL
+        -- 조직
+        SELECT * FROM (
+                          SELECT  DISTINCT A.ENTER_CD,
+                                 A.ORG_CD AS TARGET_CD,
+                                 F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) AS TARGET_NM,
+                                 '' AS NOTE1,
+                                 F_COM_GET_ORG_NM(A.ENTER_CD, A.PRIOR_ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS NOTE2,
+                                'ORG' AS TYPE,
+                                 CASE WHEN T.TYPE = 'ORG'
+                                     AND T.TARGET_CD = A.ORG_CD
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN 'Y' ELSE 'N' END AS CHECK_YN,
+                                 CASE WHEN T.TYPE = 'ORG'
+                                     AND T.TARGET_CD = A.ORG_CD
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN TO_CHAR(TO_DATE(T.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD') ELSE '' END AS SDATE,
+                                 CASE WHEN T.TYPE = 'ORG'
+                                     AND T.TARGET_CD = A.ORG_CD
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN TO_CHAR(TO_DATE(T.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD') ELSE '' END AS EDATE
+                          FROM TORG105 A
+                                   LEFT JOIN TWTM022 T
+                                             ON  T.ENTER_CD = A.ENTER_CD
+                                                 AND T.TARGET_CD = A.ORG_CD
+                                                 AND T.TYPE = 'ORG'
+                          WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                            AND A.SDATE = (SELECT MAX(AA.SDATE)
+                                           FROM TORG103 AA
+                                           WHERE AA.ENTER_CD = A.ENTER_CD
+                                             AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN AA.SDATE AND NVL(AA.EDATE, '29991231'))
+                            <if test='searchKey != null and !searchKey.equals("")'>
+                                AND (A.ORG_CD LIKE '%' || #{searchKey} || '%'
+                                OR F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) LIKE '%' || #{searchKey} || '%')
+                            </if>
+                      )
+        UNION ALL
+        -- 임직원
+        SELECT * FROM (
+                          SELECT DISTINCT A.ENTER_CD,
+                                 A.SABUN AS TARGET_CD,
+                                 A.NAME AS TARGET_NM,
+                                 B.JIKWEE_NM AS NOTE1,
+                                 F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS NOTE2,
+                                'EMP' AS TYPE,
+                                 CASE WHEN T.TYPE = 'EMP'
+                                     AND T.TARGET_CD = A.SABUN
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN 'Y' ELSE 'N' END AS CHECK_YN,
+                                 CASE WHEN T.TYPE = 'EMP'
+                                     AND T.TARGET_CD = A.SABUN
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN TO_CHAR(TO_DATE(T.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD') ELSE '' END AS SDATE,
+                                 CASE WHEN T.TYPE = 'EMP'
+                                     AND T.TARGET_CD = A.SABUN
+                                     AND T.WORK_CLASS_CD = #{workClassCd}
+                                     AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')
+                                          THEN TO_CHAR(TO_DATE(T.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD') ELSE '' END AS EDATE
+                          FROM THRM100 A
+                                   LEFT JOIN THRM151 B ON A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+                                   LEFT JOIN TWTM022 T
+                                             ON  T.ENTER_CD = A.ENTER_CD
+                                                 AND T.TARGET_CD = A.SABUN
+                                                 AND T.TYPE = 'EMP'
+                          WHERE SYSDATE BETWEEN TO_DATE(B.SDATE, 'YYYYMMDD') AND TO_DATE(B.EDATE, 'YYYYMMDD')
+                            AND A.ENTER_CD = #{ssnEnterCd}
+                            AND B.STATUS_CD = 'AA'
+        <if test='searchKey != null and !searchKey.equals("")'>
+            AND (A.SABUN LIKE '%' || #{searchKey} || '%'
+            OR A.NAME LIKE '%' || #{searchKey} || '%')
+        </if>
+                      )
+</select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkTargetOrgList">
+        SELECT A."_level" AS "_level"
+             , A.ENTER_CD
+             , A.PRIOR_ORG_CD
+             , A.PRIOR_ORG_NM
+             , A.ORG_CD
+             , A.ORG_NM
+             , '' AS DATA_ID
+             , 'N' AS CHECK_YN
+             , 'N' AS CHECKED_YN
+             , ROW_NUMBER() OVER (ORDER BY ROWNUM) AS ROW_NUM
+             , 1 AS SORT
+          FROM (
+                 SELECT LEVEL AS "_level"
+                      , A.ENTER_CD
+                      , A.PRIOR_ORG_CD
+                      , F_COM_GET_ORG_NM(A.ENTER_CD, A.PRIOR_ORG_CD, A.SDATE, #{ssnLocaleCd}) AS PRIOR_ORG_NM
+                      , A.ORG_CD
+                      , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+                      , A.SEQ
+                   FROM (
+                         SELECT A.*
+                           FROM TORG105 A
+                          WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                            AND A.SDATE = (SELECT MAX(AA.SDATE)
+                                            FROM TORG103 AA
+                                           WHERE AA.ENTER_CD = A.ENTER_CD
+                                             AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN AA.SDATE AND NVL(AA.EDATE, '29991231'))
+                        ) A
+                  START WITH A.PRIOR_ORG_CD = '0'
+                CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+                    AND PRIOR A.SDATE = A.SDATE
+                    AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+                  ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+               ) A
+         UNION ALL
+        SELECT (A."_level" + 1)
+             , A.ENTER_CD
+             , A.PRIOR_ORG_CD
+             , A.PRIOR_ORG_NM
+             , B.SABUN
+             , B.NAME
+             , 'EMP|' || B.SABUN AS DATA_ID
+             , NVL2(D.WORK_CLASS_CD, 'Y' , 'N') AS CHECK_YN
+             , NVL2(D.WORK_CLASS_CD, 'Y' , 'N') AS CHECKED_YN
+             , A.ROW_NUM
+             , 2 AS SORT
+          FROM (
+                 SELECT A.*
+                      , ROW_NUMBER() OVER (ORDER BY ROWNUM) AS ROW_NUM
+                   FROM (
+                         SELECT LEVEL AS "_level"
+                              , A.ENTER_CD
+                              , A.SDATE
+                              , A.PRIOR_ORG_CD
+                              , F_COM_GET_ORG_NM(A.ENTER_CD, A.PRIOR_ORG_CD, A.SDATE, #{ssnLocaleCd}) AS PRIOR_ORG_NM
+                              , A.ORG_CD
+                              , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+                              , A.SEQ
+                           FROM (
+                                 SELECT A.*
+                                   FROM TORG105 A
+                                  WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                                    AND A.SDATE = (SELECT MAX(AA.SDATE)
+                                                    FROM TORG103 AA
+                                                   WHERE AA.ENTER_CD = A.ENTER_CD
+                                                     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN AA.SDATE AND NVL(AA.EDATE, '29991231'))
+                                ) A
+                          START WITH A.PRIOR_ORG_CD = '0'
+                        CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+                            AND PRIOR A.SDATE = A.SDATE
+                            AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+                          ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+                        ) A
+               ) A
+          JOIN THRM100 B
+            ON A.ENTER_CD = B.ENTER_CD
+          JOIN THRM151 C
+            ON B.ENTER_CD = C.ENTER_CD
+           AND B.SABUN = C.SABUN
+           AND A.ORG_CD = C.ORG_CD
+           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND C.EDATE
+           AND C.STATUS_CD NOT IN ('RA', 'RAA')
+          LEFT JOIN TWTM022 D
+            ON B.ENTER_CD = D.ENTER_CD
+           AND B.SABUN = D.SABUN
+           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND D.EDATE
+           AND D.WORK_CLASS_CD = #{workClassCd}
+         ORDER BY ROW_NUM, SORT
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkTargetOrgList_BK">
+    <![CDATA[
+        SELECT LEVEL                                                           AS "_level"
+             , A.ENTER_CD
+             , A.SDATE
+             , A.PRIOR_ORG_CD
+             , F_COM_GET_ORG_NM(A.ENTER_CD, A.PRIOR_ORG_CD, A.SDATE, #{ssnLocaleCd}) AS PRIOR_ORG_NM
+             , A.ORG_CD
+             , 'ORG|' || A.ORG_CD AS DATA_ID
+             , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+             , A.DIRECT_YN
+             , A.SEQ
+             , A.ORG_LEVEL
+             , ''                                                              AS ORG_CHART_NM
+             , CASE
+                   WHEN (SELECT COUNT(*) FROM TWTM022 T
+                         WHERE T.TYPE = 'ORG'
+                           AND T.ENTER_CD = A.ENTER_CD
+                           AND T.TARGET_CD = A.ORG_CD
+                           AND T.WORK_CLASS_CD = #{workClassCd}
+                           AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')) > 0
+                       THEN 'Y'
+                   ELSE 'N' END                                                AS CHECK_YN
+             , CASE
+                   WHEN (SELECT COUNT(*) FROM TWTM022 T
+                         WHERE T.TYPE = 'ORG'
+                           AND T.ENTER_CD = A.ENTER_CD
+                           AND T.TARGET_CD = A.ORG_CD
+                           AND T.WORK_CLASS_CD = #{workClassCd}
+                           AND SYSDATE BETWEEN TO_DATE(T.SDATE, 'YYYYMMDD') AND TO_DATE(T.EDATE, 'YYYYMMDD')) > 0
+                       THEN 'Y'
+                   ELSE 'N' END                                                AS CHECKED_YN
+        FROM TORG105 A
+        WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+          AND A.SDATE = (SELECT MAX(AA.SDATE)
+                         FROM TORG103 AA
+                         WHERE AA.ENTER_CD = A.ENTER_CD
+                           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN AA.SDATE AND NVL(AA.EDATE, '29991231'))
+            START
+        WITH A.PRIOR_ORG_CD = '0'
+        CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+               AND PRIOR A.SDATE = A.SDATE
+               AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+        ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+        ]]>
+</select>
+
+    <update parameterType="map" id="updateOldClassEdate">
+                UPDATE TWTM022
+                SET EDATE = TO_CHAR(TO_DATE(#{target.sdate})-1, 'YYYYMMDD'),
+                    CHKDATE = SYSDATE,
+                    CHKID = #{ssnSabun}
+                WHERE ENTER_CD = #{ssnEnterCd}
+                AND WORK_CLASS_CD = #{target.oldClassCd}
+                AND SABUN = #{target.targetCd}
+                AND (REPLACE(#{target.sdate}, '-', '') BETWEEN SDATE AND NVL(EDATE, '29991231') OR REPLACE(#{target.edate}, '-', '') BETWEEN SDATE AND NVL(EDATE, '29991231'))
+    </update>
+
+    <delete parameterType="map" id="deleteWtmWorkTarget">
+        DELETE
+        FROM TWTM022
+        WHERE ENTER_CD = #{ssnEnterCd}
+        AND WORK_CLASS_CD = #{workClassCd}
+--         AND SYSDATE BETWEEN TO_DATE(SDATE, 'YYYYMMDD') AND TO_DATE(EDATE, 'YYYYMMDD')
+    </delete>
+
+    <update parameterType="map" id="saveWtmWorkTarget">
+        INSERT ALL
+        <foreach collection="targets" item="target">
+            INTO TWTM022 (
+            ENTER_CD, WORK_CLASS_CD, SABUN, SDATE, EDATE, INSDATE, INSID
+            ) VALUES (
+            #{ssnEnterCd}, #{workClassCd}, #{target.targetCd},
+            TO_CHAR(TO_DATE(#{target.sdate}, 'yyyy-MM-dd'), 'yyyyMMdd'),
+            TO_CHAR(TO_DATE(NVL(#{target.edate}, '9999-12-31'), 'yyyy-MM-dd'), 'yyyyMMdd'),
+            SYSDATE, #{ssnSabun}
+            )
+        </foreach>
+        SELECT 1 FROM DUAL
+    </update>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkShiftTargetList">
+        SELECT A.ENTER_CD
+             , A.SABUN
+             , A.NAME
+             , B.JIKWEE_NM
+             , B.ORG_CD
+             , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+             , NVL2(A.SABUN, DECODE(D.SDATE, REPLACE(#{sdate}, '-', ''), DECODE(D.WORK_GROUP_CD, #{workGroupCd}, 'Y', 'N'), 'N'), 'N') AS CHECK_YN
+          FROM THRM100 A
+          JOIN THRM151 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.SABUN = B.SABUN
+           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+          JOIN TWTM022 C
+            ON A.ENTER_CD = C.ENTER_CD
+           AND A.SABUN = C.SABUN
+           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND C.EDATE
+          LEFT JOIN TWTM033 D
+            ON C.ENTER_CD = D.ENTER_CD
+           AND C.WORK_CLASS_CD = D.WORK_CLASS_CD
+           AND C.SABUN = D.SABUN
+           AND D.SDATE = REPLACE(#{sdate}, '-', '')
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND B.STATUS_CD NOT IN ('RA', 'RAA')
+           AND C.WORK_CLASS_CD = #{workClassCd}
+        GROUP BY A.ENTER_CD, A.SABUN, A.NAME, B.JIKWEE_NM, B.ORG_CD, D.SDATE, D.WORK_GROUP_CD
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkShiftTargetList_BK">
+        WITH EMP_BASE AS (
+            SELECT A.ENTER_CD
+                 , A.SABUN
+                 , A.NAME
+                 , B.JIKWEE_NM
+                 , B.ORG_CD
+                 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+                 , F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS BP_CD
+                 , F_COM_GET_BP_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS BP_NM
+              FROM THRM100 A
+              JOIN THRM151 B
+                ON A.ENTER_CD = B.ENTER_CD
+               AND A.SABUN = B.SABUN
+               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+             WHERE A.ENTER_CD = #{ssnEnterCd}
+               AND B.STATUS_CD NOT IN ('RA', 'RAA')
+        )
+        SELECT *
+          FROM (
+                SELECT A.ENTER_CD
+                     , B.WORK_GROUP_CD
+                     , A.SABUN AS TARGET_CD
+                     , A.NAME AS TARGET_NM
+                     , A.JIKWEE_NM AS NOTE1
+                     , A.ORG_NM AS NOTE2
+                     , NVL2(B.TARGET_CD, DECODE(B.WORK_GROUP_CD, #{workGroupCd}, 'Y', 'N'), 'N') AS CHECK_YN
+                     , 3 AS SORT
+                     , 'EMP' AS TYPE
+                     , A.TARGET_CD AS DIV
+                  FROM (
+                        SELECT E.*
+                             , C.WORK_CLASS_CD
+                             , C.TARGET_CD
+                          FROM EMP_BASE E
+                          JOIN TWTM022 C
+                            ON E.ENTER_CD = C.ENTER_CD
+                           AND E.ORG_CD = C.TARGET_CD
+                           AND C.TYPE = 'ORG'
+                           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND C.EDATE
+                         WHERE C.WORK_CLASS_CD = #{workClassCd}
+                         UNION ALL
+                        SELECT E.*
+                             , C.WORK_CLASS_CD
+                             , C.TARGET_CD
+                          FROM EMP_BASE E
+                          JOIN TWTM022 C
+                            ON E.ENTER_CD = C.ENTER_CD
+                           AND E.BP_CD = C.TARGET_CD
+                           AND C.TYPE = 'BIZ'
+                           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND C.EDATE
+                         WHERE C.WORK_CLASS_CD = #{workClassCd}
+                         UNION ALL
+                        SELECT E.*
+                             , C.WORK_CLASS_CD
+                             , C.TARGET_CD
+                          FROM EMP_BASE E
+                          JOIN TWTM022 C
+                            ON E.ENTER_CD = C.ENTER_CD
+                           AND E.SABUN = C.TARGET_CD
+                           AND C.TYPE = 'EMP'
+                           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND C.EDATE
+                         WHERE C.WORK_CLASS_CD = #{workClassCd}
+                       ) A
+                  LEFT JOIN TWTM033 B
+                    ON A.ENTER_CD = B.ENTER_CD
+                   AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+                   AND A.SABUN = B.TARGET_CD
+                   AND B.TYPE = 'EMP'
+                 UNION ALL
+                SELECT C.ENTER_CD
+                     , D.WORK_GROUP_CD
+                     , C.TARGET_CD
+                     , DECODE(C.TYPE, 'ORG', F_COM_GET_ORG_NM(C.ENTER_CD, C.TARGET_CD, C.SDATE)
+                                    , 'BIZ', F_COM_GET_MAP_NM2(C.ENTER_CD, '100', C.TARGET_CD))
+                     , NULL
+                     , NULL
+                     , NVL2(D.TARGET_CD, DECODE(D.WORK_GROUP_CD, #{workGroupCd}, 'Y', 'N'), 'N') AS CHECK_YN
+                     , DECODE(C.TYPE, 'BIZ', 1, 'ORG', 2) AS SORT
+                     , C.TYPE
+                     , C.TARGET_CD AS DIV
+                  FROM TWTM022 C
+                  LEFT JOIN TWTM033 D
+                    ON C.ENTER_CD = D.ENTER_CD
+                   AND C.WORK_CLASS_CD = D.WORK_CLASS_CD
+                   AND C.TYPE = D.TYPE
+                   AND C.TARGET_CD = D.TARGET_CD
+                 WHERE C.ENTER_CD = #{ssnEnterCd}
+                   AND C.WORK_CLASS_CD = #{workClassCd}
+                   AND C.TYPE IN ('ORG', 'BIZ')
+               )
+         WHERE 1=1
+        <if test='checkYN != null and !checkYN.equals("")'>
+           AND CHECK_YN = #{checkYN}
+        </if>
+        <if test='searchKey != null and !searchKey.equals("")'>
+           AND (TARGET_CD LIKE '%' || #{searchKey} || '%' OR TARGET_NM LIKE '%' || #{searchKey} || '%')
+        </if>
+         ORDER BY SORT, F_COM_JIKJE_SORT(ENTER_CD, TARGET_CD, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmShiftWorkList">
+        SELECT
+            A.ENTER_CD
+             , A.SABUN
+             , A.WORK_CLASS_CD
+             , A.SDATE
+             , NVL(
+                 TO_CHAR(
+                     TO_DATE(LAG(A.SDATE) OVER (PARTITION BY ENTER_CD, SABUN  ORDER BY ENTER_CD, SDATE DESC),'YYYYMMDD')-1
+                     ,'YYYYMMDD'
+                 )
+                 ,(SELECT EDATE FROM TWTM021 WHERE ENTER_CD = A.ENTER_CD AND WORK_CLASS_CD = A.WORK_CLASS_CD)
+             ) AS EDATE
+        FROM TWTM022 A
+        WHERE A.ENTER_CD = #{ssnEnterCd}
+          AND A.SABUN = #{searchSabun}
+        ORDER BY A.SDATE
+    </select>
+
+    <update parameterType="map" id="saveWtmWorkClassShiftTarget">
+        INSERT ALL
+        <foreach collection="targets" item="target">
+            INTO TWTM033 (
+            ENTER_CD, WORK_CLASS_CD, WORK_GROUP_CD, SABUN, SDATE, EDATE, CHKDATE, CHKID
+            ) VALUES (
+            #{ssnEnterCd}, #{workClassCd}, #{workGroupCd}, #{target.targetCd},
+            TO_CHAR(TO_DATE(#{sdate}, 'yyyy-MM-dd'), 'yyyyMMdd'),
+            NVL((
+            SELECT
+            TO_CHAR(TO_DATE(MIN(SDATE), 'YYYYMMDD')-1, 'yyyyMMdd')
+            FROM TWTM033
+            where ENTER_CD = #{ssnEnterCd}
+            and SABUN = #{target.targetCd}
+            and SDATE > TO_CHAR(TO_DATE(#{sdate}, 'yyyy-MM-dd'), 'yyyyMMdd')
+            ), '29991231'),
+            SYSDATE, #{ssnSabun}
+            )
+        </foreach>
+        SELECT 1 FROM DUAL
+    </update>
+
+    <update parameterType="map" id="updateShiftContEdate">
+        UPDATE TWTM033
+        SET EDATE = #{edate},
+            CHKDATE = SYSDATE,
+            CHKID = #{ssnSabun}
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND SABUN = #{sabun}
+          AND WORK_CLASS_CD = #{workClassCd}
+          AND SDATE = #{sdate}
+    </update>
+
+    <delete parameterType="map" id="deleteWtmWorkClassShiftTarget">
+        DELETE
+        FROM TWTM033
+        WHERE ENTER_CD = #{ssnEnterCd}
+          AND WORK_CLASS_CD = #{workClassCd}
+          AND WORK_GROUP_CD = #{workGroupCd}
+          AND SDATE = REPLACE(#{sdate}, '-', '')
+    </delete>
+
+    <select parameterType="map" resultType="cMap" id="getWtmWorkClassApplCdList">
+        SELECT A.*
+          FROM THRI101 A
+          LEFT JOIN TWTM021 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.APPL_CD = B.APPL_CD
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND UPPER(A.APPL_CD) LIKE 'WTM1%'
+           AND A.USE_YN = 'Y'
+    </select>
+
+    <update parameterType="map" id="saveWtmWorkClassApplCd">
+        MERGE INTO THRI101 T
+            USING (
+                SELECT
+                    TRIM(#{applCd})  				    AS APPL_CD
+                     ,  TRIM(#{applNm})  				AS APPL_NM
+                     ,  TRIM(#{applTitle})  			AS APPL_TITLE
+                     ,  NVL(TRIM(#{agreeYn}), 'Y')  	AS AGREE_YN
+                     ,  NVL(TRIM(#{recevYn}), 'Y')		AS RECEV_YN
+                     ,  TRIM(#{fileYn})  				AS FILE_YN
+                     ,  TRIM(#{orgLevelCd})				AS ORG_LEVEL_CD
+                     ,  NVL(TRIM(#{etcNoteYn}),	'Y')	AS ETC_NOTE_YN
+                     ,  TRIM(#{etcNote})	            AS ETC_NOTE
+                     ,  TRIM(#{fileSeq})	            AS FILE_SEQ
+                FROM   DUAL
+            ) S
+            ON (
+                T.ENTER_CD = #{ssnEnterCd}
+                    AND T.APPL_CD = S.APPL_CD
+                )
+            WHEN MATCHED THEN
+                UPDATE SET    T.APPL_NM         	= S.APPL_NM
+                    , T.APPL_TITLE          = S.APPL_TITLE
+                    , T.FILE_YN         	= S.FILE_YN
+                    , T.ORG_LEVEL_CD		= S.ORG_LEVEL_CD
+                    , T.ETC_NOTE            = S.ETC_NOTE
+                    , T.FILE_SEQ            = S.FILE_SEQ
+                    , T.CHKDATE				= SYSDATE
+                    , T.CHKID				= #{ssnSabun}
+            WHEN NOT MATCHED THEN
+                INSERT
+                    (
+                     T.ENTER_CD
+                        , T.APPL_CD
+                        , T.APPL_NM
+                        , T.APPL_TITLE
+                        , T.BIZ_CD
+                        , T.AGREE_YN
+                        , T.RECEV_YN
+                        , T.RECEV_TYPE
+                        , T.FILE_YN
+                        , T.ORG_LEVEL_CD
+                        , T.ETC_NOTE_YN
+                        , T.ETC_NOTE
+                        , T.FILE_SEQ
+                        , T.CHKDATE
+                        , T.CHKID
+                        )
+                    VALUES
+                        (
+                          #{ssnEnterCd}
+                        , S.APPL_CD
+                        , S.APPL_NM
+                        , S.APPL_TITLE
+                        , 'TIM'
+                        , S.AGREE_YN
+                        , S.RECEV_YN
+                        , 'A'
+                        , S.FILE_YN
+                        , S.ORG_LEVEL_CD
+                        , S.ETC_NOTE_YN
+                        , S.ETC_NOTE
+                        , S.FILE_SEQ
+                        , SYSDATE
+                        , #{ssnSabun}
+                        )
+    </update>
+
+    <select parameterType="map" resultType="cMap" id="getMaxWtmAppCode">
+        SELECT MAX(APPL_CD) AS APPL_CD
+        FROM THRI101
+        WHERE APPL_CD LIKE '%wtm1%'
+          AND ENTER_CD = #{ssnEnterCd}
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassSchDetailList">
+        <![CDATA[
+        SELECT A.ENTER_CD, A.SABUN, A.YMD, A.WRK_DTL_ID, A.WORK_CLASS_CD, A.WORK_SCH_CD, A.POST_YN
+             , B.WORK_SCH_NM, B.WORK_SCH_SRT_NM, B.WORK_TIME_F, B.WORK_TIME_T, B.BREAK_TIMES, B.COLOR, B.SYSTEM_CD_YN
+             , C.NAME
+          FROM TWTM035 A
+          JOIN TWTM031 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+           AND A.WORK_SCH_CD = B.WORK_SCH_CD
+          JOIN THRM100 C
+            ON A.ENTER_CD = C.ENTER_CD
+           AND A.SABUN = C.SABUN
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.WORK_CLASS_CD = #{workClassCd}
+           AND A.YMD BETWEEN #{sdate} AND #{edate}
+       ]]>
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+           AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(C.NAME) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+        </if>
+        <if test='searchPostYn != null and searchPostYn neq ""'>
+            AND NVL(A.POST_YN, 'N') = #{searchPostYn}
+        </if>
+         ORDER BY A.YMD, A.SABUN
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassSchDetailEmpList">
+        <![CDATA[
+        SELECT A.ENTER_CD
+             , A.SABUN
+             , A.NAME
+             , B.JIKWEE_NM
+             , B.ORG_CD
+             , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+             , F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS BP_CD
+             , F_COM_GET_BP_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS BP_NM
+             , C.WORK_CLASS_CD
+             , C.WORK_GROUP_CD
+             , C.SDATE
+             , NVL(C.EDATE, '29991231') AS EDATE
+             , D.WORK_GROUP_NM
+             , COUNT(SABUN) OVER ( PARTITION BY C.ENTER_CD, C.WORK_CLASS_CD, C.WORK_GROUP_CD) AS CNT
+          FROM THRM100 A
+          JOIN THRM151 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.SABUN = B.SABUN
+           AND REPLACE(#{sdate}, '-', '') BETWEEN B.SDATE AND B.EDATE
+          JOIN TWTM033 C
+            ON A.ENTER_CD = C.ENTER_CD
+           AND A.SABUN = C.SABUN
+           AND C.SDATE <= REPLACE(#{edate}, '-', '')
+           AND NVL(C.EDATE, '29991231') >= REPLACE(#{sdate}, '-', '')
+          JOIN TWTM032 D
+            ON C.ENTER_CD = D.ENTER_CD
+           AND C.WORK_CLASS_CD = D.WORK_CLASS_CD
+           AND C.WORK_GROUP_CD = D.WORK_GROUP_CD
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND B.STATUS_CD NOT IN ('RA', 'RAA')
+           AND C.WORK_CLASS_CD = #{workClassCd}
+           AND A.SABUN IN
+               (
+                   SELECT SABUN
+                     FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+               )
+        ]]>
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+           AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(A.NAME) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+        </if>
+        <if test='searchWorkGroupCd != null and searchWorkGroupCd neq ""'>
+           AND C.WORK_GROUP_CD = #{searchWorkGroupCd}
+        </if>
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassSchDetailEmpList_bk">
+        WITH EMP_BASE AS (
+            SELECT A.ENTER_CD
+                 , A.SABUN
+                 , A.NAME
+                 , B.JIKWEE_NM
+                 , B.ORG_CD
+                 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+                 , F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS BP_CD
+                 , F_COM_GET_BP_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS BP_NM
+              FROM THRM100 A
+              JOIN THRM151 B
+                ON A.ENTER_CD = B.ENTER_CD
+               AND A.SABUN = B.SABUN
+               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+             WHERE A.ENTER_CD = #{ssnEnterCd}
+               AND B.STATUS_CD NOT IN ('RA', 'RAA')
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+               AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(A.NAME) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+        </if>
+        )
+        SELECT X.*
+             , Y.WORK_GROUP_NM
+             , COUNT(SABUN) OVER ( PARTITION BY X.ENTER_CD, X.WORK_CLASS_CD, X.WORK_GROUP_CD) AS CNT
+          FROM (
+                SELECT A.*
+                      /* TYPE에 중복되는 직원이 있다면 EMP > ORG > BIZ 순으로 우선순위를 매겨 최우선순위 데이터 하나만 조회 */
+                     , ROW_NUMBER() OVER (PARTITION BY ENTER_CD, SABUN
+                                          ORDER BY
+                                                CASE TYPE
+                                                  WHEN 'EMP' THEN 1
+                                                  WHEN 'ORG' THEN 2
+                                                  WHEN 'BIZ' THEN 3
+                                                END) as RN
+                  FROM (
+                        SELECT B.*
+                             , A.WORK_CLASS_CD
+                             , A.WORK_GROUP_CD
+                             , A.TYPE
+                          FROM TWTM033 A
+                          JOIN EMP_BASE B
+                            ON A.ENTER_CD = B.ENTER_CD
+                           AND A.TARGET_CD = B.SABUN
+                           AND A.TYPE = 'EMP'
+                         WHERE A.ENTER_CD = #{ssnEnterCd}
+                           AND A.WORK_CLASS_CD = #{workClassCd}
+                         UNION ALL
+                        SELECT B.*
+                             , A.WORK_CLASS_CD
+                             , A.WORK_GROUP_CD
+                             , A.TYPE
+                          FROM TWTM033 A
+                          JOIN EMP_BASE B
+                            ON A.ENTER_CD = B.ENTER_CD
+                           AND A.TARGET_CD = B.ORG_CD
+                           AND A.TYPE = 'ORG'
+                         WHERE A.ENTER_CD = #{ssnEnterCd}
+                           AND A.WORK_CLASS_CD = #{workClassCd}
+                         UNION ALL
+                        SELECT B.*
+                             , A.WORK_CLASS_CD
+                             , A.WORK_GROUP_CD
+                             , A.TYPE
+                          FROM TWTM033 A
+                          JOIN EMP_BASE B
+                            ON A.ENTER_CD = B.ENTER_CD
+                           AND A.TARGET_CD = B.BP_CD
+                           AND A.TYPE = 'BIZ'
+                         WHERE A.ENTER_CD = #{ssnEnterCd}
+                           AND A.WORK_CLASS_CD = #{workClassCd}
+                       ) A
+               ) X
+          JOIN TWTM032 Y
+            ON X.ENTER_CD = Y.ENTER_CD
+           AND X.WORK_CLASS_CD = Y.WORK_CLASS_CD
+           AND X.WORK_GROUP_CD = Y.WORK_GROUP_CD
+         WHERE RN = 1
+         ORDER BY X.WORK_GROUP_CD, F_COM_JIKJE_SORT(X.ENTER_CD, X.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+    </select>
+
+    <update parameterType="map" id="saveWorkClassSchDetail">
+        INSERT INTO TWTM035 (ENTER_CD, SABUN, YMD, WRK_DTL_ID, WORK_CLASS_CD, WORK_SCH_CD, POST_YN, INSDATE, INSID, CHKDATE, CHKID)
+        VALUES (#{ssnEnterCd}, #{sabun}, #{ymd}, #{wrkDtlId}, #{workClassCd}, #{workSchCd}, #{postYn}, SYSDATE, #{ssnSabun}, SYSDATE, #{ssnSabun})
+    </update>
+
+    <delete parameterType="map" id="deleteWorkClassSchDetail">
+        DELETE
+          FROM TWTM035
+         WHERE ENTER_CD = #{ssnEnterCd}
+           AND SABUN = #{sabun}
+           AND YMD = #{ymd}
+           AND NVL(POST_YN, 'N') = 'N'
+    </delete>
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassSchDetailHolidayList">
+        SELECT A.YY||A.MM||A.DD AS YMD
+             , A.RP_YY||A.RP_MM||A.RP_DD AS RP_YMD
+             , BUSINESS_PLACE_CD AS BP_CD
+             , HOLIDAY_CD
+             , HOLIDAY_NM
+          FROM TWTM001 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND (A.YY||A.MM||A.DD BETWEEN #{sdate} AND #{edate}
+                OR  A.RP_YY||A.RP_MM||A.RP_DD BETWEEN #{sdate} AND #{edate})
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassSchDetailAttendList">
+        <![CDATA[
+        SELECT A.YMD, A.SABUN
+             , B.GNT_NM, B.GNT_SHORT_NM
+          FROM TWTM103 A
+          JOIN TWTM041 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.GNT_CD = B.GNT_CD
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.YMD BETWEEN #{sdate} AND #{edate}
+        ]]>
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+           AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+        </if>
+    </select>
+
+    <delete parameterType="map" id="deleteWorkClassSchDetailApply">
+        DELETE
+          FROM TWTM102 A
+         WHERE EXISTS (
+                        SELECT X.WRK_DTL_ID
+                          FROM TWTM035 X
+                         WHERE X.POST_YN = 'Y'
+                           AND X.WRK_DTL_ID = A.WRK_DTL_ID
+                           AND X.ENTER_CD = A.ENTER_CD
+                           AND X.SABUN = A.SABUN
+                           AND X.YMD = A.YMD
+                      )
+           AND A.ENTER_CD = #{ssnEnterCd}
+           AND A.YMD BETWEEN #{sdate} AND #{edate}
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+           AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+        </if>
+    </delete>
+
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassSchDetailApply">
+        <![CDATA[
+        SELECT A.ENTER_CD
+             , A.YMD
+             , A.SABUN
+             , E.NAME
+             , A.TIME_CD
+             , A.PLAN_SYMD
+             , A.PLAN_SHM
+             , A.PLAN_EYMD
+             , A.PLAN_EHM
+             , A.PLAN_MM
+             , C.WORK_TIME_TYPE
+             , NVL(D.NOTE1, NVL(C.DEEMED_YN, 'N')) AS ADD_WORK_TIME_YN
+          FROM TWTM102 A
+          LEFT JOIN TWTM035 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.YMD = B.YMD
+           AND A.WRK_DTL_ID = B.WRK_DTL_ID
+          JOIN TWTM051 C
+            ON A.ENTER_CD = C.ENTER_CD
+           AND A.WORK_CD = C.WORK_CD
+          LEFT JOIN TSYS005 D
+            ON C.ENTER_CD = D.ENTER_CD
+           AND C.WORK_TIME_TYPE = D.CODE
+           AND D.GRCODE_CD = 'WT0511'
+          JOIN THRM100 E
+            ON A.ENTER_CD = E.ENTER_CD
+           AND A.SABUN = E.SABUN
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.YMD BETWEEN #{sdate} AND #{edate}
+           AND B.WRK_DTL_ID IS NULL
+        ]]>
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+            AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(E.NAME) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+        </if>
+         ORDER BY A.SABUN, A.YMD
+    </select>
+
+    <update parameterType="map" id="saveWorkClassSchDetailApply">
+        INSERT INTO TWTM102 (ENTER_CD, WRK_DTL_ID, YMD, SABUN, WORK_CD, PLAN_SYMD, PLAN_SHM, PLAN_EYMD, PLAN_EHM, PLAN_MM, INSDATE, INSID, CHKDATE, CHKID)
+        VALUES (#{ssnEnterCd}, #{wrkDtlId}, #{ymd}, #{sabun}, #{workCd}, #{planSymd}, #{planShm}, #{planEymd}, #{planEhm}, #{planMm}, SYSDATE, #{ssnSabun}, SYSDATE, #{ssnSabun})
+    </update>
+
+    <delete parameterType="map" id="deleteOldWorkClassSchDetail">
+        DELETE FROM TWTM035 A
+         WHERE EXISTS (
+                SELECT X.WRK_DTL_ID
+                  FROM TWTM035 X
+                  JOIN TWTM035 Y
+                    ON X.ENTER_CD = Y.ENTER_CD
+                   AND X.SABUN = Y.SABUN
+                   AND X.YMD = Y.YMD
+                   AND Y.POST_YN = 'N'
+                   AND X.POST_YN = 'Y'
+                 WHERE Y.WRK_DTL_ID IS NOT NULL
+                   AND X.WRK_DTL_ID = A.WRK_DTL_ID
+                )
+           AND A.ENTER_CD = #{ssnEnterCd}
+           AND A.YMD BETWEEN #{sdate} AND #{edate}
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+           AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+        </if>
+    </delete>
+
+    <update parameterType="map" id="updateWorkClassSchDetailPostYn">
+        UPDATE TWTM035
+           SET POST_YN = 'Y'
+         WHERE ENTER_CD = #{ssnEnterCd}
+           AND YMD BETWEEN #{sdate} AND #{edate}
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+           AND (SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(ENTER_CD, SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+        </if>
+    </update>
+
+
+    <select parameterType="map" resultType="cMap" id="getWorkClassSchDetailGntDetail">
+        <![CDATA[
+        SELECT A.ENTER_CD
+             , A.GNT_DTL_ID
+             , A.YMD
+             , A.SABUN
+             , B.NAME
+             , A.GNT_CD
+             , A.SYMD
+             , A.SHM
+             , A.EYMD
+             , A.EHM
+             , A.MM
+          FROM TWTM103 A
+          JOIN THRM100 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.SABUN = B.SABUN
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.YMD BETWEEN #{sdate} AND #{edate}
+        ]]>
+        <if test='searchSabunName != null and searchSabunName neq ""'>
+            AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR UPPER(B.NAME) LIKE '%'||UPPER(TRIM( #{searchSabunName} ))||'%')
+        </if>
+    </select>
+</mapper>

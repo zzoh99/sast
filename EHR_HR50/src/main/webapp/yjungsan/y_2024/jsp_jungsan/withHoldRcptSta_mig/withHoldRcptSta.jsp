@@ -1,0 +1,858 @@
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="yjungsan.util.*"%>
+<!DOCTYPE html> <html class="hidden"><head> <title>원천징수영수증</title>
+<%@ include file="../common/include/session.jsp"%>
+<%@ include file="../common/include/meta.jsp"%><!-- Meta -->
+<%@ include file="../common/include/jqueryScript.jsp"%>
+<%@ include file="../common/include/ibSheetScript.jsp"%>
+<%String ssnSearchType = (String)session.getAttribute("ssnSearchType");%>
+<% String reCalc = (request.getParameter("reCalc")==null) ? "" : (String)request.getParameter("reCalc"); %>
+<script type="text/javascript">
+
+    $(function() {
+    	//엑셀,파일다운 시 화면명 저장(교보증권) - 2021.10.26
+        $("#menuNm").val($(document).find("title").text()); //엑셀,CURD
+    	/*영문은 브로제 전용*/
+    	if("BRS" == "<%=session.getAttribute("ssnEnterCd")%>") {
+    		$("#rdEngBtn").show() ;
+    	}
+
+        $("#searchWorkYy").val("<%=yeaYear%>") ;
+
+        //조회건수가 너무 많을 수 있으므로 초기 조회조건에 세팅
+        var initdata1 = {};
+        initdata1.Cfg = {FrozenCol:0,SearchMode:smLazyLoad,Page:22,MergeSheet:msHeaderOnly};
+        initdata1.HeaderMode = {Sort:1,ColMove:1,ColResize:1,HeaderCheck:1};
+        initdata1.Cols = [
+            {Header:"No",           Type:"<%=sNoTy%>",  Hidden:Number("<%=sNoHdn%>"),   Width:"<%=sNoWdt%>",  Align:"Center", ColMerge:0,   SaveName:"sNo" },
+            {Header:"상태",         Type:"<%=sSttTy%>", Hidden:1,Width:"<%=sSttWdt%>",  Align:"Center", ColMerge:1, SaveName:"sStatus", Sort:0. },
+            {Header:"삭제",         Type:"<%=sDelTy%>", Hidden:0,Width:"<%=sDelWdt%>",  Align:"Center",  ColMerge:1,    SaveName:"sDelete", Sort:0, HeaderCheck:0,UpdateEdit:0,InsertEdit:0},
+            {Header:"성명",         Type:"Popup",       Hidden:0,  Width:80,    Align:"Center",  ColMerge:0,   SaveName:"name",       KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:0,   InsertEdit:1,    EditLen:100 },
+            {Header:"사번",         Type:"Text",        Hidden:0,  Width:80,    Align:"Center",  ColMerge:0,   SaveName:"sabun",      KeyField:1,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:0,   InsertEdit:0,    EditLen:100 },
+            {Header:"사업장",       Type:"Text",        Hidden:0,  Width:100,   Align:"Center",  ColMerge:0,   SaveName:"bp_nm",     KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:0,   InsertEdit:0,    EditLen:100 },
+            {Header:"조직명",       Type:"Text",        Hidden:0,  Width:100,   Align:"Center",  ColMerge:0,   SaveName:"org_nm",     KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:0,   InsertEdit:0,    EditLen:100 },
+            {Header:"사원구분",     Type:"Text",        Hidden:0,  Width:60,   Align:"Center",  ColMerge:0,   SaveName:"manage_nm",  KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:0,   InsertEdit:0,    EditLen:100 },
+            {Header:"퇴직일",       Type:"Date",        Hidden:0,  Width:60,   Align:"Center",  ColMerge:0,   SaveName:"ret_ymd",    KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:0,   InsertEdit:0,    EditLen:100 },
+            
+            {Header:"정산코드",		Type:"Text",		Hidden:1,  Width:80,	Align:"Center",	 ColMerge:0,   SaveName:"adjust_type",	  KeyField:0,				Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:100 },
+            {Header:"정산구분",		Type:"Combo",		Hidden:0,  Width:70,	Align:"Center",	 ColMerge:0,   SaveName:"adjust_type_nm", KeyField:1,				Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:1,	EditLen:100 },
+            {Header:"구분",		    Type:"Combo",		Hidden:1,  Width:70,	Align:"Center",	 ColMerge:0,   SaveName:"gubun",	      KeyField:0,				Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:1,	EditLen:100 },
+            {Header:"차수",		    Type:"Int",		    Hidden:1,  Width:60,	Align:"Center",	 ColMerge:0,   SaveName:"re_seq",	      KeyField:0,				Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:1,	EditLen:100 },
+            
+            {Header:"출력순서",     Type:"Text",        Hidden:0,  Width:70,    Align:"Center",  ColMerge:0,   SaveName:"sort_no",    KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:1,   InsertEdit:1,    EditLen:100 },
+            {Header:"전체",         Type:"CheckBox",    Hidden:0,  Width:70,    Align:"Center",  ColMerge:0,   SaveName:"checked",    KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:1,   InsertEdit:1,    EditLen:100, TrueValue:"Y", FalseValue:"N" },
+            {Header:"도장출력",     Type:"CheckBox",    Hidden:0,  Width:70,    Align:"Center",  ColMerge:0,   SaveName:"stamp_chk",  KeyField:0,   CalcLogic:"",   Format:"",         PointCount:0,   UpdateEdit:1,   InsertEdit:1,    EditLen:1}
+        ]; IBS_InitSheet(sheet1, initdata1);sheet1.SetEditable("<%=editable%>");sheet1.SetVisible(true);sheet1.SetCountPosition(4);
+
+        var adjustTypeList  = stfConvCode( codeList("<%=jspPath%>/common/commonCode.jsp?cmd=getCommonCodeList&searchYear=<%=yeaYear%>","C00303"), "전체");
+        var purposeCdList   = stfConvCode( codeList("<%=jspPath%>/common/commonCode.jsp?cmd=getCommonCodeList&searchYear=<%=yeaYear%>","C00315"), "");
+        
+		// 사업장(권한 구분)
+		var ssnSearchType  = "<%=removeXSS(ssnSearchType, '1')%>";
+		var bizPlaceCdList = "";
+
+		if(ssnSearchType == "A"){
+			bizPlaceCdList = stfConvCode( ajaxCall("<%=jspPath%>/common/commonCode.jsp?cmd=getCommonNSCodeList&queryId=getBizPlaceCdList","",false).codeList, "전체");
+		}else{
+			bizPlaceCdList = stfConvCode( ajaxCall("<%=jspPath%>/common/commonCode.jsp?cmd=getBizPlaceCdAuthList&queryId=getBizPlaceCdAuthList","",false).codeList, "");
+		}
+
+        $("#searchBusinessPlaceCd").html(bizPlaceCdList[2]);
+        $("#searchAdjustType").html(adjustTypeList[2]).val("1");
+        $("#searchPurposeCd").html(purposeCdList[2]);
+
+		sheet1.SetColProperty("adjust_type_nm",  	{ComboText:"|"+adjustTypeList[0], 		ComboCode:"|"+adjustTypeList[1]});
+		sheet1.SetColProperty("gubun", 	            {ComboText:"|최종|수정(이력)",				ComboCode:"|F|H"});		
+        
+        $(window).smartresize(sheetResize); sheetInit();
+
+        var data = ajaxCall("<%=jspPath%>/common/commonCode.jsp?cmd=getCommonNSCodeList&searchStdCd=CPN_YEA_PAGE_UNIT", "queryId=getSystemStdData",false).codeList;
+        if ( data != null && data.length>0) {
+        	$("#searchDivPage").val($.trim(data[0].code_nm));
+		}
+
+        if($("#searchDivPage").val() != "" && !isNaN($("#searchDivPage").val()) && $("#searchDivPage").val()>0) {
+        	$(".pageHide").show();
+        	initPage();
+        }
+        
+        data = ajaxCall("<%=jspPath%>/common/commonCode.jsp?cmd=getCommonNSCodeList&searchStdCd=CPN_YEA_RD_COMMENT_YN", "queryId=getSystemStdData",false).codeList;
+        if ( data != null && data.length>0) {
+        	$("#searchRdCmtYn").val($.trim(data[0].code_nm));
+		}
+        
+      //파일생성 사용 여부
+		var fileCreYn = ajaxCall("<%=jspPath%>/common/commonCode.jsp?cmd=getCommonNSCodeList&searchStdCd=CPN_YEA_PDF_CRE_YN", "queryId=getSystemStdData",false).codeList;
+
+		$("#btnDisplayYn").hide() ;
+		if ( fileCreYn != null && fileCreYn.length>0) {
+			if(fileCreYn[0].code_nm == "Y") {
+				$("#btnDisplayYn").show() ;
+			}
+		}
+
+		<% if ("Y".equals(reCalc)) { %>
+		    sheet1.SetColHidden("adjust_type", 0);
+			sheet1.SetColHidden("gubun", 0);
+			sheet1.SetColHidden("re_seq", 0);
+		<% } %>
+		
+        //doAction1("Search");
+    });
+
+    $(function(){
+        $("#searchWorkYy").bind("keyup",function(event){
+            makeNumber(this,"A");
+            if( event.keyCode == 13){
+                doAction1("Search");
+            }
+        });
+
+        $("#searchSbNm").bind("keyup",function(event){
+            if( event.keyCode == 13){
+                doAction1("Search");
+            }
+        });
+        $("#searchOrgNm").bind("keyup",function(event){
+            if( event.keyCode == 13){
+                doAction1("Search");
+            }
+        });
+
+        $("#searchAdjustType").bind("change",function(event){
+			doAction1("Search");
+		});
+
+        $("#searchPrintYMD").datepicker2();
+    });
+
+    //Sheet1 Action
+    function doAction1(sAction) {
+        switch (sAction) {
+        case "Search":
+            sheet1.DoSearch( "<%=jspPath%>/withHoldRcptSta_mig/withHoldRcptStaRst.jsp?cmd=selectWithHoldRcptStaList", $("#sheetForm").serialize() );
+            break;
+        case "Insert":
+
+        	// 정산구분이 전체일 경우 입력불가
+    		var searchAdjustType = $("#searchAdjustType").val();
+
+    		if( searchAdjustType == "" ){
+    			alert("정산구분을 선택해주세요.");
+    			return;
+    		}else{
+    			var newRow = sheet1.DataInsert(0) ;
+    			sheet1.SetCellValue(newRow,"work_yy",parent.$("#searchWorkYy").val(), 0); // change 이벤트는 발생 안 함
+    			sheet1.SetCellValue(newRow,"adjust_type_nm",parent.$("#searchAdjustType").val(), 0);  // change 이벤트는 발생 안 함
+    			sheet1.SetCellValue(newRow,"gubun","F", 0); // 일단 최종으로   // change 이벤트는 발생 안 함
+    			sheet1.SetCellValue(newRow,"re_seq","", 0); // change 이벤트는 1번만 발생
+    			sheet1.SetCellValue(newRow,"adjust_type",parent.$("#searchAdjustType").val(), 0);  // change 이벤트는 발생 안 함			
+    		}
+
+            break;
+        case "Down2Excel":
+            var downcol = makeHiddenSkipCol(sheet1);
+            var param  = {DownCols:downcol,SheetDesign:1,Merge:1,CheckBoxOnValue:"Y",CheckBoxOffValue:"N",menuNm:$(document).find("title").text()};
+            sheet1.Down2Excel(param);
+            break;
+        case "LoadExcel":
+
+        	// 정산구분이 전체일 경우 입력불가
+    		var searchAdjustType = $("#searchAdjustType").val();
+
+    		if( searchAdjustType == "" ){
+    			alert("정산구분을 선택해주세요.");
+    			return;
+    		}
+            var params = {Mode:"HeaderMatch", WorkSheetNo:1};
+            sheet1.LoadExcel(params);
+            break;
+        case "SaveRdCmtYn":
+            var params = $("#sheetForm").serialize();
+			//TSYS955 UPDATE!
+			ajaxCall("<%=jspPath%>/withHoldRcptSta_mig/withHoldRcptStaRst.jsp?cmd=SaveRdCmtYn",params,false);
+            break;
+
+        }
+    }
+
+    // 조회 후 에러 메시지
+    function sheet1_OnSearchEnd(Code, Msg, StCode, StMsg) {
+        try {
+            alertMessage(Code, Msg, StCode, StMsg);
+            sheetResize();
+        } catch (ex) {
+            alert("OnSearchEnd Event Error : " + ex);
+        }
+    }
+
+	function sheet1_OnChange(Row, Col, Value){
+		if(sheet1.ColSaveName(Col)  == "gubun") {
+			if (Value == "F") { // 최종
+				sheet1.SetCellValue(Row, "re_seq",  "", 0); //change 이벤트 발생 제외
+			}
+		}
+		if(sheet1.ColSaveName(Col)  == "re_seq") {
+			if (sheet1.GetCellValue(Row,"gubun") == "H") { // 이력(수정)
+				if (typeof Value !== 'undefined' && Value < 1) {
+					alert(sheet1.GetCellText(Row,"gubun") + "은 1차수 이상부터 등록 가능합니다.");
+				}
+			}
+		}
+		if(sheet1.ColSaveName(Col)  == "adjust_type_nm" || sheet1.ColSaveName(Col)  == "gubun" || sheet1.ColSaveName(Col)  == "re_seq") {
+			if (sheet1.GetCellValue(Row,"gubun") == "H") { // 이력(수정)
+				sheet1.SetCellValue(Row, "adjust_type", sheet1.GetCellValue(Row,"adjust_type_nm") + "R" + sheet1.GetCellValue(Row,"re_seq"), 0); //change 이벤트 발생 제외
+			} else {
+				sheet1.SetCellValue(Row, "adjust_type", sheet1.GetCellValue(Row,"adjust_type_nm"), 0); //change 이벤트 발생 제외
+			}
+		}
+	}
+
+    function sheet1_OnClick(Row,Col) {
+        try {
+            if(sheet1.ColSaveName(Col) == "sDelete") {
+                sheet1.RowDelete(Row,0);
+            }
+        } catch (ex) {
+            alert("OnClick Event Error : " + ex);
+        }
+    }
+
+    var gPRow  = "";
+    var pGubun = "";
+
+    // 팝업 클릭시 발생
+    function sheet1_OnPopupClick(Row,Col) {
+        try {
+            if(sheet1.ColSaveName(Col) == "name") {
+                openEmployeePopup(Row) ;
+            }
+        } catch (ex) {
+            alert("OnPopupClick Event Error : " + ex);
+        }
+    }
+
+    function sheet1_OnLoadExcel() {
+        try {
+            LoadPersonInfo();
+        } catch (ex) {
+            alert("OnLoadExcel Event Error : " + ex);
+        }
+
+        var errMsg = "";
+
+	    try {
+            for(var i = 1; i <= sheet1.RowCount(); i++) {	            	
+            	<% if (!"Y".equals(reCalc)) { %>
+        	    	sheet1.SetCellValue(i, "gubun", "F", 0); // 최종 //change 이벤트 발생 제외
+        	    	sheet1.SetCellValue(i, "re_seq", "", 0); //change 이벤트 발생 제외
+        	    	sheet1.SetCellValue(i, "adjust_type", sheet1.GetCellValue(i,"adjust_type_nm"), 0); //change 이벤트 발생 제외
+        	    <% } else { %>
+	       			if (sheet1.GetCellValue(i,"gubun") == "F") { // 최종
+	       				if (typeof sheet1.GetCellValue(i,"re_seq") !== 'undefined') {
+	       					if (errMsg != "") errMsg = errMsg + "\n";
+	       					errMsg = errMsg + i + " 행 : " + sheet1.GetCellText(i,"gubun") + "은 차수를 시스템이 자동부여 합니다.";
+	       				}
+	       				sheet1.SetCellValue(i, "adjust_type", sheet1.GetCellValue(i,"adjust_type_nm"), 0); //change 이벤트 발생 제외
+	       			} else if (sheet1.GetCellValue(i,"gubun") == "H") { // 이력(수정)
+	       				if (typeof sheet1.GetCellValue(i,"re_seq") !== 'undefined' && sheet1.GetCellValue(i,"re_seq") < 1) {
+	       					if (errMsg != "") errMsg = errMsg + "\n";
+	       					errMsg = errMsg + i + " 행 : " + sheet1.GetCellText(i,"gubun") + "은 1차수 이상부터 등록 가능합니다.";
+	       				}
+	       				sheet1.SetCellValue(i, "adjust_type", sheet1.GetCellValue(i,"adjust_type_nm") + "R" + sheet1.GetCellValue(i,"re_seq"), 0); //change 이벤트 발생 제외
+	       			}
+        	    <% } %>
+            }
+            if (errMsg != "") {
+            	alert(errMsg); 
+            }
+        } catch(ex) {
+            alert("OnLoadExcel Event Error " + ex);
+        }
+    }
+
+    // 사원 조회
+    function openEmployeePopup(Row){
+        try{
+
+            if(!isPopup()) {return;}
+            gPRow = Row;
+            pGubun = "employeePopup";
+
+            var args    = new Array();
+            var rv = openPopup("<%=jspPath%>/common/employeePopup.jsp?authPg=<%=authPg%>", args, "740","520");
+            /*
+            if(rv!=null){
+                sheet1.SetCellValue(Row, "name",        rv["name"] );
+                sheet1.SetCellValue(Row, "sabun",       rv["sabun"] );
+                sheet1.SetCellValue(Row, "org_nm",      rv["org_nm"] );
+                sheet1.SetCellValue(Row, "manage_nm",   rv["manage_nm"] );
+                sheet1.SetCellValue(Row, "stamp_chk",   '1' );
+            }
+            */
+        } catch(ex) {
+            alert("Open Popup Event Error : " + ex);
+        }
+    }
+
+    function getReturnValue(returnValue) {
+
+        var rv = $.parseJSON('{'+ returnValue+'}');
+
+        if ( pGubun == "employeePopup" ){
+            //사원조회
+            sheet1.SetCellValue(gPRow, "name",      rv["name"] );
+            sheet1.SetCellValue(gPRow, "sabun",     rv["sabun"] );
+            sheet1.SetCellValue(gPRow, "org_nm",    rv["org_nm"] );
+            sheet1.SetCellValue(gPRow, "manage_nm", rv["manage_nm"] );
+            sheet1.SetCellValue(gPRow, "stamp_chk", '1' );
+        }
+    }
+    //출력
+    function print(printGbn) {
+
+        if ($("#searchPurposeCd").val() == "") {
+            alert("용도를 선택해 주십시오.");
+            $("#searchPurposeCd").focus();
+            return;
+
+        }
+
+     	// 정산구분이 전체일 경우 출력불가
+		var searchAdjustType = $("#searchAdjustType").val();
+
+		if( searchAdjustType == "" ){
+			alert("정산구분을 선택해주세요.");
+			return;
+		}
+
+        var sabuns = "";
+        var sortSabuns = "";
+        var sortNos = "";
+        var stamps = "";
+        var checked = "";
+        var searchAllCheck = "";
+        var sabunCnt = 0;
+		var adjustTypes = "";
+
+        if(sheet1.RowCount() != 0) {
+            for(i=1; i<=sheet1.LastRow(); i++) {
+
+                checked = sheet1.GetCellValue(i, "checked");
+
+                if (checked == "1" || checked == "Y") {
+                    sabuns      += "'"+sheet1.GetCellValue( i, "sabun" ) + "',";
+                    sortSabuns  += sheet1.GetCellValue( i, "sabun" ) + ",";
+                    sortNos     += sheet1.GetCellValue( i, "sort_no" ) + ",";
+
+                    if("1" == sheet1.GetCellValue( i, "stamp_chk" )) {
+                        stamps += sheet1.GetCellValue( i, "stamp_chk" ) + ",";
+                    } else {
+                        stamps += ",";
+                    }
+                	adjustTypes += sheet1.GetCellValue( i, "adjust_type" ) + ",";
+                }
+            }
+
+            if (sabuns.length > 1) {
+                sabuns      = sabuns.substr(0,sabuns.length-1);
+                sortSabuns  = sortSabuns.substr(0,sortSabuns.length-1);
+                sortNos     = sortNos.substr(0,sortNos.length-1);
+                stamps      = stamps.substr(0,stamps.length-1);
+            	adjustTypes = adjustTypes.substr(0,adjustTypes.length-1);
+            }
+
+            if (sabuns.length < 1) {
+                alert("선택된 사원이 없습니다.");
+                return;
+            }
+            //call RD!
+            withHoldRcptStaPopup(sabuns, sortSabuns, sortNos, stamps, printGbn, adjustTypes) ;
+        } else {
+
+            alert("선택된 사원이 없습니다.");
+            return;
+
+        }
+
+    }
+
+    /**
+     * 출력 window open event
+     * 레포트 공통에 맞춘 개발 코드 템플릿
+     * by JSG
+     */
+    function withHoldRcptStaPopup(sabuns, sortSabuns, sortNos, stamps, printGbn, adjustTypes){
+        var w       = 800;
+        var h       = 600;
+        var url     = "<%=jspPath%>/common/rdPopup.jsp";
+        var args    = new Array();
+        // args의 Y/N 구분자는 없으면 N과 같음
+        var rdFileNm ;
+        
+        /*if($("#searchWorkYy").val() !=null && ( $("#searchWorkYy").val()*1 ) >= 2007 ){
+            rdFileNm        = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+".mrd";
+
+			//원천징수영수증 출력시 2014 이후에는
+			//재정산 이전의 결과를 출력할 수 있도록 별도의 작업(이전)버튼이 존재
+			if(printGbn == "printBk" && ( $("#searchWorkYy").val()*1 ) >= 2014 ) {
+				rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"reCalc.mrd";
+			}
+        } else {
+            rdFileNm        = "WorkIncomeWithholdReceipt.mrd";
+        }*/
+
+        /*영문 버튼 클릭시 영문 원징*/
+        /*if(printGbn == "printEng" && ( $("#searchWorkYy").val()*1 ) >= 2017) {
+			rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"en.mrd"
+		}*/
+		
+        if($("#searchWorkYy").val() != null && $("#searchWorkYy").val() >= "2022"){
+        	var searchSabuns = "";
+        	if(sheet1.RowCount() > 0 ){
+            	for(var i = 1; i < sheet1.RowCount()+1; i++) {
+            		if(sheet1.GetCellValue(i,"checked") == "Y"){
+            			searchSabuns += "'"+sheet1.GetCellValue( i, "sabun" ) + "',";
+            		}
+            	}
+            	if (searchSabuns.length > 1) {
+            		searchSabuns = searchSabuns.substr(0,searchSabuns.length-1);
+                }
+
+            	var params = $("#sheetForm").serialize();
+            		params += "&searchSabuns="+searchSabuns;
+            		params += "&queryId=selectMigExistCnt";
+
+                var result = ajaxCall("<%=jspPath%>/withHoldRcptSta_mig/withHoldRcptStaRst.jsp?cmd=selectMigExistCnt",params,false);
+        		if(result.Result.Code == 1) {
+        			if(result.Data.cnt > 0 ){
+        				 rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"_M.mrd";
+        			}else{
+        	            if($("#searchWorkYy").val() !=null && ( $("#searchWorkYy").val()*1 ) >= 2007 ){
+        	                rdFileNm        = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+".mrd";
+
+        	    			//원천징수영수증 출력시 2014 이후에는
+        	    			//재정산 이전의 결과를 출력할 수 있도록 별도의 작업(이전)버튼이 존재
+        	    			if(printGbn == "printBk" && ( $("#searchWorkYy").val()*1 ) >= 2014 ) {
+        	    				rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"reCalc.mrd";
+        	    			}
+        	            } else {
+        	                rdFileNm        = "WorkIncomeWithholdReceipt.mrd";
+        	            }
+        	            /*영문 버튼 클릭시 영문 원징*/
+        	            if(printGbn == "printEng" && ( $("#searchWorkYy").val()*1 ) >= 2017) {
+        	    			rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"en.mrd"
+        	    		}
+        			}
+        		}
+        	}
+        } else{
+            if($("#searchWorkYy").val() !=null && ( $("#searchWorkYy").val()*1 ) >= 2007 ){
+                rdFileNm        = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+".mrd";
+
+    			//원천징수영수증 출력시 2014 이후에는
+    			//재정산 이전의 결과를 출력할 수 있도록 별도의 작업(이전)버튼이 존재
+    			if(printGbn == "printBk" && ( $("#searchWorkYy").val()*1 ) >= 2014 ) {
+    				rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"reCalc.mrd";
+    			}
+            } else {
+                rdFileNm        = "WorkIncomeWithholdReceipt.mrd";
+            }
+
+            /*영문 버튼 클릭시 영문 원징*/
+            if(printGbn == "printEng" && ( $("#searchWorkYy").val()*1 ) >= 2017) {
+    			rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"en.mrd"
+    		}
+        }
+
+        var printYmd = $("#searchPrintYMD").val().replace(/-/gi,"");
+        var imgPath = '<%=removeXSS(rdStempImgUrl,"filePathUrl")%>';
+        var imgFile = '<%=removeXSS(rdStempImgFile,"fileName")%>';
+        var bpCd = $("#searchBusinessPlaceCd").val() ;
+        if(bpCd == "") bpCd = "ALL" ;
+
+        args["rdTitle"] = "원천징수영수증" ;//rd Popup제목
+        args["rdMrd"] = "<%=removeXSS(cpnYearEndPath, "filePathUrl")%>/"+ rdFileNm; //( 공통경로 /html/report/는 공통에서 처리)업무경로+rd파일명
+        args["rdParam"] = "[<%=removeXSS(session.getAttribute("ssnEnterCd"), "1")%>]"
+                         +"["+$("#searchWorkYy").val()+"]"
+                         +"["+$("#searchAdjustType").val()+"]"
+                         +"["+sabuns+"]"
+                         +"['']"
+                         +"["+bpCd+"]"
+                         +"["+$("#searchPurposeCd").val()+"]"
+                         +"["+imgPath+"]"
+                         +"[4]"
+                         +"["+sortSabuns+"]"
+                         +"["+sortNos+"]"
+                         +"["+$("#searchPageLimit").val()+"]"
+                         +"["+printYmd+"]"
+                         +"["+ imgFile +"]"
+                         +"["+stamps+"]"
+                         +"["+$("#searchOption").val()+"]"
+                         +"["+adjustTypes+"]"
+                         ;//rd파라매터
+
+        args["rdParamGubun"] = "rp" ;//파라매터구분(rp/rv)
+        args["rdToolBarYn"] = "Y" ;//툴바여부
+        args["rdZoomRatio"] = "100" ;//확대축소비율
+
+        <%-- 2011년 이후 연말정산 패치가 될 소지가 있어 아래 로직을 추가 반영한다. 이수화학의 경우, 파일로 저장할 수 없도록 설정한다. 출력만 가능. 2012-02-23 김명주씨 요청사항. --%>
+        args["rdSaveYn"]    = '<%=("ISU_CH".equals(removeXSS(session.getAttribute("ssnEnterCd"), "1"))) ? "N" : "Y"%>' ;//기능컨트롤_저장
+
+        args["rdPrintYn"]   = "Y" ;//기능컨트롤_인쇄
+        args["rdExcelYn"]   = "Y" ;//기능컨트롤_엑셀
+        args["rdWordYn"]    = "Y" ;//기능컨트롤_워드
+        args["rdPptYn"]     = "Y" ;//기능컨트롤_파워포인트
+        args["rdHwpYn"]     = "Y" ;//기능컨트롤_한글
+        args["rdPdfYn"]     = "Y" ;//기능컨트롤_PDF
+
+        if(!isPopup()) {return;}
+        var rv = openPopup(url,args,w,h);//알디출력을 위한 팝업창
+        //if(rv!=null){
+            //return code is empty
+        //}
+    }
+
+    function print2(printGbn) {
+
+        if ($("#searchPurposeCd").val() == "") {
+            alert("용도를 선택해 주십시오.");
+            $("#searchPurposeCd").focus();
+            return;
+
+        }
+
+     	// 정산구분이 전체일 경우 출력불가
+		var searchAdjustType = $("#searchAdjustType").val();
+
+		if( searchAdjustType == "" ){
+			alert("정산구분을 선택해주세요.");
+			return;
+		}
+
+        var sabuns = "";
+        var sortSabuns = "";
+        var sortNos = "";
+        var stamps = "";
+        var checked = "";
+        var searchAllCheck = "";
+        var sabunCnt = 0;
+        var sabun = "";
+        var empName = "";
+        var arrName = "";
+		var adjustTypes = "";
+
+        if(sheet1.RowCount() != 0) {
+            for(i=1; i<=sheet1.LastRow(); i++) {
+
+                checked = sheet1.GetCellValue(i, "checked");
+
+                if (checked == "1" || checked == "Y") {
+                    sabuns      += "'"+sheet1.GetCellValue( i, "sabun" ) + "',";
+                    arrName     += "'"+sheet1.GetCellValue( i, "name" ) + "',";
+                    sortSabuns  += sheet1.GetCellValue( i, "sabun" ) + ",";
+                    sortNos     += sheet1.GetCellValue( i, "sort_no" ) + ",";
+                    if (sabun == "") { //20240418 첫번째 선택된 대상자가 파일명 구성할 때 대표로 만들어 지도록 
+	                    sabun = sheet1.GetCellValue( i, "sabun" );
+	                    empName = sheet1.GetCellText( i, "name" );
+                    }
+                    sabunCnt++;
+                    
+                    if("1" == sheet1.GetCellValue( i, "stamp_chk" )) {
+                        stamps += sheet1.GetCellValue( i, "stamp_chk" ) + ",";
+                    } else {
+                        stamps += ",";
+                    }
+                	adjustTypes += sheet1.GetCellValue( i, "adjust_type" ) + ",";
+                }
+            }
+
+            if (sabuns.length > 1) {
+                sabuns      = sabuns.substr(0,sabuns.length-1);
+                arrName     = arrName.substr(0,arrName.length-1);
+                sortSabuns  = sortSabuns.substr(0,sortSabuns.length-1);
+                sortNos     = sortNos.substr(0,sortNos.length-1);
+                stamps      = stamps.substr(0,stamps.length-1);
+            	adjustTypes = adjustTypes.substr(0,adjustTypes.length-1);
+            }
+
+            if (sabuns.length < 1) {
+                alert("선택된 사원이 없습니다.");
+                return;
+            }
+            //call RD!
+            withHoldRcptDownPopup(sabuns, sortSabuns, sortNos, stamps, printGbn, sabun, empName, sabunCnt, arrName, adjustTypes) ;
+        } else {
+
+            alert("선택된 사원이 없습니다.");
+            return;
+
+        }
+
+    }
+    
+    function withHoldRcptDownPopup(sabuns, sortSabuns, sortNos, stamps, printGbn, sabun, empName, sabunCnt, arrName, adjustTypes){
+        var w       = 900;
+        var h       = 300;
+        var url     = "<%=jspPath%>/withHoldRcptSta_mig/callRcptInvokerPop.jsp";
+        var args    = new Array();
+        // args의 Y/N 구분자는 없으면 N과 같음
+        var rdFileNm ;
+        if($("#searchWorkYy").val() !=null && ( $("#searchWorkYy").val()*1 ) >= 2007 ){
+            rdFileNm        = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+".mrd";
+
+			//원천징수영수증 출력시 2014 이후에는
+			//재정산 이전의 결과를 출력할 수 있도록 별도의 작업(이전)버튼이 존재
+			if(printGbn == "printBk" && ( $("#searchWorkYy").val()*1 ) >= 2014 ) {
+				rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"reCalc.mrd";
+			}
+        } else {
+            rdFileNm        = "WorkIncomeWithholdReceipt.mrd";
+        }
+
+        /*영문 버튼 클릭시 영문 원징*/
+        if(printGbn == "printEng" && ( $("#searchWorkYy").val()*1 ) >= 2017) {
+			rdFileNm = "WorkIncomeWithholdReceipt_"+$("#searchWorkYy").val()+"en.mrd"
+		}
+
+        var printYmd = $("#searchPrintYMD").val().replace(/-/gi,"");
+        var imgPath = '<%=removeXSS(rdStempImgUrl,"filePathUrl")%>';
+        var imgFile = '<%=removeXSS(rdStempImgFile,"fileName")%>';
+        var bpCd = $("#searchBusinessPlaceCd").val() ;
+        if(bpCd == "") bpCd = "ALL" ;
+		
+        args["rdTitle"] = "원천징수영수증" ;//rd Popup제목
+        args["rdMrd"] = "<%=removeXSS(cpnYearEndPath, "filePathUrl")%>/"+ rdFileNm; //( 공통경로 /html/report/는 공통에서 처리)업무경로+rd파일명
+        args["rdParam1"] = "[<%=removeXSS(session.getAttribute("ssnEnterCd"), "1")%>]";
+        args["rdParam2"] = "["+$("#searchWorkYy").val()+"]";
+        args["rdParam3"] = "["+$("#searchAdjustType").val()+"]";
+        args["rdParam4"] = "["+sabuns+"]";
+        args["rdParam5"] = "['']";
+        args["rdParam6"] = "["+bpCd+"]";
+        args["rdParam7"] = "["+$("#searchPurposeCd").val()+"]";
+        args["rdParam8"] = "["+imgPath+"]";
+        args["rdParam9"] = "[4]";
+        args["rdParam10"] = "["+sortSabuns+"]";
+        args["rdParam11"] = "["+sortNos+"]";
+        args["rdParam12"] = "["+$("#searchPageLimit").val()+"]";
+        args["rdParam13"] = "["+printYmd+"]";
+        args["rdParam14"] = "["+ imgFile +"]";
+        args["rdParam15"] = "["+stamps+"]";
+        args["rdParam16"] = "["+$("#searchOption").val()+"]";//rd파라매터
+        args["rdParam17"] = "["+adjustTypes+"]";//rd파라매터        
+        args["sabun"] = sabun;
+        args["pSabuns"] = sabuns;
+        args["empName"] = empName;
+        args["sabunCnt"] = sabunCnt;
+        args["rdFileNm"] = rdFileNm;
+        args["arrName"] = arrName;
+        args["searchWorkYy"] = $("#searchWorkYy").val();
+       
+        if(!isPopup()) {return;}
+        var rv = openPopup(url,args,w,h);//알디출력을 위한 팝업창
+        
+    }
+    
+    function LoadPersonInfo()
+    {
+        var rowSabun = "";
+        var errSabun = "";
+        var enterCd = "";
+        if( sheet1.RowCount() != 0 ) {
+
+            for(i=1; i<=sheet1.LastRow(); i++) {
+                rowSabun = sheet1.GetCellValue( i, "sabun" );
+                var req = ajaxCall("<%=jspPath%>/withHoldRcptSta_mig/withHoldRcptStaRst.jsp?cmd=selectEmpInfoUsingSabun","searchSabun="+rowSabun,false);
+
+                if(req.Result.Code == 1) {
+                    if(typeof req.Data.name != "undefined") {
+                        sheet1.SetCellValue(i, "name", req.Data.name);
+                        sheet1.SetCellValue(i, "sabun", req.Data.sabun);
+                        sheet1.SetCellValue(i, "org_nm", req.Data.org_nm);
+                        sheet1.SetCellValue(i, "manage_nm", req.Data.manage_nm);
+                        sheet1.SetCellValue(i, "stamp_chk", 1) ;
+                        sheet1.SetCellValue(i, "sort_no", i) ;
+                    } else {
+                        errSabun += rowSabun+",";
+                    }
+                }
+            }
+
+            if(errSabun != "") {
+                alert("*사원정보 가저오는 도중 에러 발생*\n - 업로드 된 사번 중 인사정보에 없는 사번이 존재합니다.\n에러가 발생한 사번 => "+errSabun) ;
+            }
+        }
+    }
+    function initPage() {
+    	if($("#searchDivPage").val() != "" && !isNaN($("#searchDivPage").val())) {
+    		var totalCount = 0;
+        	var maxPage = 0;
+        	var divPage = $("#searchDivPage").val();
+
+        	var param = $("#sheetForm").serialize();
+    		var rstData = ajaxCall("<%=jspPath%>/withHoldRcptSta_mig/withHoldRcptStaRst.jsp?cmd=selecWithHoldTotCnt",param,false);
+
+    		if(rstData.Result.Code == "1") {
+    			totalCount = rstData.Data.cnt;
+
+    			if(totalCount > 0 && divPage > 0) {
+    				maxPage = Math.floor(totalCount/divPage)+1;
+    			}
+
+    			$("#searchPage").html('');
+    			$("#searchPage").append("<option value=''>전체</option>");
+
+    			if(maxPage > 0) {
+    				for(i=1; i<=maxPage; i++) {
+    					$("#searchPage").append("<option value='"+i+"' >"+((i-1)*divPage+1)+" ~ "+i*divPage+"</option>");
+    				}
+    			}
+    		}
+
+    	}
+    }
+</script>
+</head>
+<body class="hidden">
+<div id="progressCover" style="display:none;position:absolute;top:0;bottom:0;left:0;right:0;background:url(<%=imagePath%>/common/process.png) no-repeat 50% 50%;"></div>
+<div class="wrapper">
+    <form id="sheetForm" name="sheetForm" >
+    	<input type="hidden" id="searchDivPage" name="searchDivPage" value="100" />
+    	<input type="hidden" id="menuNm" name="menuNm" value="" />
+        <input type="hidden" id="reCalc" name="reCalc" value="<%=reCalc%>"/>
+        <div class="sheet_search outer">
+            <div>
+                <table>
+                    <tr>
+
+                    <td>
+                        <span>귀속</span>
+						<%
+						if(!"SH".equals(session.getAttribute("ssnEnterCd")) && !"GT".equals(session.getAttribute("ssnEnterCd")) && !"FMS".equals(session.getAttribute("ssnEnterCd")) && !"CSM".equals(session.getAttribute("ssnEnterCd")) && !"SHN".equals(session.getAttribute("ssnEnterCd"))){
+						%>
+							<input id="searchWorkYy" name ="searchWorkYy" type="text" class="text w35 center" maxlength="4"/>
+						<%}else{%>
+							<input id="searchWorkYy" name ="searchWorkYy" type="text" class="text w35 center readonly" maxlength="4" readonly="readonly"/>
+						<%}%>
+                        <span>년</span>
+                        <select id="searchWorkMm" name ="searchWorkMm" onChange="" class="box">
+                            <option value=""></option>
+                            <option value="01">01</option>
+                            <option value="02">02</option>
+                            <option value="03">03</option>
+                            <option value="04">04</option>
+                            <option value="05">05</option>
+                            <option value="06">06</option>
+                            <option value="07">07</option>
+                            <option value="08">08</option>
+                            <option value="09">09</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                        </select>
+                        <span>월</span>
+                    </td>
+                    <td>
+                        <span>정산구분</span>
+                        <select id="searchAdjustType" name ="searchAdjustType" class="box"></select>
+                    </td>
+                    <td>
+                        <span>사업장</span>
+                        <select id="searchBusinessPlaceCd" name ="searchBusinessPlaceCd" onChange="" class="box"></select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span>용도</span>
+                        <select id="searchPurposeCd" name ="searchPurposeCd" onChange="" class="box">
+                        </select>
+                    </td>
+                    <td>
+                        <span>사대보험출력여부</span>
+                        <select id="searchOption" name ="searchOption" onChange="" class="box">
+                            <option value="N" >미출력</option>
+                            <option value="Y" selected>출력</option>
+                        </select>
+                    </td>
+                    <td>
+                        <span>소속 </span>
+                        <input id="searchOrgNm" name ="searchOrgNm" type="text" class="text"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span>출력일자 </span>
+                        <input id="searchPrintYMD" name ="searchPrintYMD" type="text" class="date2" value="<%=curSysYyyyMMddHyphen%>"/>
+                    </td>
+                    <td>
+                        <span>출력순서</span>
+                        <select id="searchSort" name ="searchSort" onChange="doAction1('Search')" class="box">
+                            <option value="1" selected>성명순</option>
+                            <option value="2" >사번순</option>
+                            <option value="3" >부서순</option>
+                        </select>
+                        <select id="searchPageLimit" name ="searchPageLimit" onChange="" class="box">
+                            <option value="7" selected>7</option>
+                            <option value="6" >6</option>
+                            <option value="5" >5</option>
+                            <option value="4" >4</option>
+                            <option value="3" >3</option>
+                            <option value="2" >2</option>
+                            <option value="1" >1</option>
+                        </select> &nbsp;Page까지
+                    </td>
+                    <td class="pageHide" style="display: none;">
+                        <span>Page</span>
+                        <select id="searchPage" name ="searchPage" onChange="doAction1('Search');" class="box"></select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span>사번/성명</span>
+                        <input id="searchSbNm" name ="searchSbNm" type="text" class="text w60"/>
+                    </td>
+                    <td>
+                        <span>작성방법 출력여부</span>
+                        <select id="searchRdCmtYn" name ="searchRdCmtYn" onChange="javascript:doAction1('SaveRdCmtYn');" class="box">
+                            <option value="N" >미출력</option>
+                            <option value="Y" selected>출력</option>
+                        </select>
+                        
+                    </td>
+                    <td>
+                    	<a href="javascript:doAction1('Search')" id="btnSearch" class="button" style="margin-left:20px;">조회</a>
+                    </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </form>
+    <table border="0" cellspacing="0" cellpadding="0" class="sheet_main">
+        <tr>
+            <td style="width:65%">
+                <div class="inner">
+                    <div class="sheet_title">
+                        <ul>
+                            <li id="txt" class="txt">출력대상자</li>
+                            <li class="btn">
+                                <a href="javascript:doAction1('Insert')"        class="basic authA">입력</a>
+                                <a href="javascript:doAction1('LoadExcel')"     class="basic btn-upload authA">업로드</a>
+                                <a href="javascript:doAction1('Down2Excel')"    class="basic btn-download authR">다운로드</a>
+                                <a href="javascript:print('print')"             class="basic btn-white ico-print">출력</a>
+                                <span id="btnDisplayYn">
+                                <a href="javascript:print2('print')"             class="basic btn-download authR">PDF파일다운</a>
+                                </span>
+                                <a href="javascript:print('printEng')" id="rdEngBtn" name="rdEngBtn" class="basic btn-white ico-print" style="display:none;">출력(영문)</a>
+								<!-- <a href="javascript:print('printBk')"			class="basic authA">출력(이전)</a> -->
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <script type="text/javascript">createIBSheet("sheet1", "100%", "100%"); </script>
+            </td>
+        </tr>
+    </table>
+</div>
+<iframe id="FileDownloadFrame" src="" frameborder="0" scrolling="no" width="0" height="0" style="display:none"></iframe>
+</body>
+</html>

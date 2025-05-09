@@ -1,0 +1,2694 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="main.mainBoxWidget">
+
+	<select id="getWidgetDefaultList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT 	  A.ENTER_CD
+					, A.TAB_ID
+					, A.TAB_NAME
+					, F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys342', A.TAB_ID || '.detail'  , #{ssnLocaleCd}) AS TAB_DETAIL
+					, A.TAB_SEQ
+					, A.TAB_URL
+					, B.SEQ
+					, DECODE(B.SEQ, NULL, 'off', DECODE(A.USE_YN, 'Y','on','L','fixed')) AS TAB_ON_OFF
+			FROM TSYS342 A, TSYS343 B, TSYS345 C
+			WHERE 1 = 1
+			AND A.ENTER_CD = #{ssnEnterCd}
+			AND A.USE_YN IN( 'Y','L')
+			AND B.SABUN(+) = #{ssnSabun}
+			AND A.ENTER_CD = B.ENTER_CD(+)
+			AND A.TAB_ID   = B.TAB_ID(+)
+			AND #{ssnGrpCd}  = B.GRP_CD(+)
+			AND A.ENTER_CD = C.ENTER_CD
+			AND A.TAB_ID   = C.TAB_ID
+			AND C.GRP_CD   = #{ssnGrpCd}
+			ORDER BY B.SEQ, A.TAB_SEQ
+		]]>
+	</select>
+
+	<select id="getMenuPrgMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+                SELECT T1.*
+                  FROM (
+                    SELECT	LEVEL AS "_level", ROWNUM AS rnum
+							, AA.*
+					FROM (
+						   	SELECT A.ENTER_CD
+								, A.MAIN_MENU_CD
+								, A.PRIOR_MENU_CD
+								, A.MENU_CD
+								, A.MENU_SEQ
+								, NVL(B.MENU_NM, A.MENU_NM) AS MENU_NM
+								, A.TYPE
+								, A.PRG_CD
+								, NVL(B.SEQ, A.SEQ) AS SEQ
+								, B.USE_YN
+							FROM TSYS303 A, TSYS311 B
+							WHERE A.ENTER_CD = #{ssnEnterCd}
+							AND A.ENTER_CD = B.ENTER_CD(+)
+							AND A.MAIN_MENU_CD = B.MAIN_MENU_CD(+)
+							AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD(+)
+							AND A.MENU_CD = B.MENU_CD(+)
+							AND A.MENU_SEQ = B.MENU_SEQ(+)
+							AND B.GRP_CD(+) = #{ssnGrpCd}
+						    AND B.USE_YN = '1'
+							AND A.MAIN_MENU_CD = #{mainMenuCd})AA
+					WHERE 1=1
+					START WITH AA.PRIOR_MENU_CD = '0'
+					CONNECT BY PRIOR AA.ENTER_CD = AA.ENTER_CD
+					AND PRIOR AA.MAIN_MENU_CD = AA.MAIN_MENU_CD
+					AND PRIOR AA.MENU_CD = AA.PRIOR_MENU_CD
+					ORDER SIBLINGS BY AA.SEQ) T1
+				]]>
+		 WHERE T1.TYPE = 'P'
+		   AND ROWNUM= 1
+		 ORDER BY RNUM
+	</select>
+
+	<select id="getWidgetList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT 	  A.ENTER_CD
+					, A.TAB_ID
+					, A.TAB_NAME
+					, F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys342', A.TAB_ID || '.detail', #{ssnLocaleCd}) AS TAB_DETAIL
+					, A.TAB_SEQ
+					, A.TAB_URL
+					, NVL (B.SEQ , ROWNUM+1) AS SEQ
+					, DECODE(B.SEQ, NULL, 'OFF', DECODE(A.USE_YN, 'Y','ON','L','FIXED')) AS TAB_ON_OFF
+					, B.TAB_SIZE
+					, A.STATS_CD
+				FROM TSYS342 A, TSYS345 B
+				WHERE 1 = 1
+				AND A.ENTER_CD  = #{ssnEnterCd}
+				AND A.USE_YN IN( 'Y','L')
+				AND A.ENTER_CD  = B.ENTER_CD
+				AND A.TAB_ID    = B.TAB_ID
+				AND B.GRP_CD    = #{ssnGrpCd} ]]>
+		<if test='mainMenuCd != null and mainMenuCd neq ""'>
+				AND B.MAIN_MENU_CD = #{mainMenuCd}
+		</if>
+		<![CDATA[
+		--ORDER BY DECODE(B.SEQ, null, 2, B.SEQ), NVL( B.SEQ, ROWNUM+1 ), A.TAB_SEQ
+		ORDER BY DECODE(B.SEQ, NULL, 2, 1), NVL( B.SEQ, ROWNUM+1 ), A.TAB_SEQ
+		]]>
+	</select>
+
+	<delete id="deleteWidget" parameterType="map">
+		<![CDATA[
+			DELETE FROM TSYS343
+			WHERE ENTER_CD 	= #{ssnEnterCd}
+			AND GRP_CD		= #{ssnGrpCd}
+			AND SABUN 		= #{ssnSabun}
+		]]>
+	</delete>
+
+	<insert id="saveWidget" parameterType="map">
+		<![CDATA[
+			INSERT INTO TSYS343(
+					ENTER_CD
+					, GRP_CD
+					, SABUN
+					, TAB_ID
+					, SEQ
+					, CHKDATE
+					, CHKID
+				)
+				SELECT	  #{ssnEnterCd}
+						, #{ssnGrpCd}
+						, #{ssnSabun}
+						, A.TAB_ID
+						, ROW_NUMBER() OVER(ORDER BY NVL(A.SEQ, 0))
+						, SYSDATE
+						, #{ssnSabun}
+				FROM (
+						SELECT	  NULL 	AS TAB_ID
+								, NULL 	AS SEQ
+						FROM   DUAL ]]>
+		<foreach item="rm" collection="insertRows">
+		<![CDATA[
+			UNION ALL
+				SELECT TRIM(#{rm.tabId}) AS TAB_ID
+					 , TO_NUMBER(TRIM(#{rm.seq}))	AS SEQ
+				FROM   DUAL
+		]]>
+		</foreach>
+	<![CDATA[	) A
+				WHERE A.TAB_ID IS NOT NULL
+		]]>
+	</insert>
+
+	<update id="updateWidgetType" parameterType="map">
+		<![CDATA[
+			UPDATE TSYS305
+			   SET WIDGET_TYPE = #{widgetType}
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			   AND SABUN = #{ssnSabun}
+		]]>
+	</update>
+
+	<select id="getListBox8List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT KM.* FROM (
+			SELECT A.SABUN
+				 , NAME
+				 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+				 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				 , TO_CHAR(TO_DATE(EMP_YMD,'YYYYMMDD'),'YYYY.MM.DD') AS EMP_YMD
+				 , B.MANAGE_CD
+			 FROM THRM100 A , THRM151 B
+			WHERE A.ENTER_CD = B.ENTER_CD
+			  AND A.SABUN = B.SABUN
+			  AND A.ENTER_CD = #{ssnEnterCd}
+			  -- AND A.EMP_YMD >= TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYYMMDD')
+			  AND A.SABUN IN ('101134', '101136', '101157')
+			  AND B.STATUS_CD != 'RA'
+			  AND B.MANAGE_CD <> '004'
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+			  AND NVL(A.RET_YMD, '99991231') >= TO_CHAR(ADD_MONTHS(SYSDATE, +1), 'YYYYMMDD')
+			) KM
+            ORDER BY EMP_YMD
+		]]>
+	</select>
+
+	<select id="getListBox8List2" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * FROM (
+				SELECT KM.*, ROWNUM AS RNUM FROM (
+					SELECT A.SABUN
+						 , NAME
+						 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+						 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+						 , TO_CHAR(TO_DATE(EMP_YMD,'YYYYMMDD'),'YYYY.MM.DD') AS EMP_YMD
+						 , B.MANAGE_CD
+					 FROM THRM100 A , THRM151 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+					  AND A.SABUN = B.SABUN
+					  AND A.ENTER_CD = #{ssnEnterCd}
+					  AND A.EMP_YMD >= TO_CHAR(ADD_MONTHS(SYSDATE, -1), 'YYYYMMDD')
+					  AND B.STATUS_CD != 'RA'
+					  AND B.MANAGE_CD <> '004'
+					  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				) KM
+                 ORDER BY EMP_YMD
+             )
+		]]>
+	</select>
+
+	<select id="getListBox2CntL" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT FROM (
+				SELECT  RANK() OVER (ORDER BY A.APPL_SEQ DESC ) AS RK
+					,'1' AS DETAIL
+					, A.ENTER_CD
+       				, A.APPL_SEQ
+		         	, A.TITLE || DECODE( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+		         	, A.APPL_CD
+		         	, B.APPL_NM
+		         	, A.APPL_YMD
+   					, TO_CHAR(TO_DATE(A.APPL_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') 	AS APPL_YMD_A
+    				, A.APPL_SABUN
+   					, F_COM_GET_NAMES(A.ENTER_CD, A.APPL_SABUN) 	AS APPL_NAME
+    				, A.APPL_IN_SABUN
+   					, F_COM_GET_NAMES(A.ENTER_CD,A.APPL_IN_SABUN) 	AS APPL_IN_NAME
+    				, A.APPL_STATUS_CD
+    				, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010' , A.APPL_STATUS_CD) AS APPL_STATUS_CD_NM
+    				, A.AGREE_SABUN
+   					, F_COM_GET_NAMES(A.ENTER_CD, A.AGREE_SABUN) 	AS AGREE_NAME
+    				, A.AGREE_YMD
+    				, TO_CHAR(TO_DATE(A.AGREE_YMD, 'YYYYMMDD' ), 'YYYY-MM-DD') 	AS AGREE_YMD_A
+				FROM THRI103 A, THRI101 B
+				WHERE 1=1
+				AND		A.ENTER_CD 		= #{ssnEnterCd}
+				AND     A.APPL_SABUN  	= #{ssnSabun}
+				AND     A.ENTER_CD      = B.ENTER_CD
+				AND    	A.APPL_CD    	= B.APPL_CD
+				AND    	B.USE_YN    	= 'Y'
+				AND 	A.APPL_STATUS_CD = '21'
+				AND A.APPL_YMD BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE,-12),'YYYYMMDD') AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+			)
+		]]>
+	</select>
+
+	<select id="getListBox3List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT TO_CHAR(TO_DATE(T2.SUN_DATE,'YYYYMMDD'),'MM.DD') AS S_YMD
+				 , DECODE(F_TIM_GET_HOLIDAY_GB('PTCH', T2.SUN_DATE),'2','Y','1','N') AS HOL_DAY_YN
+				 , TO_CHAR(TO_DATE(T1.IN_TIME, 'HH24MISS'),'HH24:MI') AS S_TIME
+				 , TO_CHAR(TO_DATE(T1.OUT_TIME, 'HH24MISS'),'HH24:MI') AS E_TIME
+				 , T1.GNT_NM
+			  FROM  ( SELECT RANK() OVER (ORDER BY A.IN_YMD DESC ) AS RK
+						   , A.IN_YMD
+						   , A.IN_TIME
+						   , A.OUT_YMD
+						   , A.OUT_TIME
+						   , B.GNT_CD
+						   , ( SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD = B.ENTER_CD AND GNT_CD = B.GNT_CD) AS GNT_NM
+								 FROM TTIM651 A
+									,( SELECT S1.*
+										FROM TTIM405 S1, THRI103 S2
+										WHERE S1.ENTER_CD   = S2.ENTER_CD
+										AND S1.APPL_SEQ   = S2.APPL_SEQ
+										AND S2.APPL_STATUS_CD = '99'
+										AND TO_DATE(S1.YMD,'YYYYMMDD') BETWEEN (SYSDATE-7) AND SYSDATE ) B
+								WHERE A.ENTER_CD = B.ENTER_CD(+)
+									AND A.SABUN = B.SABUN(+)
+									AND A.IN_YMD = B.YMD(+)
+											AND A.ENTER_CD   = TRIM(#{ssnEnterCd})
+											AND A.SABUN      = TRIM(#{ssnSabun})
+											AND TO_DATE(A.IN_YMD,'YYYYMMDD') BETWEEN (SYSDATE-7) AND SYSDATE ) T1, TSYS007 T2
+			WHERE T1.IN_YMD (+)= T2.SUN_DATE
+				AND TO_DATE(T2.SUN_DATE ,'YYYYMMDD') BETWEEN (SYSDATE-7) AND SYSDATE
+				AND RK < 4
+		]]>
+	</select>
+
+	<select id="getListBox8ListCnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT KM.SABUN FROM (
+				SELECT A.SABUN
+					 , NAME
+					 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+					 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					 , TO_CHAR(TO_DATE(EMP_YMD,'YYYYMMDD'),'YYYY.MM.DD') AS EMP_YMD
+				 FROM THRM100 A , THRM151 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+				  AND A.SABUN = B.SABUN
+				  AND A.ENTER_CD = #{ssnEnterCd}
+				  AND A.EMP_YMD >= TO_CHAR(ADD_MONTHS(SYSDATE, -3), 'YYYYMMDD')
+				  AND B.STATUS_CD != 'RA'
+				  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+			) KM ORDER BY EMP_YMD
+		]]>
+	</select>
+
+	<select id="getListBox9List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * FROM (
+				SELECT ROWNUM AS NUM, T.* FROM(
+         				SELECT RANK () OVER ( ORDER BY  A.RESEARCH_SEQ DESC ) AS RK
+						 , A.RESEARCH_SEQ
+						 , A.RESEARCH_NM
+						 , TO_CHAR(TO_DATE(A.RESEARCH_SYMD,'YYYYMMDD'),'YYYY.MM.DD') AS RESEARCH_SYMD
+						 , TO_CHAR(TO_DATE(A.RESEARCH_EYMD,'YYYYMMDD'),'YYYY.MM.DD') AS RESEARCH_EYMD
+						 , A.STATE_CD
+					  FROM TSYS601 A
+					 WHERE 1=1
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.STATE_CD = '20'
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.RESEARCH_SYMD AND A.RESEARCH_EYMD
+					   AND OPEN_YN = 'Y'
+					 ORDER BY A.RESEARCH_SEQ DESC
+				) T
+			) ]]>
+		<if test="countAnniv != null and countAnniv != ''">
+		<![CDATA[
+			WHERE NUM BETWEEN (TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page})) * TO_NUMBER(#{countAnniv})
+		]]>
+		</if>
+	</select>
+
+	<select id="getListBox9ListCnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * FROM (
+				SELECT ROWNUM AS NUM, T.* FROM(
+         				SELECT RANK () OVER ( ORDER BY  A.RESEARCH_SEQ DESC ) AS RK
+							 , A.RESEARCH_SEQ
+							 , A.RESEARCH_NM
+							 , TO_CHAR(TO_DATE(A.RESEARCH_SYMD,'YYYYMMDD'),'YYYY.MM.DD')     AS RESEARCH_SYMD
+							 , TO_CHAR(TO_DATE(A.RESEARCH_EYMD,'YYYYMMDD'),'YYYY.MM.DD')     AS RESEARCH_EYMD
+							 , A.STATE_CD
+						  FROM TSYS601 A
+						 WHERE 1=1
+						   AND A.ENTER_CD = #{ssnEnterCd}
+						   AND A.STATE_CD = '20'
+						   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.RESEARCH_SYMD AND A.RESEARCH_EYMD
+						   AND OPEN_YN = 'Y'
+						 ORDER BY A.RESEARCH_SEQ DESC
+					) T
+				)
+		]]>
+	</select>
+
+	<select id="getListBox10List" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT SEQ, POSITION_NM, NAME, OFFICE_TEL, SABUN, ROWNUM AS RNUN
+	  	  FROM TSYS985
+	  	 WHERE ENTER_CD = #{ssnEnterCd}
+	  	 ORDER BY SEQ
+	]]>
+	</select>
+
+	<select id="getListBox23List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT T.*
+			     , CASE WHEN IN_HM IS NOT NULL THEN '&nbsp;&nbsp;' || SUBSTR(IN_HM, 1,2) || ':' || SUBSTR(IN_HM, 3,2) ELSE '' END AS VIN_HM
+			     , CASE WHEN OUT_HM IS NOT NULL THEN '&nbsp;&nbsp;' || SUBSTR(OUT_HM, 1,2) || ':' || SUBSTR(OUT_HM, 3,2) ELSE '' END AS VOUT_HM
+			     , TRIM(#{ip}) AS IP_ADDRESS
+			     , DECODE( ( SELECT COUNT(1)
+					           FROM TORG905 X
+					          WHERE X.ENTER_CD = #{ssnEnterCd}
+					            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL( X.EDATE, '29991231' )
+					            AND TRIM(#{ip}) BETWEEN TRIM(X.IP_ADDRESS) AND TRIM(NVL(X.IP_ADDRESS_END, X.IP_ADDRESS ))
+					        ), 0, 'N', 'Y' ) AS IP_CHK
+			FROM (
+				SELECT TO_CHAR(SYSDATE, 'YYYY.MM.DD') || ' (' || TO_CHAR(SYSDATE, 'DY') || ')' AS TO_DAY
+					 , TO_CHAR(SYSDATE, 'YYYY/MM/DD HH24:MI:SS') AS TO_TIME
+				     , B.IN_YMD
+				     , NVL(NVL(C.IN_HM, D.IN_HM), B.IN_HM) AS IN_HM
+				     , B.OUT_YMD
+				     , NVL(NVL(C.OUT_HM, D.OUT_HM), B.OUT_HM) AS OUT_HM
+				     , C.GNT_CD
+				  FROM THRM100 A, TTIM730 B, TTIM330 D, TTIM335 C
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN    = #{ssnSabun}
+				   AND A.ENTER_CD = B.ENTER_CD(+)
+				   AND A.SABUN    = B.SABUN(+)
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') = B.YMD(+)
+				   AND A.ENTER_CD = C.ENTER_CD(+)
+				   AND A.SABUN    = C.SABUN(+)
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') = C.YMD(+)
+				   AND A.ENTER_CD = D.ENTER_CD(+)
+				   AND A.SABUN    = D.SABUN(+)
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') = D.YMD(+)
+			) T
+ 		]]>
+	</select>
+
+	<select id="getListBox6List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT TA.*
+				FROM (SELECT RANK () OVER ( ORDER BY A.REG_DATE  DESC, A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ (A.ENTER_CD, A.BBS_CD, A.BBS_SEQ)) AS RK,
+							A.BBS_CD,
+							A.BBS_SEQ,
+							A.SABUN,
+							F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) || ' ' || F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.REG_DATE, #{ssnLocaleCd}) AS WRITER,
+							A.DEPTH,
+							(SUBSTR ('        ', 0, DEPTH * 2))|| DECODE (A.DEPTH, '0', '', '└RE:')|| A.TITLE AS TITLE,
+							TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYY.MM.DD ')
+									AS REG_DATE,
+							TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYYMMDD ')
+									AS REG_DATE_NEW,
+							A.ENTER_CD,
+							NVL((CASE WHEN TO_CHAR(sysdate, 'YYYYMMDD') BETWEEN A.NOTIFY_SDATE AND A.NOTIFY_EDATE
+													AND A.POP_NOTIFY_YN = 'Y' THEN 'Y'
+											ELSE 'N' END),'N'
+								) AS POP,
+							A.MASTER_BBS_SEQ
+					FROM TSYS710 A, TSYS700 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.BBS_CD = B.BBS_CD
+					AND A.ENTER_CD = TRIM (#{ssnEnterCd})
+					AND A.BBS_CD = TRIM ('10000')
+					AND 'Y' =  NVL ((SELECT 'N' AS BBS_CD
+															FROM TSYS750
+														WHERE SABUN = TRIM (#{ssnSabun})
+															AND BBS_CD = A.BBS_CD),'Y')) TA
+			WHERE RK <= NVL(#{searchRk}, 4)
+			  AND REG_DATE_NEW BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE,-1),'YYYYMMDD') AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+			ORDER BY REG_DATE DESC
+		]]>
+	</select>
+
+	<select id="getListBox6List2" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * FROM (
+				SELECT TA.*, ROWNUM AS RNUM
+					FROM (SELECT RANK () OVER ( ORDER BY A.REG_DATE  DESC, A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ (A.ENTER_CD, A.BBS_CD, A.BBS_SEQ)) AS RK,
+								A.BBS_CD,
+								A.BBS_SEQ,
+								A.SABUN,
+								F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) || ' ' || F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.REG_DATE, #{ssnLocaleCd}) AS WRITER,
+								A.DEPTH,
+								(SUBSTR ('        ', 0, DEPTH * 2))|| DECODE (A.DEPTH, '0', '', '└RE:')|| A.TITLE AS TITLE,
+								TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYY.MM.DD ') AS REG_DATE ,
+								TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYYMMDD ') AS REG_DATE_NEW ,
+								A.ENTER_CD,
+								NVL((CASE WHEN TO_CHAR(sysdate, 'YYYYMMDD') BETWEEN A.NOTIFY_SDATE AND A.NOTIFY_EDATE
+														AND A.POP_NOTIFY_YN = 'Y' THEN 'Y'
+												ELSE 'N' END),'N'
+									) AS POP,
+								A.MASTER_BBS_SEQ
+						FROM TSYS710 A, TSYS700 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.BBS_CD = B.BBS_CD
+						AND A.ENTER_CD = TRIM (#{ssnEnterCd})
+						AND A.BBS_CD = TRIM ('10000')
+						AND 'Y' =  NVL ((SELECT 'N' AS BBS_CD
+																FROM TSYS750
+															WHERE SABUN = TRIM (#{ssnSabun})
+																AND BBS_CD = A.BBS_CD),'Y')) TA
+			) ]]>
+		<if test="countAnniv != null and countAnniv != ''">
+		<![CDATA[
+				WHERE RNUM BETWEEN (TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page})) * TO_NUMBER(#{countAnniv})
+		]]>
+		</if>
+	<![CDATA[	ORDER BY REG_DATE DESC ]]>
+	</select>
+
+	<select id="getListBox6ListCnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT RK
+				FROM (SELECT RANK () OVER ( ORDER BY A.REG_DATE  DESC, A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ (A.ENTER_CD, A.BBS_CD, A.BBS_SEQ)) AS RK,
+							A.BBS_CD,
+							A.BBS_SEQ,
+							A.SABUN,
+							F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) || ' ' || F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.REG_DATE, #{ssnLocaleCd}) AS WRITER,
+							A.DEPTH,
+							(SUBSTR ('        ', 0, DEPTH * 2))|| DECODE (A.DEPTH, '0', '', '└RE:')|| A.TITLE AS TITLE,
+							TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYY.MM.DD ')
+									AS REG_DATE,
+							TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYYMMDD ')
+									AS REG_DATE_NEW,
+							A.ENTER_CD,
+							NVL((CASE WHEN TO_CHAR(sysdate, 'YYYYMMDD') BETWEEN A.NOTIFY_SDATE AND A.NOTIFY_EDATE
+													AND A.POP_NOTIFY_YN = 'Y' THEN 'Y'
+											ELSE 'N' END),'N'
+								) AS POP,
+							A.MASTER_BBS_SEQ
+					FROM TSYS710 A, TSYS700 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.BBS_CD = B.BBS_CD
+					AND A.ENTER_CD = TRIM (#{ssnEnterCd})
+					AND A.BBS_CD = TRIM ('10000')
+					AND 'Y' =  NVL ((SELECT 'N' AS BBS_CD
+															FROM TSYS750
+														WHERE SABUN = TRIM (#{ssnSabun})
+															AND BBS_CD = A.BBS_CD),'Y')) TA
+		]]>
+	</select>
+
+	<select id="getListBox0List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT KM.*, rownum FROM (
+			SELECT RANK() OVER (ORDER BY A.PAYMENT_YMD DESC ) AS RK,
+						TO_CHAR(TO_DATE(PAY_YM,'YYYYMM'),'YYYY.MM') AS CPNYM,
+						CASE WHEN LENGTH(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd})) > 6 THEN substr(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd}), 0,5) || '..'
+							WHEN  LENGTH(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd})) < 6 THEN F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd})
+						END AS CNAME,
+						A.PAY_ACTION_CD,
+						A.PAY_CD
+			FROM TCPN201 A, TCPN051 B, TCPN981 C, TCPN303 D , TCPN991 E
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND TO_DATE(A.PAY_YM,'YYYYMM') BETWEEN TRUNC(ADD_MONTHS(SYSDATE,-12)+1)-TO_CHAR(SYSDATE,'DD') AND TRUNC(LAST_DAY(ADD_MONTHS(SYSDATE, 0)))+0.99999421
+			AND D.SABUN= #{ssnSabun}
+			AND B.ENTER_CD = A.ENTER_CD
+			AND B.PAY_CD   = A.PAY_CD
+			AND C.ENTER_CD(+)      = A.ENTER_CD
+			AND C.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+			AND D.ENTER_CD = A.ENTER_CD
+			AND D.PAY_ACTION_CD = A.PAY_ACTION_CD
+			AND NVL(C.CLOSE_YN, 'N') LIKE 'Y'
+			AND E.PAY_CD(+)   = A.PAY_CD
+			AND E.ENTER_CD(+) = A.ENTER_CD
+			AND B.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			AND (
+					CASE WHEN B.RUN_TYPE IN ('R0001','R0002','ROO03') THEN -1
+						ELSE
+							CASE WHEN  TO_CHAR((SYSDATE + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') > A.PAYMENT_YMD THEN -1
+								WHEN  TO_CHAR((SYSDATE + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') = A.PAYMENT_YMD THEN
+									CASE WHEN E.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+								ELSE 0
+							END
+					END
+				) < 0
+			) KM
+			WHERE  RK < 5
+          order by cpnym desc
+		]]>
+	</select>
+
+	<select id="getListBox7List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT TA.*
+				FROM (SELECT RANK () OVER ( ORDER BY A.REG_DATE DESC, A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ (A.ENTER_CD, A.BBS_CD, A.BBS_SEQ)) AS RK,
+							 A.BBS_CD,
+							 A.BBS_SEQ,
+							 A.SABUN,
+							 F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) || ' ' || F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.REG_DATE, #{ssnLocaleCd}) AS WRITER,
+							 A.DEPTH,
+							 (SUBSTR('        ', 0, DEPTH*2))||DECODE(A.DEPTH, '0','','└RE:')|| DECODE(A.HEAD , NULL,  A.TITLE ,'['|| A.HEAD ||']' ||A.TITLE ) AS TITLE,
+							 TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYY.MM.DD ') AS REG_DATE,
+							 A.ENTER_CD,
+							 A.MASTER_BBS_SEQ
+						FROM TSYS710 A, TSYS700 B
+					   WHERE A.ENTER_CD = B.ENTER_CD
+						 AND A.BBS_CD = B.BBS_CD
+						 AND A.ENTER_CD = TRIM (#{ssnEnterCd})
+						 AND A.BBS_CD = TRIM ('10009')
+						 AND 'Y' =  NVL ((SELECT 'N' AS BBS_CD FROM TSYS750 WHERE SABUN = TRIM (#{ssnSabun}) AND BBS_CD = A.BBS_CD),'Y')) TA
+			WHERE RK < 6
+		]]>
+	</select>
+
+	<select id="getListBox0ListCnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT KM.CPNYM FROM (
+			SELECT RANK() OVER (ORDER BY A.PAYMENT_YMD DESC ) AS RK,
+						TO_CHAR(TO_DATE(PAY_YM,'YYYYMM'),'YYYY.MM') AS CPNYM,
+						CASE WHEN LENGTH(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd})) > 6 THEN substr(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd}), 0,5) || '..'
+							WHEN  LENGTH(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd})) < 6 THEN F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD,'tcpn051',B.PAY_CD, #{ssnLocaleCd})
+						END AS CNAME,
+						A.PAY_ACTION_CD,
+						A.PAY_CD
+			FROM TCPN201 A, TCPN051 B, TCPN981 C, TCPN303 D , TCPN991 E
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND TO_DATE(A.PAY_YM,'YYYYMM') BETWEEN TRUNC(ADD_MONTHS(SYSDATE,-12)+1)-TO_CHAR(SYSDATE,'DD') AND TRUNC(LAST_DAY(ADD_MONTHS(SYSDATE, 0)))+0.99999421
+			AND D.SABUN= #{ssnSabun}
+			AND B.ENTER_CD = A.ENTER_CD
+			AND B.PAY_CD   = A.PAY_CD
+			AND C.ENTER_CD(+)      = A.ENTER_CD
+			AND C.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+			AND D.ENTER_CD = A.ENTER_CD
+			AND D.PAY_ACTION_CD = A.PAY_ACTION_CD
+			AND NVL(C.CLOSE_YN, 'N') LIKE 'Y'
+			AND E.PAY_CD(+)   = A.PAY_CD
+			AND E.ENTER_CD(+) = A.ENTER_CD
+			-- 퇴직금,연말정산 제외
+			AND B.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			AND (
+					CASE WHEN B.RUN_TYPE IN ('R0001','R0002','ROO03') THEN -1
+						ELSE
+							CASE WHEN  TO_CHAR((SYSDATE + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') > A.PAYMENT_YMD THEN -1
+								WHEN  TO_CHAR((SYSDATE + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') = A.PAYMENT_YMD THEN
+									CASE WHEN E.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+								ELSE 0
+							END
+					END
+				) < 0
+			) KM
+		]]>
+	</select>
+
+	<select id="getListBox0List2" parameterType="map" resultType="cMap">
+		<![CDATA[
+				SELECT * FROM (
+					SELECT KM.*, ROWNUM AS RNUM FROM (
+					SELECT RANK() OVER (ORDER BY A.PAYMENT_YMD DESC ) AS RK,
+								TO_CHAR(TO_DATE(PAY_YM,'YYYYMM'),'YYYY.MM') AS CPNYM,
+								CASE WHEN LENGTH(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD, 'tcpn051', B.PAY_CD, #{ssnLocaleCd})) > 6 THEN SUBSTR(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD, 'tcpn051', B.PAY_CD, #{ssnLocaleCd}), 0,5) || '..'
+									 WHEN  LENGTH(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD, 'tcpn051', B.PAY_CD, #{ssnLocaleCd})) < 6 THEN F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD, 'tcpn051', B.PAY_CD, #{ssnLocaleCd})
+								 END AS CNAME,
+								A.PAY_ACTION_CD,
+								A.PAY_CD
+					FROM TCPN201 A, TCPN051 B, TCPN981 C, TCPN303 D , TCPN991 E
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND TO_DATE(A.PAY_YM,'YYYYMM') BETWEEN TRUNC(ADD_MONTHS(SYSDATE,-12)+1)-TO_CHAR(SYSDATE,'DD') AND TRUNC(LAST_DAY(ADD_MONTHS(SYSDATE, 0))) + 0.99999421
+					AND D.SABUN= #{ssnSabun}
+					AND B.ENTER_CD = A.ENTER_CD
+					AND B.PAY_CD = A.PAY_CD
+					AND C.ENTER_CD(+) = A.ENTER_CD
+					AND C.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+					AND D.ENTER_CD = A.ENTER_CD
+					AND D.PAY_ACTION_CD = A.PAY_ACTION_CD
+					AND NVL(C.CLOSE_YN, 'N') LIKE 'Y'
+					AND E.PAY_CD(+) = A.PAY_CD
+					AND E.ENTER_CD(+) = A.ENTER_CD
+					AND B.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+					AND (
+							CASE WHEN B.RUN_TYPE IN ('R0001','R0002','ROO03') THEN -1
+								ELSE
+									CASE WHEN  TO_CHAR((SYSDATE + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') > A.PAYMENT_YMD THEN -1
+										WHEN  TO_CHAR((SYSDATE + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') = A.PAYMENT_YMD THEN
+											CASE WHEN E.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+										ELSE 0
+									END
+							END
+						) < 0
+					) KM
+				) ]]>
+		<if test="countAnniv != '' and countAnniv != ''">
+			WHERE RNUM BETWEEN(TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page})) * TO_NUMBER(#{countAnniv})
+		</if>
+		<![CDATA[ ORDER BY CPNYM DESC ]]>
+	</select>
+
+	<select id="getListBox1List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT P_POINT
+	             , TO_NUMBER('5') AS EDU_P_POINT
+				 , (CASE WHEN S_POINT > TO_NUMBER('2') THEN TO_NUMBER('2') ELSE S_POINT END) AS S_POINT
+	             , TO_NUMBER('2') AS EDU_S_POINT
+	             , CASE WHEN P_POINT + (CASE WHEN S_POINT > TO_NUMBER('2') THEN TO_NUMBER('2') ELSE S_POINT END) < TO_NUMBER('5') THEN 'N' ELSE 'Y' END AS EDU_YN
+			  FROM (
+			 	 SELECT ENTER_CD
+			      	  , SABUN
+			      	  , NVL(SUM(P_POINT), 0) AS P_POINT
+			      	  , NVL(SUM(S_POINT), 0) AS S_POINT
+			      	  , NVL(SUM(PER_EXPENSE_MON), 0) AS PER_EXPENSE_MON
+			 	   FROM (
+			   		 SELECT A.ENTER_CD
+                          , A.SABUN
+                          , A.PER_EXPENSE_MON
+                          , CASE WHEN NVL(B.ESSENTIAL_YN, 'N') = 'Y' THEN NVL(B.EDU_POINT, 0) END AS P_POINT
+                          , CASE WHEN NVL(B.ESSENTIAL_YN, 'N') = 'N' THEN NVL(B.EDU_POINT, 0) END AS S_POINT
+                      FROM TTRA203 A
+                         , TTRA301 B
+                         , THRI103 D
+                         , TTRA101 E
+                         , TTRA201 F
+                    WHERE A.ENTER_CD = #{ssnEnterCd}
+                      AND A.ENTER_CD = D.ENTER_CD
+                      AND A.APPL_SEQ = D.APPL_SEQ
+                      AND A.ENTER_CD = E.ENTER_CD
+                      AND A.EDU_SEQ  = E.EDU_SEQ
+                      AND A.EDU_COURSE_CD = E.EDU_COURSE_CD
+                      AND A.ENTER_CD = F.ENTER_CD
+                      AND A.EDU_SEQ  = F.EDU_SEQ
+                      AND A.EDU_COURSE_CD = F.EDU_COURSE_CD
+                      AND A.AP_APPL_SEQ = F.APPL_SEQ
+                      AND A.ENTER_CD = B.ENTER_CD
+                      AND A.EDU_SEQ  = B.EDU_SEQ
+                      AND A.EDU_COURSE_CD = B.EDU_COURSE_CD
+                      AND A.SABUN = #{searchSabun}
+                      AND D.APPL_STATUS_CD = '99'
+                      AND D.APPL_YMD BETWEEN TO_CHAR(SYSDATE, 'YYYY') ||'0101' AND TO_CHAR(SYSDATE, 'YYYY') ||'1231'
+			  )
+			  GROUP BY ENTER_CD, SABUN
+			  ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+			)
+		]]>
+	</select>
+
+	<select id="getListBox2CntR" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT FROM (
+			 SELECT DISTINCT RANK() OVER (ORDER BY APPL_SEQ DESC ) AS RK
+			       , DETAIL
+			       , ENTER_CD
+			       , APPL_SEQ
+			       , APPL_CD
+			       , APPL_NM
+			       , APPL_YMD
+			       , APPL_YMD_A
+			       , APPL_SABUN
+			       , AGREE_SABUN
+			       , AGREE_NAME
+			       , APPL_IN_SABUN
+			       , APPL_IN_SABUN_NAME
+			       , AGREE_YMD
+			       , AGREE_STATUS_CD
+			       , MEMO
+			       , PATH_SEQ
+			       , APPL_STATUS_CD
+			       , APPL_STATUS_CD_NM
+			       , AGREE_SEQ
+			       , GUBUN
+			       , TITLE
+			      FROM (
+					SELECT '1' AS DETAIL
+						   , A.ENTER_CD
+					       , A.APPL_SEQ
+					       , B.APPL_CD
+					       , C.APPL_NM
+					       , B.APPL_YMD
+					       , TO_CHAR(TO_DATE(B.APPL_YMD,'YYYYMMDD'),'YYYY-MM-DD') 	AS APPL_YMD_A
+					       , B.APPL_SABUN
+					       , A.AGREE_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN) AS AGREE_NAME
+					       , B.APPL_IN_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,B.APPL_IN_SABUN) AS APPL_IN_SABUN_NAME
+					       , B.AGREE_YMD
+					       , A.AGREE_STATUS_CD
+					       , A.MEMO
+					       , A.PATH_SEQ
+					       , B.APPL_STATUS_CD
+					       , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10010',B.APPL_STATUS_CD) APPL_STATUS_CD_NM
+					       , A.AGREE_SEQ
+					       , A.GUBUN
+					       , B.TITLE || decode( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+                        FROM THRI107 A
+                       INNER JOIN THRI103 B
+                          ON B.ENTER_CD = A.ENTER_CD
+                         AND B.APPL_SEQ = A.APPL_SEQ
+                       INNER JOIN THRI101 C
+                          ON C.ENTER_CD = A.ENTER_CD
+                         AND C.APPL_CD = B.APPL_CD
+                         AND C.USE_YN = 'Y'
+                        LEFT OUTER JOIN THRI120 D
+                          ON A.ENTER_CD = D.ENTER_CD
+                         AND A.AGREE_SABUN = D.AGREE_SABUN
+                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+                       WHERE A.ENTER_CD = #{ssnEnterCd}
+                         AND A.AGREE_STATUS_CD = '10'
+                         AND B.APPL_STATUS_CD IN ('21','31')
+                         AND 'Y' = (CASE WHEN B.APPL_STATUS_CD = '31' AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+                         AND ( A.AGREE_SABUN = #{ssnSabun} OR D.DEPUTY_SABUN = #{ssnSabun} )
+                         AND NVL( A.ORG_APP_YN , 'N' ) = 'N'
+                       UNION ALL
+                    SELECT '1' AS DETAIL
+						   , A.ENTER_CD
+					       , A.APPL_SEQ
+					       , B.APPL_CD
+					       , C.APPL_NM
+					       , B.APPL_YMD
+					       , TO_CHAR(TO_DATE(B.APPL_YMD,'YYYYMMDD'),'YYYY-MM-DD') 	AS APPL_YMD_A
+					       , B.APPL_SABUN
+					       , A.AGREE_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN) AS AGREE_NAME
+					       , B.APPL_IN_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,B.APPL_IN_SABUN) AS APPL_IN_SABUN_NAME
+					       , B.AGREE_YMD
+					       , A.AGREE_STATUS_CD
+					       , A.MEMO
+					       , A.PATH_SEQ
+					       , B.APPL_STATUS_CD
+					       , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10010',B.APPL_STATUS_CD) APPL_STATUS_CD_NM
+					       , A.AGREE_SEQ
+					       , A.GUBUN
+					       , B.TITLE || decode( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+                        FROM THRI107 A
+                       INNER JOIN THRI103 B
+                          ON B.ENTER_CD = A.ENTER_CD
+                         AND B.APPL_SEQ = A.APPL_SEQ
+                       INNER JOIN THRI101 C
+                          ON C.ENTER_CD = A.ENTER_CD
+                         AND C.APPL_CD = B.APPL_CD
+                         AND C.USE_YN = 'Y'
+                        LEFT OUTER JOIN THRI120 D
+                          ON A.ENTER_CD = D.ENTER_CD
+                         AND A.AGREE_SABUN = D.AGREE_SABUN
+                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+                       WHERE A.ENTER_CD = #{ssnEnterCd}
+                         AND A.AGREE_STATUS_CD = '10'
+                         AND B.APPL_STATUS_CD IN ('21','31')
+                         AND 'Y' = (CASE WHEN B.APPL_STATUS_CD = '31' AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+                         AND ( A.AGREE_SABUN = F_COM_GET_ORG_CD(#{ssnEnterCd}, #{ssnSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD')) )
+                         AND NVL( A.ORG_APP_YN , 'N' ) = 'Y'
+                      )
+                   WHERE APPL_YMD BETWEEN to_char(add_months(SYSDATE,-12),'YYYYMMDD') AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+			 )
+		]]>
+	</select>
+
+	<select id="getListBox2ListR" parameterType="map" resultType="cMap">
+		<![CDATA[
+			 SELECT * FROM (
+			  SELECT DISTINCT RANK() OVER (ORDER BY APPL_SEQ DESC ) AS RK
+				   , 'R' AS APPL_TYPE
+			       , DETAIL
+			       , ENTER_CD
+			       , APPL_SEQ
+			       , APPL_CD
+			       , APPL_NM
+			       , APPL_YMD
+			       , APPL_YMD_A
+			       , APPL_SABUN
+			       , F_COM_GET_NAMES(ENTER_CD, APPL_SABUN) AS APPL_SABUN_NAME
+			       , AGREE_SABUN
+			       , AGREE_NAME
+			       , APPL_IN_SABUN
+			       , APPL_IN_SABUN_NAME
+			       , AGREE_YMD
+			       , AGREE_STATUS_CD
+			       , MEMO
+			       , PATH_SEQ
+			       , APPL_STATUS_CD
+			       , APPL_STATUS_CD_NM
+			       , AGREE_SEQ
+			       , GUBUN
+			       , TITLE
+			      FROM (
+					SELECT '1' AS DETAIL
+						   , A.ENTER_CD
+					       , A.APPL_SEQ
+					       , B.APPL_CD
+					       , C.APPL_NM
+					       , B.APPL_YMD
+					       , TO_CHAR(TO_DATE(B.APPL_YMD,'YYYYMMDD'),'YY-MM-DD') AS APPL_YMD_A
+					       , B.APPL_SABUN
+					       , A.AGREE_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN) AS AGREE_NAME
+					       , B.APPL_IN_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,B.APPL_IN_SABUN) AS APPL_IN_SABUN_NAME
+					       , B.AGREE_YMD
+					       , A.AGREE_STATUS_CD
+					       , A.MEMO
+					       , A.PATH_SEQ
+					       , B.APPL_STATUS_CD
+					       , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10010',B.APPL_STATUS_CD) APPL_STATUS_CD_NM
+					       , A.AGREE_SEQ
+					       , A.GUBUN
+					       , B.TITLE || decode( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+                        FROM THRI107 A
+                       INNER JOIN THRI103 B
+                          ON B.ENTER_CD = A.ENTER_CD
+                         AND B.APPL_SEQ = A.APPL_SEQ
+                       INNER JOIN THRI101 C
+                          ON C.ENTER_CD = A.ENTER_CD
+                         AND C.APPL_CD = B.APPL_CD
+                         AND C.USE_YN = 'Y'
+                        LEFT OUTER JOIN THRI120 D
+                          ON A.ENTER_CD = D.ENTER_CD
+                         AND A.AGREE_SABUN = D.AGREE_SABUN
+                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+                       WHERE A.ENTER_CD = #{ssnEnterCd}
+                         AND A.AGREE_STATUS_CD = '10'
+                         AND B.APPL_STATUS_CD IN ('21','31')
+                         AND 'Y' = (CASE WHEN B.APPL_STATUS_CD = '31' AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+                         AND ( A.AGREE_SABUN = #{ssnSabun} OR D.DEPUTY_SABUN = #{ssnSabun} )
+                         AND NVL( A.ORG_APP_YN , 'N' ) = 'N'
+                       UNION ALL
+                    SELECT '1' AS DETAIL
+						   , A.ENTER_CD
+					       , A.APPL_SEQ
+					       , B.APPL_CD
+					       , C.APPL_NM
+					       , B.APPL_YMD
+					       , TO_CHAR(TO_DATE(B.APPL_YMD,'YYYYMMDD'),'YY-MM-DD') 	AS APPL_YMD_A
+					       , B.APPL_SABUN
+					       , A.AGREE_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN) AS AGREE_NAME
+					       , B.APPL_IN_SABUN
+					       , F_COM_GET_NAMES(A.ENTER_CD,B.APPL_IN_SABUN) AS APPL_IN_SABUN_NAME
+					       , B.AGREE_YMD
+					       , A.AGREE_STATUS_CD
+					       , A.MEMO
+					       , A.PATH_SEQ
+					       , B.APPL_STATUS_CD
+					       , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10010',B.APPL_STATUS_CD) APPL_STATUS_CD_NM
+					       , A.AGREE_SEQ
+					       , A.GUBUN
+					       , B.TITLE || decode( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+                        FROM THRI107 A
+                       INNER JOIN THRI103 B
+                          ON B.ENTER_CD = A.ENTER_CD
+                         AND B.APPL_SEQ = A.APPL_SEQ
+                       INNER JOIN THRI101 C
+                          ON C.ENTER_CD = A.ENTER_CD
+                         AND C.APPL_CD = B.APPL_CD
+                         AND C.USE_YN = 'Y'
+                        LEFT OUTER JOIN THRI120 D
+                          ON A.ENTER_CD = D.ENTER_CD
+                         AND A.AGREE_SABUN = D.AGREE_SABUN
+                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+                       WHERE A.ENTER_CD = #{ssnEnterCd}
+                         AND A.AGREE_STATUS_CD = '10'
+                         AND B.APPL_STATUS_CD IN ('21','31')
+                         AND 'Y' = (CASE WHEN B.APPL_STATUS_CD = '31' AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+                         AND ( A.AGREE_SABUN = #{ssnOrgCd}  )
+                         AND NVL( A.ORG_APP_YN , 'N' ) = 'Y'
+                       )
+                      WHERE APPL_YMD BETWEEN to_char(add_months(SYSDATE,-12),'YYYYMMDD') AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+                       ORDER BY APPL_YMD DESC
+                      ) ]]>
+        <choose>
+        	<when test="countAnniv != null and countAnniv != ''">
+        	<![CDATA[
+        		WHERE RK BETWEEN (TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page}) ) * TO_NUMBER(#{countAnniv})
+        	]]>
+        	</when>
+        	<otherwise>
+        	<![CDATA[
+        		WHERE RK < 5
+        	]]>
+        	</otherwise>
+        </choose>
+	</select>
+
+	<select id="getListBox15List" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT * FROM (
+		      		SELECT KM.*, ROWNUM AS RNUM FROM (
+						SELECT  B.CODE, --B.NOTE1 AS CODE_NM,
+								F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H60300', B.CODE, #{ssnLocaleCd} ) AS CODE_NM,
+								NVL(A.CNT_6,0) AS CNT_6
+							 ,  NVL(A.CNT_3,0) AS CNT_3
+							 ,  NVL(A.CNT_1,0) AS CNT_1
+						FROM (
+								SELECT X.CODE
+										,SUM(CASE WHEN X.EDATE >= TO_CHAR(ADD_MONTHS ( SYSDATE, 3) ,'YYYYMMDD') THEN 1 ELSE 0 END) AS CNT_6
+										,SUM(CASE WHEN X.EDATE >= TO_CHAR(ADD_MONTHS ( SYSDATE, 1) ,'YYYYMMDD') AND X.EDATE <= TO_CHAR(ADD_MONTHS ( SYSDATE, 3) - 1,'YYYYMMDD') THEN 1 ELSE 0 END) AS CNT_3
+										,SUM(CASE WHEN X.EDATE <= TO_CHAR(ADD_MONTHS ( SYSDATE, 1) - 1,'YYYYMMDD') THEN 1 ELSE 0 END) AS CNT_1
+								FROM (
+										SELECT A.ENTER_CD
+												,'AP'            AS CODE
+												,A.SABUN
+												,A.CONTRACT_SYMD AS SDATE   /*      발령기간_시작      */
+												,A.CONTRACT_EYMD AS EDATE   /*      발령기간_종료      */
+										FROM THRM191 A       /*      발령    */
+												,TSYS013 B
+												,TSYS011 C
+										WHERE A.ENTER_CD        = B.ENTER_CD
+											AND A.ORD_DETAIL_CD = B.ORD_DETAIL_CD
+											AND B.ENTER_CD      = C.ENTER_CD
+											AND B.ORD_TYPE_CD   = C.ORD_TYPE_CD
+											AND C.ORD_TYPE      = '20' /* 휴직 */
+											AND A.CONTRACT_EYMD IS NOT NULL
+										UNION ALL
+						                SELECT ENTER_CD
+						                    , 'AP'
+						                    , SABUN
+						                     , ORD_YMD
+						                     , ORD_YMD
+						                  FROM THRM191
+						                 WHERE ORD_TYPE_CD = '150'
+						                   AND ENTER_CD = #{ssnEnterCd}
+						                 UNION ALL
+										SELECT A.ENTER_CD
+										     , 'CT' AS CODE
+										     , A.SABUN
+										     , A.CON_S_YMD AS SDATE   /*      발령기간_시작      */
+										     , A.CON_E_YMD AS EDATE   /*      발령기간_종료      */
+										  FROM THRM100 A
+										 WHERE A.CON_E_YMD BETWEEN TO_CHAR(SYSDATE - (INTERVAL '1' YEAR), 'YYYYMMDD') AND TO_CHAR(SYSDATE + (INTERVAL '1' YEAR), 'YYYYMMDD')
+										   AND NOT EXISTS (
+										        SELECT *
+										     	  FROM THRM191 X
+										     	     , TSYS013 Y
+										     	 WHERE X.ENTER_CD = Y.ENTER_CD
+										     	   AND X.ORD_TYPE_CD = Y.ORD_TYPE_CD
+										     	   AND X.ORD_DETAIL_CD = Y.ORD_DETAIL_CD
+										     	   AND X.ORD_TYPE_CD = ( CASE WHEN X.ENTER_CD = 'ISU_CT' THEN '400' ELSE '' END )
+										     	   AND X.ORD_DETAIL_CD = ( CASE WHEN A.ENTER_CD = 'ISU_CT' THEN '1210' ELSE '' END )
+										   )
+										UNION ALL
+										SELECT A.ENTER_CD
+												,'PV'            AS CODE
+												,A.SABUN
+												,A.SDATE   /*      연봉계약기간_시작      */
+												,A.EDATE   /*      연봉계약기간_종료      */
+										FROM TCPN403 A  /*   연봉관리    */
+										UNION ALL
+										SELECT A.ENTER_CD
+												,'TR'            AS CODE
+												,A.SABUN
+												,A.EMP_YMD       AS SDATE   /*     입사일      */
+												,A.TRA_YMD       AS EDATE   /*    면수습일      */
+										FROM THRM100 A  /*   면수습일    */
+										UNION ALL
+										SELECT A.ENTER_CD
+										     , 'ICA' AS CODE
+										     , A.SABUN
+										     , A.APPL_YMD AS SDATE /* 신청일자 */
+										     , TO_CHAR(SYSDATE, 'YYYYMMDD') AS EDATE
+										  FROM THRM803 A /* 정보변경신청내역 */
+									) X
+									,(
+										SELECT  A.ENTER_CD
+												,A.SABUN
+												,A.NAME
+										FROM THRM100 A
+											,THRM151 B
+										WHERE A.ENTER_CD = #{ssnEnterCd}
+										AND A.ENTER_CD = B.ENTER_CD
+										AND A.SABUN    = B.SABUN
+										AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+										AND (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+									) Y
+								WHERE X.ENTER_CD = Y.ENTER_CD
+								AND X.SABUN    = Y.SABUN
+								AND X.EDATE BETWEEN TO_CHAR(SYSDATE, 'YYYYMMDD') AND TO_CHAR(ADD_MONTHS ( SYSDATE, 6) - 1,'YYYYMMDD')
+								GROUP BY X.CODE
+						) A
+						,(	SELECT *
+							FROM TSYS005
+							WHERE ENTER_CD  = #{ssnEnterCd}
+							AND GRCODE_CD = 'H60300'
+							AND USE_YN = 'Y'
+							AND CODE <> 'PV'
+						) B
+						WHERE A.CODE(+) = B.CODE
+						ORDER BY B.SEQ
+				      ) KM
+				    ) ]]>
+		<if test='countAnniv != null and countAnniv neq ""'>
+			WHERE RNUM BETWEEN (TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page}) ) * TO_NUMBER(#{countAnniv})
+		</if>
+	</select>
+
+	<select id="getListBox15ListCnt" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT  B.CODE
+			 ,  F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H60300', B.CODE, #{ssnLocaleCd} ) AS CODE_NM
+			 ,	NVL(A.CNT_6,0) AS CNT_6
+			 ,  NVL(A.CNT_3,0) AS CNT_3
+			 ,  NVL(A.CNT_1,0) AS CNT_1
+		FROM (
+				SELECT X.CODE
+						,SUM(CASE WHEN X.EDATE >= TO_CHAR(ADD_MONTHS ( SYSDATE, 3) ,'YYYYMMDD') THEN 1 ELSE 0 END) AS CNT_6
+						,SUM(CASE WHEN X.EDATE >= TO_CHAR(ADD_MONTHS ( SYSDATE, 1) ,'YYYYMMDD') AND X.EDATE <= TO_CHAR(ADD_MONTHS ( SYSDATE, 3) - 1,'YYYYMMDD') THEN 1 ELSE 0 END) AS CNT_3
+						,SUM(CASE WHEN X.EDATE <= TO_CHAR(ADD_MONTHS ( SYSDATE, 1) - 1,'YYYYMMDD') THEN 1 ELSE 0 END) AS CNT_1
+				FROM (
+						SELECT A.ENTER_CD
+								,'AP'            AS CODE
+								,A.SABUN
+								,A.CONTRACT_SYMD AS SDATE   /*      발령기간_시작      */
+								,A.CONTRACT_EYMD AS EDATE   /*      발령기간_종료      */
+						FROM THRM191 A       /*      발령    */
+								,TSYS013 B
+								,TSYS011 C
+						WHERE A.ENTER_CD      = B.ENTER_CD
+							AND A.ORD_DETAIL_CD = B.ORD_DETAIL_CD
+							AND B.ENTER_CD      = C.ENTER_CD
+							AND B.ORD_TYPE_CD   = C.ORD_TYPE_CD
+							AND B.ORD_TYPE      = '20' /* 휴직 */
+							AND A.CONTRACT_EYMD IS NOT NULL
+						UNION ALL
+		                SELECT ENTER_CD
+		                    , 'AP'
+		                    , SABUN
+		                     , ORD_YMD
+		                     , ORD_YMD
+		                  FROM THRM191
+		                 WHERE ORD_TYPE_CD = '150'
+		                   AND ENTER_CD = #{ssnEnterCd}
+		                 UNION ALL
+						SELECT A.ENTER_CD
+						     , 'CT' AS CODE
+						     , A.SABUN
+						     , A.CON_S_YMD AS SDATE   /*      발령기간_시작      */
+						     , A.CON_E_YMD AS EDATE   /*      발령기간_종료      */
+						  FROM THRM100 A
+						 WHERE A.CON_E_YMD BETWEEN TO_CHAR(SYSDATE - (INTERVAL '1' YEAR), 'YYYYMMDD') AND TO_CHAR(SYSDATE + (INTERVAL '1' YEAR), 'YYYYMMDD')
+						   AND NOT EXISTS (
+						        SELECT *
+						     	  FROM THRM191 X
+						     	     , TSYS013 Y
+						     	 WHERE X.ENTER_CD = Y.ENTER_CD
+						     	   AND X.ORD_TYPE_CD = Y.ORD_TYPE_CD
+						     	   AND X.ORD_DETAIL_CD = Y.ORD_DETAIL_CD
+						     	   AND X.ORD_TYPE_CD = ( CASE WHEN X.ENTER_CD = 'ISU_CT' THEN '400' ELSE '' END )
+						     	   AND X.ORD_DETAIL_CD = ( CASE WHEN A.ENTER_CD = 'ISU_CT' THEN '1210' ELSE '' END )
+						   )
+						UNION ALL
+						SELECT A.ENTER_CD
+								,'PV'            AS CODE
+								,A.SABUN
+								,A.SDATE   /*      연봉계약기간_시작      */
+								,A.EDATE   /*      연봉계약기간_종료      */
+						FROM TCPN403 A  /*   연봉관리    */
+						UNION ALL
+						SELECT A.ENTER_CD
+								,'TR'            AS CODE
+								,A.SABUN
+								,A.EMP_YMD       AS SDATE   /*     입사일      */
+								,A.TRA_YMD       AS EDATE   /*    면수습일      */
+						FROM THRM100 A  /*   면수습일    */
+						UNION ALL
+						SELECT A.ENTER_CD
+						     , 'ICA' AS CODE
+						     , A.SABUN
+						     , A.APPL_YMD AS SDATE /* 신청일자 */
+						     , TO_CHAR(SYSDATE, 'YYYYMMDD') AS EDATE
+						  FROM THRM803 A /* 정보변경신청내역 */
+					) X
+					,(
+						SELECT  A.ENTER_CD
+								,A.SABUN
+								,A.NAME
+						FROM THRM100 A
+							,THRM151 B
+						WHERE A.ENTER_CD = #{ssnEnterCd}
+						AND A.ENTER_CD = B.ENTER_CD
+						AND A.SABUN    = B.SABUN
+						AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+						AND (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+					) Y
+				WHERE X.ENTER_CD = Y.ENTER_CD
+				AND X.SABUN    = Y.SABUN
+				AND X.EDATE BETWEEN TO_CHAR(SYSDATE, 'YYYYMMDD') AND TO_CHAR(ADD_MONTHS ( SYSDATE, 6) - 1,'YYYYMMDD')
+				GROUP BY X.CODE
+		) A
+		,(	SELECT *
+			FROM TSYS005
+			WHERE ENTER_CD  = #{ssnEnterCd}
+			AND GRCODE_CD = 'H60300'
+			AND USE_YN = 'Y'
+			AND CODE <> 'PV'
+		) B
+		WHERE A.CODE(+) = B.CODE
+		ORDER BY B.SEQ
+	]]>
+	</select>
+
+	<select id="getListBox16Cnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT COUNT(*) AS CNT
+              FROM (
+                  SELECT A.ENTER_CD, A.SABUN, A.NAME, '생일' AS DIV , NVL(A.LUN_TYPE, '1') AS LUN_TYPE, B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.BIR_YMD, 5,4) AS BIR_YMD
+                  	 	, DECODE(B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'), '1', '3') AS MARK
+                    FROM THRM100 A
+                   INNER JOIN (SELECT SUN_DATE, MOON_DATE
+                                 FROM TSYS007
+                                WHERE MOON_SEQ = 1)B
+                     ON B.SUN_DATE = TO_CHAR(SYSDATE, 'YYYY')||SUBSTR(A.BIR_YMD,5, 4)
+                  WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                    AND SUBSTR(B.SUN_DATE,1, 6) = TO_CHAR(SYSDATE, 'YYYYMM')
+                    AND NVL(A.LUN_TYPE,'1') = '1'
+                  UNION
+                  SELECT A.ENTER_CD, A.SABUN, A.NAME, '생일' AS DIV , A.LUN_TYPE, B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.BIR_YMD, 5,4) AS BIR_YMD
+                  	 , DECODE(B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'), '1', '3') AS MARK
+                    FROM THRM100 A
+                   INNER JOIN (SELECT SUN_DATE, MOON_DATE
+                                 FROM TSYS007
+                                WHERE MOON_SEQ = 1)B
+                     ON B.MOON_DATE = TO_CHAR(SYSDATE, 'YYYY')||SUBSTR(A.BIR_YMD,5,4)
+                  WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                    AND SUBSTR(B.SUN_DATE,1,6) = TO_CHAR(SYSDATE, 'YYYYMM')
+                    AND A.LUN_TYPE = '2'
+                  UNION
+                 SELECT A.ENTER_CD, A.SABUN, A.NAME, '결혼' AS DIV , '1' AS LUN_TYPE, TO_CHAR(SYSDATE, 'YYYY')||SUBSTR(A.WED_YMD,5,4) AS SUN_DATE, '' AS BIR_YMD
+                 	    , DECODE(TO_CHAR(SYSDATE, 'YYYY')||SUBSTR(A.WED_YMD,5,4), TO_CHAR(SYSDATE, 'YYYYMMDD'), '2', '3') AS MARK
+                   FROM THRM100 A
+                  WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                    AND TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.WED_YMD,5,2) = TO_CHAR(SYSDATE, 'YYYYMM')
+                  ORDER BY SUN_DATE
+                  )
+              WHERE ENTER_CD = #{ssnEnterCd}
+              ORDER BY SUN_DATE, MARK
+		]]>
+	</select>
+
+	<select id="getListBox16List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * FROM
+			(
+			  SELECT ROWNUM AS NUM, NAME, F_COM_GET_ORG_NM2(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM, DIV , TO_CHAR(TO_DATE(SUN_DATE, 'YYYYMMDD'), 'MM.DD') AS SUN_DATE, DECODE(LUN_TYPE, '2', TO_CHAR(TO_DATE(BIR_YMD, 'YYYYMMDD'), 'MM.DD'), '') AS LUN_DAY, MARK
+                   FROM (
+                       SELECT A.ENTER_CD, A.SABUN, A.NAME, '생일' AS DIV , NVL(A.LUN_TYPE, '1') AS LUN_TYPE, B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.BIR_YMD, 5,4) AS BIR_YMD, DECODE(B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'), '1', '3') AS MARK
+                         FROM THRM100 A
+                        INNER JOIN (SELECT SUN_DATE, MOON_DATE FROM TSYS007 WHERE MOON_SEQ = 1) B
+                          ON B.SUN_DATE = TO_CHAR(SYSDATE, 'YYYY')||SUBSTR(A.BIR_YMD, 5, 4)
+                       WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                         AND SUBSTR(B.SUN_DATE, 1, 6) = TO_CHAR(SYSDATE, 'YYYYMM')
+                         AND NVL(A.LUN_TYPE,'1') = '1'
+                       UNION
+                       SELECT A.ENTER_CD, A.SABUN, A.NAME, '생일' AS DIV , A.LUN_TYPE, B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.BIR_YMD, 5,4) AS BIR_YMD
+                       	 , DECODE(B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'), '1', '3') AS MARK
+                         FROM THRM100 A
+                        INNER JOIN (SELECT SUN_DATE, MOON_DATE FROM TSYS007 WHERE MOON_SEQ = 1) B
+                          ON B.MOON_DATE = TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.BIR_YMD, 5, 4)
+                       WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                         AND SUBSTR(B.SUN_DATE,1,6) = TO_CHAR(SYSDATE, 'YYYYMM')
+                         AND A.LUN_TYPE = '2'
+                       UNION
+                      SELECT A.ENTER_CD, A.SABUN, A.NAME, '결혼' AS DIV , '1' AS LUN_TYPE, TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.WED_YMD,5,4) AS SUN_DATE, '' AS BIR_YMD
+                      	    , DECODE(TO_CHAR(SYSDATE, 'YYYY')||SUBSTR(A.WED_YMD,5,4), TO_CHAR(SYSDATE, 'YYYYMMDD'), '2', '3') AS MARK
+                        FROM THRM100 A
+                       WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                         AND TO_CHAR(SYSDATE, 'YYYY') || SUBSTR(A.WED_YMD,5,2) = TO_CHAR(SYSDATE, 'YYYYMM')
+                       ORDER BY SUN_DATE
+                       )
+                   WHERE ENTER_CD = #{ssnEnterCd}
+                   ORDER BY SUN_DATE, MARK
+                  )  ]]>
+        <if test="countAnniv != '' and countAnniv != ''">
+        	<![CDATA[
+        		WHERE NUM BETWEEN (TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page})) * TO_NUMBER(#{countAnniv})
+        	]]>
+        </if>
+	</select>
+
+	<select id="getListBox4Cnt" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT COUNT(*) AS CNT
+			  FROM TSYS311 A, TSYS333 B, TSYS301 C
+			 WHERE A.ENTER_CD = B.ENTER_CD
+			   AND A.MAIN_MENU_CD = B.MAIN_MENU_CD
+			   AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+			   AND A.MENU_CD = B.MENU_CD
+			   AND A.MENU_SEQ = B.MENU_SEQ
+			   AND A.GRP_CD = B.GRP_CD
+			   AND A.PRG_CD = C.PRG_CD
+			   AND A.ENTER_CD = #{ssnEnterCd}
+			   AND A.GRP_CD = #{ssnGrpCd}
+			   AND B.SABUN = #{ssnSabun}
+			   AND (A.USE_YN = '1' OR A.USE_YN IS NULL)
+			 ORDER BY B.SEQ
+		]]>
+	</select>
+
+	<select id="getListBox4List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * FROM (
+				SELECT ROWNUM AS NUM ,
+					   A.MAIN_MENU_CD,
+					   DECODE(A.MAIN_MENU_CD,'01','couple',         --채용관리
+											 '02','human' ,         --인사기본
+											 '03','oganization',    --조직
+											 '05','education',      --교육관리
+											 '06','chart',          --평가관리
+											 '07','money',          --급여관리
+											 '08','clock',          --근태관리
+											 '09','diary',          --복리후생
+											 '10','write',          --결재함
+											 '12','system',         --시스템
+											 'system') AS MAIN_MENU_CSS,
+					   A.PRIOR_MENU_CD,
+					   A.MENU_CD,
+					   A.MENU_SEQ,
+					   A.GRP_CD,
+					   A.MENU_NM,
+					   A.TYPE,
+					   D.PRG_CD, C.PRG_PATH,
+					   A.DATA_RW_TYPE,
+					   A.DATA_PRG_TYPE,
+					   A.CNT,
+					   C.DATE_TRACK_YN,
+					   A.SEARCH_SEQ,
+					   B.SEQ AS MY_SEQ, B.SABUN
+				  FROM TSYS311 A, TSYS333 B, TSYS301 C, TSYS303 D
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.MAIN_MENU_CD = B.MAIN_MENU_CD
+				   AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+				   AND A.MENU_CD = B.MENU_CD
+				   AND A.MENU_SEQ = B.MENU_SEQ
+				   AND A.GRP_CD = B.GRP_CD
+				   AND A.PRG_CD = C.PRG_CD
+				   AND D.ENTER_CD = A.ENTER_CD
+				   AND D.MAIN_MENU_CD = A.MAIN_MENU_CD
+				   AND D.PRIOR_MENU_CD = A.PRIOR_MENU_CD
+				   AND D.MENU_CD = A.MENU_CD
+				   AND D.MENU_SEQ = A.MENU_SEQ
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND A.GRP_CD = #{ssnGrpCd}
+				   AND B.SABUN = #{ssnSabun}
+				   AND (A.USE_YN = '1' OR A.USE_YN IS NULL)
+				 ORDER BY B.SEQ
+				) ]]>
+		<if test="countAnniv != null and countAnniv != ''">
+			WHERE NUM BETWEEN (TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page}) ) * TO_NUMBER(#{countAnniv})
+		</if>
+	</select>
+
+	<select id="getListBox2ListL" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * FROM (
+				SELECT  RANK() OVER (ORDER BY A.APPL_SEQ DESC ) AS RK
+					  , '1' AS DETAIL
+					  , A.ENTER_CD
+       				  , A.APPL_SEQ
+		         	  , A.TITLE || decode( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+		         	  , A.APPL_CD
+		         	  , B.APPL_NM
+		         	  , A.APPL_YMD
+      				  , TO_CHAR(TO_DATE(A.APPL_YMD, 'YYYYMMDD'), 'YY-MM-DD') 	AS APPL_YMD_A
+       				  , A.APPL_SABUN
+      				  , F_COM_GET_NAMES(A.ENTER_CD, A.APPL_SABUN) AS APPL_NAME
+       				  , A.APPL_IN_SABUN
+      				  , F_COM_GET_NAMES(A.ENTER_CD,A.APPL_IN_SABUN) AS APPL_IN_NAME
+       				  , A.APPL_STATUS_CD
+       				  , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010', A.APPL_STATUS_CD) AS APPL_STATUS_CD_NM
+       				  , A.AGREE_SABUN
+      				  , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN) 	AS AGREE_NAME
+       				  , A.AGREE_YMD
+       				  , TO_CHAR(TO_DATE(A.AGREE_YMD, 'YYYYMMDD' ), 'YY-MM-DD') 	AS AGREE_YMD_A
+				FROM THRI103 A, THRI101 B
+				WHERE 1=1
+				AND		A.ENTER_CD 		= #{ssnEnterCd}
+				AND     A.APPL_SABUN  	= #{ssnSabun}
+				AND     A.ENTER_CD      = B.ENTER_CD
+				AND    	A.APPL_CD    	= B.APPL_CD
+				AND    	B.USE_YN    	= 'Y'
+				AND 	A.APPL_STATUS_CD = '21'
+				AND A.APPL_YMD BETWEEN to_char(add_months(SYSDATE,-12),'YYYYMMDD') AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+			) ]]>
+		<!--
+		<choose>
+			<when test="countAnniv != '' and countAnniv != ''">
+			<![CDATA[
+				WHERE RK BETWEEN (TO_NUMBER(#{page}) -1) * TO_NUMBER(#{countAnniv}) + 1  and (TO_NUMBER(#{page})) * TO_NUMBER(#{countAnniv})
+			]]>
+			</when>
+			<otherwise>
+			<![CDATA[
+				WHERE RK < 5
+			]]>
+			</otherwise>
+		</choose>
+		 -->
+	</select>
+
+	<!-- 시간외 근무 사용현황 -->
+	<!-- 쿼리 작업 필요TODO -->
+	<select id="getListOverTime" parameterType="map" resultType="cMap">
+		<![CDATA[
+		SELECT YM, CNT, CASE WHEN NVL(BEF_CNT,0) = 0 THEN ''
+		                     WHEN NVL(CNT,0) = 0 THEN ''
+		                     WHEN RATE > 0 THEN RATE||'% 증가'
+		                     WHEN RATE < 0 THEN (RATE*-1)||'% 감소'
+		                     END AS RATE_TXT
+		              , RATE, AVG_HOUR,1 AS TYPE
+                            , SUM_HOUR, BEF_SUM_HOUR
+		FROM (
+		SELECT X.YM, X.CNT, Y.BEF_CNT, ROUND(((X.SUM_HOUR/Y.BEF_SUM_HOUR)-1)*100) AS RATE, AVG_HOUR
+                   , X.SUM_HOUR, Y.BEF_SUM_HOUR
+		FROM (
+		    SELECT SUBSTR(YMD, 1,6) AS YM, SUM(CNT) AS CNT, ROUND(AVG(AVG_HOUR),2) AS AVG_HOUR
+                       , ROUND(SUM(SUM_HOUR),2) AS SUM_HOUR
+		    FROM (
+		            SELECT  YMD AS YMD, MAX(1) AS CNT, AVG(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) AVG_HOUR
+                                , SUM(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) AS SUM_HOUR
+		            FROM TTIM337 A
+		            LEFT JOIN TTIM015 BB
+		            ON BB.ENTER_CD = A.ENTER_CD
+                          AND BB.WORK_CD = A.WORK_CD
+		            WHERE A.ENTER_CD = #{ssnEnterCd}
+		             AND A.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'
+		             AND A.WORK_CD IN (   SELECT WORK_CD
+		                                  FROM (   SELECT ENTER_cD
+		                                                 ,  CASE WHEN DAY_TYPE IN ('101') THEN '0'
+		                                                       WHEN DAY_TYPE IN ('105') THEN '1'
+		                                                       WHEN DAY_TYPE IN ('103', '203') THEN '2'
+		                                                       WHEN DAY_TYPE IN ('201', '205', '207') THEN '3'
+		                                                       WHEN DAY_TYPE IN ('401') THEN '9'
+		                                                    END AS WORK_TYPE
+		                                                 , WORK_CD
+		                                            FROM TTIM015 AA
+		                                         )
+		                                   WHERE ENTER_CD = A.ENTER_CD
+		                                    AND WORK_TYPE = '1'
+		                               )
+		             AND NVL(WORK_HH,0)+ NVL(WORK_MM,0) > 0
+		             GROUP BY YMD
+		         )
+		    GROUP BY SUBSTR(YMD, 1,6)
+		    ) X,  ( SELECT SUBSTR(YMD, 1,6) AS BEF_YM, SUM(CNT) AS BEF_CNT
+                               , ROUND(SUM(BEF_SUM_HOUR),2) AS BEF_SUM_HOUR
+		            FROM (
+		                    SELECT  YMD AS YMD, MAX(1) AS CNT
+                                        , SUM(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) BEF_SUM_HOUR
+		                    FROM TTIM337 A
+		                    WHERE A.ENTER_CD = #{ssnEnterCd}
+		                     AND A.YMD LIKE TO_CHAR(ADD_MONTHS(TO_DATE(TO_CHAR(SYSDATE, 'YYYYMM'), 'YYYYMM'), -1), 'YYYYMM')||'%'
+		                     AND A.WORK_CD IN (   SELECT WORK_CD
+		                                  FROM (   SELECT ENTER_cD
+		                                                 ,  CASE WHEN DAY_TYPE IN ('101') THEN '0'
+		                                                       WHEN DAY_TYPE IN ('105') THEN '1'
+		                                                       WHEN DAY_TYPE IN ('103', '203') THEN '2'
+		                                                       WHEN DAY_TYPE IN ('201', '205', '207') THEN '3'
+		                                                       WHEN DAY_TYPE IN ('401') THEN '9'
+		                                                    END AS WORK_TYPE
+		                                                 , WORK_CD
+		                                            FROM TTIM015 AA
+		                                         )
+		                                   WHERE ENTER_CD = A.ENTER_CD
+		                                    AND WORK_TYPE = '1'
+		                               )
+		                     AND NVL(WORK_HH,0)+ NVL(WORK_MM,0) > 0
+		                     GROUP BY YMD
+		                 )
+		            GROUP BY SUBSTR(YMD, 1,6)
+		            ) Y
+		)
+		UNION ALL
+		SELECT YM, CNT, CASE WHEN NVL(BEF_CNT,0) = 0 THEN ''
+		                     WHEN NVL(CNT,0) = 0 THEN ''
+		                     WHEN RATE > 0 THEN RATE||'% 증가'
+		                     WHEN RATE < 0 THEN (RATE*-1)||'% 감소'
+		                     END AS RATE_TXT
+		              , RATE, AVG_HOUR     ,2 AS TYPE
+                            , SUM_HOUR, BEF_SUM_HOUR
+		FROM (
+		SELECT X.YM, X.CNT, Y.BEF_CNT, ROUND(((X.SUM_HOUR/Y.BEF_SUM_HOUR)-1)*100) AS RATE, AVG_HOUR
+                   , X.SUM_HOUR, Y.BEF_SUM_HOUR
+		FROM (
+		    SELECT SUBSTR(YMD, 1,6) AS YM, SUM(CNT) AS CNT, ROUND(AVG(AVG_HOUR),2) AS AVG_HOUR
+                        , ROUND(SUM(SUM_HOUR), 2) AS SUM_HOUR
+		    FROM (
+		            SELECT  YMD AS YMD, MAX(1) AS CNT, AVG(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) AVG_HOUR
+                                , SUM(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) SUM_HOUR
+		            FROM TTIM337 A
+		            LEFT JOIN TTIM015 BB
+		            ON BB.ENTER_CD = A.ENTER_CD
+                          AND BB.WORK_CD = A.WORK_CD
+		            WHERE A.ENTER_CD = #{ssnEnterCd}
+		             AND A.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'
+		             AND A.WORK_CD IN (   SELECT WORK_CD
+		                                  FROM (   SELECT ENTER_cD
+		                                                 ,  CASE WHEN DAY_TYPE IN ('101') THEN '0'
+		                                                       WHEN DAY_TYPE IN ('105') THEN '1'
+		                                                       WHEN DAY_TYPE IN ('103', '203') THEN '2'
+		                                                       WHEN DAY_TYPE IN ('201', '205', '207') THEN '3'
+		                                                       WHEN DAY_TYPE IN ('401') THEN '9'
+		                                                    END AS WORK_TYPE
+		                                                 , WORK_CD
+		                                            FROM TTIM015 AA
+		                                         )
+		                                   WHERE ENTER_CD = A.ENTER_CD
+		                                    AND WORK_TYPE = '2'
+		                               )
+		             AND NVL(WORK_HH,0)+ NVL(WORK_MM,0) > 0
+		             GROUP BY YMD
+		         )
+		    GROUP BY SUBSTR(YMD, 1,6)
+		    ) X,  ( SELECT SUBSTR(YMD, 1,6) AS BEF_YM, SUM(CNT) AS BEF_CNT
+                               , SUM(BEF_SUM_HOUR) AS BEF_SUM_HOUR
+		            FROM (
+		                    SELECT  YMD AS YMD, MAX(1) AS CNT
+                                        , SUM(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) BEF_SUM_HOUR
+		                    FROM TTIM337 A
+		                    WHERE A.ENTER_CD = #{ssnEnterCd}
+		                     AND A.YMD LIKE TO_CHAR(ADD_MONTHS(TO_DATE(TO_CHAR(SYSDATE, 'YYYYMM'), 'YYYYMM'), -1), 'YYYYMM')||'%'
+		                     AND A.WORK_CD IN (   SELECT WORK_CD
+		                                  FROM (   SELECT ENTER_cD
+		                                                 ,  CASE WHEN DAY_TYPE IN ('101') THEN '0'
+		                                                       WHEN DAY_TYPE IN ('105') THEN '1'
+		                                                       WHEN DAY_TYPE IN ('103', '203') THEN '2'
+		                                                       WHEN DAY_TYPE IN ('201', '205', '207') THEN '3'
+		                                                       WHEN DAY_TYPE IN ('401') THEN '9'
+		                                                    END AS WORK_TYPE
+		                                                 , WORK_CD
+		                                            FROM TTIM015 AA
+		                                         )
+		                                   WHERE ENTER_CD = A.ENTER_CD
+		                                    AND WORK_TYPE = '2'
+		                               )
+		                     AND NVL(WORK_HH,0)+ NVL(WORK_MM,0) > 0
+		                     GROUP BY YMD
+		                 )
+		            GROUP BY SUBSTR(YMD, 1,6)
+		            ) Y
+		)
+		UNION ALL
+		SELECT YM, CNT, CASE WHEN NVL(BEF_CNT,0) = 0 THEN ''
+		                     WHEN NVL(CNT,0) = 0 THEN ''
+		                     WHEN RATE > 0 THEN RATE||'% 증가'
+		                     WHEN RATE < 0 THEN (RATE*-1)||'% 감소'
+		                     END AS RATE_TXT
+		              , RATE, AVG_HOUR     ,3 AS TYPE
+                            , SUM_HOUR, BEF_SUM_HOUR
+		FROM (
+		SELECT X.YM, X.CNT, Y.BEF_CNT, ROUND(((X.SUM_HOUR/Y.BEF_SUM_HOUR)-1)*100) AS RATE, AVG_HOUR
+                   , X.SUM_HOUR, Y.BEF_SUM_HOUR
+		FROM (
+		    SELECT SUBSTR(YMD, 1,6) AS YM, SUM(CNT) AS CNT, ROUND(AVG(AVG_HOUR),2) AS AVG_HOUR
+                       , ROUND(SUM(SUM_HOUR),2) AS SUM_HOUR
+		    FROM (
+		            SELECT  YMD AS YMD, MAX(1) AS CNT, AVG(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) AVG_HOUR
+                               , SUM(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) SUM_HOUR
+		            FROM TTIM337 A
+		            LEFT JOIN TTIM015 BB
+		            ON BB.ENTER_CD = A.ENTER_CD
+                          AND BB.WORK_CD = A.WORK_CD
+		            WHERE A.ENTER_CD = #{ssnEnterCd}
+		             AND A.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'
+		             AND A.WORK_CD IN (   SELECT WORK_CD
+		                                  FROM (   SELECT ENTER_cD
+		                                                 ,  CASE WHEN DAY_TYPE IN ('101') THEN '0'
+		                                                       WHEN DAY_TYPE IN ('105') THEN '1'
+		                                                       WHEN DAY_TYPE IN ('103', '203') THEN '2'
+		                                                       WHEN DAY_TYPE IN ('201', '205', '207') THEN '3'
+		                                                       WHEN DAY_TYPE IN ('401') THEN '9'
+		                                                    END AS WORK_TYPE
+		                                                 , WORK_CD
+		                                            FROM TTIM015 AA
+		                                         )
+		                                   WHERE ENTER_CD = A.ENTER_CD
+		                                    AND WORK_TYPE = '3'
+		                               )
+		             AND NVL(WORK_HH,0)+ NVL(WORK_MM,0) > 0
+		             GROUP BY YMD
+		         )
+		    GROUP BY SUBSTR(YMD, 1,6)
+		    ) X,  ( SELECT SUBSTR(YMD, 1,6) AS BEF_YM, SUM(CNT) AS BEF_CNT, SUM(BEF_SUM_HOUR) AS BEF_SUM_HOUR
+		            FROM (
+		                    SELECT  YMD AS YMD, MAX(1) AS CNT
+                                      , SUM(NVL(WORK_HH,0)+ NVL(WORK_MM,0)/60) BEF_SUM_HOUR
+		                    FROM TTIM337 A
+		                    WHERE A.ENTER_CD = #{ssnEnterCd}
+		                     AND A.YMD LIKE TO_CHAR(ADD_MONTHS(TO_DATE(TO_CHAR(SYSDATE, 'YYYYMM'), 'YYYYMM'), -1), 'YYYYMM')||'%'
+		                     AND A.WORK_CD IN (   SELECT WORK_CD
+		                                  FROM (   SELECT ENTER_cD
+		                                                 ,  CASE WHEN DAY_TYPE IN ('101') THEN '0'
+		                                                       WHEN DAY_TYPE IN ('105') THEN '1'
+		                                                       WHEN DAY_TYPE IN ('103', '203') THEN '2'
+		                                                       WHEN DAY_TYPE IN ('201', '205', '207') THEN '3'
+		                                                       WHEN DAY_TYPE IN ('401') THEN '9'
+		                                                    END AS WORK_TYPE
+		                                                 , WORK_CD
+		                                            FROM TTIM015 AA
+		                                         )
+		                                   WHERE ENTER_CD = A.ENTER_CD
+		                                    AND WORK_TYPE = '3'
+		                               )
+		                     AND NVL(WORK_HH,0)+ NVL(WORK_MM,0) > 0
+		                     GROUP BY YMD
+		                 )
+		            GROUP BY SUBSTR(YMD, 1,6)
+		            ) Y
+		)
+		ORDER BY TYPE ASC
+              ]]>
+	</select>
+
+	<!-- 연차 보상 비용 현황 -->
+	<!-- 수정 필요 TODO -->
+	<select id="getVacationLeaveCost" parameterType="map" resultType="cMap">
+		SELECT AA.TOT_MON
+       , AA.MAX_MON
+       , AA.MIN_MON
+       , AA.CNT
+       , BB.TOT_MON AS BF_TOT_MON1
+       , CC.TOT_MON AS BF_TOT_MON2
+       , DD.TOT_MON AS BF_TOT_MON3
+       , TO_CHAR(SYSDATE, 'YYYYMM') AS BF_PAY_DAY
+       , TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYY') AS BF_PAY_DAY1
+       , TO_CHAR(ADD_MONTHS(SYSDATE, -24), 'YYYY') AS BF_PAY_DAY2
+       , TO_CHAR(ADD_MONTHS(SYSDATE, -36), 'YYYY') AS BF_PAY_DAY3
+ FROM (   SELECT CEIL(NVL(SUM(C.RESULT_MON),0)/100000) AS TOT_MON
+                , CEIL(NVL(MAX(C.RESULT_MON),0)/100000) AS MAX_MON
+                , CEIL(NVL(MIN(C.RESULT_MON),0)/100000) AS MIN_MON
+                , COUNT(DISTINCT B.SABUN) AS CNT
+          FROM TCPN201 A, TCPN203 B, TCPN205 C, TCPN981 D
+          WHERE A.ENTER_CD = B.ENTER_CD
+              AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+              AND A.ENTER_CD = C.ENTER_CD
+              AND A.PAY_ACTION_CD = C.PAY_ACTION_CD
+              AND B.SABUN = C.SABUN
+              AND A.ENTER_CD = D.ENTER_CD
+              AND A.PAY_ACTION_CD = D.PAY_ACTION_CD
+              AND NVL(D.CLOSE_YN, 'N') = 'Y'
+              AND NVL(C.RESULT_MON, 0) > 0
+              AND A.ENTER_CD = #{ssnEnterCd}
+              AND A.PAY_YM LIKE TO_CHAR(SYSDATE, 'YYYY')||'%'
+              AND C.ELEMENT_CD IN (SELECT ELEMENT_CD
+                                    FROM TCPN011
+                                    WHERE ENTER_CD = A.ENTER_CD
+                                      AND ELEMENT_NM LIKE '%기본급%'
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                    )
+        ) AA , (   SELECT CEIL(NVL(SUM(C.RESULT_MON),0)/100000) AS TOT_MON
+                , CEIL(NVL(MAX(C.RESULT_MON),0)/100000) AS MAX_MON
+                , CEIL(NVL(MIN(C.RESULT_MON),0)/100000) AS MIN_MON
+          FROM TCPN201 A, TCPN203 B, TCPN205 C, TCPN981 D
+          WHERE A.ENTER_CD = B.ENTER_CD
+              AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+              AND A.ENTER_CD = C.ENTER_CD
+              AND A.PAY_ACTION_CD = C.PAY_ACTION_CD
+              AND B.SABUN = C.SABUN
+              AND A.ENTER_CD = D.ENTER_CD
+              AND A.PAY_ACTION_CD = D.PAY_ACTION_CD
+              AND NVL(D.CLOSE_YN, 'N') = 'Y'
+              AND NVL(C.RESULT_MON, 0) > 0
+              AND A.ENTER_CD = #{ssnEnterCd}
+              AND A.PAY_YM LIKE TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYY')||'%'
+              AND C.ELEMENT_CD IN (SELECT ELEMENT_CD
+                                    FROM TCPN011
+                                    WHERE ENTER_CD = A.ENTER_CD
+                                      AND ELEMENT_NM LIKE '%기본급%'
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                    )
+        ) BB, (   SELECT CEIL(NVL(SUM(C.RESULT_MON),0)/100000) AS TOT_MON
+                , CEIL(NVL(MAX(C.RESULT_MON),0)/100000) AS MAX_MON
+                , CEIL(NVL(MIN(C.RESULT_MON),0)/100000) AS MIN_MON
+          FROM TCPN201 A, TCPN203 B, TCPN205 C, TCPN981 D
+          WHERE A.ENTER_CD = B.ENTER_CD
+              AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+              AND A.ENTER_CD = C.ENTER_CD
+              AND A.PAY_ACTION_CD = C.PAY_ACTION_CD
+              AND B.SABUN = C.SABUN
+              AND A.ENTER_CD = D.ENTER_CD
+              AND A.PAY_ACTION_CD = D.PAY_ACTION_CD
+              AND NVL(D.CLOSE_YN, 'N') = 'Y'
+              AND NVL(C.RESULT_MON, 0) > 0
+              AND A.ENTER_CD = #{ssnEnterCd}
+              AND A.PAY_YM LIKE TO_CHAR(ADD_MONTHS(SYSDATE, -24), 'YYYY')||'%'
+              AND C.ELEMENT_CD IN (SELECT ELEMENT_CD
+                                    FROM TCPN011
+                                    WHERE ENTER_CD = A.ENTER_CD
+                                      AND ELEMENT_NM LIKE '%기본급%'
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                    )
+        ) CC , (   SELECT CEIL(NVL(SUM(C.RESULT_MON),0)/100000) AS TOT_MON
+                , CEIL(NVL(MAX(C.RESULT_MON),0)/100000) AS MAX_MON
+                , CEIL(NVL(MIN(C.RESULT_MON),0)/100000) AS MIN_MON
+          FROM TCPN201 A, TCPN203 B, TCPN205 C, TCPN981 D
+          WHERE A.ENTER_CD = B.ENTER_CD
+              AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+              AND A.ENTER_CD = C.ENTER_CD
+              AND A.PAY_ACTION_CD = C.PAY_ACTION_CD
+              AND B.SABUN = C.SABUN
+              AND A.ENTER_CD = D.ENTER_CD
+              AND A.PAY_ACTION_CD = D.PAY_ACTION_CD
+              AND NVL(D.CLOSE_YN, 'N') = 'Y'
+              AND NVL(C.RESULT_MON, 0) > 0
+              AND A.ENTER_CD = #{ssnEnterCd}
+              AND A.PAY_YM LIKE TO_CHAR(ADD_MONTHS(SYSDATE, -36), 'YYYY')||'%'
+              AND C.ELEMENT_CD IN (SELECT ELEMENT_CD
+                                    FROM TCPN011
+                                    WHERE ENTER_CD = A.ENTER_CD
+                                      AND ELEMENT_NM LIKE '%기본급%'
+                                      AND A.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                    )
+        ) DD
+
+	</select>
+
+	<!--  TODO -->
+	<select id="getAttendanceCnt" parameterType="map" resultType="cMap">
+		SELECT CNT, BF_CNT, CASE WHEN BF_CNT > 0 THEN CEIL((CNT/BF_CNT-1)*100)
+                         ELSE 0 END AS RATE, 40 as GNT_CD
+		FROM (  SELECT COUNT(DISTINCT D.SABUN) AS CNT
+	        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+	        WHERE A.ENTER_CD = B.ENTER_CD
+				AND A.SABUN = B.SABUN
+				AND A.GNT_CD = B.GNT_CD
+				AND A.APPL_SEQ = B.APPL_SEQ
+				AND NVL(A.UPDATE_YN, 'N') = 'N'
+				AND A.ENTER_CD = C.ENTER_CD
+				AND A.APPL_SEQ = C.APPL_SEQ
+				AND C.APPL_STATUS_CD = '99'
+				AND A.ENTER_CD = D.ENTER_CD
+				AND A.SABUN = D.SABUN
+				AND A.ENTER_CD = E.ENTER_CD
+				AND A.GNT_CD = E.GNT_CD
+				AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+				AND B.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+				AND A.GNT_CD = '40'              <!-- /*@@근태코드@@*/  -->
+          ) A,
+        (  SELECT COUNT(DISTINCT D.SABUN) AS BF_CNT
+			FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+			WHERE A.ENTER_CD = B.ENTER_CD
+				AND A.SABUN = B.SABUN
+				AND A.GNT_CD = B.GNT_CD
+				AND A.APPL_SEQ = B.APPL_SEQ
+				AND NVL(A.UPDATE_YN, 'N') = 'N'
+				AND A.ENTER_CD = C.ENTER_CD
+				AND A.APPL_SEQ = C.APPL_SEQ
+				AND C.APPL_STATUS_CD = '99'
+				AND A.ENTER_CD = D.ENTER_CD
+				AND A.SABUN = D.SABUN
+				AND A.ENTER_CD = E.ENTER_CD
+				AND A.GNT_CD = E.GNT_CD
+				AND A.ENTER_CD = #{ssnEnterCd}          <!-- /*@@회사코드@@*/  -->
+				AND B.YMD LIKE TO_CHAR(SYSDATE -1, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+				AND A.GNT_CD = '40'               <!-- /*@@근태코드@@*/  -->
+          ) B
+          UNION ALL
+		SELECT CNT, BF_CNT, CASE WHEN BF_CNT > 0 THEN CEIL((CNT/BF_CNT-1)*100)
+                         ELSE 0 END AS RATE, 111 as GNT_CD
+		FROM (  SELECT COUNT(DISTINCT D.SABUN) AS CNT
+	        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+	        WHERE A.ENTER_CD = B.ENTER_CD
+				AND A.SABUN = B.SABUN
+				AND A.GNT_CD = B.GNT_CD
+				AND A.APPL_SEQ = B.APPL_SEQ
+				AND NVL(A.UPDATE_YN, 'N') = 'N'
+				AND A.ENTER_CD = C.ENTER_CD
+				AND A.APPL_SEQ = C.APPL_SEQ
+				AND C.APPL_STATUS_CD = '99'
+				AND A.ENTER_CD = D.ENTER_CD
+				AND A.SABUN = D.SABUN
+				AND A.ENTER_CD = E.ENTER_CD
+				AND A.GNT_CD = E.GNT_CD
+				AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+				AND B.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+				AND A.GNT_CD = '111'               <!-- /*@@근태코드@@*/  -->
+          ) A,
+        (  SELECT COUNT(DISTINCT D.SABUN) AS BF_CNT
+			FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+			WHERE A.ENTER_CD = B.ENTER_CD
+				AND A.SABUN = B.SABUN
+				AND A.GNT_CD = B.GNT_CD
+				AND A.APPL_SEQ = B.APPL_SEQ
+				AND NVL(A.UPDATE_YN, 'N') = 'N'
+				AND A.ENTER_CD = C.ENTER_CD
+				AND A.APPL_SEQ = C.APPL_SEQ
+				AND C.APPL_STATUS_CD = '99'
+				AND A.ENTER_CD = D.ENTER_CD
+				AND A.SABUN = D.SABUN
+				AND A.ENTER_CD = E.ENTER_CD
+				AND A.GNT_CD = E.GNT_CD
+				AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+				AND B.YMD LIKE TO_CHAR(SYSDATE -1, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+				AND A.GNT_CD = '111'               <!-- /*@@근태코드@@*/  -->
+          ) B
+           UNION ALL
+		SELECT CNT, BF_CNT, CASE WHEN BF_CNT > 0 THEN CEIL((CNT/BF_CNT-1)*100)
+                         ELSE 0 END AS RATE, 999 as GNT_CD
+		FROM (  SELECT COUNT(DISTINCT D.SABUN) AS CNT
+			FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+			WHERE A.ENTER_CD = B.ENTER_CD
+				AND A.SABUN = B.SABUN
+				AND A.GNT_CD = B.GNT_CD
+				AND A.APPL_SEQ = B.APPL_SEQ
+				AND NVL(A.UPDATE_YN, 'N') = 'N'
+				AND A.ENTER_CD = C.ENTER_CD
+				AND A.APPL_SEQ = C.APPL_SEQ
+				AND C.APPL_STATUS_CD = '99'
+				AND A.ENTER_CD = D.ENTER_CD
+				AND A.SABUN = D.SABUN
+				AND A.ENTER_CD = E.ENTER_CD
+				AND A.GNT_CD = E.GNT_CD
+				AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+				AND B.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+				AND A.GNT_CD = '999'               <!-- /*@@근태코드@@*/  -->
+          ) A,
+        (  SELECT COUNT(DISTINCT D.SABUN) AS BF_CNT
+		FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+		WHERE A.ENTER_CD = B.ENTER_CD
+			AND A.SABUN = B.SABUN
+			AND A.GNT_CD = B.GNT_CD
+			AND A.APPL_SEQ = B.APPL_SEQ
+			AND NVL(A.UPDATE_YN, 'N') = 'N'
+			AND A.ENTER_CD = C.ENTER_CD
+			AND A.APPL_SEQ = C.APPL_SEQ
+			AND C.APPL_STATUS_CD = '99'
+			AND A.ENTER_CD = D.ENTER_CD
+			AND A.SABUN = D.SABUN
+			AND A.ENTER_CD = E.ENTER_CD
+			AND A.GNT_CD = E.GNT_CD
+			AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+			AND B.YMD LIKE TO_CHAR(SYSDATE -1, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+			AND A.GNT_CD = '999'               <!-- /*@@근태코드@@*/  -->
+          ) B
+	</select>
+
+	<select id="getAttendanceAllCnt" parameterType="map" resultType="cMap">
+		SELECT count(DISTINCT D.SABUN) AS GNT_COUNT, A.GNT_CD, E.GNT_NM
+		FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+		WHERE A.ENTER_CD = B.ENTER_CD
+			AND A.SABUN = B.SABUN
+			AND A.GNT_CD = B.GNT_CD
+			AND A.APPL_SEQ = B.APPL_SEQ
+			AND NVL(A.UPDATE_YN, 'N') = 'N'
+			AND A.ENTER_CD = C.ENTER_CD
+			AND A.APPL_SEQ = C.APPL_SEQ
+			AND C.APPL_STATUS_CD = '99'
+			AND A.ENTER_CD = D.ENTER_CD
+			AND A.SABUN = D.SABUN
+			AND A.ENTER_CD = E.ENTER_CD
+			AND A.GNT_CD = E.GNT_CD
+			AND A.ENTER_CD = #{ssnEnterCd}
+			AND A.GNT_CD = '40'
+		GROUP BY A.GNT_CD, E.GNT_NM
+          union all
+        SELECT count(DISTINCT D.SABUN) AS GNT_COUNT, A.GNT_CD, E.GNT_NM
+		FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+		WHERE A.ENTER_CD = B.ENTER_CD
+			AND A.SABUN = B.SABUN
+			AND A.GNT_CD = B.GNT_CD
+			AND A.APPL_SEQ = B.APPL_SEQ
+			AND NVL(A.UPDATE_YN, 'N') = 'N'
+			AND A.ENTER_CD = C.ENTER_CD
+			AND A.APPL_SEQ = C.APPL_SEQ
+			AND C.APPL_STATUS_CD = '99'
+			AND A.ENTER_CD = D.ENTER_CD
+			AND A.SABUN = D.SABUN
+			AND A.ENTER_CD = E.ENTER_CD
+			AND A.GNT_CD = E.GNT_CD
+			AND A.ENTER_CD = #{ssnEnterCd}
+			AND A.GNT_CD = '111'
+		GROUP BY A.GNT_CD, E.GNT_NM
+         union all
+        SELECT count(DISTINCT D.SABUN) AS GNT_COUNT, A.GNT_CD, E.GNT_NM
+		FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+		WHERE A.ENTER_CD = B.ENTER_CD
+			AND A.SABUN = B.SABUN
+			AND A.GNT_CD = B.GNT_CD
+			AND A.APPL_SEQ = B.APPL_SEQ
+			AND NVL(A.UPDATE_YN, 'N') = 'N'
+			AND A.ENTER_CD = C.ENTER_CD
+			AND A.APPL_SEQ = C.APPL_SEQ
+			AND C.APPL_STATUS_CD = '99'
+			AND A.ENTER_CD = D.ENTER_CD
+			AND A.SABUN = D.SABUN
+			AND A.ENTER_CD = E.ENTER_CD
+			AND A.GNT_CD = E.GNT_CD
+			AND A.ENTER_CD = #{ssnEnterCd}
+			AND A.GNT_CD = '999'
+		GROUP BY A.GNT_CD, E.GNT_NM
+	</select>
+
+	<!-- 날짜 막혀있음 TODO -->
+	<select id="getAttendanceAllInfo" parameterType="map" resultType="cMap">
+		SELECT DISTINCT D.SABUN, D.NAME, 40 as classify, E.GNT_NM
+		FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+		WHERE A.ENTER_CD = B.ENTER_CD
+		  AND A.SABUN = B.SABUN
+		  AND A.GNT_CD = B.GNT_CD
+		  AND A.APPL_SEQ = B.APPL_SEQ
+		  AND NVL(A.UPDATE_YN, 'N') = 'N'
+		  AND A.ENTER_CD = C.ENTER_CD
+		  AND A.APPL_SEQ = C.APPL_SEQ
+		  AND C.APPL_STATUS_CD = '99'
+		  AND A.ENTER_CD = D.ENTER_CD
+		  AND A.SABUN = D.SABUN
+		  AND A.ENTER_CD = E.ENTER_CD
+		  AND A.GNT_CD = E.GNT_CD
+		  AND A.ENTER_CD = #{ssnEnterCd}     <!-- /*@@회사코드@@*/ -->
+<!-- 		  AND B.YMD LIKE '202303'||'%'   /*@@년월@@*/ -->
+		  AND A.GNT_CD = '40'      <!-- /*@@근태코드@@*/ 지각 cnt_cd ='40',해외법인 파견자 cnt_cd ='111',결근 cnt_cd ='999'-->
+		  union all
+        SELECT DISTINCT D.SABUN, D.NAME, 111 as classify, E.GNT_NM
+		FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+		WHERE A.ENTER_CD = B.ENTER_CD
+		  AND A.SABUN = B.SABUN
+		  AND A.GNT_CD = B.GNT_CD
+		  AND A.APPL_SEQ = B.APPL_SEQ
+		  AND NVL(A.UPDATE_YN, 'N') = 'N'
+		  AND A.ENTER_CD = C.ENTER_CD
+		  AND A.APPL_SEQ = C.APPL_SEQ
+		  AND C.APPL_STATUS_CD = '99'
+		  AND A.ENTER_CD = D.ENTER_CD
+		  AND A.SABUN = D.SABUN
+		  AND A.ENTER_CD = E.ENTER_CD
+		  AND A.GNT_CD = E.GNT_CD
+		  AND A.ENTER_CD = #{ssnEnterCd}      <!-- /*@@회사코드@@*/ -->
+<!-- 		  AND B.YMD LIKE '202303'||'%'   /*@@년월@@*/ -->
+		  AND A.GNT_CD = '111'  	<!-- /*@@근태코드@@*/ -->
+		  union all
+        SELECT DISTINCT D.SABUN, D.NAME, 999 as classify, E.GNT_NM
+		FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+		WHERE A.ENTER_CD = B.ENTER_CD
+		  AND A.SABUN = B.SABUN
+		  AND A.GNT_CD = B.GNT_CD
+		  AND A.APPL_SEQ = B.APPL_SEQ
+		  AND NVL(A.UPDATE_YN, 'N') = 'N'
+		  AND A.ENTER_CD = C.ENTER_CD
+		  AND A.APPL_SEQ = C.APPL_SEQ
+		  AND C.APPL_STATUS_CD = '99'
+		  AND A.ENTER_CD = D.ENTER_CD
+		  AND A.SABUN = D.SABUN
+		  AND A.ENTER_CD = E.ENTER_CD
+		  AND A.GNT_CD = E.GNT_CD
+		  AND A.ENTER_CD = #{ssnEnterCd}      <!-- /*@@회사코드@@*/ -->
+<!-- 		  AND B.YMD LIKE '202303'||'%'   /*@@년월@@*/ -->
+		  AND A.GNT_CD = '999'   <!-- /*@@근태코드@@*/ 지각 cnt_cd ='40',해외법인 파견자 cnt_cd ='111',결근 cnt_cd ='999'-->
+	</select>
+
+
+	   <select id="getAttendanceLeaderRate" parameterType="map" resultType="cMap">
+        SELECT CNT, BF_CNT, CASE WHEN BF_CNT > 0 THEN CEIL((CNT/BF_CNT-1)*100)
+                         ELSE 0 END AS RATE, 40 as GNT_CD
+        FROM (  SELECT COUNT(DISTINCT D.SABUN) AS CNT
+            FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+            WHERE A.ENTER_CD = B.ENTER_CD
+                AND A.SABUN = B.SABUN
+                AND A.GNT_CD = B.GNT_CD
+                AND A.APPL_SEQ = B.APPL_SEQ
+                AND NVL(A.UPDATE_YN, 'N') = 'N'
+                AND A.ENTER_CD = C.ENTER_CD
+                AND A.APPL_SEQ = C.APPL_SEQ
+                AND C.APPL_STATUS_CD = '99'
+                AND A.ENTER_CD = D.ENTER_CD
+                AND A.SABUN = D.SABUN
+                AND A.ENTER_CD = E.ENTER_CD
+                AND A.GNT_CD = E.GNT_CD
+                AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+                AND B.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+                AND A.GNT_CD = '40'              <!-- /*@@근태코드@@*/  -->
+                AND A.SABUN IN ( SELECT DISTINCT SABUN
+                                   FROM TORG111
+                                  WHERE ENTER_CD = 'DEMO'
+                                    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          ) A,
+        (  SELECT COUNT(DISTINCT D.SABUN) AS BF_CNT
+            FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+            WHERE A.ENTER_CD = B.ENTER_CD
+                AND A.SABUN = B.SABUN
+                AND A.GNT_CD = B.GNT_CD
+                AND A.APPL_SEQ = B.APPL_SEQ
+                AND NVL(A.UPDATE_YN, 'N') = 'N'
+                AND A.ENTER_CD = C.ENTER_CD
+                AND A.APPL_SEQ = C.APPL_SEQ
+                AND C.APPL_STATUS_CD = '99'
+                AND A.ENTER_CD = D.ENTER_CD
+                AND A.SABUN = D.SABUN
+                AND A.ENTER_CD = E.ENTER_CD
+                AND A.GNT_CD = E.GNT_CD
+                AND A.ENTER_CD = #{ssnEnterCd}          <!-- /*@@회사코드@@*/  -->
+                AND B.YMD LIKE TO_CHAR(SYSDATE -1, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+                AND A.GNT_CD = '40'               <!-- /*@@근태코드@@*/  -->
+                AND A.SABUN IN ( SELECT DISTINCT SABUN
+                                   FROM TORG111
+                                  WHERE ENTER_CD = 'DEMO'
+                                    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          ) B
+          UNION ALL
+        SELECT CNT, BF_CNT, CASE WHEN BF_CNT > 0 THEN CEIL((CNT/BF_CNT-1)*100)
+                         ELSE 0 END AS RATE, 111 as GNT_CD
+        FROM (  SELECT COUNT(DISTINCT D.SABUN) AS CNT
+            FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+            WHERE A.ENTER_CD = B.ENTER_CD
+                AND A.SABUN = B.SABUN
+                AND A.GNT_CD = B.GNT_CD
+                AND A.APPL_SEQ = B.APPL_SEQ
+                AND NVL(A.UPDATE_YN, 'N') = 'N'
+                AND A.ENTER_CD = C.ENTER_CD
+                AND A.APPL_SEQ = C.APPL_SEQ
+                AND C.APPL_STATUS_CD = '99'
+                AND A.ENTER_CD = D.ENTER_CD
+                AND A.SABUN = D.SABUN
+                AND A.ENTER_CD = E.ENTER_CD
+                AND A.GNT_CD = E.GNT_CD
+                AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+                AND B.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+                AND A.GNT_CD = '111'               <!-- /*@@근태코드@@*/  -->
+                AND A.SABUN IN ( SELECT DISTINCT SABUN
+                                   FROM TORG111
+                                  WHERE ENTER_CD = 'DEMO'
+                                    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          ) A,
+        (  SELECT COUNT(DISTINCT D.SABUN) AS BF_CNT
+            FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+            WHERE A.ENTER_CD = B.ENTER_CD
+                AND A.SABUN = B.SABUN
+                AND A.GNT_CD = B.GNT_CD
+                AND A.APPL_SEQ = B.APPL_SEQ
+                AND NVL(A.UPDATE_YN, 'N') = 'N'
+                AND A.ENTER_CD = C.ENTER_CD
+                AND A.APPL_SEQ = C.APPL_SEQ
+                AND C.APPL_STATUS_CD = '99'
+                AND A.ENTER_CD = D.ENTER_CD
+                AND A.SABUN = D.SABUN
+                AND A.ENTER_CD = E.ENTER_CD
+                AND A.GNT_CD = E.GNT_CD
+                AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+                AND B.YMD LIKE TO_CHAR(SYSDATE -1, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+                AND A.GNT_CD = '111'               <!-- /*@@근태코드@@*/  -->
+                AND A.SABUN IN ( SELECT DISTINCT SABUN
+                                   FROM TORG111
+                                  WHERE ENTER_CD = 'DEMO'
+                                    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          ) B
+           UNION ALL
+        SELECT CNT, BF_CNT, CASE WHEN BF_CNT > 0 THEN CEIL((CNT/BF_CNT-1)*100)
+                         ELSE 0 END AS RATE, 999 as GNT_CD
+        FROM (  SELECT COUNT(DISTINCT D.SABUN) AS CNT
+            FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+            WHERE A.ENTER_CD = B.ENTER_CD
+                AND A.SABUN = B.SABUN
+                AND A.GNT_CD = B.GNT_CD
+                AND A.APPL_SEQ = B.APPL_SEQ
+                AND NVL(A.UPDATE_YN, 'N') = 'N'
+                AND A.ENTER_CD = C.ENTER_CD
+                AND A.APPL_SEQ = C.APPL_SEQ
+                AND C.APPL_STATUS_CD = '99'
+                AND A.ENTER_CD = D.ENTER_CD
+                AND A.SABUN = D.SABUN
+                AND A.ENTER_CD = E.ENTER_CD
+                AND A.GNT_CD = E.GNT_CD
+                AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+                AND B.YMD LIKE TO_CHAR(SYSDATE, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+                AND A.GNT_CD = '999'               <!-- /*@@근태코드@@*/  -->
+                AND A.SABUN IN ( SELECT DISTINCT SABUN
+				                   FROM TORG111
+				                  WHERE ENTER_CD = 'DEMO'
+				                    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          ) A,
+        (  SELECT COUNT(DISTINCT D.SABUN) AS BF_CNT
+        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+        WHERE A.ENTER_CD = B.ENTER_CD
+            AND A.SABUN = B.SABUN
+            AND A.GNT_CD = B.GNT_CD
+            AND A.APPL_SEQ = B.APPL_SEQ
+            AND NVL(A.UPDATE_YN, 'N') = 'N'
+            AND A.ENTER_CD = C.ENTER_CD
+            AND A.APPL_SEQ = C.APPL_SEQ
+            AND C.APPL_STATUS_CD = '99'
+            AND A.ENTER_CD = D.ENTER_CD
+            AND A.SABUN = D.SABUN
+            AND A.ENTER_CD = E.ENTER_CD
+            AND A.GNT_CD = E.GNT_CD
+            AND A.ENTER_CD = #{ssnEnterCd}           <!-- /*@@회사코드@@*/  -->
+            AND B.YMD LIKE TO_CHAR(SYSDATE -1, 'YYYYMM')||'%'    <!-- /*@@년월@@*/ -->
+            AND A.GNT_CD = '999'               <!-- /*@@근태코드@@*/  -->
+            AND A.SABUN IN ( SELECT DISTINCT SABUN
+                               FROM TORG111
+                              WHERE ENTER_CD = 'DEMO'
+                                 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          ) B
+    </select>
+
+    <select id="getAttendanceLeaderCnt" parameterType="map" resultType="cMap">
+        SELECT count(DISTINCT D.SABUN) AS GNT_COUNT, A.GNT_CD, E.GNT_NM
+        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+        WHERE A.ENTER_CD = B.ENTER_CD
+            AND A.SABUN = B.SABUN
+            AND A.GNT_CD = B.GNT_CD
+            AND A.APPL_SEQ = B.APPL_SEQ
+            AND NVL(A.UPDATE_YN, 'N') = 'N'
+            AND A.ENTER_CD = C.ENTER_CD
+            AND A.APPL_SEQ = C.APPL_SEQ
+            AND C.APPL_STATUS_CD = '99'
+            AND A.ENTER_CD = D.ENTER_CD
+            AND A.SABUN = D.SABUN
+            AND A.ENTER_CD = E.ENTER_CD
+            AND A.GNT_CD = E.GNT_CD
+            AND A.ENTER_CD = #{ssnEnterCd}
+            AND A.GNT_CD = '40'
+            AND A.SABUN IN ( SELECT DISTINCT SABUN
+                               FROM TORG111
+                              WHERE ENTER_CD = 'DEMO'
+                                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+        GROUP BY A.GNT_CD, E.GNT_NM
+          union all
+        SELECT count(DISTINCT D.SABUN) AS GNT_COUNT, A.GNT_CD, E.GNT_NM
+        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+        WHERE A.ENTER_CD = B.ENTER_CD
+            AND A.SABUN = B.SABUN
+            AND A.GNT_CD = B.GNT_CD
+            AND A.APPL_SEQ = B.APPL_SEQ
+            AND NVL(A.UPDATE_YN, 'N') = 'N'
+            AND A.ENTER_CD = C.ENTER_CD
+            AND A.APPL_SEQ = C.APPL_SEQ
+            AND C.APPL_STATUS_CD = '99'
+            AND A.ENTER_CD = D.ENTER_CD
+            AND A.SABUN = D.SABUN
+            AND A.ENTER_CD = E.ENTER_CD
+            AND A.GNT_CD = E.GNT_CD
+            AND A.ENTER_CD = #{ssnEnterCd}
+            AND A.GNT_CD = '111'
+            AND A.SABUN IN ( SELECT DISTINCT SABUN
+                               FROM TORG111
+                              WHERE ENTER_CD = 'DEMO'
+                                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+        GROUP BY A.GNT_CD, E.GNT_NM
+         union all
+        SELECT count(DISTINCT D.SABUN) AS GNT_COUNT, A.GNT_CD, E.GNT_NM
+        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+        WHERE A.ENTER_CD = B.ENTER_CD
+            AND A.SABUN = B.SABUN
+            AND A.GNT_CD = B.GNT_CD
+            AND A.APPL_SEQ = B.APPL_SEQ
+            AND NVL(A.UPDATE_YN, 'N') = 'N'
+            AND A.ENTER_CD = C.ENTER_CD
+            AND A.APPL_SEQ = C.APPL_SEQ
+            AND C.APPL_STATUS_CD = '99'
+            AND A.ENTER_CD = D.ENTER_CD
+            AND A.SABUN = D.SABUN
+            AND A.ENTER_CD = E.ENTER_CD
+            AND A.GNT_CD = E.GNT_CD
+            AND A.ENTER_CD = #{ssnEnterCd}
+            AND A.GNT_CD = '999'
+            AND A.SABUN IN ( SELECT DISTINCT SABUN
+                               FROM TORG111
+                              WHERE ENTER_CD = 'DEMO'
+                                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+        GROUP BY A.GNT_CD, E.GNT_NM
+    </select>
+
+    <!-- 날짜 막혀있음 TODO -->
+    <select id="getAttendanceLeaderInfo" parameterType="map" resultType="cMap">
+        SELECT DISTINCT D.SABUN, D.NAME, 40 as classify, E.GNT_NM
+        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+        WHERE A.ENTER_CD = B.ENTER_CD
+          AND A.SABUN = B.SABUN
+          AND A.GNT_CD = B.GNT_CD
+          AND A.APPL_SEQ = B.APPL_SEQ
+          AND NVL(A.UPDATE_YN, 'N') = 'N'
+          AND A.ENTER_CD = C.ENTER_CD
+          AND A.APPL_SEQ = C.APPL_SEQ
+          AND C.APPL_STATUS_CD = '99'
+          AND A.ENTER_CD = D.ENTER_CD
+          AND A.SABUN = D.SABUN
+          AND A.ENTER_CD = E.ENTER_CD
+          AND A.GNT_CD = E.GNT_CD
+          AND A.ENTER_CD = #{ssnEnterCd}     <!-- /*@@회사코드@@*/ -->
+<!--          AND B.YMD LIKE '202303'||'%'   /*@@년월@@*/ -->
+          AND A.GNT_CD = '40'      <!-- /*@@근태코드@@*/ 지각 cnt_cd ='40',해외법인 파견자 cnt_cd ='111',결근 cnt_cd ='999'-->
+          AND A.SABUN IN ( SELECT DISTINCT SABUN
+                             FROM TORG111
+                            WHERE ENTER_CD = 'DEMO'
+                              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          union all
+        SELECT DISTINCT D.SABUN, D.NAME, 111 as classify, E.GNT_NM
+        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+        WHERE A.ENTER_CD = B.ENTER_CD
+          AND A.SABUN = B.SABUN
+          AND A.GNT_CD = B.GNT_CD
+          AND A.APPL_SEQ = B.APPL_SEQ
+          AND NVL(A.UPDATE_YN, 'N') = 'N'
+          AND A.ENTER_CD = C.ENTER_CD
+          AND A.APPL_SEQ = C.APPL_SEQ
+          AND C.APPL_STATUS_CD = '99'
+          AND A.ENTER_CD = D.ENTER_CD
+          AND A.SABUN = D.SABUN
+          AND A.ENTER_CD = E.ENTER_CD
+          AND A.GNT_CD = E.GNT_CD
+          AND A.ENTER_CD = #{ssnEnterCd}      <!-- /*@@회사코드@@*/ -->
+<!--          AND B.YMD LIKE '202303'||'%'   /*@@년월@@*/ -->
+          AND A.GNT_CD = '111'      <!-- /*@@근태코드@@*/ -->
+          AND A.SABUN IN ( SELECT DISTINCT SABUN
+                             FROM TORG111
+                            WHERE ENTER_CD = 'DEMO'
+                              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+          union all
+        SELECT DISTINCT D.SABUN, D.NAME, 999 as classify, E.GNT_NM
+        FROM TTIM301 A, TTIM405 B, THRI103 C, THRM100 D, TTIM014 E
+        WHERE A.ENTER_CD = B.ENTER_CD
+          AND A.SABUN = B.SABUN
+          AND A.GNT_CD = B.GNT_CD
+          AND A.APPL_SEQ = B.APPL_SEQ
+          AND NVL(A.UPDATE_YN, 'N') = 'N'
+          AND A.ENTER_CD = C.ENTER_CD
+          AND A.APPL_SEQ = C.APPL_SEQ
+          AND C.APPL_STATUS_CD = '99'
+          AND A.ENTER_CD = D.ENTER_CD
+          AND A.SABUN = D.SABUN
+          AND A.ENTER_CD = E.ENTER_CD
+          AND A.GNT_CD = E.GNT_CD
+          AND A.ENTER_CD = #{ssnEnterCd}      <!-- /*@@회사코드@@*/ -->
+<!--          AND B.YMD LIKE '202303'||'%'   /*@@년월@@*/ -->
+          AND A.GNT_CD = '999'   <!-- /*@@근태코드@@*/ 지각 cnt_cd ='40',해외법인 파견자 cnt_cd ='111',결근 cnt_cd ='999'-->
+          AND A.SABUN IN ( SELECT DISTINCT SABUN
+                             FROM TORG111
+                            WHERE ENTER_CD = 'DEMO'
+                              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE )
+    </select>
+
+
+	<!-- 직급대비 급여 상위 -->
+	<select id="getSalaryTop" parameterType="map" resultType="cMap">
+		SELECT A.RANK, A.SABUN, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+		     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.EDATE) AS ORG_NM
+		     ,F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.EDATE) AS JIKWEE_NM, F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, A.EDATE)
+		FROM (
+		            SELECT A.ENTER_CD, A.SABUN, MAX(A.EDATE) AS EDATE, SUM(B.ELEMENT_MON) AS PAYMON
+		                 , ROW_NUMBER() OVER (ORDER BY SUM(B.ELEMENT_MON) DESC) AS RANK
+		              FROM TCPN403 A, TCPN404 B
+		             WHERE A.ENTER_CD = #{ssnEnterCd}
+		               AND A.ENTER_CD = B.ENTER_CD
+		               AND A.SABUN = B.SABUN
+		               AND A.SDATE = B.SDATE
+		               AND B.ELEMENT_CD = '100'
+		               AND F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, A.EDATE) = #{jikwee}
+	<![CDATA[
+		               AND A.SDATE = (SELECT MAX(X.SDATE)
+		                                FROM TCPN403 X
+		                               WHERE X.ENTER_CD = A.ENTER_CD
+		                                 AND X.SABUN = A.SABUN
+		                                 AND X.SDATE = A.SDATE
+		                                 AND TO_CHAR(SYSDATE, 'YYYY') BETWEEN SUBSTR(X.SDATE,1,4) AND SUBSTR(NVL(X.EDATE,'99991231'),1,4)
+		                                 )
+		               AND F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, A.EDATE) <> 'RA'
+		             GROUP BY A.ENTER_CD, A.SABUN
+		      )A
+		WHERE A.RANK <= 3
+	]]>
+	</select>
+
+	<select id="getCompanyJikweeList" parameterType="map" resultType="cMap">
+		SELECT F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.EDATE) AS JIKWEE_NM, F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, A.EDATE) AS JIKWEE_CD
+		FROM (
+				SELECT A.ENTER_CD, A.SABUN, MAX(A.EDATE) AS EDATE, SUM(B.ELEMENT_MON) AS PAYMON
+				     , ROW_NUMBER() OVER (ORDER BY SUM(B.ELEMENT_MON) DESC) AS RANK
+				FROM TCPN403 A, TCPN404 B
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.ENTER_CD = B.ENTER_CD
+				   AND A.SABUN = B.SABUN
+				   AND A.SDATE = B.SDATE
+				   AND B.ELEMENT_CD = '100'
+				   AND A.SDATE = (SELECT MAX(X.SDATE)
+				                    FROM TCPN403 X
+				                   WHERE X.ENTER_CD = A.ENTER_CD
+				                     AND X.SABUN = A.SABUN
+				                     AND X.SDATE = A.SDATE
+				                     AND TO_CHAR(SYSDATE, 'YYYY') BETWEEN SUBSTR(X.SDATE,1,4) AND SUBSTR(NVL(X.EDATE,'99991231'),1,4)
+				                     )
+				   <![CDATA[
+				   AND F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, A.EDATE) <> 'RA'
+				   	]]>
+				 GROUP BY A.ENTER_CD, A.SABUN
+		      )A
+		GROUP BY F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.EDATE), F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, A.EDATE)
+	</select>
+
+	<select id="getSalaryBottom" parameterType="map" resultType="cMap">
+		SELECT A.RANK, A.SABUN, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+			, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.EDATE) AS ORG_NM
+		FROM (
+            SELECT A.ENTER_CD, A.SABUN, MAX(A.EDATE) AS EDATE, SUM(B.ELEMENT_MON) AS PAYMON
+                 , ROW_NUMBER() OVER (ORDER BY SUM(B.ELEMENT_MON) ASC) AS RANK
+              FROM TCPN403 A, TCPN404 B
+		WHERE A.ENTER_CD = #{ssnEnterCd}
+               AND A.ENTER_CD = B.ENTER_CD
+               AND A.SABUN = B.SABUN
+               AND A.SDATE = B.SDATE
+               AND B.ELEMENT_CD = '100'
+               AND F_COM_GET_JIKWEE_CD(A.ENTER_CD, A.SABUN, A.EDATE) = #{jikwee}
+               <![CDATA[
+               AND A.SDATE = (SELECT MAX(X.SDATE)
+                                FROM TCPN403 X
+                               WHERE X.ENTER_CD = A.ENTER_CD
+                                 AND X.SABUN = A.SABUN
+                                 AND X.SDATE = A.SDATE
+                                 AND TO_CHAR(SYSDATE, 'YYYY') BETWEEN SUBSTR(X.SDATE,1,4) AND SUBSTR(NVL(X.EDATE,'99991231'),1,4)
+                                 )
+               AND F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, A.EDATE) <> 'RA'
+             GROUP BY A.ENTER_CD, A.SABUN
+				      )A
+				WHERE A.RANK <= 3
+		]]>
+	</select>
+
+	<select id="getSalaryIncrease" parameterType="map" resultType="cMap">
+		SELECT A.*
+  		FROM (
+            SELECT A.SABUN, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.EDATE) AS JIKWEE_NM
+                 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.EDATE) AS ORG_NM, A.PAYMON, B.PRE_PAYMON, A.PAYMON-B.PRE_PAYMON AS UPMON
+                 , (A.PAYMON-B.PRE_PAYMON)/A.PAYMON*100 AS UPRATE
+                 , ROW_NUMBER() OVER (ORDER BY (A.PAYMON-B.PRE_PAYMON)/A.PAYMON*100 DESC) AS RANK
+              FROM (
+                         SELECT A.ENTER_CD, A.SABUN, MAX(A.EDATE) AS EDATE, SUM(B.ELEMENT_MON) AS PAYMON
+                          FROM TCPN403 A, TCPN404 B
+                         WHERE A.ENTER_CD = #{ssnEnterCd}
+                           AND A.ENTER_CD = B.ENTER_CD
+                           AND A.SABUN = B.SABUN
+                           AND A.SDATE = B.SDATE
+                           AND B.ELEMENT_CD = '100'	<!-- 연봉총액 (회사별 상이) -->
+                           AND A.SDATE = (SELECT MAX(X.SDATE)
+                                            FROM TCPN403 X
+                                           WHERE X.ENTER_CD = A.ENTER_CD
+                                             AND X.SABUN = A.SABUN
+                                             AND X.SDATE = A.SDATE
+                                             AND TO_CHAR(SYSDATE, 'YYYY') BETWEEN SUBSTR(X.SDATE,1,4) AND SUBSTR(NVL(X.EDATE,'99991231'),1,4)
+                                             )
+                                             	<![CDATA[
+							AND F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, A.EDATE) <> 'RA'
+							]]>
+                         GROUP BY A.ENTER_CD, A.SABUN
+                    )A,
+                    (
+                         SELECT A.ENTER_CD, A.SABUN, MAX(A.EDATE) AS EDATE, SUM(B.ELEMENT_MON) AS PRE_PAYMON
+                          FROM TCPN403 A, TCPN404 B
+                         WHERE A.ENTER_CD = #{ssnEnterCd}
+                           AND A.ENTER_CD = B.ENTER_CD
+                           AND A.SABUN = B.SABUN
+                           AND A.SDATE = B.SDATE
+                           AND B.ELEMENT_CD = '100'	<!-- 연봉총액 (회사별 상이) -->
+                           AND A.SDATE = (SELECT MAX(X.SDATE)
+                                            FROM TCPN403 X
+                                           WHERE X.ENTER_CD = A.ENTER_CD
+                                             AND X.SABUN = A.SABUN
+                                             AND X.SDATE = A.SDATE
+                                             AND TO_CHAR(SYSDATE - 1, 'YYYY') BETWEEN SUBSTR(X.SDATE,1,4) AND SUBSTR(NVL(X.EDATE,'99991231'),1,4)
+                                             )
+                                             <![CDATA[
+							AND F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, A.EDATE) <> 'RA'
+                         GROUP BY A.ENTER_CD, A.SABUN
+                      )B
+             WHERE A.ENTER_CD = B.ENTER_CD
+               AND A.SABUN = B.SABUN
+        )A
+		WHERE A.RANK <= 10
+		]]>
+	</select>
+
+	<select id="getSalaryOutlier" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT JIKWEE
+	     , JIKWEE_CD
+	     , SUM(MON) AS TOT
+	     , COUNT(1) AS JIKWEE_CNT
+	     , ROUND(SUM(MON)/COUNT(1), 0) AS BAND_S
+	     , ROUND(SUM(MON)/COUNT(1), 0) AS BAND_E
+	     , ROUND(SUM(MON)/COUNT(1), 0) AS AVG
+	     , MIN(MON) AS MIN
+	     , MAX(MON) AS MAX
+	     , (MIN(MON) + MAX(MON))/2 AS MIN_MAX_AVG
+	  FROM (
+	SELECT A.SDATE
+	     , A.SABUN
+	     , T.JIKWEE_CD
+	     , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.SDATE, '') AS JIKWEE
+	     , NVL(SUM(B.ELEMENT_MON * 12), 0) AS MON
+	  FROM TCPN403 A, TCPN404 B, THRM100 S, THRM151 T
+	WHERE A.ENTER_CD = B.ENTER_CD
+	   AND A.SABUN    = B.SABUN
+	   AND A.SDATE    = B.SDATE
+	   AND A.ENTER_CD = S.ENTER_CD
+	   AND A.SABUN    = S.SABUN
+	   AND A.ENTER_CD = T.ENTER_CD
+	   AND A.SABUN    = T.SABUN
+	   AND B.ELEMENT_CD != 'EX01'
+	   AND A.ENTER_CD = #{ssnEnterCd}
+	   AND A.SDATE >= CONCAT(TO_CHAR(SYSDATE, 'YYYY'), '0101')
+	   AND T.SDATE = (SELECT MAX(SUB.SDATE)
+	                    FROM THRM151 SUB
+	                   WHERE SUB.ENTER_CD = A.ENTER_CD
+	                     AND SUB.SABUN = A.SABUN
+	                     AND SUB.STATUS_CD != 'RA'
+	                     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SUB.SDATE AND NVL(SUB.EDATE, '99991231')
+	                     )
+	   GROUP BY A.ENTER_CD, A.SDATE, A.SABUN, T.JIKWEE_CD
+	   ORDER BY A.SABUN
+	   )
+	   GROUP BY JIKWEE, JIKWEE_CD
+	   ORDER BY JIKWEE_CD
+	   ]]>
+	</select>
+
+	<select id="getYearlyEnterExitTrend" parameterType="map" resultType="cMap">
+		SELECT SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,4) = TO_CHAR(SYSDATE,'YYYY') THEN 1 ELSE 0 END) AS "IN"
+			, TO_CHAR (SUM(CASE WHEN SUBSTR(A.RET_YMD,1,4) = TO_CHAR(SYSDATE,'YYYY') THEN 1 ELSE 0 END) , 'FM999999999999990.0') AS "OUT"
+			, ((SUM(CASE WHEN SUBSTR(A.GEMP_YMD, 1, 4) = TO_CHAR(SYSDATE,'YYYY') THEN 1 ELSE 0 END) -
+	         SUM(CASE WHEN SUBSTR(A.GEMP_YMD, 1, 4) = TO_CHAR(SYSDATE-1,'YYYY') THEN 1 ELSE 0 END)
+			 ) / DECODE(SUM(CASE WHEN SUBSTR(A.GEMP_YMD, 1, 4) = TO_CHAR(SYSDATE-1,'YYYY') THEN 1 ELSE 0 END), 0, NULL, SUM(CASE WHEN SUBSTR(A.GEMP_YMD, 1, 4) = TO_CHAR(SYSDATE-1,'YYYY') THEN 1 ELSE 0 END)) * 100) AS "GAP_RATE_IN"
+			, ((SUM(CASE WHEN SUBSTR(A.RET_YMD, 1, 4) = TO_CHAR(SYSDATE,'YYYY') THEN 1 ELSE 0 END) -
+			  SUM(CASE WHEN SUBSTR(A.RET_YMD, 1, 4) = TO_CHAR(SYSDATE-1,'YYYY') THEN 1 ELSE 0 END)
+			 ) / DECODE(SUM(CASE WHEN SUBSTR(A.RET_YMD, 1, 4) = '2022' THEN 1 ELSE 0 END), 0, NULL, SUM(CASE WHEN SUBSTR(A.RET_YMD, 1, 4) = '2022' THEN 1 ELSE 0 END)) * 100) AS "GAP_RATE_OUT"
+	        ,SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,4) = TO_CHAR(SYSDATE,'YYYY') THEN 1 ELSE 0 END) AS "IN_CNT1"
+	        ,SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,4) = TO_CHAR(SYSDATE-1,'YYYY') THEN 1 ELSE 0 END) AS "IN_CNT2"
+	        ,SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,4) = TO_CHAR(SYSDATE-2,'YYYY') THEN 1 ELSE 0 END) AS "IN_CNT3"
+	        ,SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,4) = TO_CHAR(SYSDATE-3,'YYYY') THEN 1 ELSE 0 END) AS "IN_CNT4"
+	        ,SUM(CASE WHEN SUBSTR(A.RET_YMD,1,4) = TO_CHAR(SYSDATE,'YYYY') THEN 1 ELSE 0 END) AS "OUT_CNT1"
+	        ,SUM(CASE WHEN SUBSTR(A.RET_YMD,1,4) = TO_CHAR(SYSDATE-1,'YYYY') THEN 1 ELSE 0 END) AS "OUT_CNT2"
+	        ,SUM(CASE WHEN SUBSTR(A.RET_YMD,1,4) = TO_CHAR(SYSDATE-2,'YYYY') THEN 1 ELSE 0 END) AS "OUT_CNT3"
+	        ,SUM(CASE WHEN SUBSTR(A.RET_YMD,1,4) = TO_CHAR(SYSDATE-3,'YYYY') THEN 1 ELSE 0 END) AS "OUT_CNT4"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH1"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH2"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH3"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH4"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH5"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH6"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH7"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH8"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH9"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH10"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH11"
+	        , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "LEAVEMONTH12"
+		FROM (
+	          SELECT A.ENTER_CD, A.SABUN, A.NAME, A.GEMP_YMD, A.RET_YMD
+	          FROM THRM100 A, THRM151 B
+	          WHERE A.ENTER_CD = #{ssnEnterCd}
+	                 AND A.ENTER_CD = B.ENTER_CD
+	                 AND A.SABUN = B.SABUN
+	                 AND B.SDATE = (SELECT MAX(SDATE)
+	                                FROM THRM151 X
+	                                WHERE X.ENTER_CD = B.ENTER_CD
+	                                	AND X.SABUN = B.SABUN
+	                                 	AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+	                              	)
+        	  )A
+	</select>
+
+	<select id="getMonthlyEnterExitTrend" parameterType="map" resultType="cMap">
+		SELECT SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "1"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'01') THEN 1 ELSE 0 END) AS "1_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'02') THEN 1 ELSE 0 END) AS "2"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'02') THEN 1 ELSE 0 END) AS "2_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'03') THEN 1 ELSE 0 END) AS "3"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'03') THEN 1 ELSE 0 END) AS "3_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'04') THEN 1 ELSE 0 END) AS "4"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'04') THEN 1 ELSE 0 END) AS "4_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'05') THEN 1 ELSE 0 END) AS "5"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'05') THEN 1 ELSE 0 END) AS "5_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'06') THEN 1 ELSE 0 END) AS "6"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'06') THEN 1 ELSE 0 END) AS "6_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'07') THEN 1 ELSE 0 END) AS "7"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'07') THEN 1 ELSE 0 END) AS "7_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'08') THEN 1 ELSE 0 END) AS "8"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'08') THEN 1 ELSE 0 END) AS "8_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'09') THEN 1 ELSE 0 END) AS "9"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'09') THEN 1 ELSE 0 END) AS "9_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'10') THEN 1 ELSE 0 END) AS "10"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'10') THEN 1 ELSE 0 END) AS "10_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'11') THEN 1 ELSE 0 END) AS "11"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'11') THEN 1 ELSE 0 END) AS "11_"
+		     , SUM(CASE WHEN SUBSTR(A.GEMP_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'12') THEN 1 ELSE 0 END) AS "12"
+		     , SUM(CASE WHEN SUBSTR(A.RET_YMD,1,6) = CONCAT(TO_CHAR(SYSDATE,'YYYY'),'12') THEN 1 ELSE 0 END) AS "12_"
+		  FROM (
+		            SELECT A.ENTER_CD, A.SABUN, A.NAME, A.GEMP_YMD, A.RET_YMD
+		              FROM THRM100 A, THRM151 B
+		             WHERE A.ENTER_CD = #{ssnEnterCd}
+		               AND A.ENTER_CD = B.ENTER_CD
+		               AND A.SABUN = B.SABUN
+		               AND B.SDATE = (SELECT MAX(SDATE)
+		                                FROM THRM151 X
+		                               WHERE X.ENTER_CD = B.ENTER_CD
+		                                 AND X.SABUN = B.SABUN
+		                                 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+		                              )
+		         )A
+	</select>
+
+	<select id="getCompanyYearlyTrendsValues" parameterType="map" resultType="cMap">
+		SELECT AA.YEAR,
+	       AA.CNT,
+	       AA.REMAIN_CNT,
+	       AA.RATE,
+	       (AA.RATE - BB.RATE) AS GAP_RATE
+		FROM (
+		        SELECT YEAR, COUNT(SABUN) AS CNT, SUM(REMAIN_CNT) AS REMAIN_CNT,
+		               CASE WHEN COUNT(SABUN) = 0 THEN 0
+		                    ELSE CEIL(SUM(REMAIN_CNT)/COUNT(SABUN)*100)
+		                    END AS RATE
+		        FROM (
+		              SELECT B.YEAR, A.SABUN,
+		              <![CDATA[
+		                     CASE WHEN NVL(A.RET_YMD, '99991231') >= ADD_MONTHS(TO_DATE(NVL(A.GEMP_YMD, A.EMP_YMD), 'YYYYMMDD'),12) THEN 1
+	   				  ]]>
+		                            ELSE 0 END REMAIN_CNT
+		              FROM THRM100 A, (SELECT TO_CHAR(SYSDATE, 'YYYY') AS YEAR FROM DUAL
+		                               UNION ALL
+		                               SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -12*1), 'YYYY') AS YEAR FROM DUAL
+		                               UNION ALL
+		                               SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -12*2), 'YYYY') AS YEAR FROM DUAL
+		                               UNION ALL
+		                               SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -12*3), 'YYYY') AS YEAR FROM DUAL
+		                               ) B
+		              WHERE A.ENTER_CD(+) = #{ssnEnterCd}
+		                AND NVL(A.GEMP_YMD(+), A.EMP_YMD(+)) LIKE B.YEAR||'%'
+		          ) A
+		        GROUP BY YEAR
+		   ) AA ,
+		(
+		        SELECT YEAR, COUNT(SABUN) AS CNT, SUM(REMAIN_CNT) AS REMAIN_CNT,
+		               CASE WHEN COUNT(SABUN) = 0 THEN 0
+		                    ELSE CEIL(SUM(REMAIN_CNT)/COUNT(SABUN)*100)
+		                    END AS RATE
+		        FROM (
+		              SELECT B.YEAR, A.SABUN,
+		              <![CDATA[
+		                     CASE WHEN NVL(A.RET_YMD, '99991231') >= ADD_MONTHS(TO_DATE(NVL(A.GEMP_YMD, A.EMP_YMD), 'YYYYMMDD'),12) THEN 1
+		              ]]>
+		                            ELSE 0 END REMAIN_CNT
+		              FROM THRM100 A, (SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -12*1), 'YYYY') AS YEAR FROM DUAL
+		                               UNION ALL
+		                               SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -12*2), 'YYYY') AS YEAR FROM DUAL
+		                               UNION ALL
+		                               SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -12*3), 'YYYY') AS YEAR FROM DUAL
+		                               UNION ALL
+		                               SELECT TO_CHAR(ADD_MONTHS(SYSDATE, -12*4), 'YYYY') AS YEAR FROM DUAL
+		                               ) B
+		              WHERE A.ENTER_CD(+) = #{ssnEnterCd}
+		                AND NVL(A.GEMP_YMD(+), A.EMP_YMD(+)) LIKE B.YEAR||'%'
+		          ) A
+		        GROUP BY YEAR
+		   ) BB
+		   WHERE AA.YEAR = BB.YEAR+1
+	</select>
+
+	<select id="getCandidate" parameterType="map" resultType="cMap">
+		SELECT F_COM_GET_NAMES(B.ENTER_CD, B.SABUN) AS NAME
+			, F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN, A.BASE_YMD) AS JIKWEE_NM
+			, F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, A.BASE_YMD) AS BUSEO
+			, B.SABUN
+		FROM
+			THRM440 A, THRM449 B
+		WHERE
+			A.ENTER_CD = #{ssnEnterCd}
+			AND A.ENTER_CD = B.ENTER_CD
+			AND A.PMT_CD = B.PMT_CD
+			<if test='option.equals("head")'>
+				AND F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, A.BASE_YMD) LIKE '%' || '본부' || '%'
+			</if>
+			<if test='option.equals("team")'>
+				AND F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, A.BASE_YMD) LIKE '%' || '팀' || '%'
+			</if>
+			AND A.PMT_CD = (SELECT MAX(PMT_CD)
+	                     	FROM THRM440 X
+	                    	WHERE X.ENTER_CD = A.ENTER_CD
+	                    	)
+	</select>
+
+	<select id="getJikweeList" parameterType="map" resultType="cMap">
+		SELECT F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN, A.BASE_YMD) AS JIKWEE_NM
+		FROM
+			THRM440 A, THRM449 B
+		WHERE
+			A.ENTER_CD = #{ssnEnterCd}
+			AND A.ENTER_CD = B.ENTER_CD
+			AND A.PMT_CD = B.PMT_CD
+			<if test='option.equals("head")'>
+				AND F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, A.BASE_YMD) LIKE '%' || '본부' || '%'
+			</if>
+			<if test='option.equals("team")'>
+				AND F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, A.BASE_YMD) LIKE '%' || '팀' || '%'
+			</if>
+			AND A.PMT_CD = (SELECT MAX(PMT_CD)
+	                     	FROM THRM440 X
+	                    	WHERE X.ENTER_CD = A.ENTER_CD
+	                    	)
+        GROUP BY F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN, A.BASE_YMD)
+	</select>
+
+	<select id="getListBox5List" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT GNT_NM
+				 , ROUND(NVL(CRE_CNT, 0), 2) AS CRE_CNT
+				 , NVL(USED_CNT, 0) AS USED_CNT
+				 , NVL(REST_CNT, 0) AS REST_CNT
+				 , ROUND(NVL(USED_CNT, 0) / NVL(CRE_CNT, 0) * 100, 2) AS RATE
+			     --, ROUND(NVL(USED_CNT, 0) + NVL(APP_CNT, 0), 2) AS USED_CNT
+			     --, ROUND(NVL(REST_CNT, 0) - NVL(APP_CNT, 0), 2) AS REST_CNT
+			     --, ROUND(NVL(USED_CNT, 0) + NVL(APP_CNT, 0)/NVL(CRE_CNT, 0) * 100, 2) AS RATE
+			FROM (  SELECT '2' AS GUBUN
+						,'Total' AS GNT_NM
+						,TO_CHAR(NVL(SUM(CRE_CNT),0)) AS CRE_CNT
+						,TO_CHAR(NVL(SUM(USED_CNT),0)) AS USED_CNT
+						,TO_CHAR(NVL(SUM(REST_CNT),0)) AS REST_CNT
+						,MAX(( SELECT SUM(X.CLOSE_DAY)
+                                    FROM TTIM301 X, THRI103 Y
+                                   WHERE X.ENTER_CD = A.ENTER_CD
+                                     AND X.SABUN = A.SABUN
+                                     AND X.ENTER_CD = Y.ENTER_CD
+                                     AND X.APPL_SEQ = Y.APPL_SEQ
+                                     AND X.APPL_STATUS_CD IN ('21', '31')
+                                     AND X.GNT_CD IN (
+								  SELECT C.GNT_CD
+                                          FROM TTIM007 C, TTIM014 D
+                                         WHERE C.ENTER_CD = X.ENTER_CD
+                                           AND C.ENTER_CD = D.ENTER_CD
+                                           AND C.GNT_CD = D.GNT_CD
+                                           AND C.GNT_CD_DEL1 = '14'
+                                     )
+					           AND X.S_YMD BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+                                 )) AS APP_CNT
+					FROM TTIM511 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.SABUN = #{ssnSabun}
+					AND A.GNT_CD IN ('10', '14')
+					AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+				)
+		]]>
+	</select>
+
+	<select id="getListBox5TotalList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT AVG(REST_USED_RATE) AS RATE
+		  FROM (
+		  	SELECT A.SABUN
+				 , A.CRE_CNT
+				 , SUM(X.CLOSE_DAY) AS APP_CNT
+				 , ROUND(SUM(X.CLOSE_DAY) / A.CRE_CNT * 100, 2) AS REST_USED_RATE
+			  FROM TTIM511 A, TTIM301 X, THRI103 Y
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.GNT_CD IN ('10', '14')
+			   AND X.ENTER_CD = A.ENTER_CD
+			   AND X.SABUN = A.SABUN
+			   AND X.ENTER_CD = Y.ENTER_CD
+			   AND X.APPL_SEQ = Y.APPL_SEQ
+			   AND X.APPL_STATUS_CD IN ('21', '31')
+			   AND X.GNT_CD IN (
+			   	SELECT C.GNT_CD
+			   	  FROM TTIM007 C, TTIM014 D
+			   	 WHERE C.ENTER_CD = X.ENTER_CD
+			   	   AND C.ENTER_CD = D.ENTER_CD
+			   	   AND C.GNT_CD = D.GNT_CD
+			   	   AND C.GNT_CD_DEL1 = '14'
+			   )
+			   AND X.S_YMD BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+			   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+			  GROUP BY A.SABUN, A.CRE_CNT
+		  )
+	]]>
+	</select>
+
+	<select id="getListBox5MonthList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT X.YM
+			 , TO_NUMBER(SUBSTR(X.YM, 5, 2)) AS M
+			 , SUM(X.APP_DAY) AS APP_DAY
+		  FROM TTIM405 X
+		 WHERE X.ENTER_CD = #{ssnEnterCd}
+		   AND X.SABUN = #{ssnSabun}
+		   AND X.YMD BETWEEN TO_CHAR(SYSDATE, 'YYYY') || '0101' AND TO_CHAR(SYSDATE, 'YYYY') || '1231'
+		   AND GNT_CD IN (
+			   	SELECT C.GNT_CD
+			   	  FROM TTIM007 C, TTIM014 D
+			   	 WHERE C.ENTER_CD = X.ENTER_CD
+			   	   AND C.ENTER_CD = D.ENTER_CD
+			   	   AND C.GNT_CD = D.GNT_CD
+			   	   AND C.GNT_CD_DEL1 = '14'
+			   )
+		 GROUP BY X.YM
+		 ORDER BY X.YM
+	]]>
+	</select>
+
+	<select id="getListBox23ListStdTime" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT TO_CHAR(SYSDATE, 'YYYY.MM.DD') || ' (' || TO_CHAR(SYSDATE, 'DY') || ')' AS TO_DAY
+				 , TO_CHAR(SYSDATE, 'YYYY/MM/DD HH24:MI:SS') AS TO_TIME
+			FROM DUAL
+		]]>
+	</select>
+
+	<select id="getListBox19Infos" parameterType="map" resultType="cMap">
+		<![CDATA[
+		SELECT B.TITLE || DECODE( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') AS TITLE
+			 , A.AGREE_STATUS_CD
+			 , B.APPL_SEQ
+			 , B.APPL_SABUN
+			 , B.APPL_IN_SABUN
+			 , B.APPL_CD
+			 , B.APPL_YMD
+		  FROM THRI107 A
+		 INNER JOIN THRI103 B
+			ON B.ENTER_CD = A.ENTER_CD
+		   AND B.APPL_SEQ = A.APPL_SEQ
+		 INNER JOIN THRI101 C
+			ON C.ENTER_CD = A.ENTER_CD
+		   AND C.APPL_CD = B.APPL_CD
+		   AND C.USE_YN = 'Y'
+		  LEFT OUTER JOIN THRI120 D
+			ON A.ENTER_CD = D.ENTER_CD
+		   AND A.AGREE_SABUN = D.AGREE_SABUN
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND (
+		       		(A.AGREE_STATUS_CD = '10' AND B.APPL_STATUS_CD IN ('21', '31'))
+						OR (A.AGREE_STATUS_CD <> '10' AND TO_CHAR(A.AGREE_TIME, 'YYYYMMDD') = TO_CHAR(SYSDATE, 'YYYYMMDD') AND B.APPL_STATUS_CD IN ('21', '23', '31', '33', '99'))
+			   )
+		   AND 'Y' = (CASE WHEN B.APPL_STATUS_CD IN ('31', '33') AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+		   AND (
+			       ((A.AGREE_SABUN = #{ssnSabun} OR D.DEPUTY_SABUN = #{ssnSabun}) AND NVL(A.ORG_APP_YN, 'N') = 'N')
+				   OR
+			       ((A.AGREE_SABUN = F_COM_GET_ORG_CD(#{ssnEnterCd}, #{ssnSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+			            AND NVL(A.ORG_APP_YN, 'N') = 'Y')
+			   )
+		]]>
+	</select>
+
+	<select id="getListBox19DetailInfos" parameterType="map" resultType="cMap">
+	<![CDATA[
+		  SELECT  APPL_SEQ
+				, AGREE_SABUN
+				, F_COM_GET_NAMES(ENTER_CD,AGREE_SABUN, 'ko_KR') 		  			AS AGREE_NAME
+				, F_COM_GET_NAMES(ENTER_CD,AGREE_SABUN,'ALIAS')   						AS AGREE_EMP_ALIAS
+				, AGREE_SEQ
+				, PATH_SEQ
+				, F_COM_GET_GRCODE_NAME(ENTER_CD,'R10052',APPL_TYPE_CD, 'ko_KR') 	AS APPL_TYPE_CD_NM
+		        , APPL_TYPE_CD
+		        , F_COM_GET_GRCODE_NAME(ENTER_CD,'R10050',AGREE_STATUS_CD, 'ko_KR') AS AGREE_STATUS_CD_NM
+				, AGREE_STATUS_CD
+				, AGREE_TIME
+				, GUBUN
+				, ORG_NM        											AS AGREE_ORG_NM
+				, JIKCHAK_NM   												AS AGREE_JIKCHAK_NM
+				, JIKWEE_NM     											AS AGREE_JIKWEE_NM
+				, DEPUTY_YN
+				, NVL(ORG_APP_YN , 'N' ) 									AS ORG_APP_YN
+				, F_COM_GET_NAMES(ENTER_CD,DEPUTY_SABUN,'ALIAS')   			AS DEPUTY_NAME
+				, F_COM_GET_NAMES(ENTER_CD,DEPUTY_SABUN, 'ko_KR') 		AS DEPUTY_SABUN
+				, DEPUTY_ORG    											AS DEPUTY_ORG_NM
+				, DEPUTY_JIKCHAK 											AS DEPUTY_JIKCHAK_NM
+				, DEPUTY_JIKWEE												AS DEPUTY_JIKWEE_NM
+		  		, ENTER_CD
+		FROM THRI107
+		WHERE 	ENTER_CD = #{ssnEnterCd}
+		AND 	APPL_SEQ = TO_NUMBER( TRIM( #{applSeq} ) )
+		ORDER BY AGREE_SEQ
+	]]>
+	</select>
+
+</mapper>

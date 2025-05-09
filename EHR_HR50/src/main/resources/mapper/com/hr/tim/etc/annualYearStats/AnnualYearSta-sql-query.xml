@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.etc.annualYearStats">
+<!-- 월별  -->
+		<select parameterType="map" resultType="cMap" id="getAnnualYearStaTitleList">
+
+				<![CDATA[
+					SELECT LEVEL AS LEV
+					     , CASE WHEN LEVEL < 10 THEN '0' ELSE '' END || LEVEL AS MON
+					     , 'mon' || CASE WHEN LEVEL < 10 THEN '0' ELSE '' END || LEVEL AS SAVE_NAME
+					     , 'MON' || CASE WHEN LEVEL < 10 THEN '0' ELSE '' END || LEVEL || '_FONT_COLOR' AS SAVE_NAME_FC
+                         , CASE WHEN LEVEL < 7 THEN 1 ELSE 0 END SEQ
+                         , CASE WHEN LEVEL < 7 THEN YEAR || '0' || LEVEL   
+                              WHEN LEVEL < 10 THEN YEAR || '0' || LEVEL
+                              ELSE YEAR || LEVEL END YM
+					FROM
+					    ( SELECT CASE WHEN #{searchWorkType} = 'B' AND SUBSTR(REPLACE(TRIM(#{searchYmd}),'-',''), 5,6) <  '07' THEN TO_CHAR(TO_NUMBER(SUBSTR(REPLACE(TRIM(#{searchYmd}),'-',''), 1,4))-1)
+                                      ELSE SUBSTR(REPLACE(TRIM(#{searchYmd}),'-',''), 1,4) END AS YEAR
+                             FROM DUAL )            
+					CONNECT BY LEVEL <= 12 
+                    ORDER BY LEVEL
+				]]>
+
+
+		</select>
+		
+				
+<!-- 연차사용현황 조회 사용안함 20240719 jyp-->
+		<!--<select parameterType="map" resultType="cMap" id="getAnnualYearStaList">
+
+				<![CDATA[
+				WITH TMP AS (
+							   SELECT A.ENTER_CD
+									, A.SABUN
+									, A.EMP_YMD
+									, B.ORG_CD
+									, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD)	AS JIKGUB_NM
+					                , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, REPLACE(TRIM(#{searchYmd}), '-', '')) AS ORG_NM
+									, NVL(F_COM_GET_PRIOR_ORG_TYPE_NM(B.ENTER_CD, B.ORG_CD, 'B0400', REPLACE(TRIM(#{searchYmd}), '-', '') )
+									    ,  F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, REPLACE(TRIM(#{searchYmd}), '-', '')) )  AS P_ORG_NM
+									, NVL(F_COM_GET_PRIOR_ORG_TYPE_CD(B.ENTER_CD, B.ORG_CD, 'B0400', REPLACE(TRIM(#{searchYmd}), '-', '') )
+									    ,  B.ORG_CD )  AS P_ORG_CD
+									, CASE WHEN NVL(C.ONEYEAR_UNDER_YN, 'N') = 'N' THEN C.CRE_CNT 
+									       WHEN A.EMP_YMD > REPLACE(TRIM(#{searchYmd}), '-', '') THEN 0
+									       ELSE TRUNC(MONTHS_BETWEEN(TO_DATE(REPLACE(TRIM(#{searchYmd}), '-', '')), TO_DATE(A.EMP_YMD)))
+									       END AS CRE_CNT
+									, C.FRD_CNT
+									, CASE WHEN NVL(C.ONEYEAR_UNDER_YN, 'N') = 'N' THEN C.USE_CNT 
+									       WHEN A.EMP_YMD > REPLACE(TRIM(#{searchYmd}), '-', '') THEN 0
+									       ELSE TRUNC(MONTHS_BETWEEN(TO_DATE(REPLACE(TRIM(#{searchYmd}), '-', '')), TO_DATE(A.EMP_YMD)))
+									       END AS USE_CNT
+									, C.MOD_CNT
+									      ]]>
+<foreach item="tit" collection="titles" >
+							        <![CDATA[
+									, ( SELECT SUM(APP_DAY)
+									      FROM TTIM405 X, THRI103 Y
+									     WHERE X.ENTER_CD = A.ENTER_CD
+									       AND X.SABUN    = A.SABUN
+									       AND X.GNT_CD  IN ( '14', '15', '16')
+									       AND X.YMD BETWEEN #{tit.ym} || '01' AND #{tit.ym} || '31'
+									       AND X.YMD <= REPLACE(TRIM(#{searchYmd}), '-', '')
+									       AND X.ENTER_CD = Y.ENTER_CD
+									       AND X.APPL_SEQ = Y.APPL_SEQ
+									       AND Y.APPL_STATUS_CD = '99' ) AS "${tit.saveName}"
+				]]>
+</foreach>
+							        <![CDATA[
+                                    , ( SELECT SUM(DAYS)
+                                          FROM TTIM542 X, THRI103 Y
+                                         WHERE X.ENTER_CD = A.ENTER_CD
+                                           AND X.SABUN    = A.SABUN
+                                           AND SUBSTR(X.SDATE, 1, 4) = SUBSTR(TRIM(#{searchYmd}), 1, 4)
+                                           AND X.ENTER_CD = Y.ENTER_CD
+                                           AND X.APPL_SEQ = Y.APPL_SEQ
+                                           AND Y.APPL_STATUS_CD = '99' ) AS PLAN_CNT
+                                           
+                                    , ( SELECT SUM(X1.APP_DAY)
+                                          FROM TTIM405 X1, THRI103 Y1, TTIM542 X2, THRI103 Y2
+                                         WHERE X1.ENTER_CD = A.ENTER_CD
+                                           AND X1.SABUN    = A.SABUN
+                                           AND X1.GNT_CD  IN ( '14', '15', '16')
+                                           AND SUBSTR(X1.YMD, 1, 4) = SUBSTR(TRIM(#{searchYmd}), 1, 4)
+                                           AND X1.YMD <= REPLACE(TRIM(#{searchYmd}), '-', '')
+                                           AND X1.ENTER_CD = Y1.ENTER_CD
+                                           AND X1.APPL_SEQ = Y1.APPL_SEQ
+                                           AND Y1.APPL_STATUS_CD = '99'
+                                           AND X1.ENTER_CD = X2.ENTER_CD
+                                           AND X1.SABUN    = X2.SABUN
+                                           AND X1.YMD BETWEEN X2.SDATE AND X2.EDATE
+                                           AND X2.ENTER_CD = Y2.ENTER_CD
+                                           AND X2.APPL_SEQ = Y2.APPL_SEQ
+                                           AND Y2.APPL_STATUS_CD = '99' ) AS PLAN_USE_CNT
+                                           
+								  FROM THRM100 A, THRM151 B, TTIM511 C
+								 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+								   AND A.ENTER_CD = B.ENTER_CD
+								   AND A.SABUN    = B.SABUN
+                                   AND B.STATUS_CD NOT LIKE 'RA%'
+								   AND REPLACE(TRIM(#{searchYmd}), '-', '') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+								   AND A.ENTER_CD = C.ENTER_CD(+)
+								   AND A.SABUN    = C.SABUN(+)
+								   AND '14'       = C.GNT_CD(+)
+								   AND REPLACE(TRIM(#{searchYmd}), '-', '') BETWEEN C.USE_S_YMD(+) AND C.USE_E_YMD(+)
+								   ]]>
+<if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+								   AND B.JIKGUB_CD IN  ( ${searchJikgubCd} )
+</if>
+	<if test='searchName != null and !searchName.equals("")'>
+						       AND (A.SABUN LIKE TRIM( #{searchName} ) OR A.NAME LIKE '%'||TRIM( #{searchName} )||'%')
+	</if>
+<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+
+	<choose><when test='searchGubunCd != null and searchGubunCd.equals("A")'>
+					               AND A.SABUN IN (SELECT SABUN 
+					   				                 FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+					   				               )
+		</when><otherwise>
+
+			                       AND B.ORG_CD IN (SELECT SCOPE_VALUE
+												      FROM TSYS319
+												     WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+												       AND GRP_CD   = #{ssnGrpCd}
+												       AND AUTH_SCOPE_CD = 'W10'
+												       AND SABUN = #{ssnSabun}
+			                                       )
+		</otherwise>
+	</choose>
+</if>
+				)
+				
+				SELECT A.*
+					 , ( 	
+<foreach item="tit" collection="titles" separator=" + " >
+						 TO_NUMBER(NVL("${tit.saveName}", '0'))
+</foreach>
+		               ) AS USED_CNT
+					 , A.USE_CNT - ( 	
+<foreach item="tit" collection="titles" separator=" + ">
+						 TO_NUMBER(NVL("${tit.saveName}", '0'))
+</foreach>
+		               ) AS REST_CNT
+				  FROM 
+<if test='searchGubunCd != null and searchGubunCd.equals("A")'>
+					  (					  
+				  		SELECT A.ENTER_CD
+							 , A.SABUN
+							 , A.EMP_YMD
+							 , A.ORG_CD
+							 , A.ORG_NM
+							 , A.P_ORG_NM
+							 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+							 , A.JIKGUB_NM
+							 , A.CRE_CNT
+							 , A.FRD_CNT
+							 , A.USE_CNT
+							 , A.MOD_CNT 
+				             , F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE(TRIM(#{searchYmd}), '-', '')) AS SEQ
+<foreach item="tit" collection="titles" >
+							 , ${tit.saveName}
+</foreach>
+				             , A.PLAN_CNT
+                             , A.PLAN_USE_CNT
+				  		  FROM TMP A 
+				      ) A
+</if>
+<if test='searchGubunCd != null and searchGubunCd.equals("B")'>
+					  (					  
+				  		SELECT A.ENTER_CD
+							 , A.ORG_CD
+							 , A.ORG_NM
+							 , A.P_ORG_NM
+							 , SUM(NVL(A.CRE_CNT,0)) AS CRE_CNT
+							 , SUM(NVL(A.FRD_CNT,0)) AS FRD_CNT
+							 , SUM(NVL(A.USE_CNT,0)) AS USE_CNT
+							 , SUM(NVL(A.MOD_CNT,0)) AS MOD_CNT
+				             , F_ORG_ORG_CHART_SORT(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(#{searchYmd}), '-', '')) AS SEQ
+<foreach item="tit" collection="titles" >
+							 , SUM(NVL("${tit.saveName}", 0)) AS "${tit.saveName}"
+</foreach>
+                             , SUM(NVL(A.PLAN_CNT,0))       AS PLAN_CNT
+                             , SUM(NVL(A.PLAN_USE_CNT,0))   AS PLAN_USE_CNT
+				  		  FROM TMP A
+				  		 GROUP BY A.ENTER_CD, A.ORG_CD, A.ORG_NM, A.P_ORG_NM
+				      ) A
+</if>
+<if test='searchGubunCd != null and searchGubunCd.equals("C")'>
+					  (					  
+				  		SELECT A.ENTER_CD
+							 , A.P_ORG_NM
+							 , SUM(NVL(A.CRE_CNT,0)) AS CRE_CNT
+							 , SUM(NVL(A.FRD_CNT,0)) AS FRD_CNT
+							 , SUM(NVL(A.USE_CNT,0)) AS USE_CNT
+							 , SUM(NVL(A.MOD_CNT,0)) AS MOD_CNT
+				             , F_ORG_ORG_CHART_SORT(A.ENTER_CD, A.P_ORG_CD, REPLACE(TRIM(#{searchYmd}), '-', '')) AS SEQ
+<foreach item="tit" collection="titles" >
+							 , SUM(NVL("${tit.saveName}", 0)) AS "${tit.saveName}"
+</foreach>
+                             , SUM(NVL(A.PLAN_CNT,0))       AS PLAN_CNT
+                             , SUM(NVL(A.PLAN_USE_CNT,0))   AS PLAN_USE_CNT
+				  		  FROM TMP A
+				  		 GROUP BY A.ENTER_CD, A.P_ORG_CD, A.P_ORG_NM
+				      ) A
+
+</if>
+			    ORDER BY SEQ
+	            
+
+		</select>-->
+		
+
+</mapper>

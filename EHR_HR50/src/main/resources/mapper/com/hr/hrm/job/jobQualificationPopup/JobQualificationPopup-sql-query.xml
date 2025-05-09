@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.job.jobQualificationPopup">
+
+		<!-- 필요자격 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobQualificationPopupList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD				
+					     , A.JOB_CD				
+					     , A.LICENSE_CD				
+					     , A.LICENSE_GRADE				
+					     , A.OFFICE_CD	
+				         , C.CODE_NM AS LICENSE_NM
+				         , (CASE WHEN B.JOB_TYPE = '10040' THEN JOB_NM END) AS TASK_NM
+					  FROM TORG216 A
+				     INNER JOIN TORG201 B
+				        ON A.ENTER_CD = TRIM(#{ssnEnterCd})
+				       AND A.ENTER_CD = B.ENTER_CD
+				       AND A.JOB_CD = B.JOB_CD
+				      LEFT JOIN TSYS005 C
+				        ON C.ENTER_CD = TRIM(#{ssnEnterCd})
+				       AND C.GRCODE_CD = 'H20160'
+				       AND A.LICENSE_CD = C.CODE
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.S_YMD AND C.E_YMD
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					 ]]>
+					<choose><when test='type.equals("1")'>
+						<if test='jobCd != null and !jobCd.equals("")'>
+					       AND A.JOB_CD = #{jobCd}
+						</if>
+					</when><otherwise>
+						<if test='jobCd != null and !jobCd.equals("")'>
+					       AND REGEXP_LIKE (A.JOB_CD, REPLACE(#{jobCd},',','|'))
+						</if>
+					</otherwise>
+					</choose>
+		</select>
+		
+		<!-- 필요자격 저장 -->
+		<update parameterType="map" id="saveJobQualificationPopup">
+
+
+					 MERGE INTO TORG216 T 							
+					 USING 							
+					(
+						<bind name="icnt" value="1" />
+						<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					   SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD
+				            , TRIM(#{jobCd})  AS  JOB_CD
+				            , TRIM(#{rm.licenseCd})  AS  LICENSE_CD
+				            , TRIM(#{rm.licenseGrade})  AS  LICENSE_GRADE
+				            , TRIM(#{rm.officeCd})  AS  OFFICE_CD
+				        FROM DUAL							
+						</foreach>
+					) S 							
+					ON ( 							
+					          T.ENTER_CD = S.ENTER_CD
+					      AND T.JOB_CD = S.JOB_CD
+                          AND T.LICENSE_CD = S.LICENSE_CD
+					) 							
+					WHEN MATCHED THEN 							
+					   UPDATE SET T.CHKDATE	= sysdate						
+					            , T.CHKID	= #{ssnSabun}
+					            , T.LICENSE_GRADE = S.LICENSE_GRADE 							
+					            , T.OFFICE_CD = S.OFFICE_CD 							
+					WHEN NOT MATCHED THEN 							
+					   INSERT 							
+					   ( 							
+					              T.ENTER_CD							
+					            , T.JOB_CD							
+					            , T.LICENSE_CD							
+					            , T.LICENSE_GRADE							
+					            , T.OFFICE_CD							
+					            , T.CHKDATE							
+					            , T.CHKID							
+					   ) 							
+					   VALUES 							
+					   ( 							
+					              S.ENTER_CD							
+					            , S.JOB_CD							
+					            , S.LICENSE_CD							
+					            , S.LICENSE_GRADE							
+					            , S.OFFICE_CD							
+					            , sysdate							
+					            , #{ssnSabun}
+					   ) 							
+		</update>
+		
+		<!-- 필요자격 삭제 -->
+		<delete parameterType="map" id="deleteJobQualificationPopup">
+
+					DELETE FROM TORG216
+					WHERE ENTER_CD = #{ssnEnterCd}
+                      AND JOB_CD||'_'||LICENSE_CD IN 	(  NULL
+                        <foreach item="rm" collection="deleteRows" >
+						,
+                            <if test='jobCd != null and !jobCd.equals("")
+                                and rm.licenseCd != null and !rm.licenseCd.equals("")
+                                '>
+
+                                TRIM( #{jobCd} )||'_'||TRIM( #{rm.licenseCd} )
+							</if>
+						</foreach>
+                            )
+		</delete>
+		
+
+</mapper>

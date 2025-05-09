@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	공통 코드 쿼리 
+ -->
+<root>
+
+	<!-- 공통코드 조회  -->
+	<query id="getCommonCodeList">
+	   <![CDATA[
+			SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+			  FROM TSYS005
+			WHERE ENTER_CD = #ssnEnterCd#
+				AND GRCODE_CD = trim( #grpCd# )
+				AND VISUAL_YN = 'Y'
+				AND USE_YN = 'Y'
+				AND #searchYear#||'1231' BETWEEN S_YMD AND E_YMD
+			ORDER BY USE_YN DESC
+			       , DECODE(#orderBy#, '0', '', CODE_NM), SEQ, CODE, CODE_NM 
+	   ]]> 
+	</query>
+	
+	<!-- 연말정산 항목 -->
+	<query id="getYearEndItemList">
+	   <![CDATA[
+			SELECT ADJ_ELEMENT_CD AS CODE, ADJ_ELEMENT_NM AS CODE_NM, MAX(LEN) OVER() AS MAX_LEN
+			  FROM (
+					SELECT ADJ_ELEMENT_CD, ADJ_ELEMENT_NM, LENGTH(ADJ_ELEMENT_CD||' ('||ADJ_ELEMENT_NM||')') AS LEN
+					  FROM TCPN803
+					 WHERE ENTER_CD       	 		= #ssnEnterCd#
+					     AND WORK_YY LIKE '%'|| TRIM(#srchWorkYy#)
+					  	 AND INCOME_DATA_YN    = 'Y'
+					     AND ADJ_PROCESS_CD 	= 'C010'
+			  )
+	   ]]> 
+	</query>	
+
+	<!-- 세금항목 -->
+	<query id="getTaxList">
+	   <![CDATA[
+			SELECT TAX_RATE_CD AS CODE, TAX_RATE_NM AS CODE_NM
+			  FROM TCPN501
+			 WHERE ENTER_CD = #ssnEnterCd#
+		       AND WORK_YY = #srchWorkYy#
+	   ]]> 
+	</query>
+	
+	<!-- 연말정산 비과세 항목 -->
+	<query id="getNoTaxList">
+		<![CDATA[
+			SELECT ADJ_ELEMENT_CD AS CODE, ADJ_ELEMENT_NM AS CODE_NM
+     			 , MAX(LEN) OVER() AS MAX_LEN
+  			  FROM (
+				SELECT ADJ_ELEMENT_CD, ADJ_ELEMENT_NM, LENGTH(ADJ_ELEMENT_CD||' ('||ADJ_ELEMENT_NM||')') AS LEN
+		  		  FROM TCPN803
+		 		 WHERE ENTER_CD       	= #ssnEnterCd#
+      		   	   AND WORK_YY			= #srchWorkYy#
+    		   	   AND INCOME_DATA_YN   = 'Y'
+		   		   AND ADJ_PROCESS_CD 	= 'C010'
+	       		   AND ADJ_ELEMENT_NM LIKE '%비과세%'
+			  )
+	   ]]> 
+	</query>
+
+	<!-- 시스템기준 -->
+	<query id="getSystemStdData">
+		<![CDATA[
+			SELECT STD_CD AS CODE, STD_CD_VALUE AS CODE_NM
+			  FROM TSYS955
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND STD_CD = #searchStdCd#
+		]]> 
+	</query>
+	
+	<!-- 가족사항 코드 리스트 -->
+	<query id="getFamCodeList">
+		<![CDATA[
+			SELECT DISTINCT F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS CODE, A.FAM_NM AS CODE_NM
+				 , A.SABUN, B.SEQ
+			  FROM TCPN823 A ,(SELECT * FROM TSYS005 WHERE ENTER_CD = #ssnEnterCd# AND GRCODE_CD='C00309' AND #searchWorkYy#||'1231' BETWEEN S_YMD AND E_YMD) B
+			 WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.WORK_YY  	  = #searchWorkYy#
+			   AND A.ADJUST_TYPE  = #searchAdjustType#
+			   AND A.SABUN        = #searchSabun#
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.FAM_CD = B.CODE
+			   AND A.DPNDNT_YN = 'Y'
+			 ORDER BY A.SABUN, B.SEQ
+		]]>
+	</query>
+	
+	<!-- 연말정산 코드 리스트 -->
+	<query id="getSavingDeductList">
+		<![CDATA[
+			SELECT CODE, CODE_NM
+			  FROM TSYS005
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND GRCODE_CD = 'C00317'
+			   AND NOTE1 = #searchGubun# 
+			   AND #searchYear#||'1231' BETWEEN S_YMD AND E_YMD
+			 ORDER BY SEQ
+		]]>
+	</query>
+	
+	<!-- 연말정산 납입횟수 코드 -->
+	<query id="getPayingNumCdList">
+		<![CDATA[
+			 SELECT CODE, CODE_NM
+			    FROM TSYS005
+			   WHERE ENTER_CD = #ssnEnterCd#
+			     AND GRCODE_CD = 'C00321'
+			     AND CODE <> '00' --해당사항없음 제외
+			     AND #searchYear#||'1231' BETWEEN S_YMD AND E_YMD
+			  ORDER BY SEQ
+		]]> 
+    </query>
+    
+	<!-- 재계산 일자 코드 조회 -->
+	<query id="getReCalcCodeList">
+		<![CDATA[
+			SELECT RE_CALC_CD AS CODE
+			     , RE_CALC_NM AS CODE_NM
+			  FROM TCPN881
+			 WHERE ENTER_CD = #ssnEnterCd#
+			 ORDER BY RE_WORK_YY DESC, RE_BELONG_YM DESC
+		]]> 
+    </query>
+    
+	<!-- 사업장코드 조회  -->
+	<query id="getPayComCodeList">
+		<![CDATA[
+			SELECT X.BUSINESS_PLACE_CD AS CODE, X.BUSINESS_PLACE_NM AS CODE_NM, X.REGINO
+			  FROM TCPN121 X
+			 WHERE X.ENTER_CD = #ssnEnterCd#
+			   AND X.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+			                   WHERE Y.ENTER_CD = X.ENTER_CD
+			                     AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+			                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+			ORDER BY 1
+	   ]]> 
+	</query>
+	<!-- 사업장코드 권한 조회  -->
+	<query id="getBizPlaceCdAuthList">
+		<![CDATA[
+			SELECT X.BUSINESS_PLACE_CD AS CODE, X.BUSINESS_PLACE_NM AS CODE_NM
+			  FROM TCPN121 X
+			 WHERE X.ENTER_CD = #ssnEnterCd#
+			   AND X.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+			                   WHERE Y.ENTER_CD = X.ENTER_CD
+			                     AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+			                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+		       AND X.BUSINESS_PLACE_CD IN ( SELECT Y.SCOPE_VALUE 
+		                                      FROM TSYS319 Y 
+		                                     WHERE Y.ENTER_CD = #ssnEnterCd# 
+		                                       AND Y.AUTH_SCOPE_CD = 'C10' 
+		                                       AND Y.SABUN = #ssnSabun# 
+		                                       AND Y.GRP_CD = #ssnGrpCd#
+		                                     UNION
+		                                    SELECT F_COM_GET_BP_CD(#ssnEnterCd#,#ssnSabun#,TO_CHAR(SYSDATE,'YYYYMMDD'))
+		                                      FROM DUAL
+		                                     )
+			 ORDER BY 1
+	   ]]>  
+	</query>	
+</root>

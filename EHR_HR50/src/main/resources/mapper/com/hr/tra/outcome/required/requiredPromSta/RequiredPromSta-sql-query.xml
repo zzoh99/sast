@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.required.requiredPromSta">
+				
+<!-- 승진기준월 콤보 -->
+		<select parameterType="map" resultType="cMap" id="getRequiredPromStaBaseYmd">
+			
+				<![CDATA[
+					SELECT BASE_YMD AS CODE
+					     , TO_CHAR(TO_DATE(BASE_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS CODE_NM
+					  FROM THRM440
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND BASE_YMD LIKE TRIM(#{searchYear}) || '%' 
+					 GROUP BY BASE_YMD
+					 ORDER BY BASE_YMD DESC
+				]]>
+			
+			
+		</select>
+				
+<!-- 승격대상자 필수교육이수현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRequiredPromStaList">
+				<![CDATA[
+				SELECT * 
+				  FROM (
+						SELECT A.ENTER_CD
+						     , A.BASE_YMD
+						     , A.ORG_CD   
+						     , A.SABUN
+						     , A.JIKGUB_CD
+						     , A.PMT_CURR_YMD
+						     , A.PMT_CURR_YEAR
+						     , A.PROM_CNT
+						     , F_COM_GET_HQ_ORG_NM(A.ENTER_CD, A.ORG_CD, A.BASE_YMD)	AS P_ORG_NM
+							 , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD,A.BASE_YMD) 		AS ORG_NM  
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)                     AS NAME
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010', A.JIKGUB_CD)	AS JIKGUB_NM
+						     , CASE WHEN A.JIKGUB_CD = 'D270' THEN '0' WHEN A.PROM_CNT = 0 THEN '1' ELSE '0' END EDU_YN_A
+						     , CASE WHEN A.JIKGUB_CD = 'D270' THEN '0' WHEN A.PROM_CNT = 0 THEN '1' ELSE '0' END EDU_YN_B
+						     , CASE WHEN A.JIKGUB_CD = 'D270' THEN '0' WHEN A.PROM_CNT = 0 THEN '0' ELSE '1' END EDU_YN_C
+						     , DECODE(A1, '0', '미이수', '1', '이수', '') AS A1
+						     , DECODE(A1, '0', '#ff0000', '#0000ff') AS A1_FONT_COLOR
+						     , DECODE(A2, '0', '미이수', '1', '이수', '') AS A2
+						     , DECODE(A2, '0', '#ff0000', '#0000ff') AS A2_FONT_COLOR
+						     , DECODE(A3, '0', '미이수', '1', '이수', '') AS A3
+						     , DECODE(A3, '0', '#ff0000', '#0000ff') AS A3_FONT_COLOR
+						     , DECODE(B1, '0', '미이수', '1', '이수', '') AS B1
+						     , DECODE(B1, '0', '#ff0000', '#0000ff') AS B1_FONT_COLOR
+						     , DECODE(B2, '0', '미이수', '1', '이수', '') AS B2
+						     , DECODE(B2, '0', '#ff0000', '#0000ff') AS B2_FONT_COLOR
+						     , DECODE(B3, '0', '미이수', '1', '이수', '') AS B3
+						     , DECODE(B3, '0', '#ff0000', '#0000ff') AS B3_FONT_COLOR
+						     , DECODE(C1, '0', '미이수', '1', '이수', '') AS C1
+						     , DECODE(C1, '0', '#ff0000', '#0000ff') AS C1_FONT_COLOR
+						     , DECODE(C2, '0', '미이수', '1', '이수', '') AS C2
+						     , DECODE(C2, '0', '#ff0000', '#0000ff') AS C2_FONT_COLOR
+						     , DECODE(C3, '0', '미이수', '1', '이수', '') AS C3
+						     , DECODE(C3, '0', '#ff0000', '#0000ff') AS C3_FONT_COLOR
+				           	, CASE WHEN A.PROM_CNT = 0 THEN '적시'																				
+				                   ELSE '지체('||(A.PROM_CNT * -1 ) ||'년)'																				
+				                   END DELAY_GUBUN		
+				                    
+						     , F_TRA_GET_REQUIRED_YN( A.ENTER_CD, A.SABUN, A.BASE_YMD, 'Y') AS FIN_EDU_YN
+						     , F_TRA_GET_REQUIRED_YN( A.ENTER_CD, A.SABUN, A.BASE_YMD, 'N') AS FIN_EDU_CNT
+						     , '2' AS DETAIL
+						  FROM (
+						        SELECT A.ENTER_CD
+						             , A.BASE_YMD
+						             , A.ORG_CD   
+						             , A.SABUN
+						             , A.JIKGUB_CD
+						             , A.PMT_CURR_YMD
+						             , A.PMT_CURR_YEAR
+						             , NVL(F_TRA_GET_PROM_CNT(A.ENTER_CD, A.SABUN, A.BASE_YMD), 0) AS PROM_CNT
+						             -- 승격자 역량강화 교육
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'A1' THEN B.EDU_YN ELSE NULL END ) AS A1
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'B1' THEN B.EDU_YN ELSE NULL END ) AS A2
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'C1' THEN B.EDU_YN ELSE NULL END ) AS A3
+						             -- 직급별 사전 역량강화 교육
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'A2' THEN B.EDU_YN ELSE NULL END ) AS B1
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'B2' THEN B.EDU_YN ELSE NULL END ) AS B2
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'C2' THEN B.EDU_YN ELSE NULL END ) AS B3
+						             -- 승격누락자 보충 교육
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'D1' THEN B.EDU_YN ELSE NULL END ) AS C1
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'D2' THEN B.EDU_YN ELSE NULL END ) AS C2
+						             , MAX( CASE WHEN B.EDU_LEVEL = 'D3' THEN B.EDU_YN ELSE NULL END ) AS C3
+						          FROM (SELECT Y.*, Z.PMT_YYYY, Z.BASE_YMD FROM THRM449 Y, THRM440 Z WHERE Y.ENTER_CD = Z.ENTER_CD AND Y.PMT_CD = Z.PMT_CD) A
+						             , ( -- 필수교육 이수 대상자
+						                SELECT A.ENTER_CD, A.SABUN, F_COM_GET_JIKGUB_CD( A.ENTER_CD, A.SABUN, C.EDU_S_YMD ) AS JIKGUB_CD, B.EDU_LEVEL, MAX(A.EDU_CONFIRM_TYPE) AS EDU_YN
+						                  FROM TTRA301 A, TTRA101 B, TTRA121 C
+						                 WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+						                   AND A.ENTER_CD      = B.ENTER_CD
+						                   AND A.EDU_SEQ       = B.EDU_SEQ
+						                   AND B.EDU_METHOD_CD = 'A' -- 필수교육
+						                   AND B.EDU_LEVEL IS NOT NULL  -- 강의난이도
+						                   AND A.ENTER_CD      = C.ENTER_CD
+						                   AND A.EDU_SEQ       = C.EDU_SEQ
+						                   AND A.EDU_EVENT_SEQ = C.EDU_EVENT_SEQ
+						                 GROUP BY A.ENTER_CD, A.SABUN, F_COM_GET_JIKGUB_CD( A.ENTER_CD, A.SABUN, C.EDU_S_YMD ), B.EDU_LEVEL  
+						                )B
+						         WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						           AND A.ENTER_CD  = B.ENTER_CD(+)
+						           AND A.SABUN     = B.SABUN(+)
+						           AND A.JIKGUB_CD = B.JIKGUB_CD(+) ]]>
+								   AND A.BASE_YMD  = REPLACE(TRIM( #{searchBaseYmd} ), '-','') 
+
+<if test="searchJikgubCd != null and searchJikgubCd neq ''">
+						   		   AND A.JIKGUB_CD = TRIM( #{searchJikgubCd} ) 
+</if>
+
+
+				        		 GROUP BY A.ENTER_CD, A.BASE_YMD, A.ORG_CD, A.SABUN, A.JIKGUB_CD, A.PMT_CURR_YMD, A.PMT_CURR_YEAR
+				               ) A
+				          WHERE 1=1
+<if test="searchDelayGubun != null and searchDelayGubun neq ''">
+<choose>
+	<when test="searchDelayGubun eq 0">
+						   	AND A.PROM_CNT = 0
+	</when>
+  	<otherwise>
+						   	AND A.PROM_CNT <![CDATA[<]]> 0
+	</otherwise>
+</choose>
+</if>
+				) A
+				WHERE 1=1
+<if test="searchSabunName != null and searchSabunName neq ''">
+				  AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR A.NAME LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test="searchOrgName != null and searchOrgName neq ''">
+				  AND A.ORG_NM LIKE '%' || TRIM(#{searchOrgName}) || '%'
+</if>
+<if test="searchEduConfYn != null and searchEduConfYn neq ''">
+				  AND A.FIN_EDU_YN = TRIM(#{searchEduConfYn})
+</if>				
+				ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+		</select>
+		
+				
+<!-- 승격대상자 필수교육이수현황 팝업 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRequiredPromStaPopList">
+				<![CDATA[   
+                        SELECT A.ENTER_CD
+                             , A.SABUN
+                             , NVL(A.EDU_CONFIRM_TYPE,'0') AS EDU_CONFIRM_TYPE
+                             , C.EDU_COURSE_NM
+                             , C.EDU_LEVEL
+                             , B.EDU_S_YMD
+                             , B.EDU_E_YMD
+						     , DECODE(NVL(A.EDU_CONFIRM_TYPE,'0'), '0', '#ff0000', '#0000ff') AS EDU_CONFIRM_TYPE_FONT_COLOR
+                          FROM TTRA301 A, TTRA121 B, TTRA101 C, TSYS005 D
+                         WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+                           AND A.SABUN         = TRIM(#{searchSabun})
+                           
+                           AND A.ENTER_CD      = B.ENTER_CD
+                           AND A.EDU_SEQ       = B.EDU_SEQ
+                           AND A.EDU_EVENT_SEQ = B.EDU_EVENT_SEQ
+                           
+                           AND A.ENTER_CD      = C.ENTER_CD
+                           AND A.EDU_SEQ       = C.EDU_SEQ
+                           AND C.ENTER_CD      = D.ENTER_CD
+                           AND D.GRCODE_CD     = 'L10090'
+                           AND C.EDU_LEVEL     = D.CODE ]]> 
+<choose><when test="searchJikgubCd != null and searchJikgubCd eq 'D270'">
+                           AND F_COM_GET_JIKGUB_CD( A.ENTER_CD, A.SABUN, B.EDU_S_YMD ) = TRIM(#{searchJikgubCd})
+                           AND TRIM(D.NOTE1) = 'C'
+</when><when test="searchPromCnt != null and searchPromCnt eq '0'">
+                           AND F_COM_GET_JIKGUB_CD( A.ENTER_CD, A.SABUN, B.EDU_S_YMD ) = TRIM(#{searchJikgubCd})
+                           AND TRIM(D.NOTE1) = 'A'
+</when><otherwise>
+                           AND SUBSTR(B.EDU_S_YMD, 1, 4) = TO_CHAR(TO_NUMBER(SUBSTR(TRIM(#{searchBaseYmd}), 1, 4)) - 1 ) -- 전년도 보충 교육
+                           AND TRIM(D.NOTE1) = 'B'
+</otherwise></choose>
+						 ORDER BY D.SEQ, B.EDU_S_YMD DESC
+			
+		</select>
+</mapper>

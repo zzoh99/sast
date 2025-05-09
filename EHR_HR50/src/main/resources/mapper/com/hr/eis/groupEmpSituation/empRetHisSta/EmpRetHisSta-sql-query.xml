@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.empRetHisSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpRetHisStaList2">
+			
+				<![CDATA[
+                    SELECT T4.YYYY AS CODE_NM
+                     , NVL(T1.CNT, 0) AS CNT
+                     , NVL(T1.M_CNT, 0) AS M_CNT
+                     , NVL(T1.W_CNT, 0) AS W_CNT
+                     , NVL(T2.ENTER_CNT, 0) AS ENTER_CNT
+                     , NVL(T3.ENTER_CNT, 0) AS ENTER_CNT2
+                     , ROUND(NVL(T2.ENTER_CNT,0) / NVL(T1.CNT,1) * 100, 0) AS PER_CNT 
+                     , ROUND(NVL(T3.ENTER_CNT,0) / NVL(T1.CNT,1) * 100, 0) AS PER_CNT2 
+                FROM (
+                            SELECT SUBSTR(Y.DEF_YMD,1,4) AS YYYY
+                                 , COUNT(X.SABUN)        AS CNT
+                                 , SUM(CASE WHEN X.SEX_TYPE = '1' THEN 1 ELSE 0 END) M_CNT
+                                 , SUM(CASE WHEN X.SEX_TYPE = '2' THEN 1 ELSE 0 END) W_CNT
+                            FROM   (
+                                            SELECT A.SABUN
+                                                 , A.SEX_TYPE
+                                                 , A.EMP_YMD
+                                                 , B.SDATE
+                                                 , B.EDATE
+                                                 , C.S_YMD
+                                                 , C.E_YMD
+                                            FROM   THRM100 A   -- 인사마스터
+                                                 , THRM151 B
+                                                 , TORG900 C
+                                            WHERE  A.ENTER_CD = B.ENTER_CD
+                                            AND    A.ENTER_CD = C.ENTER_CD
+                                            AND    A.SABUN    = B.SABUN
+                                            AND    C.USE_YN = 'Y' ]]>
+		 	                           <if test="paYnVal != null and paYnVal neq ''">
+			                                 AND B.STATUS_CD NOT IN ('AC','RAC')
+			                           </if> <![CDATA[
+                                            AND B.STATUS_CD NOT IN ('RAA', 'XA', 'RA')
+                                            ) X,
+                                            (
+                                                SELECT     LEVEL, ( #{searchYyyy} - LEVEL +1 ) || '1231' AS DEF_YMD
+                                                      FROM DUAL
+                                                CONNECT BY LEVEL <= 10
+                                                ORDER BY LEVEL DESC
+                                            ) Y
+							 WHERE 1=1 
+							   AND Y.DEF_YMD BETWEEN X.SDATE AND NVL(X.EDATE, '99999999')
+							   AND Y.DEF_YMD BETWEEN NVL(X.S_YMD,'18000101') AND NVL(X.E_YMD, '99999999')
+                            GROUP BY Y.DEF_YMD
+                            ) T1,
+                            (
+                            SELECT SUBSTR(Y.DEF_YMD,1,4) AS YYYY, COUNT(X.SABUN) AS ENTER_CNT
+                                FROM (
+										SELECT A.SABUN, A.EMP_YMD, B.SDATE, B.EDATE, C.S_YMD, C.E_YMD
+										  FROM THRM100 A
+										     , THRM151 B
+										     , TORG900 C
+										 WHERE A.ENTER_CD = B.ENTER_CD
+										   AND A.SABUN = B.SABUN
+										   AND A.ENTER_CD = C.ENTER_CD
+										   AND C.USE_YN = 'Y' ]]>
+		 	                           <if test="paYnVal != null and paYnVal neq ''">
+										AND B.STATUS_CD NOT IN ('AC','RAC')
+			                           </if> <![CDATA[
+                                               AND B.STATUS_CD NOT IN ('RAA', 'XA', 'RA')
+                                            ) X,
+                                            (
+                                                SELECT     LEVEL, ( #{searchYyyy} - LEVEL +1 ) || '1231' AS DEF_YMD
+                                                      FROM DUAL
+                                                CONNECT BY LEVEL <= 10
+                                                ORDER BY LEVEL DESC
+                                            ) Y
+                            WHERE 1=1 
+                                AND Y.DEF_YMD BETWEEN X.SDATE AND NVL(X.EDATE, '99999999')
+                                AND X.EMP_YMD LIKE SUBSTR(Y.DEF_YMD,1, 4) || '%'
+                                AND Y.DEF_YMD BETWEEN NVL(X.S_YMD,'18000101') AND NVL(X.E_YMD, '99999999')
+                            GROUP BY Y.DEF_YMD
+                            ) T2,                            
+                            
+                            (
+                            SELECT SUBSTR(Y.DEF_YMD,1,4) AS YYYY
+                                 , COUNT(X.SABUN)        AS ENTER_CNT
+                            FROM (
+                                            SELECT A.SABUN
+                                                 , A.RET_YMD
+                                                 , B.SDATE
+                                                 , B.EDATE
+                                                 , C.S_YMD
+                                                 , C.E_YMD
+                                            FROM   THRM100 A                                                    -- 인사마스터
+                                                  ,THRM151 B
+                                                  ,TORG900 C
+                                            WHERE  A.ENTER_CD = B.ENTER_CD
+                                            AND    A.SABUN    = B.SABUN
+                                            AND    A.ENTER_CD = C.ENTER_CD
+                                            AND    C.USE_YN = 'Y' ]]>
+      		 	                         <if test="paYnVal != null and paYnVal neq ''">
+			                                AND B.STATUS_CD NOT IN ('AC','RAC')
+			                             </if> <![CDATA[                                                                                                                                                                          AND    F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%' || '' || '%'
+                                            AND    B.STATUS_CD NOT IN ('RAA', 'XA')
+                                            ) X,
+                                            (
+                                                SELECT  LEVEL, ( #{searchYyyy} - LEVEL +1 ) || '1231' AS DEF_YMD
+                                                FROM    DUAL
+                                                CONNECT BY LEVEL <= 10
+                                                ORDER BY LEVEL DESC
+                                            ) Y
+                            WHERE 1=1 
+                            AND   Y.DEF_YMD BETWEEN X.SDATE AND NVL(X.EDATE, '99999999')
+                            AND   X.RET_YMD LIKE SUBSTR(Y.DEF_YMD,1, 4) || '%'
+                            AND   Y.DEF_YMD BETWEEN NVL(X.S_YMD,'18000101') AND NVL(X.E_YMD, '99999999')
+                            GROUP BY Y.DEF_YMD
+                            ) T3,
+                            (
+                                SELECT   LEVEL
+                                       , ( #{searchYyyy} - LEVEL +1 ) AS YYYY
+                                FROM     DUAL
+                                CONNECT BY LEVEL <= 10
+                                ORDER BY LEVEL DESC
+                            ) T4
+                WHERE    T4.YYYY    = T1.YYYY(+)
+                AND      T4.YYYY    = T2.YYYY(+)
+                AND      T4.YYYY    = T3.YYYY(+)
+                ORDER BY T1.YYYY
+				]]>
+			
+			
+		</select>
+		
+		
+		<select parameterType="map" resultType="cMap" id="getEmpRetHisStaList1">
+			
+				<![CDATA[
+                    SELECT T4.ENTER_CD AS CODE_NM
+                     , NVL(T1.CNT, 0) AS CNT
+                     , NVL(T1.M_CNT, 0) AS M_CNT
+                     , NVL(T1.W_CNT, 0) AS W_CNT
+                     , NVL(T2.ENTER_CNT, 0) AS ENTER_CNT
+                     , NVL(T3.ENTER_CNT, 0) AS ENTER_CNT2
+                     , ROUND(NVL(T2.ENTER_CNT,0) / NVL(T1.CNT,1) * 100, 0) AS PER_CNT 
+                     , ROUND(NVL(T3.ENTER_CNT,0) / NVL(T1.CNT,1) * 100, 0) AS PER_CNT2 
+                FROM (
+                            SELECT COUNT(X.SABUN)        AS CNT
+                                 , X.ENTER_CD
+                                 , SUM(CASE WHEN X.SEX_TYPE = '1' THEN 1 ELSE 0 END) M_CNT
+                                 , SUM(CASE WHEN X.SEX_TYPE = '2' THEN 1 ELSE 0 END) W_CNT
+                            FROM   (
+                                            SELECT A.SABUN
+                                                 , A.SEX_TYPE
+                                                 , A.EMP_YMD
+                                                 , B.SDATE
+                                                 , B.EDATE
+                                                 , C.S_YMD
+                                                 , C.E_YMD
+                                                 , A.ENTER_CD
+                                            FROM   THRM100 A   -- 인사마스터
+                                                 , THRM151 B
+                                                 , TORG900 C
+                                            WHERE  A.ENTER_CD = B.ENTER_CD
+                                            AND    A.ENTER_CD = C.ENTER_CD
+                                            AND    A.SABUN    = B.SABUN
+                                            AND    A.SABUN <> '990099'
+                                            AND    C.USE_YN = 'Y'
+                                            AND B.STATUS_CD NOT IN ('RAA', 'XA', 'RA')
+                                            ) X,
+                                            (
+                                                SELECT     LEVEL, ( #{yyyy} - LEVEL +1 ) || '1231' AS DEF_YMD
+                                                      FROM DUAL
+                                                CONNECT BY LEVEL <= 1
+                                                ORDER BY LEVEL DESC
+                                            ) Y
+                            WHERE 1=1 
+                                AND Y.DEF_YMD BETWEEN X.SDATE AND NVL(X.EDATE, '99999999')
+                                AND Y.DEF_YMD BETWEEN NVL(X.S_YMD,'18000101') AND NVL(X.E_YMD, '99999999')
+                            GROUP BY X.ENTER_CD
+                            ) T1,
+
+                            (
+                            SELECT COUNT(X.SABUN) AS ENTER_CNT, X.ENTER_CD
+                                FROM (
+                                            SELECT A.SABUN, A.EMP_YMD, B.SDATE, B.EDATE, C.S_YMD, C.E_YMD, A.ENTER_CD
+                                              FROM THRM100 A, THRM151 B, TORG900 C
+                                             WHERE A.ENTER_CD = B.ENTER_CD
+                                               AND A.SABUN    = B.SABUN
+                                               AND A.ENTER_CD = C.ENTER_CD
+                                               AND A.SABUN <> '990099'
+                                               AND C.USE_YN = 'Y'
+                                               AND B.STATUS_CD NOT IN ('RAA', 'XA')
+                                               
+                                            ) X,
+                                            (
+                                                SELECT     LEVEL, ( #{yyyy} - LEVEL +1 ) || '1231' AS DEF_YMD
+                                                      FROM DUAL
+                                                CONNECT BY LEVEL <= 1
+                                                ORDER BY LEVEL DESC
+                                            ) Y
+                            WHERE 1=1 
+                                AND Y.DEF_YMD BETWEEN X.SDATE AND NVL(X.EDATE, '99999999')
+                                AND X.EMP_YMD LIKE SUBSTR(Y.DEF_YMD,1, 4) || '%'
+                                AND Y.DEF_YMD BETWEEN NVL(X.S_YMD,'18000101') AND NVL(X.E_YMD, '99999999')
+                            GROUP BY X.ENTER_CD
+                            ) T2,                            
+                            (
+                            SELECT COUNT(X.SABUN)        AS ENTER_CNT
+                                 , X.ENTER_CD
+                            FROM (
+                                            SELECT A.SABUN
+                                                 , A.RET_YMD
+                                                 , B.SDATE
+                                                 , B.EDATE
+                                                 , C.S_YMD
+                                                 , C.E_YMD
+                                                 , A.ENTER_CD
+                                            FROM   THRM100 A                                                    -- 인사마스터
+                                                  ,THRM151 B
+                                                  ,TORG900 C
+                                            WHERE  A.ENTER_CD = B.ENTER_CD
+                                            AND    A.SABUN    = B.SABUN
+                                            AND    A.ENTER_CD = C.ENTER_CD
+                                            AND    C.USE_YN = 'Y'
+                                            AND    A.SABUN <> '990099'                                                                                                                                                       AND    F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%' || '' || '%'
+                                            AND    B.STATUS_CD NOT IN ('RAA', 'XA')
+                                            ) X,
+                                            (
+                                                SELECT  LEVEL, ( #{yyyy} - LEVEL +1 ) || '1231' AS DEF_YMD
+                                                FROM    DUAL
+                                                CONNECT BY LEVEL <= 1
+                                                ORDER BY LEVEL DESC
+                                            ) Y
+                            WHERE 1=1 
+                            AND   Y.DEF_YMD BETWEEN X.SDATE AND NVL(X.EDATE, '99999999')
+                            AND   X.RET_YMD LIKE SUBSTR(Y.DEF_YMD,1, 4) || '%'
+                            AND   Y.DEF_YMD BETWEEN NVL(X.S_YMD,'18000101') AND NVL(X.E_YMD, '99999999')
+                            GROUP BY X.ENTER_CD
+                            ) T3,
+                            (
+                                SELECT  ENTER_CD FROM TORG900 WHERE USE_YN = 'Y'
+                            ) T4
+                WHERE    T4.ENTER_CD    = T1.ENTER_CD(+)
+                AND      T4.ENTER_CD    = T2.ENTER_CD(+)
+                AND      T4.ENTER_CD    = T3.ENTER_CD(+)
+                ORDER BY T1.ENTER_CD
+				]]>
+		</select>
+</mapper>

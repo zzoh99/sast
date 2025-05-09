@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.apply.benApplyUser">
+
+	<!-- 복리후생 신청서 리스트 조회 -->
+	<select parameterType="map" resultType="cMap" id="getBenApplList">
+		<![CDATA[
+		select A.APPL_SEQ
+		     , A.APPL_CD
+		     , A.TITLE
+		     , A.APPL_SABUN
+		     , A.APPL_IN_SABUN
+		     , A.APPL_STATUS_CD
+     		 , TO_CHAR(TO_DATE(A.APPL_YMD),'YYYY-MM-DD')    AS APPL_YMD
+			 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010' , A.APPL_STATUS_CD, #{ssnLocaleCd})	AS APPL_STATUS_CD_NM
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.APPL_IN_SABUN, #{ssnLocaleCd} ) AS NAME
+			 , B.APPL_NM
+			 , B.APPL_TITLE
+		FROM THRI103 A
+		INNER JOIN THRI101 B
+		ON B.ENTER_CD 			= A.ENTER_CD
+			AND B.APPL_CD			= A.APPL_CD
+		where A.ENTER_CD = #{ssnEnterCd}
+		AND B.BIZ_CD = 'BEN'
+		-- 신청/결재 프로그램ID 의 .do 앞의 부분이 대상자의 권한에 추가되어 있는지
+		AND EXISTS(
+			 SELECT 1
+			 FROM TSYS311
+			 WHERE ENTER_CD = A.ENTER_CD
+			   AND GRP_CD = #{ssnGrpCd}
+			   AND PRG_CD LIKE '%' || SUBSTR(DETAIL_PRG_CD,
+                                                  INSTR(DETAIL_PRG_CD, '/', -1) + 1,
+                                                  INSTR(DETAIL_PRG_CD, '.do') - INSTR(DETAIL_PRG_CD, '/', -1) - 1
+                             ) || '%'
+		 )
+		]]>
+		<if test="applCd != null and applCd neq ''">
+			AND B.APPL_CD = #{applCd}
+		</if>
+		ORDER BY A.APPL_YMD DESC
+	</select>
+	<select parameterType="map" resultType="cMap" id="getBenAppCodeList">
+		<![CDATA[
+					SELECT   B.APPL_CD, B.APPL_NM, B.SEQ, B.ICON
+					FROM THRI101 A
+					INNER JOIN THRI131 B
+					ON A.ENTER_CD = B.ENTER_CD
+					AND A.APPL_CD = B.APPL_CD
+					AND B.GRP_CD = #{ssnGrpCd}
+                	WHERE 1=1
+                	AND A.ENTER_CD          = #{ssnEnterCd}
+					AND A.BIZ_CD = 'BEN'
+					AND EXISTS(
+						 SELECT 1
+						 FROM TSYS311
+						 WHERE ENTER_CD = A.ENTER_CD
+						   AND GRP_CD = #{ssnGrpCd}
+						   AND PRG_CD LIKE '%' || SUBSTR(DETAIL_PRG_CD,
+                                                  INSTR(DETAIL_PRG_CD, '/', -1) + 1,
+                                                  INSTR(DETAIL_PRG_CD, '.do') - INSTR(DETAIL_PRG_CD, '/', -1) - 1
+                             ) || '%'
+					 )
+                	]]>
+		<if test='appCd != null and !appCd.equals("")'>
+			AND APPL_CD LIKE '%' || TRIM( #{appCd} ) ||'%'
+		</if>
+		<if test='appCdNm != null and !appCdNm.equals("")'>
+			AND APPL_NM LIKE '%'|| #{appCdNm}  ||'%'
+		</if>
+		<if test='srchUseYn != null and !srchUseYn.equals("")'>
+			AND USE_YN LIKE '%'|| #{srchUseYn}  ||'%'
+		</if>
+		ORDER BY SEQ, APPL_CD
+	</select>
+</mapper>

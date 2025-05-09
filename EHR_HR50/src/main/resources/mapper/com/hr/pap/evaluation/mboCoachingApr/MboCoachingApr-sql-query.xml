@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.evaluation.mboCoachingApr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getMboCoachingAprList1">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					      ,APPRAISAL_CD
+					      ,SABUN
+					      ,F_COM_GET_NAMES(ENTER_CD, SABUN) AS NAME -- 피평가자성명
+					      ,APP_ORG_CD  -- 평가부서코드
+					      ,F_COM_GET_ORG_NM(ENTER_CD, APP_ORG_CD, APP_E_YMD) AS APP_ORG_NM -- 평가부서명
+					      ,JIKCHAK_NM   -- 직책명
+					      ,JIKGUB_NM   -- 직급명
+					      ,JIKWEE_NM   -- 직위명
+					      ,ORG_CD
+					      ,ORG_NM
+					      ,EMP_YMD     -- 입사일
+					      ,STATUS_CD -- 진행상태코드
+					      ,F_COM_GET_GRCODE_NAME(ENTER_CD,'P10018',STATUS_CD) AS STATUS_NM
+					      ,APP_SABUN -- 평가자사번
+					      ,APP_SHEET_TYPE -- 평가Sheet유형
+					      ,APPRAISAL_YY -- 평가년도
+					      ,'0' AS POP
+					  FROM (
+					         SELECT A.ENTER_CD
+					               ,A.APPRAISAL_CD
+					               ,A.SABUN
+					               ,A.APP_ORG_CD  -- 평가부서코드
+					               ,C.APP_E_YMD
+					               ,B.JIKCHAK_CD
+					               ,B.JIKCHAK_NM   -- 직책명
+					               ,B.JIKGUB_CD
+					               ,B.JIKGUB_NM   -- 직급명
+					               ,B.JIKWEE_CD
+					               ,B.JIKWEE_NM   -- 직위명
+					               ,B.ORG_CD
+					               ,B.ORG_NM
+					               ,D.EMP_YMD     -- 입사일
+					               ,F_PAPN_STATUS_CD(A.ENTER_CD, A.APPRAISAL_CD, '3', 'F', A.SABUN, A.APP_ORG_CD, '0', A.APP_SABUN) AS STATUS_CD
+					               ,A.APP_SABUN -- 평가자사번
+					               ,B.APP_SHEET_TYPE -- 평가Sheet유형
+					               ,C.APPRAISAL_YY -- 평가년도
+					               ,E.D_BASE_YMD
+					           FROM TPAP202 A
+					               ,TPAP201 B
+					               ,TPAP101 C
+					               ,THRM100 D
+					               ,TPAP105 E
+					          WHERE A.ENTER_CD     = B.ENTER_CD
+					            AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					            AND A.SABUN        = B.SABUN
+								AND A.APP_STEP_CD  = B.APP_STEP_CD
+					            AND A.ENTER_CD     = C.ENTER_CD
+					            AND A.APPRAISAL_CD = C.APPRAISAL_CD
+					            AND A.ENTER_CD     = D.ENTER_CD
+					            AND A.SABUN        = D.SABUN
+					            AND B.ENTER_CD     = E.ENTER_CD
+					            AND B.APPRAISAL_CD = E.APPRAISAL_CD
+					            AND B.APP_STEP_CD  = E.APP_STEP_CD
+					            AND B.APP_STEP_CD  = '3' --목표등록
+					            AND A.APP_SEQ_CD  = '1' ---1차평가
+					            AND A.ENTER_CD     = #{ssnEnterCd} -- 회사코드
+					            AND A.APPRAISAL_CD = #{searchAppraisalCd} -- 평가ID
+					            AND A.APP_SABUN    = #{searchSabun}
+					            AND B.APP_YN       = 'Y' -- 평가포함여부
+					       )
+					ORDER BY F_ORG_ORG_CHART_SORT(ENTER_CD, ORG_CD, D_BASE_YMD),F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20030', JIKWEE_CD),
+							F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20020', JIKCHAK_CD) ,SABUN
+				]]>
+
+
+		</select>
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getMboCoachingAprList2">
+
+				<![CDATA[
+					SELECT	/*	MboCoachingApr-mapping-query.getMboCoachingAprList2	*/
+							A.ENTER_CD		/*회사구분(TORG900)*/
+						,	A.APPRAISAL_CD	/*평가ID코드(TPAP101)*/
+						,	A.SABUN			/*사원번호*/
+						,	A.APP_ORG_CD	/*평가부서코드(TORG101)*/
+						,	A.APP_SEQ_CD	/*평가차수코드(P00003)*/
+						,	A.APP_SABUN		/*평가자사번*/
+						,	A.COA_YMD		/*코칭일자*/
+						,	A.COA_PLACE		/*코칭장소*/
+						,	A.MEMO			/*코칭내용*/
+					FROM	TPAP369	A
+				 	WHERE	A.ENTER_CD		=	#{ssnEnterCd}
+					AND		A.APPRAISAL_CD	=	#{searchAppraisalCd}
+					AND		A.SABUN			=	#{searchAppSabun}
+					ORDER BY
+							A.COA_YMD	DESC
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveMboCoachingApr">
+
+					MERGE INTO	/*	MboCoachingApr-mapping-query.saveMboCoachingApr	*/
+								TPAP369 T
+					USING	(
+							SELECT	A.ENTER_CD
+								,	A.APPRAISAL_CD
+								,	A.SABUN
+								,	A.APP_ORG_CD
+								,	A.APP_SEQ_CD
+								,	A.APP_SABUN
+								,	A.COA_YMD
+								,	A.COA_PLACE
+								,	A.MEMO
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	APPRAISAL_CD
+										,	NULL		AS	SABUN
+										,	NULL		AS	APP_ORG_CD
+										,	NULL		AS	APP_SEQ_CD
+										,	NULL		AS	APP_SABUN
+										,	NULL		AS	COA_YMD
+										,	NULL		AS	COA_PLACE
+										,	NULL		AS	MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	#{ssnEnterCd}						AS	ENTER_CD
+										,	TRIM( #{rm.appraisalCd}		)	AS	APPRAISAL_CD
+										,	TRIM( #{rm.sabun}			)	AS	SABUN
+										,	TRIM( #{rm.appOrgCd}		)	AS	APP_ORG_CD
+										,	TRIM( #{rm.appSeqCd}		)	AS	APP_SEQ_CD
+										,	TRIM( #{rm.appSabun}		)	AS	APP_SABUN
+										,	TRIM( #{rm.coaYmd})	AS	COA_YMD
+										,	TRIM( #{rm.coaPlace})	AS	COA_PLACE
+										,	TRIM( #{rm.memo}			)	AS	MEMO
+									FROM	DUAL
+</foreach>
+									)	A
+									WHERE	A.ENTER_CD		IS NOT NULL
+									AND		A.APPRAISAL_CD	IS NOT NULL
+									AND		A.SABUN			IS NOT NULL
+									AND		A.APP_ORG_CD	IS NOT NULL
+									AND		A.APP_SEQ_CD	IS NOT NULL
+									AND		A.APP_SABUN		IS NOT NULL
+									AND		A.COA_YMD		IS NOT NULL
+							) S
+					ON (
+								T.ENTER_CD		=	S.ENTER_CD
+							AND	T.APPRAISAL_CD	=	S.APPRAISAL_CD
+							AND	T.SABUN			=	S.SABUN
+							AND	T.APP_ORG_CD	=	S.APP_ORG_CD
+							AND	T.APP_SEQ_CD	=	S.APP_SEQ_CD
+							AND	T.APP_SABUN		=	S.APP_SABUN
+							AND	T.COA_YMD		=	S.COA_YMD
+						)
+					WHEN MATCHED
+					THEN
+						UPDATE SET		T.COA_PLACE	=	S.COA_PLACE
+									,	T.MEMO		=	S.MEMO
+									,	T.CHKDATE	=	SYSDATE
+									,	T.CHKID		=	#{ssnSabun}
+					WHEN NOT MATCHED
+					THEN
+						INSERT	(
+								T.ENTER_CD
+							,	T.APPRAISAL_CD
+							,	T.SABUN
+							,	T.APP_ORG_CD
+							,	T.APP_SEQ_CD
+							,	T.APP_SABUN
+							,	T.COA_YMD
+							,	T.COA_PLACE
+							,	T.MEMO
+							,	T.CHKDATE
+							,	T.CHKID
+								)
+						VALUES
+								(
+								S.ENTER_CD
+							,	S.APPRAISAL_CD
+							,	S.SABUN
+							,	S.APP_ORG_CD
+							,	S.APP_SEQ_CD
+							,	S.APP_SABUN
+							,	S.COA_YMD
+							,	S.COA_PLACE
+							,	S.MEMO
+							,	SYSDATE
+							,	#{ssnSabun}
+								)
+		</update>
+
+</mapper>

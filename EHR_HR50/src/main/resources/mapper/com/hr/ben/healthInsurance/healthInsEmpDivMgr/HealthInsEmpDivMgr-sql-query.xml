@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.healthInsurance.healthInsEmpDivMgr">
+
+	<select id="getHealthInsEmpDivMgrTab1DivCnt" parameterType="map" resultType="cMap">
+		SELECT F_CPN_GET_GLOVAL_VALUE(#{ssnEnterCd}, 'HLTH_INS_DIV_CNT', #{searchYy}||'0401') AS DIV_CNT
+		  FROM DUAL
+	</select>
+
+	<!-- 조회 -->
+	<select id="getHealthInsEmpDivMgrList" parameterType="map" resultType="cMap">
+		<![CDATA[
+		SELECT
+			  C.SABUN
+			, C.NAME
+			, C.YY        --고지년월
+			, C.MON1      --건강(부과총보험료)
+			, C.MON2      --장기요양(부과총보험료)
+			, C.MON3      --연간보수총액
+			, C.MM        --근무월수
+			, C.MON4      --보수월액
+			, C.GRADE     --등급
+			, C.MON5      --표준보수월액
+			, C.MON6      --건강(확정보험료)
+			, C.MON7      --장기요양(확정보험료)
+			, C.MON8      --건강(정산보험료)
+			, C.MON9      --장기요양(정산보험료)
+			, C.MON10     --건강(가입자부담)
+			, C.MON11     --장기요양(가입자부담)
+			, C.MON12     --건강(사용자부담)
+			, C.MON13     --장기요양(사용자부담)
+			, C.TEXT1     --고지유예
+			, C.TEXT2     --비고
+			, C.TEXT3     --사업장관리번호
+			, C.TEXT4     --차수
+			, C.TEXT5     --회계
+			, C.TEXT6     --단위사업장
+			, C.TEXT7     --증번호
+			, C.RES_NO    AS  RES_NO_ENC
+			, CRYPTIT.DECRYPT(C.RES_NO, C.ENTER_CD) AS RES_NO
+			, C.SEQ_NO
+		  FROM TBEN115 C
+		 WHERE C.ENTER_CD = #{ssnEnterCd}
+		   AND C.YY = REPLACE(#{searchYy},'-','')
+		]]>
+	</select>
+
+	<!-- 저장 -->
+	<update id="saveHealthInsEmpDivMgr" parameterType="map">
+		<![CDATA[
+		MERGE INTO TBEN115 T
+		USING
+		  (
+			SELECT
+				ENTER_CD AS ENTER_CD,
+				RES_NO   AS RES_NO,
+				RES_NO_ENC  AS RES_NO_ENC,
+				YY       AS YY,
+				SEQ_NO   AS SEQ_NO,
+				SABUN    AS SABUN,
+				NAME     AS NAME,
+				MON1     AS MON1,
+				MON2     AS MON2,
+				MON3     AS MON3,
+				MM       AS MM,
+				MON4     AS MON4,
+				GRADE    AS GRADE,
+				MON5     AS MON5,
+				MON6     AS MON6,
+				MON7     AS MON7,
+				MON8     AS MON8,
+				MON9     AS MON9,
+				MON10    AS MON10,
+				MON11    AS MON11,
+				MON12    AS MON12,
+				MON13    AS MON13,
+				TEXT1    AS TEXT1,
+				TEXT2    AS TEXT2,
+				TEXT3    AS TEXT3,
+				TEXT4    AS TEXT4,
+				TEXT5    AS TEXT5,
+				TEXT6    AS TEXT6,
+				TEXT7    AS TEXT7,
+				NVL(A.SABUN, NVL((SELECT MAX(AA.SABUN)
+									FROM THRM100 AA, THRM151 BB
+								   WHERE AA.ENTER_CD = A.ENTER_CD
+									 AND AA.ENTER_CD = BB.ENTER_CD
+									 AND CRYPTIT.DECRYPT(AA.RES_NO, AA.ENTER_CD) = A.RES_NO
+									 AND AA.SABUN = BB.SABUN
+									 AND REPLACE(#{searchBaseYmd},'-','') BETWEEN BB.SDATE AND NVL(BB.EDATE, '99991231')
+									 AND AA.SABUN IS NOT NULL
+									 AND BB.STATUS_CD NOT IN ('RA')
+					),'')) AS RTN_SABUN,
+				SYSDATE  AS CHKDATE,
+				#{ssnSabun} AS CHKID
+			  FROM
+		  (
+			SELECT
+					NULL      AS ENTER_CD
+				   ,NULL      AS RES_NO
+				   ,NULL      AS RES_NO_ENC
+				   ,NULL      AS YY
+				   ,NULL      AS SEQ_NO
+				   ,NULL      AS SABUN
+				   ,NULL      AS NAME
+				   ,NULL      AS MON1
+				   ,NULL      AS MON2
+				   ,NULL      AS MON3
+				   ,NULL      AS MM
+				   ,NULL      AS MON4
+				   ,NULL      AS GRADE
+				   ,NULL      AS MON5
+				   ,NULL      AS MON6
+				   ,NULL      AS MON7
+				   ,NULL      AS MON8
+				   ,NULL      AS MON9
+				   ,NULL      AS MON10
+				   ,NULL      AS MON11
+				   ,NULL      AS MON12
+				   ,NULL      AS MON13
+				   ,NULL      AS TEXT1
+				   ,NULL      AS TEXT2
+				   ,NULL      AS TEXT3
+				   ,NULL      AS TEXT4
+				   ,NULL      AS TEXT5
+				   ,NULL      AS TEXT6
+				   ,NULL      AS TEXT7
+			  FROM DUAL ]]>
+<foreach item="rm" collection="mergeRows" index="idx">
+			  UNION ALL
+			  SELECT
+					#{ssnEnterCd}  		AS ENTER_CD
+				   ,TRIM(#{rm.resNo})   AS RES_NO
+				   ,TRIM(#{rm.resNoEnc}) AS RES_NO_ENC
+				   ,TRIM(#{rm.yy})     AS YY
+	<choose>
+		<when test="rm.seqNo != null and rm.seqNo neq ''">
+					,TRIM(#{rm.seqNo} ) AS SEQ_NO
+		</when>
+		<otherwise>
+					,TO_CHAR(
+						(
+							SELECT (NVL(MAX(TO_NUMBER(SEQ_NO)),0) + (#{idx} + 1))
+							FROM TBEN115
+							WHERE ENTER_CD = #{ssnEnterCd}
+							AND YY       = TRIM(#{rm.yy} )
+							AND CRYPTIT.DECRYPT(RES_NO, ENTER_CD) = TRIM(#{rm.resNo})
+						)
+					)	AS SEQ_NO
+		</otherwise>
+	</choose>
+				   ,TRIM( #{rm.sabun} ) AS SABUN
+				   ,TRIM( #{rm.name}  ) AS NAME
+				   ,TRIM( #{rm.mon1}  ) AS MON1
+				   ,TRIM( #{rm.mon2}  ) AS MON2
+				   ,TRIM( #{rm.mon3}  ) AS MON3
+				   ,TRIM( #{rm.mm}    )	AS MM
+				   ,TRIM( #{rm.mon4}  ) AS MON4
+				   ,TRIM( #{rm.grade} ) AS GRADE
+				   ,TRIM( #{rm.mon5}  ) AS MON5
+				   ,TRIM( #{rm.mon6}  ) AS MON6
+				   ,TRIM( #{rm.mon7}  ) AS MON7
+				   ,TRIM( #{rm.mon8}  ) AS MON8
+				   ,TRIM( #{rm.mon9}  ) AS MON9
+				   ,TRIM( #{rm.mon10} ) AS MON10
+				   ,TRIM( #{rm.mon11} ) AS MON11
+				   ,TRIM( #{rm.mon12} ) AS MON12
+				   ,TRIM( #{rm.mon13} ) AS MON13
+				   ,TRIM( #{rm.text1} ) AS TEXT1
+				   ,TRIM( #{rm.text2} ) AS TEXT2
+				   ,TRIM( #{rm.text3} ) AS TEXT3
+				   ,TRIM( #{rm.text4} ) AS TEXT4
+				   ,TRIM( #{rm.text5} ) AS TEXT5
+				   ,TRIM( #{rm.text6} ) AS TEXT6
+				   ,TRIM( #{rm.text7} ) AS TEXT7
+			  FROM DUAL
+</foreach>
+		<![CDATA[
+		  ) A
+			 WHERE ENTER_CD     IS NOT NULL
+			 AND RES_NO         IS NOT NULL
+			 AND YY             IS NOT NULL
+			 AND SEQ_NO         IS NOT NULL
+		  ) S
+		ON
+		  (
+			T.ENTER_CD = S.ENTER_CD AND
+			T.RES_NO   = S.RES_NO_ENC AND
+			T.YY       = S.YY AND
+			T.SEQ_NO   = S.SEQ_NO
+		  )
+		WHEN MATCHED THEN
+		  UPDATE SET
+			T.SABUN    = S.SABUN,
+			T.NAME     = S.NAME,
+			T.MON1     = S.MON1,
+			T.MON2     = S.MON2,
+			T.MON3     = S.MON3,
+			T.MM       = S.MM,
+			T.MON4     = S.MON4,
+			T.GRADE    = S.GRADE,
+			T.MON5     = S.MON5,
+			T.MON6     = S.MON6,
+			T.MON7     = S.MON7,
+			T.MON8     = S.MON8,
+			T.MON9     = S.MON9,
+			T.MON10    = S.MON10,
+			T.MON11    = S.MON11,
+			T.MON12    = S.MON12,
+			T.MON13    = S.MON13,
+			T.TEXT1    = S.TEXT1,
+			T.TEXT2    = S.TEXT2,
+			T.TEXT3    = S.TEXT3,
+			T.TEXT4    = S.TEXT4,
+			T.TEXT5    = S.TEXT5,
+			T.TEXT6    = S.TEXT6,
+			T.TEXT7    = S.TEXT7,
+			T.CHKDATE  = S.CHKDATE,
+			T.CHKID    = S.CHKID
+		WHEN NOT MATCHED THEN
+		  INSERT
+			(
+			  T.ENTER_CD,
+			  T.RES_NO,
+			  T.YY,
+			  T.SEQ_NO,
+			  T.SABUN,
+			  T.NAME,
+			  T.MON1,
+			  T.MON2,
+			  T.MON3,
+			  T.MM,
+			  T.MON4,
+			  T.GRADE,
+			  T.MON5,
+			  T.MON6,
+			  T.MON7,
+			  T.MON8,
+			  T.MON9,
+			  T.MON10,
+			  T.MON11,
+			  T.MON12,
+			  T.MON13,
+			  T.TEXT1,
+			  T.TEXT2,
+			  T.TEXT3,
+			  T.TEXT4,
+			  T.TEXT5,
+			  T.TEXT6,
+			  T.TEXT7,
+			  T.CHKDATE,
+			  T.CHKID
+			)
+		  VALUES
+			(
+			  S.ENTER_CD,
+			  CRYPTIT.ENCRYPT(TRIM(S.RES_NO), #{ssnEnterCd}),
+			  S.YY,
+			  S.SEQ_NO,
+			  S.RTN_SABUN,
+			  S.NAME,
+			  S.MON1,
+			  S.MON2,
+			  S.MON3,
+			  S.MM,
+			  S.MON4,
+			  S.GRADE,
+			  S.MON5,
+			  S.MON6,
+			  S.MON7,
+			  S.MON8,
+			  S.MON9,
+			  S.MON10,
+			  S.MON11,
+			  S.MON12,
+			  S.MON13,
+			  S.TEXT1,
+			  S.TEXT2,
+			  S.TEXT3,
+			  S.TEXT4,
+			  S.TEXT5,
+			  S.TEXT6,
+			  S.TEXT7,
+			  S.CHKDATE,
+			  S.CHKID
+			)
+		]]>
+	</update>
+
+	<!-- 삭제 -->
+	<delete id="deleteHealthInsEmpDivMgr" parameterType="map">
+		DELETE FROM TBEN115
+		 WHERE (ENTER_CD, RES_NO, YY, SEQ_NO) IN
+			   (
+				   SELECT NULL AS ENTER_CD
+						, NULL AS RES_NO
+						, NULL AS YY
+						, NULL AS SEQ_NO
+					 FROM DUAL
+		<foreach item="rm" collection="deleteRows">
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.resNoEnc != null and rm.resNoEnc neq '' and rm.yy != null and rm.yy neq '' and rm.seqNo != null and rm.seqNo neq ''">
+					UNION ALL
+					SELECT #{ssnEnterCd} AS ENTER_CD
+						 , TRIM(#{rm.resNoEnc}) AS RES_NO
+						 , TRIM(#{rm.yy}) AS YY
+						 , TRIM(#{rm.seqNo}) AS SEQ_NO
+					  FROM DUAL
+			</if>
+		</foreach>
+			   )
+	</delete>
+
+	<!-- 조회 -->
+	<select id="getHealthInsEmpDivMgrList2" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT A.SABUN, A.NAME
+				, F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, B.SDATE) AS ORG_NM         -- 소속
+				, C.YY        --고지년월
+				, C.PAY_YM    --공제년월
+				, C.SEC_CD    --구분(B90750)
+				, C.MON1      --건강보험
+				, C.MON2      --장기요양보험
+			  FROM THRM100 A, THRM151 B, TBEN116 C
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			   AND C.ENTER_CD = B.ENTER_CD
+			   AND C.SABUN = B.SABUN
+			   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231') ]]>
+		<if test="searchYy != null and searchYy neq ''">
+			   AND C.YY = REPLACE(#{searchYy},'-','')
+		</if>
+		<if test="searchPayYmS != null and searchPayYmS neq ''">
+			<![CDATA[
+			   AND C.PAY_YM >= REPLACE(#{searchPayYmS},'-','')
+			]]>
+		</if>
+		<if test="searchPayYmE != null and searchPayYmE neq ''">
+			<![CDATA[
+			   AND C.PAY_YM <= REPLACE(#{searchPayYmE},'-','')
+			]]>
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+			   AND (A.SABUN = #{searchSabunName} OR A.NAME LIKE '%' || #{searchSabunName} || '%')
+		</if>
+	</select>
+
+	<!-- 저장 -->
+	<update id="saveHealthInsEmpDivMgr2" parameterType="map">
+		<![CDATA[
+			MERGE INTO TBEN116 T
+			USING
+			  (
+				SELECT
+					ENTER_CD AS ENTER_CD,
+					SABUN    AS SABUN,
+					YY       AS YY,
+					PAY_YM   AS PAY_YM,
+					SEC_CD   AS SEC_CD,
+					MON1     AS MON1,
+					MON2     AS MON2,
+					CHKDATE  AS CHKDATE,
+					CHKID    AS CHKID
+				  FROM
+			  (
+				SELECT
+						NULL      AS ENTER_CD
+					   ,NULL      AS SABUN
+					   ,NULL      AS YY
+					   ,NULL      AS PAY_YM
+					   ,NULL      AS SEC_CD
+					   ,NULL      AS MON1
+					   ,NULL      AS MON2
+					   ,NULL      AS CHKDATE
+					   ,NULL      AS CHKID
+				  FROM DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+				  UNION ALL
+				  SELECT
+					   #{ssnEnterCd}          AS ENTER_CD
+					   ,TRIM(#{rm.sabun}) AS SABUN
+					   ,TRIM(#{rm.yy})    AS YY
+					   ,TRIM(#{rm.payYm}) AS PAY_YM
+					   ,TRIM(#{rm.secCd}) AS SEC_CD
+					   ,TRIM(#{rm.mon1})  AS MON1
+					   ,TRIM(#{rm.mon2})  AS MON2
+					   ,SYSDATE             AS CHKDATE
+					   ,#{ssnSabun}           AS CHKID
+				  FROM DUAL
+		</foreach>
+			  ) A
+				 WHERE ENTER_CD   IS NOT NULL
+				 AND SABUN      IS NOT NULL
+				 AND YY         IS NOT NULL
+				 AND PAY_YM     IS NOT NULL
+				 AND SEC_CD     IS NOT NULL
+			  ) S
+			ON
+			  (
+				T.ENTER_CD = S.ENTER_CD AND
+				T.SABUN    = S.SABUN AND
+				T.YY       = S.YY AND
+				T.PAY_YM   = S.PAY_YM AND
+				T.SEC_CD   = S.SEC_CD
+			  )
+			WHEN MATCHED THEN
+			  UPDATE SET
+				T.MON1     = S.MON1,
+				T.MON2     = S.MON2,
+				T.CHKDATE  = S.CHKDATE,
+				T.CHKID    = S.CHKID
+			WHEN NOT MATCHED THEN
+			  INSERT
+				(
+				  T.ENTER_CD,
+				  T.SABUN,
+				  T.YY,
+				  T.PAY_YM,
+				  T.SEC_CD,
+				  T.MON1,
+				  T.MON2,
+				  T.CHKDATE,
+				  T.CHKID
+				)
+			  VALUES
+				(
+				  S.ENTER_CD,
+				  S.SABUN,
+				  S.YY,
+				  S.PAY_YM,
+				  S.SEC_CD,
+				  S.MON1,
+				  S.MON2,
+				  S.CHKDATE,
+				  S.CHKID
+				)
+	</update>
+
+	<!-- 삭제 -->
+	<delete id="deleteHealthInsEmpDivMgr2" parameterType="map">
+		<![CDATA[
+			DELETE FROM TBEN116
+			 WHERE (ENTER_CD, SABUN, YY, PAY_YM, SEC_CD) IN
+			       (
+			           SELECT NULL AS ENTER_CD
+			                , NULL AS SABUN
+			                , NULL AS YY
+			                , NULL AS PAY_YM
+			                , NULL AS SEC_CD
+						 FROM DUAL ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq '' rm.yy != null and rm.yy neq '' and rm.payYm != null and rm.payYm neq '' and rm.secCd != null and rm.secCd neq ''">
+						UNION ALL
+						SELECT #{ssnEnterCd} AS ENTER_CD
+				             , TRIM(#{rm.sabun}) AS SABUN
+						     , TRIM(#{rm.yy}) AS YY
+						     , TRIM(#{rm.payYm}) AS PAY_YM
+						     , TRIM(#{rm.secCd}) AS SEC_CD
+						  FROM DUAL
+			</if>
+		</foreach>
+			       )
+	</delete>
+
+	<select id="getHealthInsEmpDivMgrList3" parameterType="map" resultType="cMap">
+		<![CDATA[
+		SELECT A.YY, A.SABUN, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME,
+			   A.MON1 + A.MON2 AS BF_MON1, -- 전년도부과보험료
+			   A.MON4, -- 전년도보수월액
+			   A.MON6 + A.MON7 AS BF_MON6, -- 전년도확정보험료
+			   (A.MON6 + A.MON7) - (A.MON1 + A.MON2) AS BF_YY_MON, -- 가입자분연말정산보험료
+			   F_BEN_INSURENCE_BASE_MON(A.ENTER_CD, '15', A.MON4, TO_CHAR(LAST_DAY(A.YY||'1231'), 'YYYYMMDD'), '0','0') +
+			   F_BEN_INSURENCE_BASE_MON(A.ENTER_CD, '15-1', A.MON4, TO_CHAR(LAST_DAY(A.YY||'1231'), 'YYYYMMDD'), '0','0') AS YY_MON,
+			   CASE WHEN NVL(A.MON6, 0) - NVL(A.MON1, 0) >= F_BEN_INSURENCE_BASE_MON(A.ENTER_CD, '15', A.MON4, TO_CHAR(LAST_DAY(A.YY||'1231'), 'YYYYMMDD'), '0','0') THEN '분납' ELSE '' END AS GUBUN,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 0), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON4,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 1), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON5,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 2), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON6,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 3), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON7,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 4), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON8,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 5), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON9,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 6), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON10,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 7), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON11,
+			   (SELECT MON1 + MON2 FROM TBEN116 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND YY = A.YY AND PAY_YM = TO_CHAR(ADD_MONTHS(A.YY||'0401', 8), 'YYYYMM') AND SEC_CD = 'F01') AS YY_MON12,
+			   A.TEXT2,
+			   A.TEXT3,
+			   A.TEXT4,
+			   A.TEXT5,
+			   A.TEXT6,
+			   A.TEXT7,
+			   F_COM_GET_JIKJONG_NM3 (A.ENTER_CD, A.SABUN, REPLACE(#{searchYy},'-','')||'1231',#{ssnLocaleCd}) JIKJONG_NM,
+			   F_COM_GET_ORG_NM2 (A.ENTER_CD, A.SABUN, REPLACE(#{searchYy},'-','')||'1231',#{ssnLocaleCd}) AS ORG_NM
+		  FROM TBEN115 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.YY = REPLACE(#{searchYy},'-','')
+		]]>
+	</select>
+
+	<update id="prcCreateHealthInsEmpDiv" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+				CALL P_CPN_HEALTHINS_CRE(
+					#{sqlCode, mode=OUT, jdbcType=VARCHAR},
+					#{sqlErrm, mode=OUT, jdbcType=VARCHAR},
+					#{ssnEnterCd, mode=IN, jdbcType=VARCHAR},
+					#{searchYy, mode=IN, jdbcType=VARCHAR},
+					#{ssnSabun, mode=IN, jdbcType=VARCHAR}
+				)
+		]]>
+	</update>
+
+</mapper>

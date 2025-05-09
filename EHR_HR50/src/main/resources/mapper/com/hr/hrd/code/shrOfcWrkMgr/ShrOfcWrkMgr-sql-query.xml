@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.code.shrOfcWrkMgr">
+        <select parameterType="map" resultType="cMap" id="getShrOfcWrkMgrList">
+
+                <![CDATA[
+					 SELECT A.SABUN,
+					        F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME,
+	                        A.WORK_ASSIGN_CD,
+	                        A.APPROVAL_SEQ,
+	                        A.WORK_ASSIGN_CD_LARGE,
+	                        B.WORK_ASSIGN_NM AS WORK_ASSIGN_NM_LARGE,
+	                        A.WORK_ASSIGN_CD_MIDDLE,
+	                        C.WORK_ASSIGN_NM AS WORK_ASSIGN_NM_MIDDLE,
+	                        D.WORK_ASSIGN_NM,
+	                        A.DETAIL_NM,
+	                        A.ST_YMD,
+	                        A.ED_YMD,
+	                        A.EXE_YN
+	                 FROM TCDPU161 A, TCDPW501 B, TCDPW501 C, TCDPW501 D
+	                WHERE A.ENTER_CD = #{ssnEnterCd}
+	                  AND A.ENTER_CD = B.ENTER_CD
+	                  AND A.WORK_ASSIGN_CD_LARGE = B.WORK_ASSIGN_CD
+	                  AND A.ENTER_CD = C.ENTER_CD
+	                  AND A.WORK_ASSIGN_CD_MIDDLE = C.WORK_ASSIGN_CD
+	                  AND A.ENTER_CD = D.ENTER_CD
+	                  AND A.WORK_ASSIGN_CD = D.WORK_ASSIGN_CD ]]>
+	                <if test='searchWorkAssignNm != null and !searchWorkAssignNm.equals("")'>
+					   AND LOWER(D.WORK_ASSIGN_NM) LIKE '%' || LOWER(#{searchWorkAssignNm}) || '%'
+					</if>
+	           ORDER BY A.SABUN,A.WORK_ASSIGN_CD
+
+
+
+        </select>
+
+        <update parameterType="map" id="saveShrOfcWrkMgrList">
+
+
+					MERGE INTO TCDPU161 T
+					USING (
+							SELECT A.ENTER_CD
+								 , A.SABUN
+		                         , A.WORK_ASSIGN_CD
+		                         , A.APPROVAL_SEQ
+		                         , A.WORK_ASSIGN_CD_LARGE
+		                         , A.WORK_ASSIGN_CD_MIDDLE
+		                         , A.DETAIL_NM
+		                         , A.ST_YMD
+		                         , A.ED_YMD
+		                         , A.EXE_YN
+								 , A.CHKDATE
+								 , A.CHKID
+							  FROM (
+									SELECT NULL AS ENTER_CD
+										 , NULL AS SABUN
+				                         , NULL AS WORK_ASSIGN_CD
+				                         , NULL AS APPROVAL_SEQ
+				                         , NULL AS WORK_ASSIGN_CD_LARGE
+				                         , NULL AS WORK_ASSIGN_CD_MIDDLE
+				                         , NULL AS DETAIL_NM
+				                         , NULL AS ST_YMD
+				                         , NULL AS ED_YMD
+				                         , NULL AS EXE_YN
+										 , NULL AS CHKDATE
+										 , NULL AS CHKID
+									  FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+									 UNION ALL
+									SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+										 , TRIM( #{rm.sabun}) AS SABUN
+				                         , TRIM( #{rm.workAssignCd}) AS WORK_ASSIGN_CD
+				                         <choose><when test='rm.approvalSeq != null and !rm.approvalSeq.equals("")'>
+								 		   , TO_NUMBER(TRIM(#{rm.approvalSeq})) AS APPROVAL_SEQ
+										 </when><otherwise>
+										   , (SELECT NVL(MAX(APPROVAL_SEQ),0) + ${icnt} FROM TCDPU161 WHERE ENTER_CD = #{ssnEnterCd})  AS APPROVAL_SEQ
+											<bind name="icnt" value="icnt + 1" />
+										 </otherwise>
+										 </choose>
+				                         , TRIM( #{rm.workAssignCdLarge}) AS WORK_ASSIGN_CD_LARGE
+				                         , TRIM( #{rm.workAssignCdMiddle}) AS WORK_ASSIGN_CD_MIDDLE
+				                         , TRIM( #{rm.detailNm}) AS DETAIL_NM
+				                         , TO_CHAR(SYSDATE,'YYYYMMDD') AS ST_YMD
+				                         , '99991231' AS ED_YMD
+				                         , 'Y' AS EXE_YN
+										 , SYSDATE                      AS CHKDATE
+										 , #{ssnSabun}                    AS CHKID
+									  FROM DUAL
+</foreach>
+								  ) A WHERE A.ENTER_CD IS NOT NULL
+							  ) S
+						   ON ( T.ENTER_CD = S.ENTER_CD AND T.SABUN = S.SABUN AND T.WORK_ASSIGN_CD = S.WORK_ASSIGN_CD AND T.APPROVAL_SEQ = S.APPROVAL_SEQ)
+					     WHEN MATCHED THEN
+							  UPDATE SET T.DETAIL_NM = S.DETAIL_NM
+									   , T.CHKDATE = S.CHKDATE
+									   , T.CHKID = S.CHKID
+					     WHEN NOT MATCHED THEN
+ 							  INSERT ( 
+ 							       T.ENTER_CD
+								 , T.SABUN
+		                         , T.WORK_ASSIGN_CD
+		                         , T.APPROVAL_SEQ
+		                         , T.WORK_ASSIGN_CD_LARGE
+		                         , T.WORK_ASSIGN_CD_MIDDLE
+		                         , T.DETAIL_NM
+		                         , T.ST_YMD
+		                         , T.ED_YMD
+		                         , T.EXE_YN
+								 , T.CHKDATE
+								 , T.CHKID
+ 							  ) VALUES ( 
+ 							  	  S.ENTER_CD
+								 , S.SABUN
+		                         , S.WORK_ASSIGN_CD
+		                         , S.APPROVAL_SEQ
+		                         , S.WORK_ASSIGN_CD_LARGE
+		                         , S.WORK_ASSIGN_CD_MIDDLE
+		                         , S.DETAIL_NM
+		                         , S.ST_YMD
+		                         , S.ED_YMD
+		                         , S.EXE_YN
+								 , S.CHKDATE
+								 , S.CHKID
+ 							  )
+		</update>
+
+        <delete parameterType="map" id="deleteShrOfcWrkMgrList">
+
+                    DELETE FROM TCDPU161
+                    WHERE (ENTER_CD,SABUN,WORK_ASSIGN_CD,APPROVAL_SEQ) IN ( (NULL, NULL, NULL, NULL)
+                   <foreach item="rm" collection="deleteRows" >
+                     <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.workAssignCd != null and !rm.workAssignCd.equals("") and rm.approvalSeq != null and !rm.approvalSeq.equals("")'>
+                     	,(TRIM(#{ssnEnterCd}),TRIM(#{rm.sabun}),TRIM(#{rm.workAssignCd}),TRIM(#{rm.approvalSeq}))
+					 </if>
+				   </foreach>
+                   )
+
+		</delete>
+        
+		<update parameterType="map" id="prcShrOfcWrkMgr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_CDP_CUR_WORK_ASSIGN_INS(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchSabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+
+</mapper>

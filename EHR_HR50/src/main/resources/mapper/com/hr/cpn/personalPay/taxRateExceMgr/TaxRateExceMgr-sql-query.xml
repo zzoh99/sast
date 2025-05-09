@@ -1,0 +1,176 @@
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.TaxRateExceMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getTaxRateExceMgrList">
+			
+				<![CDATA[
+				  SELECT                                               
+				        A.SABUN,
+				         F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME,
+				         F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS,
+				         C.JIKGUB_CD,
+				         C.JIKWEE_CD,
+				         D.ORG_NM,
+				         A.PAY_CD,
+				         A.SDATE,
+				         A.EDATE,
+				         A.UPDOWN_TYPE,
+				         A.UPDOWN_UNIT,
+				         A.TAX_TYPE,
+				         A.TAX_VALUE
+				    FROM TCPN104 A ]]>
+<if test='ssnSearchType != null and ssnSearchType eq "O"'>
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = A.ENTER_CD
+  AND AUTH.SABUN = A.SABUN 
+</if> <![CDATA[
+				         ,THRM100 B
+				         ,(SELECT SUB1.*
+				            FROM THRM151 SUB1
+				           WHERE SUB1.ENTER_CD IN (#{ssnEnterCd})
+				                 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL (EDATE, '99991231')) C
+				         ,(SELECT SUB1.*
+				            FROM TORG101 SUB1
+				           WHERE ENTER_CD = #{ssnEnterCd}     
+				                 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL (EDATE, '99991231')) D
+				   WHERE     A.ENTER_CD = #{ssnEnterCd}  ]]>
+				   		<if test="searchPayCd != null and searchPayCd neq ''">     
+				        	 AND A.PAY_CD LIKE '%'|| #{searchPayCd} ||'%'
+				        </if>
+				        <if test="searchSabunName != null and searchSabunName neq ''">
+						     AND ( UPPER(A.SABUN) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%'
+						               OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%' )
+						</if>
+				         AND A.ENTER_CD = B.ENTER_CD
+				         AND A.SABUN = B.SABUN
+				         AND B.ENTER_CD = C.ENTER_CD
+				         AND B.SABUN = C.SABUN
+				         AND C.ENTER_CD = D.ENTER_CD
+				         AND C.ORG_CD = D.ORG_CD
+				ORDER BY A.SDATE
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveTaxRateExceMgr">
+					MERGE INTO TCPN104 T
+					USING	(
+							SELECT    SABUN
+									, PAY_CD
+									, SDATE
+									, EDATE
+									, UPDOWN_TYPE
+									, UPDOWN_UNIT
+									, TAX_TYPE
+									, TAX_VALUE
+							FROM	(
+									SELECT	  NULL		AS SABUN            
+											, NULL		AS PAY_CD           
+											, NULL		AS SDATE            
+											, NULL		AS EDATE            
+											, NULL		AS UPDOWN_TYPE      
+											, NULL		AS UPDOWN_UNIT      
+											, NULL		AS TAX_TYPE         
+											, NULL		AS TAX_VALUE        
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM(#{rm.sabun}) AS SABUN         
+											, TRIM(#{rm.payCd}) AS PAY_CD        
+											, TRIM(#{rm.sdate}) AS SDATE         
+											, TRIM(#{rm.edate}) AS EDATE         
+											, TRIM(#{rm.updownType}) AS UPDOWN_TYPE   
+											, TRIM(#{rm.updownUnit}) AS UPDOWN_UNIT   
+											, TRIM(#{rm.taxType}) AS TAX_TYPE      
+											, TRIM(#{rm.taxValue}) AS TAX_VALUE     
+											FROM   DUAL
+</foreach>
+									)  WHERE SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = #{ssnEnterCd}
+					AND  T.SABUN    = S.SABUN
+					AND  T.PAY_CD   = S.PAY_CD
+					AND  T.SDATE    = S.SDATE
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE         	= S.EDATE        
+									, T.UPDOWN_TYPE   	= S.UPDOWN_TYPE  
+									, T.UPDOWN_UNIT   	= S.UPDOWN_UNIT  
+									, T.TAX_TYPE      	= S.TAX_TYPE     
+									, T.TAX_VALUE     	= S.TAX_VALUE    
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.PAY_CD
+							, T.SDATE
+							, T.EDATE
+							, T.UPDOWN_TYPE
+							, T.UPDOWN_UNIT
+							, T.TAX_TYPE
+							, T.TAX_VALUE
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+					 		, S.SABUN
+							, S.PAY_CD
+							, S.SDATE
+							, S.EDATE
+							, S.UPDOWN_TYPE
+							, S.UPDOWN_UNIT
+							, S.TAX_TYPE
+							, S.TAX_VALUE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteTaxRateExceMgr">
+					DELETE FROM TCPN104
+					WHERE 	(ENTER_CD, SABUN, PAY_CD, SDATE) IN 	(  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+						,			<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+										<if test="rm.sabun != null and rm.sabun neq ''">
+											<if test="rm.payCd != null and rm.payCd neq ''">
+												<if test="rm.sdate != null and sdate neq ''">
+													(#{ssnEnterCd}, TRIM( #{rm.sabun} ), TRIM( #{rm.payCd} ), TRIM( #{rm.sdate} ) )
+												</if>
+											</if>
+										</if>
+									</if>
+</foreach>
+										)
+		</delete>
+		
+		<!-- 신규로 입력될 경우 종료 일자 갱신 -->
+		<update parameterType="map" id="updateTaxRateExceMgrEdate">
+			
+				<![CDATA[
+					UPDATE TCPN104 T 
+					SET	 
+					   T.EDATE    = TO_CHAR(TO_DATE(#{sdate})-1, 'YYYYMMDD')          
+					 , T.CHKDATE  = SYSDATE
+					 , T.CHKID	  = #{ssnSabun}
+					WHERE T.ENTER_CD = #{ssnEnterCd}
+					  AND T.SABUN = #{sabun}
+					  AND T.PAY_CD = #{payCd}
+					  AND T.SDATE = (SELECT MAX(SDATE) 
+					                 FROM TCPN104 
+					                 WHERE ENTER_CD = #{ssnEnterCd} 
+					                 AND SABUN = #{sabun}
+					                 AND SDATE < #{sdate}
+					                 )
+				]]>
+			
+			
+		</update>
+		
+</mapper>

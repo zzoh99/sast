@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.required.requiredMgr">
+<!-- 대상자조회 -->
+		<select parameterType="map" resultType="cMap" id="getRequiredMgrList">
+			
+				<![CDATA[
+				SELECT A.*
+					 , CASE WHEN EDU_CONF_YN = '1' THEN '0' ELSE '1' END AS ROW_EDIT
+					 , CASE WHEN EDU_CONF_YN <> '1' AND RNUM = T_CNT OR EDU_APP_YN = 0 THEN '1' ELSE '0' END AS SEL_EDIT  -- 마지막회차 또는 미입과시 선택 가능
+				  FROM (
+					SELECT A.ENTER_CD
+					     , A.YEAR
+					     , A.SABUN
+					     , A.EDU_SEQ
+					     , A.EDU_EVENT_SEQ
+					     , A.GUBUN_CD
+					     , A.EDU_YM
+					     , A.APPL_SEQ
+					     , A.EDU_LEVEL
+					     , A.NOTE
+					     , A.ERR_NOTE
+						 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+						 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+						 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+						 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+						 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+						 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+						 , F_COM_GET_STATUS_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_NM
+						 , F_COM_GET_JIKGUB_YEUNCHA( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))  AS JIKGUB_YEAR
+					     , B.EDU_COURSE_NM
+					     , C.EDU_S_YMD
+					     , C.EDU_E_YMD
+						 ,DECODE( ( SELECT COUNT(1)
+						       FROM TTRA201 X
+						      WHERE X.ENTER_CD       = A.ENTER_CD
+		                        AND X.EDU_SEQ        = A.EDU_SEQ
+		                        AND X.EDU_EVENT_SEQ  = A.EDU_EVENT_SEQ
+		                        AND X.SABUN          = A.SABUN
+		                   ), 0, 0, 1) AS EDU_APP_YN
+						 , ( SELECT EDU_CONFIRM_TYPE  --수료여부
+						       FROM TTRA301 F
+						      WHERE F.ENTER_CD       = A.ENTER_CD
+		                        AND F.EDU_SEQ        = A.EDU_SEQ
+		                        AND F.EDU_EVENT_SEQ  = A.EDU_EVENT_SEQ
+		                        AND F.SABUN          = A.SABUN
+		                   ) AS EDU_CONF_YN
+						 , ( SELECT X.SEARCH_DESC
+						       FROM THRI201 X, TTRA160 Y
+						      WHERE X.ENTER_CD   = Y.ENTER_CD
+						        AND X.SEARCH_SEQ = Y.SEARCH_SEQ
+						        AND Y.ENTER_CD   = A.ENTER_CD
+						        AND Y.SEQ        = A.STD_SEQ
+						    ) AS SEARCH_DESC
+						 , ROW_NUMBER()OVER( PARTITION BY A.ENTER_CD, A.YEAR, A.SABUN, A.EDU_SEQ ORDER BY A.EDU_YM) AS RNUM
+						 , COUNT(1)OVER( PARTITION BY A.ENTER_CD, A.YEAR, A.SABUN, A.EDU_SEQ )  AS T_CNT
+					     
+					  FROM TTRA161 A, TTRA101 B, TTRA121 C 
+					 WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+					   AND A.YEAR          = TRIM(#{searchYear})
+					   AND A.ENTER_CD      = B.ENTER_CD
+					   AND A.EDU_SEQ       = B.EDU_SEQ
+					   AND A.ENTER_CD      = C.ENTER_CD(+)
+					   AND A.EDU_SEQ       = C.EDU_SEQ(+)
+					   AND A.EDU_EVENT_SEQ = C.EDU_EVENT_SEQ(+) ]]>
+<if test="searchJikgubCd != null and searchJikgubCd neq ''">
+				       AND F_COM_GET_JIKGUB_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) = TRIM( #{searchJikgubCd} ) 
+</if>
+<if test="searchGubunCd != null and searchGubunCd neq ''">
+				       AND A.GUBUN_CD = TRIM( #{searchGubunCd} ) 
+</if>
+<if test="searchEduCourseNm != null and searchEduCourseNm neq ''">
+				       AND B.EDU_COURSE_NM LIKE '%' || TRIM( #{searchEduCourseNm} ) || '%' 
+</if>
+<if test="searchSabunName != null and searchSabunName neq ''">
+					   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test="searchEduYm != null and searchEduYm neq ''">
+				       AND A.EDU_YM = REPLACE(#{searchEduYm}, '-', '')
+</if>
+				) A
+				WHERE 1=1
+<if test="searchEduAppYn != null and searchEduAppYn neq ''">
+				  AND A.EDU_APP_YN = TRIM( #{searchEduAppYn} ) 
+</if>
+<if test="searchEduConfYn != null and searchEduConfYn neq ''">
+				  AND A.EDU_CONF_YN = TRIM( #{searchEduConfYn} ) 
+</if>
+<if test='searchReAppYn != null and searchReAppYn eq "Y"'>
+<![CDATA[
+				  AND A.EDU_CONF_YN = '0'
+				  AND A.EDU_E_YMD <= TO_CHAR(SYSDATE, 'YYYYMMDD')
+]]>
+</if>
+
+			    ORDER BY F_COM_GET_GRCODE_SEQ( A.ENTER_CD, 'L16010', A.GUBUN_CD)
+		            , F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), A.EDU_YM 
+		</select>
+		
+<!-- 교육과정선택 팝업 조회 -->		
+		<select parameterType="map" resultType="cMap" id="getRequiredMgrPopList">
+			
+				<![CDATA[
+				SELECT /** RequiredMgr-mapping-query.xml.getRequiredMgrPopList */
+					A.ENTER_CD
+					, A.YEAR
+					, A.GUBUN_CD
+					, A.JIKGUB_CD
+					, A.JIKGUB_YEAR
+					, A.JOB_CD
+					, A.JOB_NM
+					, A.EDU_SEQ
+					, A.EDU_LEVEL
+					, A.EDU_COURSE_NM
+					, A.EDU_S_YMD
+					, A.EDU_E_YMD
+					, A.EDU_YM
+					, A.EDU_EVENT_SEQ				
+				FROM (
+					SELECT A.ENTER_CD
+					     , A.YEAR
+					     , A.GUBUN_CD
+					     , A.JIKGUB_CD
+					     , A.JIKGUB_YEAR
+					     , A.JOB_CD
+					     , A.EDU_SEQ
+					     , A.EDU_LEVEL
+					     , B.EDU_COURSE_NM
+					     , C.EDU_S_YMD
+					     , C.EDU_E_YMD
+					     , SUBSTR(C.EDU_S_YMD, 1, 6) AS EDU_YM
+					     , C.EDU_EVENT_SEQ
+				     	 , ( SELECT X.JOB_NM
+					           FROM TORG201 X
+					          WHERE X.ENTER_CD = A.ENTER_CD
+					            AND X.JOB_CD   = A.JOB_CD
+					            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL( X.EDATE, '99991231' ) ) AS JOB_NM 
+					  FROM TTRA160 A , TTRA101 B, TTRA121 C
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				       AND A.YEAR = TRIM( #{searchYear} )
+				       AND A.ENTER_CD = B.ENTER_CD
+				       AND A.EDU_SEQ  = B.EDU_SEQ
+				       AND B.ENTER_CD = C.ENTER_CD
+				       AND B.EDU_SEQ  = C.EDU_SEQ ]]>
+				        
+<if test="searchGubunCd != null and searchGubunCd neq ''">
+				       AND A.GUBUN_CD = TRIM( #{searchGubunCd} ) 
+</if>
+<if test="searchJikgubCd != null and searchJikgubCd neq ''">
+				       AND A.JIKGUB_CD = TRIM( #{searchJikgubCd} ) 
+</if>
+<if test="searchEduLevel != null and searchEduLevel neq ''">
+				       AND A.EDU_LEVEL = TRIM( #{searchEduLevel} ) 
+</if>
+<if test="searchEduYm != null and searchEduYm neq ''">
+				       AND SUBSTR(C.EDU_S_YMD, 1, 6) = REPLACE(TRIM( #{searchEduYm} ), '-', '') 
+</if>
+<if test="searchEduCourseNm != null and searchEduCourseNm neq ''">
+					   AND B.EDU_COURSE_NM LIKE '%' || TRIM( #{searchEduCourseNm} ) || '%'
+</if>
+					) A
+				WHERE 1=1
+<if test="searchJobNm != null and searchJobNm neq ''">
+				       AND A.JOB_NM LIKE '%' || TRIM( #{searchJobNm} ) || '%' 
+</if>
+                GROUP BY
+					A.ENTER_CD
+					, A.YEAR
+					, A.GUBUN_CD
+					, A.JIKGUB_CD
+					, A.JIKGUB_YEAR
+					, A.JOB_CD
+					, A.JOB_NM
+					, A.EDU_SEQ
+					, A.EDU_LEVEL
+					, A.EDU_COURSE_NM
+					, A.EDU_S_YMD
+					, A.EDU_E_YMD
+					, A.EDU_YM
+					, A.EDU_EVENT_SEQ   
+				ORDER BY F_COM_GET_GRCODE_SEQ( A.ENTER_CD, 'L16010', A.GUBUN_CD), A.EDU_SEQ, A.EDU_YM
+		</select>
+		
+<!-- 입과월에 해당하는 교육회차순번 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRequiredMgrEvtSeq">
+				<![CDATA[
+					SELECT MAX(A.EDU_EVENT_SEQ) AS EDU_EVENT_SEQ
+					  FROM TTRA121 A
+					 WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd})
+					   AND A.EDU_SEQ   = TRIM(#{eduSeq})
+					   AND SUBSTR(A.EDU_S_YMD, 1, 6) = TRIM(#{eduYm})
+				]]>
+		</select>
+		
+<!-- 입과여부조회 -->
+		<select parameterType="map" resultType="cMap" id="getRequiredMgrEduApp">
+				<![CDATA[
+					SELECT COUNT(1) AS CNT
+					  FROM TTRA201 A
+					 WHERE A.ENTER_CD       = TRIM(#{ssnEnterCd})
+					   AND A.EDU_SEQ        = TRIM(#{eduSeq})
+					   AND A.EDU_EVENT_SEQ  = TRIM(#{eduEventSeq})
+					   AND A.SABUN          = TRIM(#{sabun})
+				]]>
+		</select>
+		
+<!--  저장 -->
+		<update parameterType="map" id="saveRequiredMgr">
+				MERGE INTO TTRA161 T 
+				USING 
+				( 
+				       SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD 
+				            , TRIM(#{searchYear}) 	AS  YEAR
+				            , TRIM(#{sabun})  		AS  SABUN
+				            , TRIM(#{eduSeq})  		AS  EDU_SEQ
+				            , TRIM(#{eduYm})  		AS  EDU_YM
+				            , TRIM(#{eduEventSeq})  	AS  EDU_EVENT_SEQ
+				            , TRIM(#{gubunCd})  		AS  GUBUN_CD
+				            , TRIM(#{eduLevel})  		AS  EDU_LEVEL
+				            , TRIM(#{note})  			AS  NOTE
+				        FROM DUAL
+
+				) S 
+				ON ( 
+				          T.ENTER_CD 		= S.ENTER_CD 
+				     AND  T.YEAR 			= S.YEAR 
+				     AND  T.SABUN 			= S.SABUN 
+				     AND  T.GUBUN_CD 		= S.GUBUN_CD 
+				     AND  T.EDU_SEQ 		= S.EDU_SEQ 
+				     AND  T.EDU_YM 			= S.EDU_YM 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.NOTE = S.NOTE 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.YEAR
+				            , T.SABUN
+				            , T.GUBUN_CD
+				            , T.EDU_SEQ
+				            , T.EDU_YM
+				            , T.EDU_EVENT_SEQ
+				            , T.EDU_LEVEL
+				            , T.NOTE
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.YEAR
+				            , S.SABUN
+				            , S.GUBUN_CD
+				            , S.EDU_SEQ
+				            , S.EDU_YM
+				            , S.EDU_EVENT_SEQ
+				            , S.EDU_LEVEL
+				            , S.NOTE
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+		
+<!--  재입과 대상자 생성 저장 -->
+		<update parameterType="map" id="saveRequiredMgrEmp">
+				MERGE INTO TTRA161 T 
+				USING 
+				( 
+				       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+				            , TRIM(#{year}) 				AS  YEAR
+				            , TRIM(#{sabun})  			AS  SABUN
+				            , TRIM(#{gubunCd})  			AS  GUBUN_CD
+				            , TRIM(#{eduSeq})  			AS  EDU_SEQ
+				            , TO_CHAR(ADD_MONTHS(TO_DATE(TRIM(#{eduYm}), 'YYYYMM'), 1),'YYYYMM') AS  EDU_YM
+				        FROM DUAL
+				) S 
+				ON ( 
+				          T.ENTER_CD 		= S.ENTER_CD 
+				     AND  T.YEAR 			= S.YEAR 
+				     AND  T.GUBUN_CD 		= S.GUBUN_CD 
+				     AND  T.SABUN 			= S.SABUN 
+				     AND  T.EDU_SEQ 		= S.EDU_SEQ 
+				     AND  T.EDU_YM 			= S.EDU_YM 
+				) 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.YEAR
+				            , T.SABUN
+				            , T.GUBUN_CD
+				            , T.EDU_SEQ
+				            , T.EDU_YM
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.YEAR
+				            , S.SABUN
+				            , S.GUBUN_CD
+				            , S.EDU_SEQ
+				            , S.EDU_YM
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+
+
+<!--  저장 -->
+		<update parameterType="map" id="saveRequiredMgrErr">
+			
+				<![CDATA[			
+				MERGE INTO TTRA161 T 
+				USING 
+				( 
+				       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+				            , TRIM(#{year}) 				AS  YEAR
+				            , TRIM(#{sabun})  			AS  SABUN
+				            , TRIM(#{gubunCd})  			AS  GUBUN_CD
+				            , TRIM(#{eduSeq})  			AS  EDU_SEQ
+				            , TRIM(#{eduYm}) 				AS  EDU_YM
+				            , TRIM(#{eduEventSeq})  		AS  EDU_EVENT_SEQ
+				            , TRIM(#{applSeq})  			AS  APPL_SEQ
+				            , TRIM(#{err}) 				AS  ERR_NOTE
+				        FROM DUAL
+				) S 
+				ON ( 
+				          T.ENTER_CD 		= S.ENTER_CD 
+				     AND  T.YEAR 			= S.YEAR 
+				     AND  T.SABUN 			= S.SABUN 
+				     AND  T.GUBUN_CD 		= S.GUBUN_CD 
+				     AND  T.EDU_SEQ 		= S.EDU_SEQ 
+				     AND  T.EDU_YM 			= S.EDU_YM 
+				) 
+				WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun} 
+				   	  			, T.EDU_EVENT_SEQ 	= S.EDU_EVENT_SEQ 
+				   	  			, T.APPL_SEQ 		= S.APPL_SEQ 
+				   	  			, T.ERR_NOTE 		= S.ERR_NOTE 
+
+				]]>
+		</update>
+		
+<!-- 삭제 -->		
+		<delete parameterType="map" id="deleteRequiredMgr">
+				<![CDATA[
+				DELETE FROM TTRA161
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND YEAR      = TRIM(#{searchYear}) 
+				   AND SABUN     = TRIM(#{sabun}) 
+				   AND GUBUN_CD  = TRIM(#{gubunCd}) 
+				   AND EDU_SEQ   = TRIM(#{eduSeq}) 
+				   AND EDU_YM    = TRIM(#{eduYm}) 
+
+				]]>
+		</delete>
+		
+<!-- 삭제  : 교육신청-->		
+		<delete parameterType="map" id="deleteRequiredMgr201">
+				<![CDATA[
+				DELETE FROM TTRA201
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND APPL_SEQ  = TRIM(#{applSeq}) 
+
+				]]>
+		</delete>
+		
+<!-- 삭제  : 신청서마스터-->		
+		<delete parameterType="map" id="deleteRequiredMgr103">
+			
+				<![CDATA[
+				DELETE FROM THRI103
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND APPL_SEQ  = TRIM(#{applSeq}) 
+
+				]]>
+		</delete>
+		
+<!-- 삭제  : 신청서결재라인-->		
+		<delete parameterType="map" id="deleteRequiredMgr107">
+			
+				<![CDATA[
+				DELETE FROM THRI107
+				 WHERE ENTER_CD  = TRIM(#{ssnEnterCd}) 
+				   AND APPL_SEQ  = TRIM(#{applSeq}) 
+
+				]]>
+			
+		</delete>
+		
+		
+<!-- 대상자생성 프로시저 -->	
+         <update id="prcRequiredMgr" parameterType="map" statementType="CALLABLE">
+         <![CDATA[
+			{CALL P_TRA_REQUIRED_EMP_CRE(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchYear,mode=IN,jdbcType=VARCHAR},
+				#{searchGubunCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+        </update>
+       
+<!-- 교육신청 프로시저 -->	
+         <update id="prcRequiredMgrApp" parameterType="map" statementType="CALLABLE">
+         <![CDATA[
+			{CALL P_TRA_EDU_APP_INS(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{eduSeq,mode=IN,jdbcType=VARCHAR},
+				#{eduEventSeq,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+       </update>
+</mapper>

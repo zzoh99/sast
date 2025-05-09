@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연금보험료
+ -->
+<root>
+
+	<!-- 연금보험료 조회 -->
+	<query id="selectYeaDataPenList">
+		<![CDATA[
+			SELECT A.WORK_YY, A.ADJUST_TYPE, A.SABUN,
+			       A.SAVING_DEDUCT_TYPE,
+				   A.RET_PEN_TYPE, --퇴직연금구분(C00318)
+			       A.FINANCE_ORG_CD, -- 금융기관코드(C00319)
+			       A.PAYING_NUM_CD,  -- 납입횟수코드(C00321)
+			       F_COM_DECRYPT(A.ACCOUNT_NO, ENTER_CD) AS ACCOUNT_NO,     -- 계좌번호
+			       A.INPUT_MON,      -- 신청금액
+			       A.APPL_MON,
+			       A.DED_MON,
+			       A.INPUT_MON_ISA,      -- 신청금액
+			       A.APPL_MON_ISA,
+			       A.DED_MON_ISA,
+			       A.ADJ_INPUT_TYPE,
+			       A.FEEDBACK_TYPE,
+			       A.NTS_YN,
+			       A.CHKDATE,
+			       A.CHKID,
+			       A.REG_DT,
+			       A.DOC_SEQ,
+			       A.DOC_SEQ_DETAIL
+			  FROM TCPN830 A
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.WORK_YY = #searchWorkYy#
+			   AND A.ADJUST_TYPE = #searchAdjustType#
+			   AND A.SABUN = #searchSabun#
+			   AND A.SAVING_DEDUCT_TYPE  IN
+			                   (SELECT B.CODE
+			                      FROM TSYS005 B
+			                     WHERE B.ENTER_CD = A.ENTER_CD
+			                       AND B.GRCODE_CD = 'C00317'
+			                       AND B.NOTE1 IN ('2')
+			                       AND #searchWorkYy#||'1231' BETWEEN S_YMD AND E_YMD)
+		]]>
+	</query>
+	<!-- pdf 파일 저장 (미반영 위한 용도) -->
+	<query id="updateYeaDataPdf">
+		<![CDATA[
+			UPDATE TCPN851
+			SET STATUS_CD = DECODE(#sDelete#,'1','D','')
+			  , EXCEPT_GUBUN = DECODE(#sDelete#,'1',#exceptCheck#,'')
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND SABUN = #sabun#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND WORK_YY = #work_yy#
+			  AND DOC_SEQ = #doc_seq#
+			  AND SEQ = #doc_seq_detail#
+		]]>
+	</query>
+
+    <!-- 50세이상확인 유무 저장 -->
+    <query id="saveAgeChk">
+        <![CDATA[
+            UPDATE TCPN811
+               SET AGE_CHK = #searchAgeChk#
+                 , CHKDATE = SYSDATE
+             WHERE ENTER_CD  = #ssnEnterCd#
+                AND WORK_YY  = #searchWorkYy#
+                AND SABUN    = #searchSabun#
+                AND ADJUST_TYPE = #searchAdjustType#
+        ]]>
+    </query>
+
+    <!-- 50세이상확인 유무 조회 -->
+    <query id="getAgeChk">
+        <![CDATA[
+            SELECT NVL(( SELECT AGE_CHK
+                         FROM TCPN811
+                         WHERE ENTER_CD    = #ssnEnterCd#
+                           AND WORK_YY     = #searchWorkYy#
+                           AND SABUN       = #searchSabun#
+                           AND ADJUST_TYPE = #searchAdjustType#),'N') AS AGE_CHK
+           FROM DUAL
+        ]]>
+    </query>
+    <!-- 외국인단일세율적용 -->
+    <query id="getFrgTaxChk">
+        <![CDATA[
+        SELECT NVL(( SELECT FOREIGN_TAX_TYPE
+                     FROM TCPN811
+                     WHERE ENTER_CD    = #ssnEnterCd#
+                       AND WORK_YY     = #searchWorkYy#
+                       AND SABUN       = #searchSabun#
+                       AND ADJUST_TYPE = #searchAdjustType# ),'0') AS FRG_CHK
+        FROM DUAL        
+        ]]>
+    </query>
+
+    <!-- 주민번호 조회 -->
+    <query id="getResNo">
+        <![CDATA[
+            SELECT F_COM_DECRYPT(FAMRES,#ssnEnterCd#) AS RES_NO
+            FROM TCPN823
+            WHERE ENTER_CD   = #ssnEnterCd#
+                AND WORK_YY  = #searchWorkYy#
+                AND SABUN    = #searchSabun#
+                AND ADJUST_TYPE = #searchAdjustType#
+                AND FAM_CD = '0'
+        ]]>
+    </query>
+</root>

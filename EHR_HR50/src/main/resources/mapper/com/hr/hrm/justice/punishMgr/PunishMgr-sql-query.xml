@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.justice.punishMgr">
+
+		<!-- 징계내역관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPunishMgrList">
+
+				<![CDATA[
+					SELECT A.SEQ
+					     --, B.NAME
+					     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					     , A.SABUN
+					     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.PROBLEM_SYMD, #{ssnLocaleCd}) AS ORG_NM
+					     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, A.PROBLEM_SYMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, A.PROBLEM_SYMD, #{ssnLocaleCd}) AS JIKGUB_NM
+					     , A.PUNISH_CD
+					     , A.PUNISH_YMD
+					     , A.SDATE
+					     , A.EDATE
+					     , A.PUNISH_REASON_CD
+					     , A.MEMO
+					     , A.PUNISH_OFFICE
+					     , A.COMMITTEE_CD
+					     , A.PUNISH_DEL_YMD
+					     , A.DELETE_REASON
+					     , A.IN_OUT_CD
+					     , A.SUGGEST_ORG_CD
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.SUGGEST_ORG_CD, A.PUNISH_YMD, #{ssnLocaleCd}) AS SUGGEST_ORG_NM
+					     , A.PUNISH_SUGGEST_YMD
+					     , A.PROBLEM_SYMD
+					     , A.PROBLEM_EYMD
+					     , F_COM_GET_ORG_NM(E.ENTER_CD, E.ORG_CD, E.SDATE, #{ssnLocaleCd}) AS ORG_NM2
+					     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, E.SABUN, A.PUNISH_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM2
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, E.SABUN, A.PUNISH_YMD, #{ssnLocaleCd}) AS JIKGUB_NM2
+					     , A.PUNISH_TERM
+					     , A.DISPLAY_YN
+					     , A.FILE_SEQ
+					     , A.PUNISH_MEMO
+					  FROM THRM129 A
+						 , THRM100 B
+						 , THRM151 E
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.PUNISH_YMD BETWEEN #{srchPunishYmdS} AND #{srchPunishYmdE}
+					           ]]>
+<if test='srchPunishCd != null and !srchPunishCd.equals("") '>
+					   AND PUNISH_CD = TRIM(#{srchPunishCd})
+</if>
+<if test='searchSaNm != null and !searchSaNm.equals("")'>
+					   AND ( B.SABUN LIKE #{searchSaNm} || '%' OR B.NAME LIKE #{searchSaNm} || '%')
+</if>
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN = B.SABUN
+					   AND E.ENTER_CD = A.ENTER_CD
+					   AND E.SABUN = A.SABUN
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE AND E.EDATE
+					 ORDER BY A.PUNISH_YMD DESC
+					     , A.PUNISH_CD
+					     , B.NAME
+					     , A.SABUN
+		</select>
+
+		<!-- 징계내역관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPunishCdComboList">
+
+				<![CDATA[
+					SELECT A.PUNISH_CD AS CODE
+						 , F_COM_GET_GRCODE_NAME( A.ENTER_CD, 'H20270', A.PUNISH_CD, #{ssnLocaleCd} ) AS CODE_NM
+					  FROM THRM485 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.WARNING_YN = 'N'
+					ORDER BY A.PUNISH_CD
+
+				]]>
+
+
+		</select>
+
+		<!-- 인사위원회관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCommitteeCdComboListPunishMgr">
+
+				<![CDATA[
+					SELECT A.COMMITTEE_CD AS CODE
+						 , A.COMMITTEE_NM AS CODE_NM
+					  FROM THRM481 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+				     ORDER BY A.CHKDATE DESC
+
+				]]>
+
+
+		</select>
+
+
+
+		<!-- 징계내역관리 저장 -->
+		<update parameterType="map" id="savePunishMgr">
+
+					MERGE INTO THRM129 T
+					USING  (
+							SELECT A.ENTER_CD
+								 , A.SABUN
+								 , A.SEQ
+								 , A.PUNISH_YMD
+								 , A.SDATE
+							     , A.PUNISH_CD
+							     , A.PUNISH_TERM
+								 , A.EDATE
+								 , A.PUNISH_MEMO
+								 , A.MEMO
+							     , A.PUNISH_OFFICE
+							     , A.COMMITTEE_CD
+								 , A.PUNISH_DEL_YMD
+								 , A.DELETE_REASON
+								 , A.IN_OUT_CD
+							     , A.SUGGEST_ORG_CD
+							     , A.PUNISH_SUGGEST_YMD
+								 , A.PROBLEM_SYMD
+								 , A.PROBLEM_EYMD
+								 , A.DISPLAY_YN
+								 , A.FILE_SEQ
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS SABUN
+										 , NULL AS SEQ
+										 , NULL AS PUNISH_YMD
+										 , NULL AS SDATE
+										 , NULL AS PUNISH_CD
+										 , NULL AS PUNISH_TERM
+										 , NULL AS EDATE
+										 , NULL AS PUNISH_MEMO
+										 , NULL AS MEMO
+										 , NULL AS PUNISH_OFFICE
+										 , NULL AS COMMITTEE_CD
+										 , NULL AS PUNISH_DEL_YMD
+										 , NULL AS DELETE_REASON
+										 , NULL AS IN_OUT_CD
+										 , NULL AS SUGGEST_ORG_CD
+										 , NULL AS PUNISH_SUGGEST_YMD
+										 , NULL AS PROBLEM_SYMD
+										 , NULL AS PROBLEM_EYMD
+										 , NULL AS DISPLAY_YN
+										 , NULL AS FILE_SEQ
+									FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )			AS  ENTER_CD
+									     , TRIM( #{rm.sabun}   )			AS  SABUN
+
+
+										<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+										 , TRIM(#{rm.seq}) 			        AS SEQ
+										</when><otherwise>
+										 , TO_CHAR( (
+										  			 SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+													   FROM THRM129
+													  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+													    AND SABUN    = TRIM( #{rm.sabun}   )
+														) )	AS SEQ
+												 <bind name="icnt" value="icnt + 1" />
+										</otherwise>
+										</choose>
+
+										 , TRIM( #{rm.punishYmd}        )		AS  PUNISH_YMD
+										 , TRIM( #{rm.sdate}            )		AS  SDATE
+										 , TRIM( #{rm.punishCd}         )		AS  PUNISH_CD
+										 , TRIM( #{rm.punishTerm}       )		AS  PUNISH_TERM
+										 , TRIM( #{rm.edate}            )		AS  EDATE
+										 , TRIM( #{rm.punishMemo}   )			AS  PUNISH_MEMO
+										 , TRIM( #{rm.memo}             )		AS  MEMO
+										 , TRIM( #{rm.punishOffice}     )		AS  PUNISH_OFFICE
+										 , TRIM( #{rm.committeeCd}      )		AS  COMMITTEE_CD
+										 , TRIM( #{rm.punishDelYmd}     )		AS  PUNISH_DEL_YMD
+										 , TRIM( #{rm.deleteReason}     )		AS  DELETE_REASON
+										 , TRIM( #{rm.inOutCd}          )		AS  IN_OUT_CD
+										 , TRIM( #{rm.suggestOrgCd}     )		AS  SUGGEST_ORG_CD
+										 , TRIM( #{rm.punishSuggestYmd} )		AS  PUNISH_SUGGEST_YMD
+										 , TRIM( #{rm.problemSymd}      )		AS  PROBLEM_SYMD
+										 , TRIM( #{rm.problemEymd}      )		AS  PROBLEM_EYMD
+										 , TRIM( #{rm.displayYn}        )		AS  DISPLAY_YN
+
+										 , TRIM( #{rm.fileSeq}      	)		AS  FILE_SEQ
+
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN    IS NOT NULL
+										  AND A.SEQ      IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PUNISH_YMD  	 	= S.PUNISH_YMD
+									, T.SDATE 			 	= S.SDATE
+									, T.PUNISH_CD  		 	= S.PUNISH_CD
+									, T.PUNISH_TERM  	 	= S.PUNISH_TERM
+									, T.EDATE   		 	= S.EDATE
+									, T.PUNISH_MEMO 		= S.PUNISH_MEMO
+									, T.MEMO  			 	= S.MEMO
+									, T.PUNISH_OFFICE  	 	= S.PUNISH_OFFICE
+									, T.COMMITTEE_CD 	 	= S.COMMITTEE_CD
+									, T.PUNISH_DEL_YMD 	 	= S.PUNISH_DEL_YMD
+									, T.DELETE_REASON 	 	= S.DELETE_REASON
+									, T.IN_OUT_CD 	 	 	= S.IN_OUT_CD
+									, T.SUGGEST_ORG_CD 	 	= S.SUGGEST_ORG_CD
+									, T.PUNISH_SUGGEST_YMD 	= S.PUNISH_SUGGEST_YMD
+									, T.PROBLEM_SYMD  		= S.PROBLEM_SYMD
+									, T.PROBLEM_EYMD  		= S.PROBLEM_EYMD
+									, T.DISPLAY_YN  		= S.DISPLAY_YN
+									, T.FILE_SEQ  			= S.FILE_SEQ
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SEQ
+							, T.PUNISH_YMD
+							, T.SDATE
+							, T.PUNISH_CD
+							, T.PUNISH_TERM
+							, T.EDATE
+							, T.PUNISH_MEMO
+							, T.MEMO
+							, T.PUNISH_OFFICE
+							, T.COMMITTEE_CD
+							, T.PUNISH_DEL_YMD
+							, T.DELETE_REASON
+							, T.IN_OUT_CD
+							, T.SUGGEST_ORG_CD
+							, T.PUNISH_SUGGEST_YMD
+							, T.PROBLEM_SYMD
+							, T.PROBLEM_EYMD
+							, T.DISPLAY_YN
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SEQ
+							, S.PUNISH_YMD
+							, S.SDATE
+							, S.PUNISH_CD
+							, S.PUNISH_TERM
+							, S.EDATE
+							, S.PUNISH_MEMO
+							, S.MEMO
+							, S.PUNISH_OFFICE
+							, S.COMMITTEE_CD
+							, S.PUNISH_DEL_YMD
+							, S.DELETE_REASON
+							, S.IN_OUT_CD
+							, S.SUGGEST_ORG_CD
+							, S.PUNISH_SUGGEST_YMD
+							, S.PROBLEM_SYMD
+							, S.PROBLEM_EYMD
+							, S.DISPLAY_YN
+							, s.FILE_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 징계내역관리 삭제 -->
+		<delete parameterType="map" id="deletePunishMgr">
+
+					DELETE FROM THRM129
+					 WHERE ENTER_CD||'_'||SABUN||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.seq != null and !rm.seq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

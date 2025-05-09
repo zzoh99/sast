@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmtBasic.appmtColumMgr">
+
+<!-- 발령항목정의 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtColumMgrList">
+
+					SELECT A.ORD_TYPE_CD
+					      ,A.ORD_TYPE_NM
+<foreach item="rm" collection="postItemRows" >
+<bind name="nm" value='rm.postItem+"_VISIBLE_YN"' />
+							,(SELECT VISIBLE_YN
+					          FROM THRM201
+					         WHERE ENTER_CD = A.ENTER_CD
+					           AND ORD_TYPE_CD = A.ORD_TYPE_CD
+					           AND POST_ITEM = #{rm.postItem}) AS ${nm}
+<bind name="nm" value='rm.postItem+"_MANDATORY_YN"' />
+					       ,(SELECT MANDATORY_YN
+					          FROM THRM201
+					         WHERE ENTER_CD = A.ENTER_CD
+					           AND ORD_TYPE_CD = A.ORD_TYPE_CD
+					           AND POST_ITEM = #{rm.postItem}) AS ${nm}
+</foreach>
+					  FROM TSYS011 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+<if test='searchOrdTypeCd != null and !searchOrdTypeCd.equals("")'>
+						AND A.ORD_TYPE_CD = #{searchOrdTypeCd}
+</if>
+<if test='useYn != null and !useYn.equals("")'>
+					   AND A.USE_YN = #{useYn}
+</if>
+					ORDER BY A.SEQ
+
+		</select>
+		
+
+<!-- 발령항목정의 저장 -->
+		<update parameterType="map" id="saveAppmtColumMgr">
+
+					MERGE INTO THRM201 T
+					USING	(
+							SELECT A.ENTER_CD			-- 회사구분(TORG900)
+								 , A.ORD_TYPE_CD 		-- 발령형태(TSYS011)
+								 , A.POST_ITEM 			-- 매핑항목코드(THRM200)
+								 , A.MANDATORY_YN 		-- 필수여부(Y/N)
+								 , A.VISIBLE_YN 		-- 발령항목여부(Y/N)
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORD_TYPE_CD
+											, NULL		AS POST_ITEM
+											, NULL		AS MANDATORY_YN
+											, NULL		AS VISIBLE_YN
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT 	  TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.ordTypeCd} )		AS ORD_TYPE_CD
+											, TRIM( #{rm.postItem} )		AS POST_ITEM
+											, TRIM( #{rm.mandatoryYn} )		AS MANDATORY_YN
+											, TRIM( #{rm.visibleYn} )		AS VISIBLE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.ORD_TYPE_CD IS NOT NULL
+										  AND A.POST_ITEM IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.ORD_TYPE_CD = S.ORD_TYPE_CD AND T.POST_ITEM = S.POST_ITEM )
+					WHEN MATCHED THEN
+						UPDATE SET	   T.MANDATORY_YN   	= S.MANDATORY_YN
+									 , T.VISIBLE_YN 		= S.VISIBLE_YN
+									 , T.CHKDATE			= SYSDATE
+									 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.ORD_TYPE_CD
+							, T.POST_ITEM
+							, T.MANDATORY_YN
+							, T.VISIBLE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.ORD_TYPE_CD
+							, S.POST_ITEM
+							, S.MANDATORY_YN
+							, S.VISIBLE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+
+
+</mapper>

@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급여집계(직급/부서별)
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payAggrSta">
+		<select parameterType="map" resultType="cMap" id="getPayAggrStaAllowanceTotalList">
+
+				<![CDATA[
+					SELECT TRIM(B.ELEMENT_NM)		AS ELEMENT_NM
+						 , COUNT(A.SABUN)			AS SAWON_CNT
+						 , NVL(SUM(A.RESULT_MON),0)	AS RESULT_MON
+					  FROM TCPN205 A
+						 , TCPN011 B
+						 , TCPN203 C
+						 , TCPN201 D
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.ELEMENT_CD		= B.ELEMENT_CD
+					   AND A.ENTER_CD		= C.ENTER_CD
+					   AND A.SABUN			= C.SABUN
+					   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+					   AND A.ENTER_CD		= D.ENTER_CD
+					   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD
+                       AND B.SDATE = (SELECT MAX(SDATE)
+                      					FROM TCPN011
+                      				   WHERE ENTER_CD = A.ENTER_CD
+                                         AND ELEMENT_CD = A.ELEMENT_CD
+                                         AND D.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					   AND B.ELEMENT_TYPE	= 'A'
+					           		]]>
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND C.BUSINESS_PLACE_CD = #{businessPlaceCd}
+					</if>
+					GROUP BY A.ELEMENT_CD, B.ELEMENT_NM
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayAggrStaDeductionTotalList">
+
+				<![CDATA[
+					SELECT TRIM(B.ELEMENT_NM)		AS ELEMENT_NM
+						 , COUNT(A.SABUN)			AS SAWON_CNT
+						 , NVL(SUM(A.RESULT_MON),0)	AS RESULT_MON
+					  FROM TCPN205 A
+						 , TCPN011 B
+						 , TCPN203 C
+						 , TCPN201 D
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.ELEMENT_CD		= B.ELEMENT_CD
+					   AND A.ENTER_CD		= C.ENTER_CD
+					   AND A.SABUN			= C.SABUN
+					   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+					   AND A.ENTER_CD		= D.ENTER_CD
+					   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD
+                       AND B.SDATE = (SELECT MAX(SDATE)
+                      					FROM TCPN011
+                      				   WHERE ENTER_CD = A.ENTER_CD
+                                         AND ELEMENT_CD = A.ELEMENT_CD
+                                         AND D.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					   AND B.ELEMENT_TYPE	= 'D'
+					           	]]>
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND C.BUSINESS_PLACE_CD = #{businessPlaceCd}
+					</if>
+					GROUP BY A.ELEMENT_CD, B.ELEMENT_NM
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayAggrStaJikgubTotalList">
+
+				<![CDATA[
+					SELECT A.JIKGUB_CD
+						 , COUNT(A.SABUN)					AS SAWON_CNT
+						 , NVL(SUM(A.TOT_EARNING_MON),0)	AS TOT_EARNING_MON
+						 , NVL(SUM(A.TOT_DED_MON),0)		AS TOT_DED_MON
+						 , NVL(SUM(A.PAYMENT_MON),0)		AS PAYMENT_MON
+					  FROM TCPN303 A
+						 , TCPN203 C
+						 , TSYS005 D
+					 WHERE A.ENTER_CD		= C.ENTER_CD
+					   AND A.SABUN			= C.SABUN
+					   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+                       AND A.ENTER_CD = D.ENTER_CD
+                       AND D.GRCODE_CD = 'H20010'
+                       AND C.JIKGUB_CD = D.CODE
+                               	]]>
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND C.BUSINESS_PLACE_CD = #{businessPlaceCd}
+					</if>
+                    GROUP BY A.JIKGUB_CD, D.SEQ
+                    ORDER BY D.SEQ
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayAggrStaOrgTotalList">
+
+				<![CDATA[
+					SELECT ORG_NM
+						 , SAWON_CNT
+						 , TOT_EARNING_MON
+						 , TOT_DED_MON
+						 , PAYMENT_MON
+					  FROM (
+							SELECT TRIM(F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, A.PAYMENT_YMD)) AS ORG_NM
+								  ,COUNT(B.SABUN)					AS SAWON_CNT
+								  ,NVL(SUM(B.TOT_EARNING_MON),0)	AS TOT_EARNING_MON
+								  ,NVL(SUM(B.TOT_DED_MON),0)		AS TOT_DED_MON
+								  ,NVL(SUM(B.PAYMENT_MON),0)		AS PAYMENT_MON
+								  ,B.ORG_CD
+								  ,B.ENTER_CD
+								  ,A.PAYMENT_YMD
+							  FROM TCPN201 A
+								 , TCPN303 B
+								 , TCPN203 C
+							 WHERE A.ENTER_CD		= B.ENTER_CD
+							   AND A.PAY_ACTION_CD	= B.PAY_ACTION_CD
+							   AND B.ENTER_CD		= C.ENTER_CD
+							   AND B.SABUN			= C.SABUN
+							   AND B.PAY_ACTION_CD	= C.PAY_ACTION_CD
+							   AND A.ENTER_CD		= #{ssnEnterCd}
+							   AND A.PAY_ACTION_CD	= #{payActionCd}
+							           ]]>
+							<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+							   AND C.BUSINESS_PLACE_CD = #{businessPlaceCd}
+							</if>
+							 GROUP BY B.ENTER_CD,B.ORG_CD,A.PAYMENT_YMD
+							)
+					ORDER BY F_ORG_ORG_CHART_SORT(ENTER_CD, ORG_CD, PAYMENT_YMD)
+
+
+
+		</select>
+	</mapper>

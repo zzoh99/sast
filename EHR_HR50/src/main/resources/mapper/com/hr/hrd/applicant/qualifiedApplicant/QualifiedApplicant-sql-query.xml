@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.applicant.qualifiedApplicant">
+<!-- 		조회 -->
+        <select parameterType="map" resultType="cMap" id="getJobCatCodeList">
+
+                <![CDATA[
+                    SELECT JOB_CD AS CODE , JOB_NM AS CODE_NM
+                      FROM (
+                            SELECT '0' AS DETAIL,
+                                   LEVEL AS "_level",
+                                   B.PRIOR_JOB_CD,
+                                   B.JOB_CD,
+                                   B.SDATE,
+                                   B.EDATE,
+                                   A.JOB_NM,
+                                   A.JOB_ENG_NM,
+                                   A.JOB_TYPE,
+                                   A.MEMO,
+                                   A.JOB_DEFINE,
+                                   A.ACADEMY_REQ,
+                                   A.MAJOR_REQ,
+                                   A.JIKGUB_REQ,
+                                   A.CAREER_REQ,
+                                   A.OTHER_JOB_REQ,
+                                   A.NOTE,
+                                   B.SEQ,
+                                   A.KEY_POSITION_YN
+                              FROM TORG201 A, TORG204 B
+                             WHERE 1=1
+                               AND A.ENTER_CD = B.ENTER_CD
+                               AND A.JOB_CD = B.JOB_CD
+                               AND B.SDATE BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                               AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+                             START WITH B.PRIOR_JOB_CD = '0'
+                           CONNECT BY PRIOR B.ENTER_CD = B.ENTER_CD
+                               AND PRIOR B.SDATE = B.SDATE
+                               AND PRIOR B.JOB_CD = B.PRIOR_JOB_CD
+                             ORDER SIBLINGS BY B.PRIOR_JOB_CD, B.SEQ
+                         )
+                    WHERE 1=1 ]]>
+<if test='searchType != null and !searchType.equals("")'>
+    <if test='searchType != null and searchType.equals("G")'>
+                      AND JOB_TYPE = '10010'
+    </if>
+    <if test='searchType != null and searchType.equals("M")'>
+                      AND PRIOR_JOB_CD = #{searchWorkAssignCd}
+    </if>
+    <if test='searchType != null and searchType.equals("S")'>
+                      AND PRIOR_JOB_CD = #{searchWorkAssignCd}
+                      AND JOB_TYPE = '10030'
+    </if>
+
+</if>
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getQualifiedApplicantList">
+
+                <![CDATA[
+
+                    SELECT B.SABUN
+                      FROM TCDPU161 B    -- 담당업무사항
+                     WHERE B.ENTER_CD         = #{ssnEnterCd}
+                       AND ( B.APPROVAL_STATUS  IN ('3', '5') OR EXE_YN = 'N' )
+                ]]>
+<foreach item="rm" collection="mergeRows" >
+                        <![CDATA[
+                       AND B.SABUN IN ( SELECT SABUN
+                                          FROM ( SELECT ENTER_CD, SABUN , SUM(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD')  - TO_DATE(ST_YMD,'YYYYMMDD')) AS TERM
+                                                   FROM (  SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+                                                             FROM TCDPU161
+                                                            WHERE ENTER_CD = #{ssnEnterCd}
+                                                              AND ED_YMD > '20070630'
+                                                              AND APPROVAL_TYPE <> '3'
+                                                              AND APPROVAL_STATUS = '5'
+                                                            GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+                                                            UNION ALL
+                                                           SELECT ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+                                                             FROM TCDPU161
+                                                            WHERE ENTER_CD = #{ssnEnterCd}
+                                                              AND ED_YMD <= '20070630'
+                                                              AND APPROVAL_STATUS = '5'
+                                                            GROUP BY ENTER_CD, SABUN, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+                                                        )
+                                                  WHERE ENTER_CD = #{ssnEnterCd}
+                            ]]>
+    <if test='rm.workAssignCd != null and !rm.workAssignCd.equals("")'>
+    --단위업무조건
+                       AND WORK_ASSIGN_CD = #{rm.workAssignCd}
+    </if>
+
+    <if test='rm.workAssignNmMiddle != null and !rm.workAssignNmMiddle.equals("")  and rm.workAssignCd.equals("")'>
+    --중분류조건
+                       AND WORK_ASSIGN_CD IN ( SELECT WORK_ASSIGN_CD
+                                                FROM TCDPW501
+                                               WHERE ENTER_CD = #{ssnEnterCd}
+                                                 AND PRIOR_WORK_ASSIGN_CD = #{rm.workAssignNmMiddle}
+                                                 AND WORK_ASSIGN_TYPE = 'S'
+                                                 AND USE_YN = 'Y'
+                                                 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN START_YMD AND END_YMD )
+
+    </if>
+
+    <if test='rm.workAssignNmMiddle != null and rm.workAssignNmMiddle.equals("")  and rm.workAssignCd.equals("")'>
+    --대분류조건
+                       AND WORK_ASSIGN_CD IN ( SELECT WORK_ASSIGN_CD
+                                                 FROM TCDPW501
+                                                WHERE ENTER_CD = #{ssnEnterCd}
+                                                  AND PRIOR_WORK_ASSIGN_CD IN ( SELECT WORK_ASSIGN_CD
+                                                                                  FROM TCDPW501
+                                                                                 WHERE ENTER_CD = #{ssnEnterCd}
+                                                                                   AND PRIOR_WORK_ASSIGN_CD = #{rm.workAssignNmLarge}
+                                                                                   AND WORK_ASSIGN_TYPE = 'M'
+                                                                                   AND USE_YN = 'Y'
+                                                                                   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN START_YMD AND END_YMD )
+
+                                                  AND WORK_ASSIGN_TYPE = 'S'
+                                                  AND USE_YN = 'Y'
+                                                  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN START_YMD AND END_YMD )
+    </if>
+                     GROUP BY ENTER_CD, SABUN
+                   )
+                   WHERE ENTER_CD = B.ENTER_CD
+                       AND SABUN = B.SABUN
+         <![CDATA[              AND TERM >= 365 * rm.minTerm    ]]>
+               )
+
+</foreach>
+GROUP BY B.SABUN
+
+
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getQualifiedITKList">
+
+                <![CDATA[
+
+SELECT B.SABUN
+  FROM (
+         SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE
+           FROM (
+                 SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE
+                   FROM TCDPV000 -- CDP 차수관리
+                  WHERE ENTER_CD = #{ssnEnterCd}
+                  ORDER BY ACTIVE_YYYY DESC, HALF_GUBUN_TYPE DESC
+                )
+          WHERE rownum = 1
+       ) A,                 -- CDP 차수관리
+       TCDPV101 B    -- 자기평가
+ WHERE A.ENTER_CD         = B.ENTER_CD
+   AND A.ACTIVE_YYYY      = B.ACTIVE_YYYY
+   AND A.HALF_GUBUN_TYPE  = B.HALF_GUBUN_TYPE
+   AND B.APPROVAL_STATUS  = '3'
+           ]]>
+<foreach item="rm" collection="mergeRows" >
+    <if test='rm.gubun != null and rm.gubun.equals("T")'>
+          <![CDATA[
+            AND EXISTS ( SELECT SABUN FROM TCDPV102 WHERE ENTER_CD = B.ENTER_CD AND ACTIVE_YYYY = B.ACTIVE_YYYY AND HALF_GUBUN_TYPE  = B.HALF_GUBUN_TYPE AND SABUN = B.SABUN AND KNOWLEDGE_CD = #{rm.knowledgeCd} AND FINAL_GRADE >= #{rm.finalGrade} )
+            ]]>
+    </if>
+
+    <if test='rm.gubun != null and rm.gubun.equals("B")'>
+        <![CDATA[
+          AND EXISTS ( SELECT SABUN FROM TCDPV103 WHERE ENTER_CD = B.ENTER_CD AND ACTIVE_YYYY = B.ACTIVE_YYYY AND HALF_GUBUN_TYPE  = B.HALF_GUBUN_TYPE AND SABUN = B.SABUN AND KNOWLEDGE_CD = #{rm.knowledgeCd} AND FINAL_GRADE >= #{rm.finalGrade} )
+                  ]]>
+    </if>
+
+    <if test='rm.gubun != null and rm.gubun.equals("S")'>
+        <![CDATA[
+          AND EXISTS ( SELECT SABUN FROM TCDPV104 WHERE ENTER_CD = B.ENTER_CD AND ACTIVE_YYYY = B.ACTIVE_YYYY AND HALF_GUBUN_TYPE  = B.HALF_GUBUN_TYPE AND SABUN = B.SABUN AND SKILL_CD     = #{rm.knowledgeCd} AND FINAL_GRADE >= #{rm.finalGrade} )
+          ]]>
+    </if>
+</foreach>
+
+
+    <if test="mergeRows != null" >
+AND 1 = 2
+    </if>
+
+
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getQualifiedApplicantOCList">
+
+                <![CDATA[
+
+                    SELECT B.OUT_EMP_NO AS SABUN
+                      FROM TCDPU715 B -- 담당업무사항
+                     WHERE B.ENTER_CD = #{ssnEnterCd}
+
+                ]]>
+<foreach item="rm" collection="mergeRows" >
+     AND B.OUT_EMP_NO IN ( SELECT OUT_EMP_NO
+               FROM (
+                 SELECT ENTER_CD, OUT_EMP_NO , SUM(TO_DATE(DECODE(ED_YMD,'99991231',TO_CHAR(SYSDATE,'YYYYMMDD'),ED_YMD),'YYYYMMDD')  - TO_DATE(ST_YMD,'YYYYMMDD')) AS TERM
+                 FROM (
+                   SELECT ENTER_CD, OUT_EMP_NO , WORK_ASSIGN_CD, ST_YMD, ED_YMD
+                   FROM TCDPU715
+                   WHERE ENTER_CD = #{ssnEnterCd}
+                   GROUP BY ENTER_CD, OUT_EMP_NO, WORK_ASSIGN_CD, ST_YMD, ED_YMD
+                 )
+                 WHERE ENTER_CD = #{ssnEnterCd}
+
+    <if test='rm.workAssignCd != null and !rm.workAssignCd.equals("")'>
+    --단위업무조건
+                   AND WORK_ASSIGN_CD = #{rm.workAssignCd}
+    </if>
+
+    <if test='rm.workAssignNmMiddle != null and !rm.workAssignNmMiddle.equals("")  and rm.workAssignCd.equals("")'>
+    --중분류조건
+
+                   AND WORK_ASSIGN_CD IN ( SELECT WORK_ASSIGN_CD
+                                             FROM TCDPW501
+                                            WHERE ENTER_CD = #{ssnEnterCd}
+                                              AND PRIOR_WORK_ASSIGN_CD = #{rm.workAssignNmMiddle}
+                                              AND WORK_ASSIGN_TYPE = 'S'
+                                              AND USE_YN = 'Y'
+                                              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN START_YMD AND END_YMD )
+    </if>
+
+    <if test='rm.workAssignNmMiddle != null and rm.workAssignNmMiddle.equals("")  and rm.workAssignCd.equals("")'>
+    --대분류조건
+
+                      AND WORK_ASSIGN_CD IN ( SELECT WORK_ASSIGN_CD
+                                                FROM TCDPW501
+                                               WHERE ENTER_CD = #{ssnEnterCd}
+                                                 AND PRIOR_WORK_ASSIGN_CD IN ( SELECT WORK_ASSIGN_CD
+                                                                                 FROM TCDPW501
+                                                                                WHERE ENTER_CD = #{ssnEnterCd}
+                                                                                  AND PRIOR_WORK_ASSIGN_CD = #{rm.workAssignNmLarge}
+                                                                                  AND WORK_ASSIGN_TYPE = 'M'
+                                                                                  AND USE_YN = 'Y'
+                                                                                  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN START_YMD AND END_YMD )
+                                                 AND WORK_ASSIGN_TYPE = 'S'
+                                                 AND USE_YN = 'Y'
+                                                 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN START_YMD AND END_YMD )
+    </if>
+                 GROUP BY ENTER_CD, OUT_EMP_NO
+               )
+               WHERE ENTER_CD = B.ENTER_CD
+                 AND OUT_EMP_NO = B.OUT_EMP_NO
+               <![CDATA[  AND TERM >= 365 * rm.minTerm ]]>
+     )
+
+
+
+
+</foreach>
+GROUP BY B.OUT_EMP_NO
+
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getQualifiedITKOCList">
+
+                <![CDATA[
+
+                  SELECT B.OUT_EMP_NO AS SABUN
+                   FROM TCDPU807 B    -- 외주직원관리
+                  WHERE B.ENTER_CD         = #{ssnEnterCd}
+                ]]>
+                <foreach item="rm" collection="mergeRows" >
+                    <if test='rm.gubun != null and rm.gubun.equals("T")'>
+                    <![CDATA[
+                          AND EXISTS ( SELECT OUT_EMP_NO FROM TCDPU711 WHERE ENTER_CD = B.ENTER_CD AND OUT_EMP_NO = B.OUT_EMP_NO AND KNOWLEDGE_CD = #{rm.knowledgeCd} AND HOLD_LEVEL  >= #{rm.finalGrade} AND TECH_BIZ_TYPE = 'T')
+                    ]]>
+                    </if>
+                    <if test='rm.gubun != null and rm.gubun.equals("B")'>
+                    <![CDATA[
+                          AND EXISTS ( SELECT OUT_EMP_NO FROM TCDPU711 WHERE ENTER_CD = B.ENTER_CD AND OUT_EMP_NO = B.OUT_EMP_NO AND KNOWLEDGE_CD = #{rm.knowledgeCd} AND HOLD_LEVEL  >= #{rm.finalGrade} AND TECH_BIZ_TYPE = 'B')
+                    ]]>
+                    </if>
+                    <if test='rm.gubun != null and rm.gubun.equals("S")'>
+                    <![CDATA[
+                          AND EXISTS ( SELECT OUT_EMP_NO FROM TCDPU713 WHERE ENTER_CD = B.ENTER_CD AND OUT_EMP_NO = B.OUT_EMP_NO AND SKILL_CD     = #{rm.knowledgeCd} AND HOLD_LEVEL  >= #{rm.finalGrade} )
+                    ]]>
+                    </if>
+                </foreach>
+
+
+    <if test="mergeRows != null" >
+    AND 1 = 2
+    </if>
+
+
+
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getQualifiedApplicantFinalList">
+
+                <![CDATA[
+
+
+SELECT A.*
+     , 0 AS PERSON_INFO
+     , 0 AS SELF_REPORT
+     , 0 AS SELF_RATING
+     , 0 AS SELF_DEVELOP
+  FROM
+(
+SELECT 'ITG' AS EMP_GBN,
+       Z.*,
+       (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = Z.ENTER_CD AND GRCODE_CD = 'D10010' AND CODE = G.MOVE_HOPE_TIME AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD ) AS MOVE_HOPE_TIME,
+       H.WORK_ASSIGN_CD AS WORK_ASSIGN_CD_1,
+       H.WORK_ASSIGN_NM AS WORK_ASSIGN_NM_1,
+       I.WORK_ASSIGN_CD AS WORK_ASSIGN_CD_2,
+       I.WORK_ASSIGN_NM AS WORK_ASSIGN_NM_2,
+       J.WORK_ASSIGN_CD AS WORK_ASSIGN_CD_3,
+       J.WORK_ASSIGN_NM AS WORK_ASSIGN_NM_3,
+       DECODE(G.SABUN, '', '0', '1') AS SELF_REPORT_DETAIL,
+       DECODE(L.SABUN, '', '0', '1') AS SELF_RATING_DETAIL,
+       DECODE(M.SABUN, '', '0', '1') AS SELF_DEVELOPMENT_DETAIL
+
+  FROM
+       (
+        SELECT
+               A.ENTER_CD,
+               A.ACTIVE_YYYY,
+               A.HALF_GUBUN_TYPE,
+               B.SABUN,
+               B.NAME,
+               --DECODE(B.SEX_TYPE, '1', '남', '2', '여', '') AS SEX_TYPE,
+               (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = A.ENTER_CD AND GRCODE_CD = 'H00010' AND CODE = B.SEX_TYPE AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD) AS SEX_TYPE,
+               B.EMP_YMD,
+        	   ( TO_NUMBER(TO_CHAR(SYSDATE, 'YYYY')) - TO_NUMBER(SUBSTR(B.BIR_YMD, 1, 4)) ) AS RESNO_YEAR,
+        	   F_COM_FINAL_SCH(B.ENTER_CD,B.SABUN,'1') AS ACA_SCH_NM,
+        	   F_COM_FINAL_SCH(B.ENTER_CD,B.SABUN,'2') AS ACAMAJ_CD,
+               C.JIKWEE_CD,
+               C.JIKWEE_NM,
+               C.JIKGUB_CD,
+               C.JIKGUB_NM,
+               D.MAIN_ORG_CD,
+               D.MAIN_ORG_NM,
+               F_COM_GET_PRIOR_ORG_NM(A.ENTER_CD, E.ORG_CD,  TO_CHAR(SYSDATE, 'YYYYMMDD')) AS PRIOR_ORG_NM,
+               E.ORG_CD,
+               E.ORG_NM,
+               F_COM_GET_CONT_ADDRESS(B.ENTER_CD, B.SABUN, 'OT') AS OFFICE_TEL,
+               F_COM_GET_CONT_ADDRESS(B.ENTER_CD, B.SABUN, 'HP') AS HAND_PHONE,
+               F_HRM_GET_PERSONAL_WORK_ASSIGN(A.ENTER_CD, B.SABUN) AS WORK_ASSIGN,
+               (
+                 SELECT SUM(POINT)
+                   FROM TCDPV202
+                  WHERE ENTER_CD        = A.ENTER_CD
+                    AND ACTIVE_YYYY     = A.ACTIVE_YYYY
+                    AND HALF_GUBUN_TYPE = A.HALF_GUBUN_TYPE
+                    AND SABUN           = B.SABUN
+               ) AS SATISFACTION_POINT
+          FROM (
+                 SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE
+                   FROM (
+                         SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE
+                           FROM TCDPV000 -- CDP 차수관리
+                          WHERE ENTER_CD = #{ssnEnterCd}
+                          ORDER BY ACTIVE_YYYY DESC, HALF_GUBUN_TYPE DESC
+                        )
+                  WHERE rownum = 1
+               ) A,
+               ( SELECT *
+        	       FROM THRM100    -- 인사마스타
+        		  WHERE ENTER_CD = #{ssnEnterCd}
+]]>
+
+<if test='qrySabun1 != null and !qrySabun1.equals("")'>
+AND SABUN IN
+		<foreach collection="qrySabun1" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+
+<if test='qrySabun2 and !qrySabun2.equals("")'>
+AND SABUN IN
+		<foreach collection="qrySabun2" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+
+<if test='(!qrySabun1 and !qrySabun2) or (qrySabun1.equals("") and qrySabun2.equals("")' > '>
+AND 1=2
+</if>
+<![CDATA[
+        	   ) B,
+               THRM151 C,    -- 개인조직사항
+               TCDPW909 D,    -- 본부부점정보  -- TCDPW909(본부부점정보)를 관리하지 않아 OUTER JOIN 하도록 변경 (추후 사용하게 될 수도 있으니 쿼리에서 테이블을 걷어내진 않음)
+               TORG101 E    -- 조직기본관리
+         WHERE C.ENTER_CD           = A.ENTER_CD
+           AND C.ENTER_CD           = B.ENTER_CD
+           AND C.SABUN              = B.SABUN
+           AND D.ENTER_CD(+)        = B.ENTER_CD
+           AND D.MAIN_ORG_CD(+)     = B.MAIN_ORG_CD
+           AND E.ENTER_CD           = C.ENTER_CD
+           AND E.ORG_CD             = C.ORG_CD
+           AND C.SDATE = (SELECT MAX(X.SDATE)
+           			  	    FROM THRM151 X
+           			  	   WHERE X.ENTER_CD = C.ENTER_CD
+           			  	     AND X.SABUN = C.SABUN
+           			  	     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231') )
+           AND E.SDATE = (SELECT MAX(Y.SDATE)
+           			  	    FROM TORG101 Y
+           			  	   WHERE Y.ENTER_CD = E.ENTER_CD
+           			  	     AND Y.ORG_CD = E.ORG_CD
+           			  	     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231') )
+       ) Z,
+       TCDPW501 H,    -- 담당업무분류체계
+       TCDPW501 I,    -- 담당업무분류체계
+       TCDPW501 J,    -- 담당업무분류체계
+	   TCDPV101 L,    -- 자기평가
+	   TCDPV201 G,    -- 자기신고서
+	   TCDPV301 M     -- 자기계발계획
+ WHERE L.ENTER_CD       (+) = Z.ENTER_CD
+   AND L.ACTIVE_YYYY    (+) = Z.ACTIVE_YYYY
+   AND L.HALF_GUBUN_TYPE(+) = Z.HALF_GUBUN_TYPE
+   AND L.SABUN          (+) = Z.SABUN
+   AND G.ENTER_CD       (+) = Z.ENTER_CD
+   AND G.ACTIVE_YYYY    (+) = Z.ACTIVE_YYYY
+   AND G.HALF_GUBUN_TYPE(+) = Z.HALF_GUBUN_TYPE
+   AND G.SABUN          (+) = Z.SABUN
+   AND M.ENTER_CD       (+) = Z.ENTER_CD
+   AND M.ACTIVE_YYYY    (+) = Z.ACTIVE_YYYY
+   AND M.HALF_GUBUN_TYPE(+) = Z.HALF_GUBUN_TYPE
+   AND M.SABUN          (+) = Z.SABUN
+   AND H.ENTER_CD       (+) = G.ENTER_CD
+   AND H.WORK_ASSIGN_CD (+) = G.WORK_ASSIGN_CD_1
+   AND I.ENTER_CD       (+) = G.ENTER_CD
+   AND I.WORK_ASSIGN_CD (+) = G.WORK_ASSIGN_CD_2
+   AND J.ENTER_CD       (+) = G.ENTER_CD
+   AND J.WORK_ASSIGN_CD (+) = G.WORK_ASSIGN_CD_3
+UNION ALL
+SELECT 'OUT_EMP' AS EMP_GBN,
+       Z.*,
+       '' AS MOVE_HOPE_TIME,
+       '' AS WORK_ASSIGN_CD_1,
+       '' AS WORK_ASSIGN_NM_1,
+       '' AS WORK_ASSIGN_CD_2,
+       '' AS WORK_ASSIGN_NM_2,
+       '' AS WORK_ASSIGN_CD_3,
+       '' AS WORK_ASSIGN_NM_3,
+       '0' AS SELF_REPORT_DETAIL,
+       '0' AS SELF_RATING_DETAIL,
+       '0' AS SELF_DEVELOPMENT_DETAIL
+  FROM
+       (
+        SELECT
+               A.ENTER_CD,
+               A.ACTIVE_YYYY,
+               A.HALF_GUBUN_TYPE,
+               B.OUT_EMP_NO AS SABUN,
+               B.OUT_EMP_NAME AS NAME,
+               DECODE(SUBSTR(B.RES_NO, 7,1), '1', '남', '2', '여', '') AS SEX_TYPE,
+               B.OUT_EMP_S_YMD AS EMP_YMD,
+        	   ( TO_NUMBER(TO_CHAR(SYSDATE, 'YYYY')) - TO_NUMBER(DECODE(SUBSTR(B.RES_NO, 1, 1), '0', '20','19')||SUBSTR(B.RES_NO, 1, 2)) ) AS RESNO_YEAR,
+        	   DECODE(ACA2_NM,  NULL, ACA1_NM, ACA2_NM) AS ACA_SCH_NM,
+        	   DECODE(ACA2_MAJ, NULL, ACA1_MAJ, ACA2_MAJ) AS ACAMAJ_CD,
+               '' AS JIKWEE_CD,
+               B.OFFICIAL_TITLE AS JIKWEE_NM,
+               '' AS JIKGUB_CD,
+               '' AS JIKGUB_NM,
+               B.MAIN_ORG_CD,
+               B.MAIN_ORG_NM,
+               '' AS PRIOR_ORG_NM,
+               B.ORG_CD,
+               B.ORG_NM,
+               B.OFFICE_TEL,
+               B.HAND_PHONE,
+               F_HRM_GET_OUT_WORK_ASSIGN(A.ENTER_CD, B.OUT_EMP_NO) AS WORK_ASSIGN,
+               0 AS SATISFACTION_POINT
+          FROM (
+                 SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE
+                   FROM (
+                         SELECT ENTER_CD, ACTIVE_YYYY, HALF_GUBUN_TYPE
+                           FROM TCDPV000 -- CDP 차수관리
+                          WHERE ENTER_CD = #{ssnEnterCd}
+                          ORDER BY ACTIVE_YYYY DESC, HALF_GUBUN_TYPE DESC
+                        )
+                  WHERE rownum = 1
+               ) A,
+               ( SELECT *
+        	       FROM TCDPU807    -- 외주 직원관리
+        		  WHERE ENTER_CD = #{ssnEnterCd}
+        		    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN OUT_EMP_S_YMD AND OUT_EMP_E_YMD
+]]>
+<if test='qrySabun3 != null and !qrySabun3.equals("")'>
+AND OUT_EMP_NO IN
+		<foreach collection="qrySabun3" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+
+
+
+<if test='qrySabun4 != null and !qrySabun4.equals("")'>
+AND OUT_EMP_NO IN
+		<foreach collection="qrySabun4" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+
+<if test='(qrySabun3 == null and qrySabun4 == null) or (qrySabun3.equals("") and qrySabun4.equals("") '>
+AND 1=2
+</if>
+
+
+
+        	   ) B
+         WHERE B.ENTER_CD           = A.ENTER_CD
+       ) Z
+) A
+ORDER BY A.EMP_GBN ASC, A.MAIN_ORG_CD DESC, A.JIKGUB_CD DESC
+
+
+
+
+        </select>
+
+
+</mapper>

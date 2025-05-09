@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.allEmpStat">
+<!-- 조회 : 개별 DB 함수와 개별 QUERY 방식에서 단일 QUERY 와 단인함수 F_HRM_GET_ELEMENT_EMP_CNT 사용으로 변경. CBS. 2017.09.28 -->
+		<select parameterType="map" resultType="cMap" id="getAllEmpStatList">
+
+				<![CDATA[
+					
+							SELECT A.JIKWEE_NM, A.TONGYANG, A.TONGYANG_L,A.CONST, A.CONST_L, A.PLANT, A.PLANT_L,
+								   A.MATERIAL, A.MATERIAL_L, A.TOTAL, A.TOTAL_L, A.TOTAL_T, A.SEQ
+							FROM
+							(SELECT F_COM_GET_GRCODE_NAME(#{ssnEnterCd},'H20030',Z.JIKWEE_CD,'') AS JIKWEE_NM, Z.JIKWEE_CD,
+							       SUM(Z.AA) AS TONGYANG, SUM(Z.BB) AS TONGYANG_L, 
+							       SUM(Z.CC) AS CONST, SUM(Z.DD) AS CONST_L, 
+							       SUM(Z.EE) AS PLANT, SUM(Z.FF) AS PLANT_L, 
+							       SUM(Z.GG) AS MATERIAL, SUM(Z.HH) AS MATERIAL_L, 
+							       SUM(Z.II) AS TOTAL, SUM(Z.JJ) AS TOTAL_L, SUM(Z.KK) AS TOTAL_T, Y.SEQ, 2 AS RN
+							    FROM 
+							    (
+							  SELECT X.ENTER_CD, X.JIKWEE_CD, 
+							         CASE WHEN X.MAP_CD = 'B01' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS AA,   --(주)동양 본사
+							         CASE WHEN X.MAP_CD = 'B01' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS BB,		--(주)동양 사업장
+							         CASE WHEN X.MAP_CD = 'B02' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS CC,   --건설 본사
+							         CASE WHEN X.MAP_CD = 'B02' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS DD,		--건설 사업장
+							         CASE WHEN X.MAP_CD = 'B03' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS EE,		--플랜트 본사
+							         CASE WHEN X.MAP_CD = 'B03' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS FF,		--플랜트 사업장
+							         CASE WHEN X.MAP_CD = 'B04' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS GG,		--건재 본사
+							         CASE WHEN X.MAP_CD = 'B04' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS HH,		--건재 사업장
+							         CASE WHEN X.MAP_CD IN ('B01','B02','B03','B04') AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS II, -- 합계 본사
+							         CASE WHEN X.MAP_CD IN ('B01','B02','B03','B04') AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS JJ,  -- 합계 사업장
+							         CASE WHEN X.MAP_CD IN ('B01','B02','B03','B04') AND X.INOUT_TYPE IN ('H','D') THEN COUNT(*) END AS KK -- 합계 본사 사업장
+							    FROM 
+							         (SELECT T1.ENTER_CD, T1.SABUN, T1.NAME, T2.ORG_CD, T2.JIKWEE_CD, F_COM_GET_MAP_CD(T2.ENTER_CD, '900', T2.SABUN, REPLACE (  #{schDate} , '-', ''), '') AS MAP_CD,
+							                 F_COM_GET_MAP_NM(T2.ENTER_CD, '900', T2.SABUN, REPLACE (  #{schDate} , '-', ''), '') AS MAP_NM,
+							                 F_COM_GET_ORG_MAP_CD(T2.ENTER_CD, '900',T2.ORG_CD, REPLACE (  #{schDate} , '-', ''), '') AS ORG_MAP_CD,
+							                 (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE) AS INOUT_TYPE,
+							                  F_COM_GET_GRCODE_NAME(T1.ENTER_CD, 'W20050', (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE)) AS INOUT_TYPE_NM
+							            FROM THRM100 T1, THRM151 T2
+							           WHERE T1.ENTER_CD = #{ssnEnterCd}
+							             AND T2.ENTER_CD = T1.ENTER_CD
+							             AND T2.SABUN = T1.SABUN
+							             AND T2.STATUS_CD NOT IN ('RA','ZA')
+							             AND REPLACE (  #{schDate} , '-', '') BETWEEN T2.SDATE AND T2.EDATE
+							             AND T2.MANAGE_CD NOT IN ('E0008')) X
+							   WHERE X.ORG_MAP_CD IS NOT NULL
+							   GROUP BY X.ENTER_CD, X.JIKWEE_CD, X.MAP_CD, X.INOUT_TYPE) Z, TSYS005 Y
+							    WHERE Z.ENTER_CD = Y.ENTER_CD
+							     AND Z.JIKWEE_CD = Y.CODE
+							    GROUP BY Z.JIKWEE_CD,  Y.SEQ    
+							    
+							UNION ALL
+							
+							SELECT F_COM_GET_GRCODE_NAME(#{ssnEnterCd},'H10030',Z.MANAGE_CD,'') AS JIKWEE_NM, Z.MANAGE_CD,
+							       SUM(Z.AA) AS TONGYANG, SUM(Z.BB) AS TONGYANG_L, 
+							       SUM(Z.CC) AS CONST, SUM(Z.DD) AS CONST_L, 
+							       SUM(Z.EE) AS PLANT, SUM(Z.FF) AS PLANT_L, 
+							       SUM(Z.GG) AS MATERIAL, SUM(Z.HH) AS MATERIAL_L, 
+							       SUM(Z.II) AS TOTAL, SUM(Z.JJ) AS TOTAL_L, SUM(Z.KK) AS TOTAL_T, Y.SEQ, 1 AS RN
+							    FROM 
+							    (
+							  SELECT X.ENTER_CD, X.MANAGE_CD, 
+							         CASE WHEN X.MAP_CD = 'B01' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS AA,   --(주)동양 본사
+							         CASE WHEN X.MAP_CD = 'B01' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS BB,		--(주)동양 사업장
+							         CASE WHEN X.MAP_CD = 'B02' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS CC,   --건설 본사
+							         CASE WHEN X.MAP_CD = 'B02' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS DD,		--건설 사업장
+							         CASE WHEN X.MAP_CD = 'B03' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS EE,		--플랜트 본사
+							         CASE WHEN X.MAP_CD = 'B03' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS FF,		--플랜트 사업장
+							         CASE WHEN X.MAP_CD = 'B04' AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS GG,		--건재 본사
+							         CASE WHEN X.MAP_CD = 'B04' AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS HH,		--건재 사업장
+							         CASE WHEN X.MAP_CD IN ('B01','B02','B03','B04') AND X.INOUT_TYPE = 'H' THEN COUNT(*) END AS II, -- 합계 본사
+							         CASE WHEN X.MAP_CD IN ('B01','B02','B03','B04') AND X.INOUT_TYPE = 'D' THEN COUNT(*) END AS JJ,  -- 합계 사업장
+							         CASE WHEN X.MAP_CD IN ('B01','B02','B03','B04') AND X.INOUT_TYPE IN ('H','D') THEN COUNT(*) END AS KK -- 합계 본사 사업장
+							    FROM 
+							         (SELECT T1.ENTER_CD, T1.SABUN, T1.NAME, T2.ORG_CD, T2.MANAGE_CD, F_COM_GET_MAP_CD(T2.ENTER_CD, '900', T2.SABUN, REPLACE (  #{schDate} , '-', ''), '') AS MAP_CD,
+							                 F_COM_GET_MAP_NM(T2.ENTER_CD, '900', T2.SABUN, REPLACE (  #{schDate} , '-', ''), '') AS MAP_NM,
+							                 F_COM_GET_ORG_MAP_CD(T2.ENTER_CD, '900',T2.ORG_CD, REPLACE (  #{schDate} , '-', ''), '') AS ORG_MAP_CD,
+							                 (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE) AS INOUT_TYPE,
+							                  F_COM_GET_GRCODE_NAME(T1.ENTER_CD, 'W20050', (SELECT INOUT_TYPE FROM TORG101 WHERE ENTER_CD = T1.ENTER_CD AND ORG_CD = T2.ORG_CD AND T2.SDATE BETWEEN SDATE AND EDATE)) AS INOUT_TYPE_NM
+							            FROM THRM100 T1, THRM151 T2
+							           WHERE T1.ENTER_CD = #{ssnEnterCd}
+							             AND T2.ENTER_CD = T1.ENTER_CD
+							             AND T2.SABUN = T1.SABUN
+							             AND T2.STATUS_CD NOT IN ('RA','ZA')
+							             AND REPLACE (  #{schDate} , '-', '') BETWEEN T2.SDATE AND T2.EDATE
+							             AND T2.MANAGE_CD = 'E0008') X
+							   WHERE X.ORG_MAP_CD IS NOT NULL
+							   GROUP BY X.ENTER_CD, X.MANAGE_CD, X.MAP_CD, X.INOUT_TYPE) Z, TSYS005 Y
+							    WHERE Z.ENTER_CD = Y.ENTER_CD
+							     AND Z.MANAGE_CD = Y.CODE
+							    GROUP BY Z.MANAGE_CD,  Y.SEQ
+							) A       
+							ORDER BY A.RN, A.SEQ
+				]]>
+
+
+		</select>
+
+</mapper>

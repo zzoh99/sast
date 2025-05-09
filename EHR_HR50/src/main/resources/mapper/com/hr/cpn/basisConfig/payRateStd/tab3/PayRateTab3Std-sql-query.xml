@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.payRateStd.tab3">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayRateTab3StdList">
+				<![CDATA[
+					SELECT A.PAY_CD 
+					     , A.PUNISH_CD 
+					     , A.SEQ 
+					     , A.SDATE 
+					     , A.EDATE 
+					     , A.GNT_APPLY_TYPE 
+					     , A.MINUS_RATE 
+					     , A.RATE 
+					     , A.ELEMENT_SET_CD 
+					     , A.ELE_SET_EXC_YN 
+					     , A.SEARCH_SEQ 
+					     , B.SEARCH_DESC
+					FROM  TCPN010  A        /* TCPN010 - TRACKTABLE */ 
+					    , THRI201 B      /* THRI201  */ 
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					  AND A.ENTER_CD = B.ENTER_CD(+)
+					  AND A.SEARCH_SEQ = B.SEARCH_SEQ(+)
+					          ]]>
+					  <if test='searchDate != null and !searchDate.equals("")'>
+                      AND #{searchDate} BETWEEN SDATE AND NVL (EDATE, '99991231')
+					  </if>
+					ORDER BY A.PAY_CD, A.PUNISH_CD, A.SDATE, A.SEQ
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePayRateTab3Std">
+
+					MERGE INTO TCPN010 T
+                    USING   (
+                            SELECT    
+									  A.SEQ                -- KEY
+                                    , A.PAY_CD    
+                                    , A.PUNISH_CD 
+                                    , A.SDATE     
+                                    , A.EDATE
+									, A.GNT_APPLY_TYPE
+									, A.MINUS_RATE
+									, A.RATE
+									, A.ELEMENT_SET_CD
+									, A.ELE_SET_EXC_YN
+									, A.SEARCH_SEQ
+                            FROM    (
+                                    SELECT    NULL      AS SEQ                
+                                            , NULL      AS PAY_CD              
+                                            , NULL      AS PUNISH_CD              
+                                            , NULL      AS SDATE              
+                                            , NULL      AS EDATE              
+                                            , NULL      AS GNT_APPLY_TYPE     
+                                            , NULL      AS MINUS_RATE         
+                                            , NULL      AS RATE               
+                                            , NULL      AS ELEMENT_SET_CD     
+                                            , NULL      AS ELE_SET_EXC_YN     
+                                            , NULL      AS SEARCH_SEQ         
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT 
+                                                 TRIM(#{rm.seq})             AS SEQ
+                                                ,TRIM(#{rm.payCd})         AS PAY_CD
+                                                ,TRIM(#{rm.punishCd})      AS PUNISH_CD
+                                                ,TRIM(#{rm.sdate})         AS SDATE
+                                                ,TRIM(#{rm.edate})         AS EDATE
+                                                ,TRIM(#{rm.gntApplyType})  AS GNT_APPLY_TYPE
+                                                ,TRIM(#{rm.minusRate})     AS MINUS_RATE
+                                                ,TRIM(#{rm.rate})          AS RATE
+                                                ,TRIM(#{rm.elementSetCd})  AS ELEMENT_SET_CD
+                                                ,TRIM(#{rm.eleSetExcYn})   AS ELE_SET_EXC_YN
+                                                ,TRIM(#{rm.searchSeq})     AS SEARCH_SEQ
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.SEQ IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD   = #{ssnEnterCd}
+                    AND  T.PAY_CD     = S.PAY_CD   
+                    AND  T.PUNISH_CD  = S.PUNISH_CD
+                    AND  T.SEQ        = S.SEQ      
+                    AND  T.SDATE      = S.SDATE    
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.EDATE             = S.EDATE                
+                                    , T.GNT_APPLY_TYPE    = S.GNT_APPLY_TYPE       
+                                    , T.MINUS_RATE        = S.MINUS_RATE           
+                                    , T.RATE              = S.RATE                 
+                                    , T.ELEMENT_SET_CD    = S.ELEMENT_SET_CD       
+                                    , T.ELE_SET_EXC_YN    = S.ELE_SET_EXC_YN       
+                                    , T.SEARCH_SEQ        = S.SEARCH_SEQ           
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+							  T.ENTER_CD           -- KEY
+							, T.PAY_CD             -- KEY
+							, T.PUNISH_CD          -- KEY
+							, T.SEQ                -- KEY
+							, T.SDATE              -- KEY
+							, T.EDATE
+							, T.GNT_APPLY_TYPE
+							, T.MINUS_RATE
+							, T.RATE
+							, T.ELEMENT_SET_CD
+							, T.ELE_SET_EXC_YN
+							, T.SEARCH_SEQ
+							, T.CHKDATE
+							, T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd} -- KEY
+                            , S.PAY_CD             -- KEY
+                            , S.PUNISH_CD          -- KEY
+                            , S.SEQ                -- KEY
+                            , S.SDATE              -- KEY
+                            , S.EDATE
+                            , S.GNT_APPLY_TYPE
+                            , S.MINUS_RATE
+                            , S.RATE
+                            , S.ELEMENT_SET_CD
+                            , S.ELE_SET_EXC_YN
+                            , S.SEARCH_SEQ
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayRateTab3Std">
+				<![CDATA[
+                    DELETE FROM TCPN010 
+                    WHERE   (ENTER_CD, PAY_CD, PUNISH_CD, SEQ, SDATE) IN   (  (NULL,NULL,NULL,NULL,NULL)
+                                                                                  ]]>
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.payCd != null and !rm.payCd.equals("")'>
+                                            <if test='rm.punishCd != null and !rm.punishCd.equals("")'>
+                                              <if test='rm.seq != null and !rm.seq.equals("")'>
+                                                <if test='rm.sdate != null and !rm.sdate.equals("")'>
+                                               (#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.punishCd} ), TRIM( #{rm.seq} ), TRIM( #{rm.sdate} ) )
+                                                </if>
+                                              </if>
+                                            </if>
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+
+		</delete>
+		
+<!-- 		생성 -->	
+		<insert parameterType="map" id="insertPayRateTab3Std">
+						INSERT INTO MainMnStdTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+        </insert>
+        
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePayRateTab3Std">
+					UPDATE ZTST002 T SET 
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID 
+						) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT   
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+            <foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+        </update>
+        
+	</mapper>

@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.exWorkDriverNAppDet">
+
+<!-- 야근수당종합신청 Master 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverNAppDet">
+
+				<![CDATA[
+			          SELECT A.ENTER_CD
+			                      ,A.APPL_SEQ
+			                      ,A.WORK_GUBUN
+			                      ,B.APPL_STATUS_CD
+			                      ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+			                      ,DECODE(WORK_GUBUN, 'N', '야근수당', 'S', '특근수당', '') AS WORK_GUBUN
+			                      ,B.APPL_YMD 
+			                      ,TO_CHAR(TO_DATE(A.WORK_YM,'YYYYMM'), 'YYYY-MM') AS WORK_YM
+			                      ,A.TOT_MON
+			                      ,A.BIGO
+			              FROM TTIM715 A, THRI103 B
+			            WHERE A.ENTER_CD = #{ssnEnterCd}
+			                AND B.ENTER_CD = A.ENTER_CD    
+			                AND B.APPL_SEQ = A.APPL_SEQ
+					    AND B.APPL_SABUN = #{searchApplSabun}
+					    AND A.APPL_SEQ = #{searchApplSeq}
+			                AND A.WORK_GUBUN = 'N' -- 야근수당(고정값)
+				]]>
+
+
+		</select>
+
+<!-- 야근수당종합신청여부 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverNAppDetCnt">
+
+				<![CDATA[
+			          SELECT COUNT(A.WORK_YM) AS CNT
+			              FROM TTIM715 A, THRI103 B
+			            WHERE A.ENTER_CD = #{ssnEnterCd}
+			                AND B.ENTER_CD = A.ENTER_CD    
+			                AND B.APPL_SEQ = A.APPL_SEQ
+			                AND A.WORK_GUBUN = 'N'
+							AND B.APPL_STATUS_CD NOT IN ('11', '12','23','33','44') /*결재반려,승인반려*/
+							AND SUBSTR(A.WORK_YM, 1, 6) =  NVL(REPLACE(TRIM( #{workYm} ), '-', ''),'')
+				]]>
+
+
+		</select>
+				
+<!-- 야근수당종합신청 Detail 조회 -->				
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverNAppDetDetailList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					          ,A.APPL_SEQ
+					          ,C.SABUN          
+					          ,D.NAME
+					          ,F_COM_GET_JIKWEE_NM(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS JIKWEE_NM
+					          ,F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS ORG_NM
+					          ,DECODE(A.WORK_GUBUN, 'N', '야근수당', 'S', '특근수당', '') AS WORK_GUBUN
+					          ,B.APPL_STATUS_CD
+					          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+					          ,B.APPL_YMD          
+					          ,A.WORK_YM
+					          ,C.PAY_MON
+					          ,C.DETAIL_BIGO
+					  FROM TTIM715 A, THRI103 B, TTIM717 C, THRM100 D
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND B.ENTER_CD = A.ENTER_CD    
+					    AND B.APPL_SEQ = A.APPL_SEQ
+					    AND C.ENTER_CD = A.ENTER_CD
+					    AND C.APPL_SEQ = A.APPL_SEQ    
+					    AND A.APPL_SEQ = #{searchApplSeq}
+					    AND D.ENTER_CD = C.ENTER_CD
+					    AND D.SABUN      = C.SABUN  
+					ORDER BY D.NAME ASC   				
+				]]>
+
+
+		</select>
+				
+
+<!-- 야근수당종합신청 Master 테이블 저장 -->
+		<update parameterType="map" id="saveExWorkDriverNApp">
+
+
+                  MERGE INTO TTIM715 T
+					USING (
+							SELECT #{ssnEnterCd}                              AS ENTER_CD
+							    , #{searchApplSeq}                            AS APPL_SEQ
+								, #{searchApplSabun}                          AS SABUN
+                                , 'N'                                       AS WORK_GUBUN
+							    , NVL(REPLACE(TRIM( #{workYm} ), '-', ''),'') AS WORK_YM
+							    , TRIM(REPLACE( #{totMon} ,',',''))  AS TOT_MON
+								, TRIM( #{bigo})		                        AS BIGO
+							  FROM DUAL
+                            ) S
+                    ON (
+                    		T.ENTER_CD	=	S.ENTER_CD
+                        AND T.APPL_SEQ	=	S.APPL_SEQ                    	
+                   		)
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.TOT_MON			= S.TOT_MON
+                                    , T.BIGO			= S.BIGO
+                                    -- , T.SABUN			= S.SABUN
+                                    , T.CHKDATE    		= SYSDATE
+                                    , T.CHKID      		= #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.APPL_SEQ
+                            , T.SABUN                            
+                            , T.WORK_GUBUN
+                            , T.WORK_YM 
+                            , T.TOT_MON                            
+                            , T.BIGO
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.APPL_SEQ
+                            , S.SABUN
+                            , S.WORK_GUBUN
+                            , S.WORK_YM
+                            , S.TOT_MON
+                            , S.BIGO
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+		</update>
+
+		
+<!-- 야근수당종합신청 Detail 테이블 저장 -->
+		<update parameterType="map" id="saveExWorkDriverNAppDet">
+
+
+					MERGE INTO TTIM717 T
+					USING	(
+							SELECT	 ENTER_CD
+                                    , APPL_SEQ
+                                    , SABUN
+									, WORK_GUBUN                                    
+                                    , WORK_YM
+                                    , PAY_MON
+                                    , DETAIL_BIGO
+                                    , CHKDATE
+                                    , CHKID
+							FROM	(
+									SELECT	      NULL AS ENTER_CD
+                                                , NULL AS APPL_SEQ
+        							                  , NULL AS SABUN
+									                  , NULL AS WORK_GUBUN
+									                  , NULL AS WORK_YM
+                                                      , NULL AS PAY_MON
+                                                      , NULL AS DETAIL_BIGO
+                                                      , NULL AS CHKDATE
+									                  , NULL AS CHKID
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )     AS ENTER_CD
+                                                  , TRIM( #{searchApplSeq}) AS APPL_SEQ
+                                                  , TRIM( #{rm.sabun}) AS SABUN
+                                                  , 'N' AS WORK_GUBUN
+                                                  , NVL(REPLACE(TRIM( #{rm.workYm} ), '-', ''),'') 	AS  WORK_YM
+                                                  , TRIM( #{rm.payMon} ) AS PAY_MON
+                                                  , TRIM( #{rm.detailBigo} ) AS DETAIL_BIGO
+                                                  , SYSDATE AS CHKDATE
+                                                  , #{ssnSabun} AS CHKID
+											FROM   DUAL
+</foreach>
+									)  WHERE SABUN IS NOT NULL 
+							) S
+					ON (  T.ENTER_CD     = #{ssnEnterCd}
+				   AND   T.APPL_SEQ  = S.APPL_SEQ
+                   AND   T.SABUN        = S.SABUN
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	 --, T.PAY_YM   = S.PAY_YM
+                                   T.PAY_MON   = S.PAY_MON
+                                  , T.DETAIL_BIGO   = S.DETAIL_BIGO               
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+                              T.ENTER_CD
+                            , T.APPL_SEQ
+                            , T.SABUN
+                            , T.WORK_GUBUN
+                            , T.WORK_YM
+                            , T.PAY_MON
+                            , T.DETAIL_BIGO
+                            , T.CHKDATE
+                            , T.CHKID
+						)
+						VALUES
+						(
+                              S.ENTER_CD
+                            , S.APPL_SEQ
+                            , S.SABUN
+                            , S.WORK_GUBUN
+                            , S.WORK_YM
+                            , S.PAY_MON
+                            , S.DETAIL_BIGO
+							  , SYSDATE
+							  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		
+		
+<!-- 계산금액불러오기 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverNAppDetCalc">
+
+				<![CDATA[
+					SELECT B.ENTER_CD
+					     , B.SABUN
+					     , C.NAME
+					     , WORK_GUBUN
+					     , PAY_MON
+					     , SDATE
+					     ,TO_CHAR(TO_DATE(SDATE,'YYYYMM'), 'YYYY-MM') AS WORK_YM
+					     , DETAIL_BIGO
+					     , F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN, SDATE||'01') AS JIKWEE_NM
+					     , 'I' AS S_STATUS
+					     FROM (
+					                SELECT ENTER_CD, SABUN, WORK_GUBUN, ROUND(SUM(PAY_MON)) AS PAY_MON, SUBSTR(SDATE, 1, 6) AS SDATE, '' AS DETAIL_BIGO
+					                  FROM TTIM713 A
+					                WHERE A.ENTER_CD = #{ssnEnterCd}
+					                    AND A.WORK_GUBUN = 'N' 
+					                    AND SUBSTR(A.SDATE, 1, 6) = NVL(REPLACE(TRIM( #{workYm} ), '-', ''),'')
+					                 GROUP BY A.ENTER_CD, A.WORK_GUBUN, A.SABUN, SUBSTR(A.SDATE, 1, 6)
+					              ) B, THRM100 C
+					   WHERE C.ENTER_CD = B.ENTER_CD
+					       AND C.SABUN      = B.SABUN  
+					ORDER BY NAME ASC
+				]]>
+
+
+		</select>
+
+	</mapper>

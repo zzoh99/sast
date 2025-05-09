@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.payWayMgr.payWorkDayTab">
+
+<!-- 근무일사항 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayWorkDayTabList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.WORK_DD_CD
+					     , A.ELEMENT_CD
+					     , F_CPN_GET_ELEMENT_NM(A.ENTER_CD,A.ELEMENT_CD,TO_CHAR(SYSDATE,'YYYYMMDD')) AS ELEMENT_NM
+					  FROM TTIM008 A
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					 ORDER BY A.WORK_DD_CD
+				]]>
+
+
+		</select>
+
+<!-- 근무일사항 저장 -->
+		<update parameterType="map" id="savePayWorkDayTab">
+
+					MERGE INTO TTIM008 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.WORK_DD_CD
+							     , A.ELEMENT_CD
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS WORK_DD_CD
+										 , NULL AS ELEMENT_CD
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 , TRIM( #{rm.workDdCd})	AS  WORK_DD_CD
+										 , TRIM( #{rm.elementCd})	AS  ELEMENT_CD
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.WORK_DD_CD IS NOT NULL
+										  AND A.ELEMENT_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_DD_CD = S.WORK_DD_CD AND T.ELEMENT_CD = S.ELEMENT_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_DD_CD
+							, T.ELEMENT_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.WORK_DD_CD
+							, S.ELEMENT_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 근무일사항 삭제 -->
+		<delete parameterType="map" id="deletePayWorkDayTab">
+
+					DELETE FROM TTIM008
+					 WHERE ENTER_CD||'_'||WORK_DD_CD||'_'||ELEMENT_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.workDdCd != null and !rm.workDdCd.equals("")
+												and rm.elementCd != null and !rm.elementCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.workDdCd})||'_'||TRIM( #{rm.elementCd})
+										</if>
+</foreach>
+
+										)
+		</delete>
+
+</mapper>

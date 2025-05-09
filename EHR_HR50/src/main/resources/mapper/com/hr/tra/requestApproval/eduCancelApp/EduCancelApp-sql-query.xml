@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.requestApproval.eduCancelApp">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduCancelAppList">
+			
+				<![CDATA[
+				SELECT A.*
+					 , DECODE(NVL(APPL_STATUS_CD,'-1'), '-1', '1', '0') AS DETAIL
+					 , DECODE(NVL(APPL_STATUS_CD,'-1'), '11', '<a class="basic">삭제</a>', '') AS BTN_DEL
+					 , CASE WHEN  RNUM = 1 AND (APPL_SEQ IS NULL OR APPL_STATUS_CD IN ('23', '33')) THEN '<a class="basic">신청</a>'
+					        ELSE '' END AS BTN_APP
+				FROM (	        
+					    SELECT A.ENTER_CD
+						     , A.SABUN
+						     , A.APPL_SEQ AS AP_APPL_SEQ
+						     , A.EDU_SEQ
+						     , A.EDU_EVENT_SEQ
+						     
+						     , E.APPL_SEQ
+							 , E.GUBUN_CD
+							 , E.APP_MEMO
+							 
+							 , E.APPL_YMD
+							 , E.APPL_STATUS_CD
+							 , E.AGREE_YMD
+							 , E.APPL_SABUN
+							 , E.APPL_IN_SABUN
+							 
+						     , C.EDU_COURSE_NM
+						     , C.IN_OUT_TYPE
+						     , C.EDU_BRANCH_CD
+						     , C.EDU_M_BRANCH_CD
+						     , C.EDU_METHOD_CD
+							 , D.EDU_S_YMD
+							 , D.EDU_E_YMD   
+							 
+                             , ROW_NUMBER()OVER(PARTITION BY A.ENTER_CD, A.APPL_SEQ ORDER BY E.APPL_SEQ DESC ) AS RNUM
+							
+						  FROM TTRA201 A, THRI103 B, TTRA101 C, TTRA121 D  
+					        , ( SELECT X.*  -- 교육취소신청
+									 , Y.APPL_YMD
+									 , Y.APPL_STATUS_CD
+									 , Y.AGREE_YMD
+									 , Y.APPL_SABUN
+									 , Y.APPL_IN_SABUN
+					              FROM TTRA205 X, THRI103 Y
+					             WHERE X.ENTER_CD     = #{ssnEnterCd}
+					               AND X.ENTER_CD     = Y.ENTER_CD
+					               AND X.APPL_SEQ     = Y.APPL_SEQ
+					               AND X.SABUN        = TRIM( #{searchSabun} )
+					          ) E
+					 	 WHERE A.ENTER_CD       = #{ssnEnterCd}
+				 		   AND A.SABUN          = TRIM( #{searchSabun} )
+			 			   AND A.ENTER_CD       = B.ENTER_CD
+						   AND A.APPL_SEQ       = B.APPL_SEQ
+						   AND B.APPL_STATUS_CD = '99'
+						   AND NOT EXISTS ( SELECT 1  -- 교육결과보고 신청 중이면 취소 불가.
+							                  FROM TTRA203 X, THRI103 Y
+								             WHERE X.ENTER_CD    = A.ENTER_CD
+								               AND X.AP_APPL_SEQ = A.APPL_SEQ 
+								               AND X.ENTER_CD    = Y.ENTER_CD 
+								               AND X.APPL_SEQ    = Y.APPL_SEQ
+								               AND Y.APPL_STATUS_CD IN ('21', '31', '99')
+			                               )  -- 수료한 교육은 취소 불가.
+						   AND NOT EXISTS ( SELECT 1  --수료여부
+							                  FROM TTRA301 F
+							                 WHERE F.ENTER_CD       = A.ENTER_CD
+						                       AND F.EDU_SEQ        = A.EDU_SEQ
+						                       AND F.EDU_EVENT_SEQ  = A.EDU_EVENT_SEQ
+						                       AND F.SABUN          = A.SABUN
+						                       AND NVL(F.EDU_CONFIRM_TYPE, '0') = '1'
+			                               )  -- 수료한 교육은 취소 불가.
+						   -- 교육과정
+			 			   AND A.ENTER_CD       = C.ENTER_CD
+			 			   AND A.EDU_SEQ        = C.EDU_SEQ
+			 			   AND C.EDU_METHOD_CD  != 'A'  --필수교육 제외
+			 			   -- 교육회차
+			 			   AND A.ENTER_CD       = D.ENTER_CD
+			 			   AND A.EDU_SEQ        = D.EDU_SEQ
+			 			   AND A.EDU_EVENT_SEQ  = D.EDU_EVENT_SEQ
+			 			   -- 교육취소신청
+	                       AND A.ENTER_CD       = E.ENTER_CD(+)
+	                       AND A.APPL_SEQ       = E.AP_APPL_SEQ(+)
+				]]>
+			 <if test='searchSYmd != null and !searchSYmd.equals("")'>
+				 <![CDATA[ AND D.EDU_S_YMD >= REPLACE(#{searchSYmd}, '-', '') ]]>
+			 </if>
+			<if test='searchEYmd != null and !searchEYmd.equals("")'>
+				 <![CDATA[ AND D.EDU_E_YMD <= REPLACE(#{searchEYmd}, '-', '') ]]>
+			 </if>
+	                   )  A
+			 	   ORDER BY AP_APPL_SEQ DESC, APPL_SEQ DESC
+
+			
+		</select>
+		
+<!-- 		임시저장 삭제 -->
+		<delete parameterType="map" id="deleteEduCancelApp">
+					DELETE FROM TTRA205
+					 WHERE ENTER_CD = #{ssnEnterCd}	
+					   AND APPL_SEQ IN 	(  NULL 
+<foreach item="rm" collection="deleteRows">
+						<if test="rm.applSeq != null and rm.applSeq neq ''">
+						,TRIM(#{rm.applSeq}) 
+						</if>
+</foreach>
+						)
+			
+			
+		</delete>
+		
+</mapper>

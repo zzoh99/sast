@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalLangMgr">
+
+		<!-- 개인별 어학관리 다건 조회 -->
+		<select id="getPsnalLangMgrList" parameterType="map" resultType="cMap">
+
+					SELECT *
+					  FROM (
+						SELECT	F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd})	AS ORG_NM
+						, 		F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) 									AS NAME
+	             		, 		F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010' , B.JIKGUB_CD , #{ssnLocaleCd}) 			AS JIKGUB_NM
+
+
+						<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")' >
+						, 		F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'yyyymmdd')) 					AS BP_CD
+						</if>
+
+						, 		A.ENTER_CD
+						, 		A.SABUN
+						,		A.SEQ
+						, 		A.FOREIGN_CD
+						, 		F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20307', A.F_TEST_CD, #{ssnLocaleCd}) 				AS F_TEST_CD
+						, 		A.APPLY_YMD
+						, 		A.TEST_POINT
+						, 		A.PASS_SCORES
+						, 		F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD,'H20307',A.F_TEST_CD,'2') 						AS FULL_SCORES
+						, 		A.OFFICE_NM 																		AS F_TEST_ORG_NM
+						, 		A.FILE_SEQ
+			<![CDATA[
+						, 		CASE WHEN A.FILE_SEQ IS NULL THEN '<a class=basic>첨부</a>'
+	                            	 ELSE '<a class=basic>다운로드</a>' END AS BTN_FILE
+						     ]]>
+				        , 		B.STATUS_CD
+						, 		ROW_NUMBER() OVER( ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), A.APPLY_YMD DESC) AS ORDER_SEQ
+						, 		A.STA_YMD
+						, 		A.END_YMD
+						FROM 	THRM125 A
+					 <choose>
+						<when test='ssnSearchType != null and ssnSearchType.equals("A")' >
+						, 		THRM151 B
+						</when>
+						 <otherwise>
+						, 		TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD'))) B
+						 </otherwise>
+					 </choose>
+						WHERE 	A.ENTER_CD = #{ssnEnterCd}
+						AND 	A.ENTER_CD	= B.ENTER_CD
+						AND 	A.SABUN		= B.SABUN
+						AND 	B.STATUS_CD NOT IN ('RAA')
+
+						<if test='searchForeignCd != null and !searchForeignCd.equals("")' >
+						AND 	A.FOREIGN_CD = #{searchForeignCd}
+						</if>
+
+						<if test='searchStatusCd != null and !searchStatusCd.equals("")' >
+						AND 	B.STATUS_CD = #{searchStatusCd}
+						</if>
+
+						AND 	B.SDATE = (
+											SELECT	MAX(BB.SDATE)
+				                          	FROM 	THRM151 BB
+				                          	WHERE	BB.ENTER_CD = B.ENTER_CD
+				                          	AND 	BB.SABUN    = B.SABUN
+				                          	AND 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN BB.SDATE AND NVL(BB.EDATE, '99991231'))
+										  )
+						WHERE 	1=1
+
+						<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")' >
+						AND 	BP_CD = #{searchBizPlaceCd}
+						</if>
+
+						<if test='searchSabunNameAlias != null and !searchSabunNameAlias.equals("")' >
+						AND 	( SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'OR NAME LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%')
+						</if>
+
+
+		</select>
+
+		<!-- 개인별어학관리저장 -->
+		<update id="savePsnalLangMgr" parameterType="map">
+
+					MERGE INTO THRM125 T
+					USING	(
+							SELECT	A.ENTER_CD
+							, 		A.SABUN
+							, 		A.SEQ
+							, 		A.FOREIGN_CD
+							, 		A.F_TEST_CD
+							, 		A.APPLY_YMD
+							, 		A.TEST_POINT
+							, 		A.PASS_SCORES
+							, 		A.OFFICE_NM
+							, 		A.FILE_SEQ
+							,		A.STA_YMD
+							,		A.END_YMD
+							FROM	(
+									SELECT	NULL AS ENTER_CD
+									, 		NULL AS SABUN
+									, 		NULL AS SEQ
+									, 		NULL AS FOREIGN_CD
+									, 		NULL AS F_TEST_CD
+									, 		NULL AS APPLY_YMD
+									, 		NULL AS TEST_POINT
+									, 		NULL AS PASS_SCORES
+									, 		NULL AS OFFICE_NM
+									, 		NULL AS FILE_SEQ
+									,		NULL AS STA_YMD
+									,		NULL AS END_YMD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )		AS ENTER_CD
+									, 		TRIM( #{rm.sabun} )			AS SABUN
+	<choose>
+									<when test='rm.seq != null and !rm.seq.equals("")' >
+									, 		TRIM(#{rm.seq}) 			AS SEQ
+									</when>
+										<otherwise>
+									, 		TO_CHAR( (
+												SELECT	(NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+												FROM 	THRM125
+												WHERE 	ENTER_CD = TRIM( #{ssnEnterCd} )
+												AND 	SABUN    = TRIM( #{rm.sabun} )
+											) )							AS SEQ
+
+											<bind name="icnt" value="icnt +1 "/>
+										</otherwise>
+	</choose>
+									, 		TRIM( #{rm.foreignCd} )		AS FOREIGN_CD
+									, 		TRIM( #{rm.fTestCd} )		AS F_TEST_CD
+									, 		TRIM( #{rm.applyYmd} )		AS APPLY_YMD
+									, 		TRIM( #{rm.testPoint} )		AS TEST_POINT
+									, 		TRIM( #{rm.passScores} )	AS PASS_SCORES
+									, 		TRIM( #{rm.fTestOrgNm} )	AS OFFICE_NM
+									, 		TRIM( #{rm.fileSeq} )	    AS FILE_SEQ
+									, 		TRIM( #{rm.staYmd} )	    AS STA_YMD
+									, 		TRIM( #{rm.endYmd} )	    AS END_YMD
+									FROM	DUAL
+</foreach>
+									) A
+									WHERE 	A.ENTER_CD IS NOT NULL
+									AND 	A.SABUN IS NOT NULL
+									AND 	A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	T.FOREIGN_CD 	= S.FOREIGN_CD
+						, 			T.F_TEST_CD  	= S.F_TEST_CD
+						, 			T.APPLY_YMD  	= S.APPLY_YMD
+						, 			T.TEST_POINT 	= S.TEST_POINT
+						, 			T.PASS_SCORES	= S.PASS_SCORES
+						, 			T.OFFICE_NM		= S.OFFICE_NM
+						, 			T.FILE_SEQ		= S.FILE_SEQ
+						,			T.STA_YMD		= S.STA_YMD
+						,			T.END_YMD		= S.END_YMD
+						, 			T.CHKDATE		= SYSDATE
+						, 			T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SEQ
+							, T.FOREIGN_CD
+							, T.F_TEST_CD
+							, T.APPLY_YMD
+							, T.TEST_POINT
+							, T.PASS_SCORES
+							, T.OFFICE_NM
+							, T.FILE_SEQ
+							, T.STA_YMD
+							, T.END_YMD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SEQ
+							, S.FOREIGN_CD
+							, S.F_TEST_CD
+							, S.APPLY_YMD
+							, S.TEST_POINT
+							, S.PASS_SCORES
+							, S.OFFICE_NM
+							, S.FILE_SEQ
+							, S.STA_YMD
+							, S.END_YMD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+
+		<!-- 개인별어학관리 삭제 -->
+		<delete id="deletePsnalLangMgr" parameterType="map">
+
+                    DELETE FROM THRM125
+					WHERE 	(ENTER_CD, SABUN,SEQ ) IN 	(  ( NULL,NULL,NULL)
+<foreach collection="deleteRows" item="rm" >
+
+                <if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+                        and rm.sabun != null and !rm.sabun.equals("")
+                        and rm.seq != null and !rm.seq.equals("")'>
+						, (TRIM(#{ssnEnterCd}),TRIM(#{rm.sabun}),TRIM( #{rm.seq} ) )
+               	</if>
+</foreach>
+						)
+
+
+
+		</delete>
+	</mapper>

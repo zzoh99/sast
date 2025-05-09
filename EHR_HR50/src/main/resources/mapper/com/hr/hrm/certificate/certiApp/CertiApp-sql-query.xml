@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.certificate.certiApp">
+
+<!-- 제증명신청 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCertiAppList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.APPL_SEQ
+					     , A.APPL_CD
+					     , (SELECT APPL_TITLE FROM THRI101 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_CD = A.APPL_CD) AS APPL_TITLE
+					     , A.REQ_SABUN
+					     , A.REG_NO
+					     , A.S_YMD
+					     , A.E_YMD
+					     , A.PERIOD_YY_CNT
+					     , A.PERIOD_MM_CNT
+					     , A.PURPOSE
+					     , A.PRT_CNT
+					     , A.SUBMIT_OFFICE
+					     , NVL(A.PRT_YN,'N') AS PRT_YN
+					     , (SELECT B.PRT_RSC FROM THRI101 B WHERE B.ENTER_CD = A.ENTER_CD AND B.APPL_CD = A.APPL_CD) AS PRT_RSC
+					     , A.ADDRESS
+					     , A.ETC
+					     , A.REQ_YY
+					     , C.SELF_PRT_LIMIT_CNT
+					     , (SELECT CASE WHEN COUNT(*) > 0 THEN 'Y' ELSE 'N' END  
+					          FROM THRI107
+					         WHERE ENTER_CD = A.ENTER_CD
+					           AND APPL_SEQ = A.APPL_SEQ
+					           AND APPL_TYPE_CD = '40'
+					           AND AGREE_STATUS_CD = '20'
+					       ) AS DAMDANG_YN
+					     , C.SIGN_PRT_YN
+					     , B.APPL_YMD
+					     , B.APPL_STATUS_CD
+					     , B.APPL_IN_SABUN
+					     , B.APPL_SABUN
+					     , CASE WHEN B.APPL_STATUS_CD = '99' AND A.PRT_CNT > 0 AND NVL(A.PRT_YN,'N') = 'Y' THEN
+					                 /* 2019년까지의 원천징수영수증의 경우 pdf 다운로드 처리함 */
+					                 CASE WHEN A.APPL_CD = '16' AND A.REQ_YY < 2020 THEN
+					                           '<a class="sbasic">다운</a>'
+					                      ELSE
+					                           '<a class="sbasic">출력</a>'
+					                 END
+					            ELSE ''
+					       END AS BTN_PRT
+					     , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+						 , 0 AS DETAIL
+					  FROM TBEN401 A, THRI103 B, TBEN405 C
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.APPL_CD  = C.APPL_CD
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN    = #{searchSabun}
+					           ]]>
+<if test='searchApplCd != null and !searchApplCd.equals("")'>
+					   AND A.APPL_CD = #{searchApplCd}
+</if>
+<if test=' searchApplStatusCd != null and !searchApplStatusCd.equals("") '>
+					   AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchApplSeq != null and !searchApplSeq.equals("")'>
+	AND A.APPL_SEQ = #{searchApplSeq}
+</if>
+					 ORDER BY A.APPL_YMD DESC,  A.APPL_SEQ DESC
+
+
+		</select>
+
+<!-- 대출신청 가능일 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLoanStdDateCertiApp">
+
+				<![CDATA[
+					SELECT B.STD_DATE
+					FROM (
+					    SELECT A.MEMO AS STD_DATE 
+					    FROM THRM199 A
+					    WHERE 1=1
+					      AND A.ENTER_CD = #{ssnEnterCd}
+					      AND A.SABUN = TRIM( #{searchSabun} )
+					      AND A.DIV_CD = '01' -- 대출신청 허용 기준일
+					    UNION ALL
+					    SELECT TO_CHAR(ADD_MONTHS( TO_DATE(A.EMP_YMD, 'YYYYMMDD'), 12 ), 'YYYYMMDD') AS STD_DATE
+					    FROM THRM100 A
+					    WHERE 1=1
+					      AND A.ENTER_CD = #{ssnEnterCd}
+					      AND A.SABUN = TRIM( #{searchSabun} )
+					) B
+					WHERE ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 제증명신청 삭제 -->
+		<delete parameterType="map" id="deleteCertiApp103">
+
+					DELETE FROM THRI103
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+		
+<!-- 제증명신청 삭제 -->
+		<delete parameterType="map" id="deleteCertiApp107">
+
+					DELETE FROM THRI107
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+		
+
+<!-- 제증명신청 삭제 -->
+		<delete parameterType="map" id="deleteCertiApp">
+
+					DELETE FROM TBEN401
+					 WHERE ENTER_CD||'_'||SABUN||'_'||APPL_CD||'_'||APPL_YMD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSabun != null and !rm.applSabun.equals("")
+												and rm.applCd != null and !rm.applCd.equals("")
+												and rm.applYmd != null and !rm.applYmd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSabun} )||'_'||TRIM( #{rm.applCd} )||'_'||TRIM( #{rm.applYmd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

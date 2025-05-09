@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobRegAppDet">
+	
+		<!-- 부서 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobOrgCdList">
+
+				<![CDATA[
+						SELECT ORG_CD AS CODE
+						     , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, SDATE) AS CODE_NM 
+						FROM THRM151 
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						  AND SABUN = #{searchApplSabun}
+						  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+						UNION 
+						SELECT ORG_CD AS CODE, 
+						       F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, SDATE) AS CODE_NM 
+						FROM THRM126 
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						  AND SABUN = #{searchApplSabun}
+						  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				]]>
+
+
+		</select>
+		
+		<!-- 직무내용 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobDutyList">
+
+				<![CDATA[
+					WITH DATA AS (
+						    SELECT B.TITLE_YN
+						         , B.JOB_M_TYPE
+						         , B.JOB_D_TYPE
+						         , B.JOB_CD
+						         , B.TASK_CD 
+						         , A.APPL_SEQ AS SEARCH_APPL_SEQ
+					         	 , A.SABUN AS SEARCH_APPL_SABUN 
+					         	 , A.ORG_CD
+					         	 , A.APPL_YMD
+						    FROM THRM171 A, THRM173 B, THRI103 C
+						    WHERE A.ENTER_CD = B.ENTER_CD
+						    AND A.APPL_SEQ = B.APPL_SEQ
+						    AND A.ENTER_CD = C.ENTER_CD
+						    AND A.APPL_SEQ = C.APPL_SEQ
+						            ]]>
+					   <if test='pageApply != null and pageApply.equals("1")'>
+					   		AND A.APPL_YN = 'Y'
+						    AND C.APPL_STATUS_CD = '99'
+					   </if>
+						    AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						    AND A.ORG_CD = #{orgCd}
+						    AND A.SABUN = #{searchApplSabun}
+						)
+					    SELECT A.ORG_CD 
+						     , A.TITLE_YN 
+					         , A.JOB_M_TYPE 
+					         , A.JOB_D_TYPE 
+					         , A.JOB_CD 
+					         , A.TASK_CD
+					       <choose><when test='pageApply != null and pageApply.equals("1")'>
+					         , #{searchApplSeq} AS SEARCH_APPL_SEQ
+							</when><otherwise>
+					         , A.SEARCH_APPL_SEQ
+						   </otherwise>
+						   </choose>
+					         , A.SEARCH_APPL_SABUN 
+						  FROM DATA A
+						 WHERE 1=1
+						 
+					   <choose><when test='pageApply != null and pageApply.equals("1")'>
+					   		AND A.SEARCH_APPL_SEQ IN (SELECT SEARCH_APPL_SEQ FROM DATA WHERE APPL_YMD = (SELECT MAX(APPL_YMD) FROM DATA))
+		</when><otherwise>
+						   	<if test='searchApplSeq != null and !searchApplSeq.equals("")'>
+							   AND A.SEARCH_APPL_SEQ = #{searchApplSeq}
+							</if>
+					   </otherwise>
+					   </choose>
+		</select>
+		
+		<!-- 직무내용 저장 -->
+		<update parameterType="map" id="saveJobRegAppDet">
+
+				<![CDATA[
+		    MERGE INTO THRM171 T 									
+				 USING 									
+				(
+	                   SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+				            , TRIM(#{searchApplSeq}) AS APPL_SEQ
+			            	, TRIM(#{searchApplSabun}) AS SABUN
+				            , TRIM(#{orgCd}) AS ORG_CD
+				            , TRIM(#{searchApplYmd}) AS APPL_YMD
+				            , REPLACE(TRIM(#{searchApplyYmd}),'-') AS APPLY_YMD
+				        FROM DUAL									
+				) S 									
+				ON ( 									
+				          T.ENTER_CD = S.ENTER_CD 									
+				     AND  T.APPL_SEQ = S.APPL_SEQ 									
+				) 									
+				WHEN MATCHED THEN 									
+				   UPDATE SET T.CHKDATE	= sysdate
+				            , T.CHKID = #{ssnSabun}
+				            , T.SABUN = S.SABUN 									
+				            , T.ORG_CD = S.ORG_CD 									
+				            , T.APPL_YMD = S.APPL_YMD 									
+				            , T.APPLY_YMD = S.APPLY_YMD 									
+				WHEN NOT MATCHED THEN 									
+				   INSERT 									
+				   ( 									
+				              T.ENTER_CD									
+				            , T.APPL_SEQ									
+				            , T.SABUN									
+				            , T.ORG_CD									
+				            , T.APPL_YMD									
+				            , T.APPLY_YMD									
+				            , T.CHKDATE									
+				            , T.CHKID									
+				   ) 									
+				   VALUES 									
+				   ( 									
+				              S.ENTER_CD									
+				            , S.APPL_SEQ									
+				            , S.SABUN									
+				            , S.ORG_CD									
+				            , S.APPL_YMD									
+				            , S.APPLY_YMD									
+				            , sysdate									
+				            , #{ssnSabun}
+				   )
+				]]>
+
+		</update>
+		<update parameterType="map" id="saveJobRegAppDetAdmin">
+
+		    MERGE INTO THRM171 T 									
+				 USING 									
+				(
+	<bind name="icnt" value="1" />
+	<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+	                   SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+				            , TRIM(#{rm.searchApplSeq}) AS APPL_SEQ
+			            	, TRIM(#{rm.searchApplSabun}) AS SABUN
+				        FROM DUAL									
+	</foreach>
+				) S 									
+				ON ( 									
+				          T.ENTER_CD = S.ENTER_CD 									
+				     AND  T.APPL_SEQ = S.APPL_SEQ 									
+				) 									
+				WHEN MATCHED THEN 									
+				   UPDATE SET T.CHKDATE	= sysdate
+				            , T.CHKID = #{ssnSabun}
+				            , T.SABUN = S.SABUN 	
+				            , T.CHKDATE	= SYSDATE
+							, T.CHKID = #{ssnSabun}
+		</update>
+		
+		<!-- 직무내용 저장 -->
+		<update parameterType="map" id="saveJobRegAppDetGrid">
+
+		    MERGE INTO THRM173 T 									
+			 USING 									
+			(
+	<bind name="icnt" value="1" />
+	<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                   SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+			            , TRIM(#{rm.searchApplSeq}) AS APPL_SEQ
+			            , TRIM(#{rm.searchApplSabun}) AS SABUN
+			            , TRIM(#{rm.orgCd}) AS ORG_CD
+			            , TRIM(#{rm.jobMType}) AS JOB_M_TYPE
+			            , TRIM(#{rm.jobDType}) AS JOB_D_TYPE
+			            , TRIM(#{rm.jobCd}) AS JOB_CD
+			            , TRIM(#{rm.taskCd}) AS TASK_CD
+			            , TRIM(#{rm.titleYn}) AS TITLE_YN
+			        FROM DUAL									
+	</foreach>
+			) S 									
+			ON ( 									
+			          T.ENTER_CD = S.ENTER_CD 									
+			     AND  T.APPL_SEQ = S.APPL_SEQ 									
+			     AND  T.SABUN = S.SABUN 									
+			     AND  T.ORG_CD = S.ORG_CD 									
+			     AND  T.JOB_M_TYPE = S.JOB_M_TYPE 									
+			     AND  T.JOB_D_TYPE = S.JOB_D_TYPE 									
+			     AND  T.JOB_CD = S.JOB_CD 									
+			     AND  T.TASK_CD = S.TASK_CD 									
+			) 									
+			WHEN MATCHED THEN 									
+			   UPDATE SET T.CHKDATE	= sysdate
+			            , T.CHKID = #{ssnSabun}
+			            , T.TITLE_YN = S.TITLE_YN 									
+			WHEN NOT MATCHED THEN 									
+			   INSERT 									
+			   ( 									
+			              T.ENTER_CD									
+			            , T.APPL_SEQ									
+			            , T.SABUN									
+			            , T.ORG_CD									
+			            , T.JOB_M_TYPE									
+			            , T.JOB_D_TYPE									
+			            , T.JOB_CD									
+			            , T.TASK_CD									
+			            , T.TITLE_YN									
+			            , T.CHKDATE									
+			            , T.CHKID									
+			   ) 									
+			   VALUES 									
+			   ( 									
+			              S.ENTER_CD									
+			            , S.APPL_SEQ									
+			            , S.SABUN									
+			            , S.ORG_CD									
+			            , S.JOB_M_TYPE									
+			            , S.JOB_D_TYPE									
+			            , S.JOB_CD									
+			            , S.TASK_CD									
+			            , S.TITLE_YN									
+			            , sysdate									
+			            , #{ssnSabun}
+			   ) 
+		</update>
+		
+		<!-- 직무내용 삭제 -->
+		<delete parameterType="map" id="deleteJobRegAppDet">
+
+			DELETE FROM THRM171		
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND ( APPL_SEQ ) IN ( ( NULL) 		
+	<foreach item="rm" collection="deleteRows" >
+	    <if test='  rm.searchApplSeq != null and !rm.applSeq.equals("") '>
+			     , ( TRIM( #{rm.applSeq} ) )
+		</if>
+	</foreach>
+
+			       )		
+		</delete>
+		
+		<!-- 직무내용 삭제 -->
+		<delete parameterType="map" id="deleteJobRegAppDetGrid">
+
+			DELETE FROM THRM173
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND ( APPL_SEQ,SABUN,ORG_CD,JOB_M_TYPE,JOB_D_TYPE,JOB_CD,TASK_CD ) IN ( ( NULL,NULL,NULL,NULL,NULL,NULL,NULL) 
+	<foreach item="rm" collection="deleteRows" >
+	    <if test='  rm.searchApplSeq != null and !rm.searchApplSeq.equals("") and rm.searchApplSabun != null and !rm.searchApplSabun.equals("") and rm.orgCd != null and !rm.orgCd.equals("") and rm.jobMType != null and !rm.jobMType.equals("") and rm.jobDType != null and !rm.jobDType.equals("") and rm.jobCd != null and !rm.jobCd.equals("") and rm.taskCd != null and !rm.taskCd.equals("") '>
+			     , ( TRIM( #{rm.searchApplSeq} ),TRIM( #{rm.searchApplSabun} ),TRIM( #{rm.orgCd} ),TRIM( #{rm.jobMType} ),TRIM( #{rm.jobDType} ),TRIM( #{rm.jobCd} ),TRIM( #{rm.taskCd} ) )
+		</if>
+	</foreach>
+			       )
+		</delete>
+		
+		<!-- 기본사항 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobRegAppDetMap">
+
+				<![CDATA[
+				WITH DATA AS (
+                       SELECT A.ENTER_CD
+                            , A.APPL_SEQ
+                            , A.SABUN
+                            , A.ORG_CD
+                            , A.CHKDATE
+                            , A.CHKID
+                            , A.APPL_YN
+                            , A.APPL_YMD
+                            , A.APPLY_YMD
+                            , B.APPL_STATUS_CD
+                          FROM THRM171 A
+                         INNER JOIN THRI103 B
+                            ON A.APPL_SEQ = B.APPL_SEQ
+                           AND A.ENTER_CD = A.ENTER_CD
+                           AND A.ORG_CD = F_COM_GET_ORG_CD ( A.ENTER_CD, A.SABUN, REPLACE(TO_CHAR(SYSDATE,'YYYYMMDD'), '-', ''))
+                         WHERE 1=1
+                           AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+                           AND A.SABUN = TRIM(#{searchApplSabun})
+                     ), APPL_DATA AS (
+                            SELECT A.APPL_SEQ
+                                 , MAX(A.APPL_YMD) AS APPL_YMD
+                              FROM DATA A
+                             WHERE 1=1
+                               AND A.APPL_YN = 'Y'
+                               AND A.APPL_STATUS_CD = '99'
+                             GROUP BY A.APPL_SEQ
+                     )SELECT F_COM_GET_JIKCHAK_NM( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+                          , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+                          , F_COM_FINAL_SCH(A.ENTER_CD, A.SABUN, '1') AS FINAL_SCH_NM
+                          , F_COM_FINAL_SCH(A.ENTER_CD, A.SABUN, '2') AS FINAL_ACAMAJ_NM
+                          , F_COM_GET_ORG_CD ( A.ENTER_CD, A.SABUN, REPLACE(TO_CHAR(SYSDATE,'YYYYMMDD'), '-', '')) AS ORG_CD
+                          , (SELECT B.JOB_NM 
+                               FROM TORG201 B, THRM173 C 
+                              WHERE B.ENTER_CD = C.ENTER_CD 
+                                AND B.JOB_CD = C.JOB_CD
+                                        ]]>
+                             <choose><when test='pageApply != null and pageApply.equals("1")'>
+                               AND C.APPL_SEQ IN (
+                                          SELECT APPL_SEQ FROM APPL_DATA WHERE APPL_YMD = (SELECT MAX(APPL_YMD) FROM APPL_DATA)
+                             	)
+							</when><otherwise>
+                               AND C.APPL_SEQ = #{searchApplSeq}
+							 </otherwise>
+							 </choose>
+                                AND C.TITLE_YN = 'Y'
+                              GROUP BY B.JOB_NM
+                                ) AS JOB_NM
+                          , ( SELECT MAX(CASE WHEN A.APPLY_YMD IS NULL THEN A.APPL_YMD
+                                              WHEN A.APPLY_YMD IS NOT NULL THEN A.APPLY_YMD
+                                     END) AS APPLY_YMD
+                            FROM DATA A
+                           WHERE 1=1
+                            <choose><when test='pageApply != null and pageApply.equals("1")'>
+                                AND A.APPL_SEQ IN (SELECT APPL_SEQ FROM APPL_DATA WHERE APPL_YMD = (SELECT MAX(APPL_YMD) FROM APPL_DATA))
+		</when><otherwise>
+                               AND A.APPL_SEQ = #{searchApplSeq}
+							</otherwise>
+							</choose>
+                          ) AS APPLY_YMD
+                       FROM THRM100 A
+                      WHERE 1=1
+                        AND A.ENTER_CD = TRIM(TRIM(#{ssnEnterCd}))
+                        AND A.SABUN = TRIM(#{searchApplSabun})
+
+
+		</select>
+		
+		<!-- 이수교육 조회 -->
+		<select parameterType="map" resultType="cMap" id="getTrueEduList">
+
+				<![CDATA[
+					SELECT B.EDU_COURSE_NM  
+					       , (SELECT EDU_ORG_NM FROM TTRA001 WHERE ENTER_CD = B.ENTER_CD AND EDU_ORG_CD = B.EDU_ORG_CD) AS EDU_ORG_NM
+					       , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10010', B.EDU_BRANCH_CD) AS  EDU_BRANCH_NM
+					       , EDU_S_YMD
+					       , EDU_E_YMD
+					    FROM TTRA301 A, TTRA101 B, TTRA121 C
+					    WHERE A.ENTER_CD = B.ENTER_CD
+					      AND A.EDU_SEQ = B.EDU_SEQ
+					      AND A.ENTER_CD = C.ENTER_CD
+					      AND A.EDU_SEQ = C.EDU_SEQ
+					      AND A.EDU_EVENT_SEQ = C.EDU_EVENT_SEQ
+					      AND A.EDU_CONFIRM_TYPE = '1'
+					      AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					      AND A.SABUN = TRIM(#{searchApplSabun})
+					              ]]>
+					<if test='jobCd != null and !jobCd.equals("")'>
+				       AND REGEXP_LIKE (A.JOB_CD, REPLACE(#{jobCd},',','|'))
+					</if>
+
+
+		</select>
+		
+		<!-- 필요교육 -->
+		<select parameterType="map" resultType="cMap" id="getNeedEduList">
+
+				<![CDATA[
+						SELECT B.EDU_COURSE_NM
+						      , (SELECT EDU_ORG_NM FROM TTRA001 WHERE ENTER_CD = B.ENTER_CD AND EDU_ORG_CD = B.EDU_ORG_CD) AS EDU_ORG_NM
+						      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10010', B.EDU_BRANCH_CD) AS  EDU_BRANCH_NM 
+						      , B.JOB_CD
+						  FROM TTRA101 B
+						  WHERE B.ENTER_CD = TRIM(#{ssnEnterCd})
+						            ]]>
+					<if test='jobCd != null and !jobCd.equals("")'>
+						    AND REGEXP_LIKE (B.JOB_CD, REPLACE(#{jobCd},',','|'))
+					</if>
+						    AND B.EDU_SEQ NOT IN (SELECT BB.EDU_SEQ
+						                                FROM TTRA301 AA, TTRA101 BB, TTRA121 CC
+						                                WHERE AA.ENTER_CD = BB.ENTER_CD
+						                                  AND AA.EDU_SEQ = BB.EDU_SEQ
+						                                  AND AA.ENTER_CD = CC.ENTER_CD
+						                                  AND AA.EDU_SEQ = CC.EDU_SEQ
+						                                  AND AA.EDU_EVENT_SEQ = CC.EDU_EVENT_SEQ
+						                                  AND AA.EDU_CONFIRM_TYPE = '1' /*수료여부 (고정값) */
+						                                  AND AA.ENTER_CD = TRIM(#{ssnEnterCd}) /*회사코드*/
+						                                  AND AA.SABUN = #{searchApplSabun} /*회사코드*/
+						                           <if test='jobCd != null and !jobCd.equals("")'>
+						                                  AND REGEXP_LIKE (AA.JOB_CD, REPLACE(#{jobCd},',','|'))
+												   </if>
+						                                )
+
+
+		</select>
+		
+		<!-- 요구지식 -->
+		<select parameterType="map" resultType="cMap" id="getJobAskList">
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.JOB_CD
+						     , A.ORG_CD
+						     , A.SEQ
+						     , A.KNOWLEDGE
+						     , A.DOC_INFO
+						     , A.STORAGE_TYPE
+						     , A.ACCESS_AUTH_ALL
+						     , A.ACCESS_AUTH_COMP
+						     , A.ACCESS_AUTH_HQ
+						     , A.ACCESS_AUTH_TEAM
+						     , A.ACCESS_AUTH_RELATE
+						     , A.ACCESS_AUTH_CHARGE
+						     , A.INFO_PLAN
+						     , A.FILE_SEQ
+						  FROM TORG217 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						           ]]>
+					 <if test='orgCd != null and !orgCd.equals("")'>
+						   AND A.ORG_CD = #{orgCd}
+					 </if>
+					 <if test='jobCd != null and !jobCd.equals("")'>
+						   AND A.JOB_CD IN (#{jobCd})
+					 </if>
+		</select>
+		
+		<!-- 적용일자 체크 -->
+		<select parameterType="map" resultType="cMap" id="getApplYmdYn">
+
+				<![CDATA[
+				WITH DATA AS (
+                       SELECT A.ENTER_CD
+                            , A.APPL_SEQ
+                            , A.SABUN
+                            , A.ORG_CD
+                            , A.CHKDATE
+                            , A.CHKID
+                            , A.APPL_YN
+                            , A.APPL_YMD
+                            , A.APPLY_YMD
+                            , B.APPL_STATUS_CD
+                          FROM THRM171 A
+                         INNER JOIN THRI103 B
+                            ON A.APPL_SEQ = B.APPL_SEQ
+                           AND A.ENTER_CD = A.ENTER_CD
+                           AND A.ORG_CD = F_COM_GET_ORG_CD ( A.ENTER_CD, A.SABUN, REPLACE(TO_CHAR(SYSDATE,'YYYYMMDD'), '-', ''))
+                         WHERE 1=1
+                           AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+                           AND A.SABUN = TRIM(#{searchApplSabun})
+                     ), APPL_DATA AS (
+                            SELECT A.APPL_SEQ
+                                 , MAX(A.APPL_YMD) AS APPL_YMD
+                              FROM DATA A
+                             WHERE 1=1
+                               AND A.APPL_YN = 'Y'
+                               AND A.APPL_STATUS_CD = '99'
+                             GROUP BY A.APPL_SEQ
+                     )
+                     SELECT (CASE WHEN A.APPL_YMD <= REPLACE(TRIM(#{searchApplyYmd}),'-') THEN 'Y' ELSE 'N' END) AS APPLY_YN
+                       FROM APPL_DATA A
+                      WHERE 1=1
+                        AND A.APPL_SEQ IN (SELECT APPL_SEQ FROM APPL_DATA WHERE APPL_YMD = (SELECT MAX(APPL_YMD) FROM APPL_DATA))
+				]]>
+
+
+		</select>
+
+
+</mapper>

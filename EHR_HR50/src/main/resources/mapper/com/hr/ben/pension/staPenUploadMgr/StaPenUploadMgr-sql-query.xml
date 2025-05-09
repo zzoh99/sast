@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 국민연금 자료Upload
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.pension.staPenUploadMgr">
+		
+	<select id="getStaPenUploadMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+			 , A.BENEFIT_BIZ_CD
+			 , B.RES_NO
+			 , A.SDATE
+			 , B.ORG_NM
+			 , B.WORK_TYPE
+			 , B.JIKCHAK_CD
+			 , B.JIKWEE_CD
+			 , B.SABUN
+			 , B.NAME
+			 , B.MANAGE_CD
+			 , B.STATUS_CD
+			 , B.EMP_YMD
+			 , B.GEMP_YMD
+			 , A.MON1
+			 , A.MON2
+			 , A.CHKDATE
+		  FROM TBEN011 A
+			 , (
+				SELECT X.ENTER_CD
+					 , Y.ORG_CD
+					 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+					 , Y.WORK_TYPE
+					 , Y.JIKCHAK_CD
+					 , Y.JIKWEE_CD
+					 , Y.MANAGE_CD
+					 , Y.STATUS_CD
+					 , X.SABUN
+					 , TRIM(X.NAME) AS NAME
+					 , X.EMP_YMD
+					 , X.GEMP_YMD
+					 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+					 , X.RES_NO AS ORG_RES_NO
+					 , X.RET_YMD
+				  FROM THRM100 X
+					 , THRM151 Y
+				 WHERE X.ENTER_CD	= Y.ENTER_CD
+				   AND X.SABUN		= Y.SABUN
+				   AND X.ENTER_CD	= #{ssnEnterCd} ]]>
+				<if test="multiManageCd != null and multiManageCd neq ''">
+				   AND Y.MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+				</if>
+				<if test="multiStatusCd != null and multiStatusCd neq ''">
+				   AND Y.STATUS_CD	IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+				</if>
+				<if test="sabunName != null and sabunName neq ''">
+				   AND X.SABUN||X.NAME LIKE '%'||trim(#{sabunName})||'%'
+				</if>
+	<![CDATA[
+				   AND Y.SDATE 		= (	SELECT MAX(SDATE)
+										  FROM THRM151
+										 WHERE ENTER_CD	= Y.ENTER_CD
+										   AND SABUN	= Y.SABUN
+										   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+				) B
+		 WHERE A.ENTER_CD		= #{ssnEnterCd}
+		   AND A.BENEFIT_BIZ_CD	= '10'
+		   AND A.SDATE			= REPLACE(#{sdate},'-','')
+		   AND A.ENTER_CD		= B.ENTER_CD
+		   AND A.RES_NO			= B.ORG_RES_NO
+		ORDER BY B.ORG_NM,B.WORK_TYPE,B.JIKCHAK_CD,B.JIKWEE_CD,B.NAME
+	]]>
+	</select>
+		
+	<update id="saveStaPenUploadMgr" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN011 T
+		USING	(
+				SELECT A.BENEFIT_BIZ_CD
+					 , A.RES_NO
+					 , A.SDATE
+					 , A.MON1
+					 , A.MON2
+				FROM (
+						SELECT NULL		AS BENEFIT_BIZ_CD
+							 , NULL		AS RES_NO
+							 , NULL		AS SDATE
+							 , NULL		AS MON1
+							 , NULL		AS MON2
+						  FROM DUAL ]]>
+			<foreach item="rm" collection="mergeRows" >
+				UNION ALL
+				SELECT NVL(TRIM(#{rm.benefitBizCd}),'10')	AS BENEFIT_BIZ_CD
+					 , CRYPTIT.ENCRYPT(TRIM(#{rm.resNo}), #{ssnEnterCd})	AS RES_NO
+					 , TRIM(#{rm.sdate})		AS SDATE
+					 , TRIM(#{rm.mon1})			AS MON1
+					 , TRIM(#{rm.mon2})			AS MON2
+				  FROM DUAL
+			</foreach>
+	<![CDATA[
+					) A
+				 WHERE A.BENEFIT_BIZ_CD IS NOT NULL
+				   AND A.RES_NO IS NOT NULL
+				   AND A.SDATE IS NOT NULL
+				) S
+		ON (	T.ENTER_CD			= #{ssnEnterCd}
+			AND	T.BENEFIT_BIZ_CD	= S.BENEFIT_BIZ_CD
+			AND	T.RES_NO			= S.RES_NO
+			AND	T.SDATE				= S.SDATE
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.MON1		= S.MON1
+					 , T.MON2		= S.MON2
+					 , T.CHKDATE	= SYSDATE
+					 , T.CHKID		= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				T.ENTER_CD
+			  , T.BENEFIT_BIZ_CD
+			  , T.RES_NO
+			  , T.SDATE
+			  , T.MON1
+			  , T.MON2
+			  , T.CHKDATE
+			  , T.CHKID
+			)
+			VALUES
+			(
+				#{ssnEnterCd}
+			  , S.BENEFIT_BIZ_CD
+			  , S.RES_NO
+			  , S.SDATE
+			  , S.MON1
+			  , S.MON2
+			  , SYSDATE
+			  , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<update id="StaPenUploadMgrP_BEN_NP_UPD" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_NP_UPD(
+			#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{cnt,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{benefitBizCd,mode=IN,jdbcType=VARCHAR},
+			#{sdate,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+		
+	<delete id="deleteStaPenUploadMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN011
+		 WHERE ENTER_CD||'_'||BENEFIT_BIZ_CD||'_'||RES_NO||'_'||SDATE IN (  NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.benefitBizCd != null and rm.benefitBizCd neq ''
+				and rm.resNo != null and rm.resNo neq '' and rm.sdate != null and rm.sdate neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.benefitBizCd})||'_'||CRYPTIT.ENCRYPT(TRIM(#{rm.resNo}),#{ssnEnterCd})||'_'||TRIM(#{rm.sdate})
+			</if>
+		</foreach>
+				)
+	</delete>
+</mapper>

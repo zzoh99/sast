@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalNasaUpload">
+<!-- 노사관리 리스트 조회 -->
+        <select id="getPsnalNosaUploadList" parameterType="map" resultType="cMap">
+
+                    SELECT T1.*
+                    FROM  (
+                           SELECT T.*
+                                 ,F_COM_GET_ORG_NM2(T.ENTER_CD,T.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd})	AS ORG_NM
+                                 ,F_COM_GET_JIKWEE_CD(T.ENTER_CD,T.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))				AS JIKWEE_CD
+                                 ,(SELECT RET_YMD FROM THRM100 WHERE ENTER_CD = T.ENTER_CD AND SABUN = T.SABUN)		AS RET_YMD
+                                 ,(SELECT EMP_YMD FROM THRM100 WHERE ENTER_CD = T.ENTER_CD AND SABUN = T.SABUN)		AS EMP_YMD
+                                 ,F_COM_GET_STATUS_CD(T.ENTER_CD,T.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))				AS STATUS_CD
+                                <![CDATA[ , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || T.ENTER_CD || chr(38) || 'searchKeyword=' || T.SABUN || chr(38) || 'type=1' AS PHOTO ]]>
+                           FROM  (
+                                  SELECT   ENTER_CD
+                                          ,SABUN
+                                          ,F_COM_GET_NAMES(ENTER_CD,SABUN, #{ssnLocaleCd}) AS NAME
+                                          ,SDATE
+                                          ,EDATE
+                                          ,NOSA_JIKCHAK_CD
+                                          ,FILE_SEQ
+                                          ,MEMO
+                                          ,B_JIKCHAK_NM
+                                  FROM     THRM182
+                                  WHERE    ENTER_CD = #{ssnEnterCd}
+        <if test='searchFromSdate != null and !searchFromSdate.equals("")'>
+                          <![CDATA[ AND  SDATE  >=  #{searchFromSdate} ]]>
+        </if>
+        <if test='searchToSdate != null and !searchToSdate.equals("")'>
+                          <![CDATA[ AND  SDATE  <= #{searchToSdate} ]]>
+        </if>
+        <if test='multiNosaJikchakCd != null and !multiNosaJikchakCd.equals("")'>
+                                    AND NOSA_JIKCHAK_CD  IN
+            <foreach collection="multiNosaJikchakCd" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+        </if>
+                                 ) T
+                           WHERE 1=1
+        <if test='searchName != null and !searchName.equals("")'>
+                           AND   (T.SABUN  LIKE '%'|| TRIM( #{searchName} ) ||'%'  OR T.NAME  LIKE '%'|| TRIM( #{searchName} ) ||'%' )
+        </if>
+                          ) T1
+                    WHERE 1=1
+        <if test='multiStatusCd != null and !multiStatusCd.equals("")'>
+                    AND  T1.STATUS_CD  IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+        </if>
+                    ORDER BY F_COM_JIKJE_SORT(ENTER_CD,SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))
+        </select>
+
+<!-- 노사관리 저장 -->
+        <update id="savePsnalNosaUpload" parameterType="map">
+
+                    MERGE INTO THRM182 T
+                    USING   (
+                            SELECT    A.ENTER_CD
+                                    , A.SABUN
+                                    , A.SDATE
+                                    , A.EDATE
+                                    , A.FILE_SEQ
+                                    , A.MEMO
+                                    , A.B_JIKCHAK_NM
+                                    , A.NOSA_JIKCHAK_CD
+                            FROM    (
+                                    SELECT    NULL      AS ENTER_CD
+                                            , NULL      AS SABUN
+                                            , NULL      AS SDATE
+                                            , NULL      AS EDATE
+                                            , NULL      AS FILE_SEQ
+                                            , NULL      AS MEMO
+                                            , NULL		AS B_JIKCHAK_NM
+                                            , NULL		AS NOSA_JIKCHAK_CD
+                                    FROM    DUAL
+<foreach collection="mergeRows" item="rm" >
+                            UNION ALL
+                                    SELECT
+                                            #{ssnEnterCd}                     AS ENTER_CD
+                                            , TRIM( #{rm.sabun} )           AS SABUN
+                                            , TRIM( #{rm.sdate} )           AS SDATE
+                                            , TRIM( #{rm.edate} )           AS EDATE
+                                            , TRIM( #{rm.fileSeq} )         AS FILE_SEQ
+                                            , TRIM( #{rm.memo} )            AS MEMO
+                                            , TRIM( #{rm.bJikchakNm} )		AS B_JIKCHAK_NM
+                                            , TRIM( #{rm.nosaJikchakCd} )		AS NOSA_JIKCHAK_CD
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.ENTER_CD IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD     = S.ENTER_CD
+                    AND  T.SABUN        = S.SABUN
+                    AND  T.SDATE        = S.SDATE
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.EDATE           = S.EDATE
+                                    , T.FILE_SEQ        = S.FILE_SEQ
+                                    , T.MEMO            = S.MEMO
+                                    , T.B_JIKCHAK_NM	= S.B_JIKCHAK_NM
+                                    , T.NOSA_JIKCHAK_CD	= S.NOSA_JIKCHAK_CD
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.SABUN
+                            , T.SDATE
+                            , T.EDATE
+                            , T.FILE_SEQ
+                            , T.MEMO
+                            , T.B_JIKCHAK_NM
+                            , T.NOSA_JIKCHAK_CD
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.SABUN
+                            , S.SDATE
+                            , S.EDATE
+                            , S.FILE_SEQ
+                            , S.MEMO
+                            , S.B_JIKCHAK_NM
+                            , S.NOSA_JIKCHAK_CD
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+        </update>
+<!-- 노사관리 삭제 -->
+        <delete id="deletePsnalNosaUpload" parameterType="map">
+
+                    DELETE FROM THRM182
+                    WHERE   (ENTER_CD,SABUN,SDATE) IN   (  (NULL,NULL,NULL)
+<foreach collection="deleteRows" item="rm" >
+                                        , (
+                                        #{ssnEnterCd}
+                                        <if test='rm.sabun != null and !rm.sabun.equals("")'>
+                                        ,TRIM( #{rm.sabun} )
+                                        </if>
+                                        <if test='rm.sdate != null and !rm.sdate.equals("")'>
+                                        ,TRIM( #{rm.sdate} )
+                                        </if>
+                                        )
+</foreach>
+
+                                        )
+
+        </delete>
+<!--        생성 -->
+    </mapper>

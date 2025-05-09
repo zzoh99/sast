@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.orgWorkOrgMgr">
+<!-- 	 조직도 조회 -->
+	
+		<select parameterType="map" resultType="cMap" id="getOrgWorkOrgMgrOrgList">
+
+				<![CDATA[
+					SELECT A.LVL AS "_level"
+		                 , A.ORG_CD 
+		                 , A.ORG_NM
+		                 , NVL(B.MAP_CD, F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'TIM_STD_WORK_ORG_CD')) AS WORK_ORG_CD
+                         , B.MAP_NM AS WORK_ORG_NM
+		              FROM (
+						    SELECT LEVEL AS LVL
+		                         , A.ENTER_CD
+		                         , A.ORG_CD
+						    	 , B.ORG_NM
+		                         , A.ORDER_SEQ
+						      FROM TORG105 A, TORG101 B
+						     WHERE A.ENTER_CD = B.ENTER_CD
+					           AND A.ORG_CD   = B.ORG_CD
+					           AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					           AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+						       AND A.SDATE   = (SELECT MAX(SDATE) FROM TORG103 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND TRIM(#{searchSdate}) BETWEEN SDATE AND NVL(EDATE, '29991231'))
+						     START WITH A.PRIOR_ORG_CD = '0'
+						   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+							   AND PRIOR A.SDATE       = A.SDATE
+							   AND PRIOR A.ORG_CD      = A.PRIOR_ORG_CD
+		                   ) A 
+		                 , (
+		                    SELECT ENTER_CD, ORG_CD, MAP_CD, F_COM_GET_MAP_NM2(ENTER_CD, MAP_TYPE_CD, MAP_CD, SDATE) AS MAP_NM
+		                      FROM TORG107
+		                     WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+		                       AND MAP_TYPE_CD = '500'
+		                       AND NVL(TRIM(#{searchSdate}),'99991231') BETWEEN SDATE AND NVL(EDATE, '99991231')
+		                    ) B
+		             WHERE A.ENTER_CD = B.ENTER_CD(+)
+		               AND A.ORG_CD   = B.ORG_CD(+)
+		             ORDER BY ORDER_SEQ      
+
+				]]>
+
+
+		</select>
+
+	
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgWorkOrgMgrList">
+
+				<![CDATA[
+				SELECT *
+				  FROM (
+				SELECT
+				        AA.ENTER_CD
+			          , AA.ORG_NM
+			          , AA.SABUN
+			          , AA.NAME
+			          , AA.JIKWEE_NM
+			          , AA.JIKCHAK_NM
+			          , AA.JIKGUB_NM
+			          , AA.MANAGE_NM
+			          , AA.STATUS_NM
+			          , AA.WORK_TYPE_NM
+			          , AA.PAY_TYPE_NM
+			          , AA.LOCATION_CD
+			          , '500' AS MAP_TYPE_CD /*고정*/
+			          , MEMO
+			          
+			          , NVL(E_WORK_ORG_CD, B_WORK_ORG_CD) AS WORK_ORG_CD
+			          , CASE WHEN E_WORK_ORG_CD IS NULL THEN B_SDATE ELSE E_SDATE END AS SDATE
+			          , CASE WHEN E_WORK_ORG_CD IS NULL THEN B_EDATE ELSE E_EDATE END AS EDATE
+			          , CASE WHEN E_WORK_ORG_CD IS NULL THEN 'B'     ELSE 'E'     END AS WORK_ORG_GUBUN
+			          
+			          , CASE WHEN E_WORK_ORG_CD IS NULL THEN '1' ELSE '0' END AS SDATE_EDIT
+				  FROM
+			    	   (
+		                 SELECT A.ENTER_CD
+		                      , B.ORG_CD
+		                      , F_COM_GET_ORG_NM(B.ENTER_CD,B.ORG_CD, REPLACE( #{searchYmd},'-','')) AS ORG_NM
+		                      , A.SABUN
+		                      , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+		                      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD ) AS JIKWEE_NM
+		                      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020', B.JIKCHAK_CD) AS JIKCHAK_NM
+		                      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD ) AS JIKGUB_NM
+		                      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10030', B.MANAGE_CD ) AS MANAGE_NM
+		                      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010', B.STATUS_CD ) AS STATUS_NM
+		                      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10050', B.WORK_TYPE ) AS WORK_TYPE_NM --직군명(직종)
+		                      , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10110', B.PAY_TYPE  ) AS PAY_TYPE_NM --급여유형
+		                      , B.LOCATION_CD
+		                      , C.MAP_CD AS B_WORK_ORG_CD
+		                      , C.SDATE  AS B_SDATE
+		                      , C.EDATE  AS B_EDATE
+		                      , D.MAP_CD AS E_WORK_ORG_CD
+		                      , D.SDATE  AS E_SDATE
+		                      , D.EDATE  AS E_EDATE
+		                      , D.MEMO
+		                   FROM THRM100 A, THRM151 B
+		                      , (SELECT *     /* 조직별 기본 근무조 */
+		                           FROM TORG107 
+		                          WHERE ENTER_CD    = TRIM( #{ssnEnterCd} )
+		                            AND MAP_TYPE_CD = '500' /*근무조 고정코드*/
+		                            AND REPLACE( #{searchYmd},'-','') BETWEEN SDATE AND NVL(EDATE,'99991231')
+		                         ) C
+		                      , (SELECT *     /* 개인별 예외 근무조 */
+		                           FROM TORG113 
+		                          WHERE ENTER_CD    = TRIM( #{ssnEnterCd} )
+		                            AND MAP_TYPE_CD = '500' /*근무조 고정코드*/
+		                            ]]>
+<choose><when test='searchHistoryYn and searchHistoryYn.equals("Y")'>
+		                            AND 1=1
+		</when><otherwise>
+                                    AND REPLACE( #{searchYmd},'-','') BETWEEN SDATE AND NVL(EDATE,'99991231')
+</otherwise>
+</choose>
+		                         ) D
+		                  WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+		                    AND A.ENTER_CD = B.ENTER_CD
+		                    AND A.SABUN    = B.SABUN
+		                    AND REPLACE( #{searchYmd},'-','') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+		                    AND B.STATUS_CD NOT IN ('RA','RAA')
+		                    AND B.ENTER_CD = C.ENTER_CD(+)
+		                    AND B.ORG_CD   = C.ORG_CD(+)
+		                    AND B.ENTER_CD = D.ENTER_CD(+)
+		                    AND B.SABUN    = D.SABUN(+)
+		                    
+
+<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+                            AND EXISTS ( SELECT 1
+                                           FROM BP_V E
+                                          WEHRE E.ENTER_CD = A.ENTER_CD
+                                            AND E.SABUN    = A.SABUN
+                                            AND REPLACE( #{searchYmd},'-','') BETWEEN E.SDATE AND NVL(E.EDATE, '99991231')
+                                            AND E.BUSINESS_PLACE_CD = #{searchBizPlaceCd} )
+</if>
+
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+		                    AND B.ORG_CD IN (SELECT #{searchOrgCd}
+                                               FROM DUAL
+
+							<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+                                            UNION
+                                            SELECT ORG_CD
+                                              FROM TORG105
+                                             WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                               AND SDATE    = TRIM( #{searchSdate} )
+                                             START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                                                    AND PRIOR SDATE    = SDATE
+                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+							</if>
+                                           )
+
+</if>
+
+					) AA
+				 ) A
+				 WHERE 1=1
+				 
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+				   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR A.NAME LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+				   AND AA.LOCATION_CD = #{searchLocationCd}
+</if>
+<if test='searchWorkOrgGubun != null and !searchWorkOrgGubun.equals("")'>
+				   AND WORK_ORG_GUBUN = #{searchWorkOrgGubun}
+</if>
+<if test='searchWorkteamCd != null and !searchWorkteamCd.equals("")'>
+				   AND NVL(A.WORK_ORG_CD,' ') = #{searchWorkteamCd}
+</if>
+				 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE( #{searchYmd},'-','') ), SDATE
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getOrgWorkOrgMgrDupCheck">
+
+				<![CDATA[
+				WITH TMP AS (
+							SELECT NULL         AS ENTER_CD
+								 , NULL			AS SABUN
+								 , NULL			AS MAP_TYPE_CD
+								 , NULL			AS MAP_CD
+								 , NULL			AS SDATE
+								 , NULL			AS EDATE
+							  FROM DUAL
+				   ]]>
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+							SELECT #{ssnEnterCd}           		AS ENTER_CD
+								 , TRIM( #{rm.sabun} )			AS SABUN
+								 , TRIM( #{rm.mapTypeCd} )		AS MAP_TYPE_CD
+								 , TRIM( #{rm.workOrgCd} )		AS MAP_CD
+								 , TRIM( #{rm.sdate} )			AS SDATE
+								 , TRIM( #{rm.edate} )			AS EDATE
+							  FROM DUAL
+						     WHERE TRIM( #{rm.sdate} ) != #{searchSdate}
+</foreach>
+				            )
+				<![CDATA[
+				SELECT COUNT(1) CNT
+				  FROM (            
+							SELECT ENTER_CD, SABUN, MAP_TYPE_CD, MAP_CD, SDATE, EDATE
+							  FROM TORG113 A
+							 WHERE A.ENTER_CD    = #{ssnEnterCd}
+							   AND A.SABUN       = #{searchSabun}
+							   AND A.MAP_TYPE_CD = #{searchMapTypeCd}
+							   AND A.SDATE      != #{searchSdate}
+							   AND NOT EXISTS ( SELECT 1 
+							                      FROM TMP X 
+							                     WHERE X.ENTER_CD    = A.ENTER_CD
+							                       AND X.SABUN       = A.SABUN
+							                       AND X.MAP_TYPE_CD = A.MAP_TYPE_CD
+							                       AND X.SDATE       = A.SDATE )
+							 UNION ALL 
+							SELECT ENTER_CD, SABUN, MAP_TYPE_CD, MAP_CD, SDATE, EDATE
+							  FROM TMP
+							 WHERE ENTER_CD IS NOT NULL                       
+				       ) A
+				 WHERE 1 = 1      
+				   AND (   NVL(A.EDATE, '29991231') BETWEEN NVL(#{searchSdate},' ') AND NVL(#{searchEdate},'29991231')
+		            OR     NVL(A.SDATE, '29991231') BETWEEN NVL(#{searchSdate},' ') AND NVL(#{searchEdate},'29991231')
+		            OR   ( NVL(A.SDATE, '29991231') < NVL(#{searchSdate},' ')  AND  NVL(A.EDATE, '29991231') > NVL(#{searchEdate},'29991231'))
+		               )
+   				]]>
+
+
+		</select>
+
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveOrgWorkOrgMgr">
+
+					MERGE INTO TORG113 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.MAP_TYPE_CD
+									, A.MAP_CD
+									, A.SDATE
+									, A.EDATE
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS MAP_TYPE_CD
+											, NULL      AS MAP_CD
+											, NULL      AS SDATE
+											, NULL      AS EDATE
+											, NULL      AS MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    #{ssnEnterCd}           		AS ENTER_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.mapTypeCd} )		AS MAP_TYPE_CD
+											, TRIM( #{rm.workOrgCd} )		AS MAP_CD
+											, TRIM( #{rm.sdate} )			AS SDATE
+											, TRIM( #{rm.edate} )			AS EDATE
+											, TRIM( #{rm.memo} )			AS MEMO
+									FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.SABUN        = S.SABUN
+					AND  T.MAP_TYPE_CD  = S.MAP_TYPE_CD
+					AND  T.SDATE        = S.SDATE
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MAP_CD  =  S.MAP_CD
+									, T.EDATE   =  S.EDATE
+									, T.MEMO    =  S.MEMO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.MAP_TYPE_CD
+							, T.MAP_CD
+							, T.SDATE
+							, T.EDATE
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.MAP_TYPE_CD
+							, S.MAP_CD
+							, S.SDATE
+							, S.EDATE
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteOrgWorkOrgMgr">
+
+					DELETE FROM TORG113
+					WHERE 	(ENTER_CD, SABUN, MAP_TYPE_CD, SDATE) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+											#{ssnEnterCd}
+											, TRIM( #{rm.sabun} )
+											, TRIM( #{rm.mapTypeCd} )
+											, TRIM( #{rm.sdate} )
+										)
+</foreach>
+										)
+		</delete>
+
+
+
+
+
+</mapper>

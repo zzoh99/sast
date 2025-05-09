@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 미공제내역관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payEmpNonDedMgr">
+		<select parameterType="map" resultType="cMap" id="getPayEmpNonDedMgrList">
+
+				<![CDATA[
+					SELECT /*+ RULE */
+						   A.PAY_ACTION_CD
+						 , A.SABUN
+						 , A.ELEMENT_CD
+						 , A.DED_MON
+						 , A.CHK_MON
+						 , A.CHK_YN
+						 , A.NOTE
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+						 , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+						 , TRIM(D.PAY_ACTION_NM)	AS PAY_ACTION_NM
+						 , TRIM(B.ELEMENT_NM2)		AS ELEMENT_NM
+					  FROM TCPN217 A
+					 INNER JOIN TCPN201 D
+					    ON A.ENTER_CD	= D.ENTER_CD
+					   AND A.PAY_ACTION_CD = D.PAY_ACTION_CD
+					 INNER JOIN (
+					              SELECT X.*
+					                   , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', X.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM)  AS ELEMENT_NM2
+					                FROM TCPN011 X ) B
+					    ON A.ENTER_CD = B.ENTER_CD
+					   AND A.ELEMENT_CD = B.ELEMENT_CD
+					   AND B.SDATE = (	SELECT MAX(X.SDATE)
+										  FROM TCPN011 X
+										 WHERE X.ENTER_CD = A.ENTER_CD
+										   AND X.ELEMENT_CD = A.ELEMENT_CD
+										   AND X.SDATE <= D.PAYMENT_YMD )
+					 INNER JOIN THRM100 C
+					    ON A.ENTER_CD	= C.ENTER_CD
+					   AND A.SABUN		= C.SABUN
+					 INNER JOIN TCPN051 E
+					    ON E.ENTER_CD = D.ENTER_CD
+					   AND E.PAY_CD = D.PAY_CD
+					 WHERE A.ENTER_CD	= #{ssnEnterCd}
+					           		]]>
+					<if test='chkYn != null and !chkYn.equals("")'>
+					   AND A.CHK_YN		= #{chkYn}
+					</if>
+					<if test='ym != null and !ym.equals("")'>
+					   AND D.PAY_YM		= REPLACE(#{ym},'-','')
+					</if>
+					<if test='payCd != null and !payCd.equals("")'>
+					   AND D.PAY_CD		= #{payCd}
+					</if>
+					<if test='ssnSearchType.equals("O")'>
+						<![CDATA[
+			           AND (E.BUSINESS_PLACE_CD IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+			                                          FROM (SELECT F_COM_GET_AUTH_PARSE(TRIM(#{ssnEnterCd}),'C10',F_COM_GET_AUTH_VALUE(TRIM(#{ssnEnterCd}),TRIM(#{ssnSabun}),TRIM(#{ssnGrpCd}))) AS PARAM FROM dual) A
+			                                        CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+						  OR E.BUSINESS_PLACE_CD IS NULL)
+						  ]]>
+
+					</if>
+					ORDER BY A.SABUN, A.PAY_ACTION_CD, A.ELEMENT_CD
+
+
+
+		</select>
+		<update parameterType="map" id="savePayEmpNonDedMgr">
+
+
+					MERGE INTO TCPN217 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.ELEMENT_CD
+								 , A.DED_MON
+								 , A.CHK_MON
+								 , A.CHK_YN
+								 , A.NOTE
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS SABUN
+										 , NULL		AS ELEMENT_CD
+										 , NULL		AS DED_MON
+										 , NULL		AS CHK_MON
+										 , NULL		AS CHK_YN
+										 , NULL		AS NOTE
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})			AS SABUN
+										 , TRIM(#{rm.elementCd})		AS ELEMENT_CD
+										 , TRIM(#{rm.dedMon})			AS DED_MON
+										 , TRIM(#{rm.chkMon})			AS CHK_MON
+										 , NVL(TRIM(#{rm.chkYn}),'N')	AS CHK_YN
+										 , TRIM(#{rm.note})				AS NOTE
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD	IS NOT NULL
+							   AND A.SABUN			IS NOT NULL
+							   AND A.ELEMENT_CD		IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						AND	T.ELEMENT_CD	= S.ELEMENT_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.CHK_MON	= S.CHK_MON
+								 , T.CHK_YN		= S.CHK_YN
+								 , T.NOTE		= S.NOTE
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+
+
+
+		</update>
+	</mapper>

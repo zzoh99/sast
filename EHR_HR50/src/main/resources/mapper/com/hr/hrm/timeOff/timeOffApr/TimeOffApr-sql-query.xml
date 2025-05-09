@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.timeOff.timeOffApr">
+		<select parameterType="map" resultType="cMap" id="getTimeOffAprList">
+
+				<![CDATA[
+					SELECT M1.*
+						 , DECODE(F.SABUN, NULL, 'N', 'Y') AS PRE_POST_YN
+					     , DECODE(F.SABUN, NULL, 'N', 'Y') AS PRE_POST_YN2
+					     , NVL(F.ORD_YN, DECODE(M1.SDATE, NULL, 'N', 'Y')) AS ORD_YN
+					     , DECODE(NVL(F.ORD_YN, DECODE(M1.SDATE, NULL, 'N', 'Y')), 'N', '0', DECODE(NVL(F.ORD_YN, DECODE(M1.SDATE, NULL, 'N', 'Y')),'Y','1','0')) AS IBS_IMAGE4
+					  FROM (SELECT '3' AS DETAIL
+					  			 , A.ENTER_CD
+							     , D.APPL_NM
+							     , F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, A.APPL_YMD) AS ORG_CD
+							     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+							     , X.JIKCHAK_CD
+							     , X.JIKCHAK_NM
+							     , X.JIKWEE_CD
+							     , X.JIKWEE_NM
+							     , X.JIKGUB_CD
+							     , X.JIKGUB_NM
+							     , A.SABUN
+							     , E.SDATE
+							     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+							     , TO_CHAR(TO_DATE(B.APPL_YMD, 'YYYYMMDD'),'YYYY-MM-DD') AS APPL_YMD
+							     , B.APPL_STATUS_CD
+							     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010' , B.APPL_STATUS_CD, #{ssnLocaleCd}) AS APPL_STATUS_CD_NM
+							     , TO_CHAR(TO_DATE(A.REF_SDATE, 'YYYYMMDD'),'YYYY-MM-DD')  AS REF_SDATE
+							     , A.REF_EDATE
+							     , TO_DATE(A.REF_EDATE,'YYYYMMDD') -TO_DATE(A.REF_SDATE,'YYYYMMDD')+1  AS REF_DAY_CNT
+							     , TO_CHAR(TO_DATE(E.EDATE,'YYYYMMDD'),'YYYY-MM-DD')       AS ACTUAL_EDATE
+							     , TO_CHAR(TO_DATE(A.RETURN_YMD, 'YYYYMMDD'),'YYYY-MM-DD') AS RETURN_YMD
+							     , A.CONTI_YN
+							     , A.REF_REASON
+							     , A.ETC
+							     , A.PROCESS_NO
+							     , B.MEMO
+							     , B.APPL_SEQ
+							     , B.APPL_CD
+							     , B.APPL_SABUN
+							     , B.APPL_IN_SABUN
+							     , F_COM_GET_NAMES(B.ENTER_CD, B.APPL_IN_SABUN) AS APPL_IN_SABUN_NAME
+							     , B.AGREE_SABUN
+							     , B.AGREE_YMD
+							     , A.FAM_NM
+							     ,  CRYPTIT.decrypt(A.FAMRES,#{ssnEnterCd}) AS FAMRES
+							     , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO
+							     , C.ORD_TYPE_CD 
+							     , C.ORD_DETAIL_CD
+							     , NVL(A.ORD_YMD, DECODE(B.APPL_CD, '64', A.RETURN_YMD, A.REF_SDATE)) AS ORD_YMD
+							  FROM THRM521 A
+							     , THRI103 B
+							     , THRM510 C
+							     , THRI101 D
+							     , (SELECT L.ENTER_CD
+						                 , L.SABUN
+						                 , L.ORD_TYPE_CD
+						                 , L.ORD_DETAIL_CD
+						                 , L.APPLY_SEQ
+						                 , L.ORD_YMD AS SDATE
+						                 , L.EDATE
+						              FROM (
+						                        SELECT ENTER_CD
+						                             , SABUN
+						                             , ORD_TYPE_CD
+						                             , ORD_DETAIL_CD
+						                             , APPLY_SEQ
+						                             , ORD_YMD
+						                             , DECODE(
+						                                   LAG(SABUN) OVER(ORDER BY ENTER_CD, SABUN, ORD_YMD DESC), SABUN
+						                                   , TO_CHAR(TO_DATE(LAG(ORD_YMD) OVER(ORDER BY ENTER_CD, SABUN, ORD_YMD DESC), 'YYYYMMDD') -1, 'YYYYMMDD')
+						                                   , NULL
+						                               ) AS EDATE
+						                          FROM THRM191
+						                         WHERE ENTER_CD       = #{ssnEnterCd}
+						                           AND (ORD_TYPE_CD, ORD_DETAIL_CD) IN (('M', 'M0'), ('N', 'N0'))
+						                   ) L
+						             WHERE L.ORD_TYPE_CD IN ( 'M', 'N')
+					       			) E
+							     , THRM151 X
+							 WHERE 1=1
+							   AND A.ENTER_CD       = #{ssnEnterCd}
+							           ]]>
+					<if test='applCd != null and !applCd.equals("")'>
+							   AND B.APPL_CD        = #{applCd}
+					</if>
+					<if test='sYmd != null and !sYmd.equals("")'>
+							   AND B.APPL_YMD <![CDATA[ >= ]]> REPLACE(#{sYmd},'-','')
+					</if>
+					<if test='eYmd != null and !eYmd.equals("")'>
+							<![CDATA[   AND B.APPL_YMD <= REPLACE(#{eYmd},'-','') ]]>
+					</if>
+			<![CDATA[  	   AND B.APPL_STATUS_CD <> '11' ]]>
+					<if test='applStatusCd != null and !applStatusCd.equals("")'>
+							   AND B.APPL_STATUS_CD = #{applStatusCd}
+					</if>
+					<if test='orgCd != null and !orgCd.equals("")'>
+							   AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, A.APPL_YMD) = #{orgCd}
+					</if>
+					<if test='orgNm != null and !orgNm.equals("")'>
+							   AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.APPL_YMD) LIKE '%'|| #{orgNm} ||'%'
+					</if>
+					<if test='saNm and !saNm.equals("")'>
+							   AND (A.SABUN LIKE '%'||TRIM( #{saNm} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'|| TRIM( #{saNm} ) ||'%')
+					</if>
+							   AND A.ENTER_CD       = B.ENTER_CD
+							   AND A.APPL_SEQ       = B.APPL_SEQ
+							   AND A.ENTER_CD       = C.ENTER_CD
+							   AND A.APPL_CD        = C.APPL_CD
+							   AND A.ENTER_CD       = D.ENTER_CD
+							   AND A.APPL_CD        = D.APPL_CD
+							   AND A.ENTER_CD       = E.ENTER_CD(+)
+							   AND A.SABUN          = E.SABUN(+)
+							   AND A.ORD_YMD        = E.SDATE(+)
+							   AND A.APPL_YMD BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+							   AND A.ENTER_CD       = X.ENTER_CD
+							   AND A.SABUN          = X.SABUN
+							   AND A.APPL_YMD BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+					   
+					      ) M1 ,   THRM221 F
+					      
+					 WHERE M1.ENTER_CD       = F.ENTER_CD(+)
+					   AND M1.SABUN          = F.SABUN(+)
+					   AND M1.ORD_YMD        = F.ORD_YMD(+)
+					   AND M1.ORD_TYPE_CD    = F.ORD_TYPE_CD(+) 
+					   AND M1.ORD_DETAIL_CD  = F.ORD_DETAIL_CD(+)
+   					ORDER BY M1.APPL_YMD DESC
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getTimeOffAprApplCodeList">
+				<![CDATA[
+					SELECT 	  A.APPL_CD 			AS CODE
+					      	, (	SELECT APPL_NM
+					          	FROM THRI101
+					         	WHERE 	ENTER_CD 	= A.ENTER_CD
+					           	AND 	APPL_CD 	= A.APPL_CD
+					          ) 					AS CODE_NM
+					FROM THRM510 A
+					WHERE 	A.ENTER_CD = #{ssnEnterCd}
+					GROUP BY A.ENTER_CD, A.APPL_CD
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getTimeOffAprTypeCodeList">
+
+				<![CDATA[
+					SELECT ORD_TYPE_CD CODE, ORD_TYPE_NM CODE_NM
+					FROM TSYS011
+					WHERE ENTER_CD = #{ssnEnterCd}
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveTimeOffApr">
+
+   					MERGE INTO THRM521 T
+                  	USING (
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                           	SELECT
+                           		      TRIM(#{rm.applCd})						AS APPL_CD
+                           			, TRIM(#{rm.sabun})							AS SABUN
+                           			, REPLACE(TRIM(#{rm.applYmd}),'-','')		AS APPL_YMD
+                           			, #{rm.applSeq}								AS APPL_SEQ
+                           			, NVL(TRIM(#{rm.processNo}),NULL )				AS PROCESS_NO
+                           			, REPLACE(TRIM(#{rm.ordYmd}),'-','')		AS ORD_YMD
+                           	FROM   DUAL
+</foreach>
+                           ) S
+                        ON (
+                               	   T.ENTER_CD	= #{ssnEnterCd}
+                               AND T.APPL_CD 	= S.APPL_CD
+                               AND T.SABUN		= S.SABUN
+                               AND T.APPL_YMD	= S.APPL_YMD
+                               AND T.APPL_SEQ	= S.APPL_SEQ
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.PROCESS_NO 	= S.PROCESS_NO
+         							, T.ORD_YMD 	= S.ORD_YMD
+									, T.CHKDATE 	= SYSDATE
+									, T.CHKID  		= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  T.ENTER_CD
+               				, T.APPL_CD
+							, T.SABUN
+							, T.APPL_YMD
+							, T.APPL_SEQ
+							, T.PROCESS_NO
+							, T.ORD_YMD
+							, T.CHKDATE
+							, T.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+							, S.APPL_CD
+							, S.SABUN
+							, S.APPL_YMD
+							, S.APPL_SEQ
+							, S.PROCESS_NO
+							, S.ORD_YMD
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<update parameterType="map" id="saveTimeOffAprOrd">
+
+			<![CDATA[
+				INSERT INTO THRM221(
+				       ENTER_CD
+				      ,ORD_DETAIL_CD
+				      ,SABUN
+				      ,ORD_YMD
+				      ,APPLY_SEQ
+				      ,ORD_TYPE_CD
+				      ,PROCESS_NO
+				      ,ORD_E_YMD
+				      ,STATUS_CD
+				      ,MANAGE_CD
+				      ,LOCATION_CD
+				      ,ORG_CD
+				      ,JIKCHAK_CD
+				      ,WORK_TYPE
+				      ,JOB_CD
+				      ,JIKWEE_CD
+				      ,JIKGUB_CD
+				      ,SAL_CLASS
+				      ,PAY_TYPE
+				      ,TRA_YMD
+				      ,GEMP_YMD
+				      ,RETURN_YMD
+				      ,EMP_YMD
+				      ,CTITLE_CHG_YMD
+				      ,FPROM_YMD
+				      ,JIKGUB_CHG_YMD
+				      ,CONTRACT_SYMD
+				      ,CONTRACT_EYMD
+				      ,PAY_GROUP_CD
+				      ,WORKORG_CD
+				      ,ORD_REASON_CD
+				      ,ORD_YN
+				      ,ORD_INS_YN
+				      ,TEMP_ORD_YN
+				      ,CHKDATE
+				      ,CHKID
+				      ,DEL_YN
+				)
+				SELECT A.ENTER_CD
+				      ,D.ORD_TYPE_CD
+				      ,A.SABUN
+				      ,DECODE(A.APPL_CD, '64', A.RETURN_YMD, A.REF_SDATE) AS SDATE
+				      ,(SELECT DECODE(MAX(APPL_SEQ), NULL, 0, MAX(APPL_SEQ)) + 1
+				              FROM THRM221
+				           WHERE ENTER_CD = B.ENTER_CD
+				           AND SABUN = A.SABUN
+				           AND ORD_YMD = A.REF_SDATE)
+				      ,D.ORD_TYPE_CD
+				      ,A.PROCESS_NO
+				      ,A.REF_EDATE
+				      ,(SELECT STATUS_CD
+				      	  FROM TSYS013
+				      	 WHERE ENTER_CD = D.ENTER_CD
+				      	   AND ORD_TYPE_CD = D.ORD_TYPE_CD
+				      	   AND ORD_DETAIL_CD = D.ORD_TYPE_CD) --재직상태
+				      ,B.MANAGE_CD
+				      ,B.LOCATION_CD
+				      ,B.ORG_CD
+				      ,B.JIKCHAK_CD
+				      ,B.WORK_TYPE
+				      ,B.JOB_CD
+				      ,B.JIKWEE_CD
+				      ,B.JIKGUB_CD
+				      ,B.SAL_CLASS
+				      ,B.PAY_TYPE
+				      ,C.TRA_YMD
+				      ,C.GEMP_YMD
+				      ,A.RETURN_YMD
+				      ,C.EMP_YMD
+				      ,B.CTITLE_CHG_YMD
+				      ,B.FPROM_YMD
+				      ,B.JIKGUB_CHG_YMD
+				      ,B.CONTRACT_SYMD
+				      ,B.CONTRACT_EYMD
+				      ,B.PAY_GROUP_CD
+				      ,B.WORKORG_CD
+				      ,D.ORD_REASON_CD
+				      ,'0'
+				      ,'Y'
+				      ,'N'
+				      ,SYSDATE
+				      ,TRIM( #{sabun} )
+				      ,'N'
+				    FROM THRM521 A
+				          ,THRM151 B
+				      ,THRM100 C
+				      ,THRM510 D
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SABUN = B.SABUN
+				   AND B.ENTER_CD = C.ENTER_CD
+				   AND B.SABUN = C.SABUN
+				   AND A.APPL_YMD BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+				   AND A.ENTER_CD = D.ENTER_CD
+				   AND A.APPL_CD = D.APPL_CD
+				   AND A.APPL_YMD BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = TRIM( #{sabun} )
+				   AND A.APPL_SEQ = TRIM( #{applSeq} )
+			]]>
+
+		</update>
+</mapper>

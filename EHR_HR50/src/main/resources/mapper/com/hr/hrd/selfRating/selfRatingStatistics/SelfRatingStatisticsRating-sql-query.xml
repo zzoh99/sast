@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.selfRating.selfRatingStatistics.rating">
+		<select parameterType="map" resultType="cMap" id="getSkillTypeCdForSearching">
+
+				<![CDATA[
+					SELECT 'S' AS CODE, 'IT Skill' AS CODE_NM FROM DUAL
+					 UNION ALL
+					SELECT 'T' AS CODE, 'IT Knowledge' AS CODE_NM FROM DUAL
+					 UNION ALL
+					SELECT 'B' AS CODE, 'Business Knowledge' AS CODE_NM FROM DUAL
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getSelfRatingStatisticsRatingList">
+
+				<![CDATA[
+					WITH TBL1 AS (
+						--IT Skill
+						SELECT 'S' AS SKILL_TYPE_CD
+							 , A.ENTER_CD
+							 , B.SKILL_CD AS PRIOR_KNOWLEDGE_CD
+							 , B.SKILL_NM AS PRIOR_KNOWLEDGE_NM
+							 , A.SKILL_CD AS KNOWLEDGE_CD
+							 , A.SKILL_NM AS KNOWLEDGE_NM
+							 , SUM(CASE WHEN C.FINAL_GRADE = 3 THEN 1 ELSE 0 END) FINAL_GRADE_01
+							 , SUM(CASE WHEN C.FINAL_GRADE = 2 THEN 1 ELSE 0 END) FINAL_GRADE_02
+							 , SUM(CASE WHEN C.FINAL_GRADE = 1 THEN 1 ELSE 0 END) FINAL_GRADE_03
+							 , NVL(SUM(CASE WHEN C.FINAL_GRADE IS NOT NULL THEN 1 ELSE 0 END),0) AS COUNT_FINAL_GRADE
+							 , CASE WHEN COUNT(C.FINAL_GRADE) <> 0  THEN NVL(SUM(C.FINAL_GRADE), 0) / COUNT(C.FINAL_GRADE) ELSE 0 END AS AVG_FINAL_GRADE
+						  FROM TCDPW203 A INNER JOIN TCDPW203 B
+							ON A.ENTER_CD       = B.ENTER_CD
+						   AND A.PRIOR_SKILL_CD = B.SKILL_CD
+						  LEFT OUTER JOIN (SELECT X.*
+						                     FROM TCDPV104 X INNER JOIN TCDPV101 Y
+						                       ON X.ENTER_CD = Y.ENTER_CD
+						                      AND X.ACTIVE_YYYY = Y.ACTIVE_YYYY
+						                      AND X.HALF_GUBUN_TYPE = Y.HALF_GUBUN_TYPE
+						                      AND X.SABUN = Y.SABUN
+						                    WHERE X.ENTER_CD = #{ssnEnterCd} AND X.ACTIVE_YYYY = #{searchActiveYyyy} AND X.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+						                      AND (LENGTH(#{searchOrgCd}) IS NULL OR Y.APPROVAL_MAIN_ORG_CD = #{searchOrgCd} )) C
+							ON A.ENTER_CD = C.ENTER_CD
+						   AND A.SKILL_CD = C.SKILL_CD
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND A.START_YMD <= (SELECT ACTIVE_START_YMD FROM TCDPV000 T WHERE T.ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+						   AND A.END_YMD   >= (SELECT ACTIVE_START_YMD FROM TCDPV000 T WHERE T.ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+						   AND A.USE_YN = 'Y'
+						 GROUP BY A.ENTER_CD
+								, B.SKILL_CD
+								, B.SKILL_NM
+								, A.SKILL_CD
+								, A.SKILL_NM
+								--, C.FINAL_GRADE
+						 ORDER BY B.SKILL_CD, A.SKILL_CD
+					)
+					, TBL2 AS (
+						--IT Knowledge
+						SELECT 'T' AS SKILL_TYPE_CD
+							 , A.ENTER_CD
+							 , B.KNOWLEDGE_CD AS PRIOR_KNOWLEDGE_CD
+							 , B.KNOWLEDGE_NM AS PRIOR_KNOWLEDGE_NM
+							 , A.KNOWLEDGE_CD
+							 , A.KNOWLEDGE_NM
+							 , SUM(CASE WHEN C.FINAL_GRADE = 3 THEN 1 ELSE 0 END) FINAL_GRADE_01
+							 , SUM(CASE WHEN C.FINAL_GRADE = 2 THEN 1 ELSE 0 END) FINAL_GRADE_02
+							 , SUM(CASE WHEN C.FINAL_GRADE = 1 THEN 1 ELSE 0 END) FINAL_GRADE_03
+							 , NVL(SUM(CASE WHEN C.FINAL_GRADE IS NOT NULL THEN 1 ELSE 0 END),0) AS COUNT_FINAL_GRADE
+							 , CASE WHEN COUNT(C.FINAL_GRADE) <> 0  THEN NVL(SUM(C.FINAL_GRADE), 0) / COUNT(C.FINAL_GRADE) ELSE 0 END AS AVG_FINAL_GRADE
+						  FROM TCDPW201 A INNER JOIN TCDPW201 B
+							ON A.ENTER_CD           = B.ENTER_CD
+						   AND A.PRIOR_KNOWLEDGE_CD = B.KNOWLEDGE_CD
+						  LEFT OUTER JOIN (SELECT X.*
+						                     FROM TCDPV102 X INNER JOIN TCDPV101 Y
+						                       ON X.ENTER_CD = Y.ENTER_CD
+						                      AND X.ACTIVE_YYYY = Y.ACTIVE_YYYY
+						                      AND X.HALF_GUBUN_TYPE = Y.HALF_GUBUN_TYPE
+						                      AND X.SABUN = Y.SABUN
+						                    WHERE X.ENTER_CD = #{ssnEnterCd} AND X.ACTIVE_YYYY = #{searchActiveYyyy} AND X.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+						                      AND (LENGTH(#{searchOrgCd}) IS NULL OR Y.APPROVAL_MAIN_ORG_CD = #{searchOrgCd} )) C
+							ON A.ENTER_CD     = C.ENTER_CD
+						   AND A.KNOWLEDGE_CD = C.KNOWLEDGE_CD
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND B.KNOWLEDGE_TYPE = 'C'
+						   AND B.TECH_BIZ_TYPE = 'T'
+						   AND A.START_YMD <= (SELECT ACTIVE_START_YMD FROM TCDPV000 WHERE ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+						   AND A.END_YMD   >= (SELECT ACTIVE_START_YMD FROM TCDPV000 WHERE ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+						   AND A.USE_YN = 'Y'
+						 GROUP BY A.ENTER_CD
+								, B.KNOWLEDGE_CD
+								, B.KNOWLEDGE_NM
+								, A.KNOWLEDGE_CD
+								, A.KNOWLEDGE_NM
+								--, C.FINAL_GRADE
+						 ORDER BY B.KNOWLEDGE_CD, A.KNOWLEDGE_CD
+					)
+					,TBL3 AS (
+						--Biz Knowledge
+						SELECT 'B' AS SKILL_TYPE_CD
+							 , A.ENTER_CD
+							 , B.KNOWLEDGE_CD AS PRIOR_KNOWLEDGE_CD
+							 , B.KNOWLEDGE_NM AS PRIOR_KNOWLEDGE_NM
+							 , A.KNOWLEDGE_CD
+							 , A.KNOWLEDGE_NM
+							 , SUM(CASE WHEN C.FINAL_GRADE = 3 THEN 1 ELSE 0 END) FINAL_GRADE_01
+							 , SUM(CASE WHEN C.FINAL_GRADE = 2 THEN 1 ELSE 0 END) FINAL_GRADE_02
+							 , SUM(CASE WHEN C.FINAL_GRADE = 1 THEN 1 ELSE 0 END) FINAL_GRADE_03
+							 , NVL(SUM(CASE WHEN C.FINAL_GRADE IS NOT NULL THEN 1 ELSE 0 END),0) AS COUNT_FINAL_GRADE
+							 , CASE WHEN COUNT(C.FINAL_GRADE) <> 0  THEN NVL(SUM(C.FINAL_GRADE), 0) / COUNT(C.FINAL_GRADE) ELSE 0 END AS AVG_FINAL_GRADE
+						  FROM TCDPW201 A INNER JOIN TCDPW201 B
+							ON A.ENTER_CD           = B.ENTER_CD
+						   AND A.PRIOR_KNOWLEDGE_CD = B.KNOWLEDGE_CD
+						  LEFT OUTER JOIN (SELECT X.*
+						                     FROM TCDPV103 X INNER JOIN TCDPV101 Y
+						                       ON X.ENTER_CD = Y.ENTER_CD
+						                      AND X.ACTIVE_YYYY = Y.ACTIVE_YYYY
+						                      AND X.HALF_GUBUN_TYPE = Y.HALF_GUBUN_TYPE
+						                      AND X.SABUN = Y.SABUN
+						                    WHERE X.ENTER_CD = #{ssnEnterCd} AND X.ACTIVE_YYYY = #{searchActiveYyyy} AND X.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+						                      AND (LENGTH(#{searchOrgCd}) IS NULL OR Y.APPROVAL_MAIN_ORG_CD = #{searchOrgCd} )) C
+							ON A.ENTER_CD     = C.ENTER_CD
+						   AND A.KNOWLEDGE_CD = C.KNOWLEDGE_CD
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND B.KNOWLEDGE_TYPE = 'C'
+						   AND B.TECH_BIZ_TYPE = 'B'
+						   AND A.START_YMD <= (SELECT ACTIVE_START_YMD FROM TCDPV000 WHERE ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+						   AND A.END_YMD   >= (SELECT ACTIVE_START_YMD FROM TCDPV000 WHERE ENTER_CD = #{ssnEnterCd} AND ACTIVE_YYYY = #{searchActiveYyyy} AND HALF_GUBUN_TYPE = #{searchHalfGubunType})
+						   AND A.USE_YN = 'Y'
+						 GROUP BY A.ENTER_CD
+								, B.KNOWLEDGE_CD
+								, B.KNOWLEDGE_NM
+								, A.KNOWLEDGE_CD
+								, A.KNOWLEDGE_NM
+								--, C.FINAL_GRADE
+						 ORDER BY B.KNOWLEDGE_CD, A.KNOWLEDGE_CD)
+					, TBL4 AS (
+						SELECT A.SKILL_TYPE_CD, ENTER_CD, PRIOR_KNOWLEDGE_CD, PRIOR_KNOWLEDGE_NM, KNOWLEDGE_CD, KNOWLEDGE_NM, FINAL_GRADE_01, FINAL_GRADE_02, FINAL_GRADE_03, COUNT_FINAL_GRADE, AVG_FINAL_GRADE
+						  FROM TBL1 A
+						 UNION ALL
+						SELECT A.SKILL_TYPE_CD, ENTER_CD, PRIOR_KNOWLEDGE_CD, PRIOR_KNOWLEDGE_NM, KNOWLEDGE_CD, KNOWLEDGE_NM, FINAL_GRADE_01, FINAL_GRADE_02, FINAL_GRADE_03, COUNT_FINAL_GRADE, AVG_FINAL_GRADE
+						  FROM TBL2 A
+						 UNION ALL
+						SELECT A.SKILL_TYPE_CD, ENTER_CD, PRIOR_KNOWLEDGE_CD, PRIOR_KNOWLEDGE_NM, KNOWLEDGE_CD, KNOWLEDGE_NM, FINAL_GRADE_01, FINAL_GRADE_02, FINAL_GRADE_03, COUNT_FINAL_GRADE, AVG_FINAL_GRADE
+						  FROM TBL3 A
+					)
+
+					SELECT *
+					  FROM TBL4
+					 WHERE SKILL_TYPE_CD = #{searchSkillTypeCd}
+					 ORDER BY SKILL_TYPE_CD, PRIOR_KNOWLEDGE_CD, KNOWLEDGE_CD
+				]]>
+
+
+		</select>
+
+</mapper>

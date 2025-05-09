@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.bizTripExpenAppDet">
+<!-- 신청자 정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAppDetUserMap">
+
+				<![CDATA[
+					SELECT SABUN
+					     , F_COM_GET_NAMES(ENTER_CD, SABUN) AS NAME
+					     , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, TRIM(#{searchApplYmd}), #{ssnLocaleCd}) AS ORG_NM
+						 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H20010' , JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+						 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H20030' , JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+						 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H20020' , JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+						 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10030' , MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+						 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'H10050' , WORK_TYPE, #{ssnLocaleCd}) AS WORK_TYPE_NM
+					  FROM THRM151
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND SABUN    = TRIM(#{searchSabun})
+					   AND TRIM(#{searchApplYmd}) BETWEEN SDATE AND NVL(EDATE, '99991231')
+				]]>
+
+
+		</select>
+				
+<!-- 유류비 기준 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAppDetOil">
+
+				<![CDATA[
+					SELECT MAX(UNIT_PRICE) KEEP(DENSE_RANK FIRST ORDER BY SDATE DESC) AS UNIT_PRICE
+					     , MAX(LMT_DIST_DRIV) KEEP(DENSE_RANK FIRST ORDER BY SDATE DESC) AS LMT_DIST_DRIV
+					  FROM TTIM856
+					 WHERE ENTER_CD  = #{ssnEnterCd}
+					   AND GUBUN_CD  = TRIM(#{oilTypeCd})
+					   AND TRIM(#{searchApplYmd}) BETWEEN SDATE AND NVL(EDATE, '99991231')
+				]]>
+
+
+		</select>
+		
+<!-- 기 신청 건 체크   -->
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAppDetDupCnt">
+
+				<![CDATA[
+					SELECT COUNT(1) AS DUP_CNT
+					  FROM TTIM851 A, THRI103 B, TTIM852 C
+					 WHERE A.ENTER_CD     = #{ssnEnterCd}
+					   AND A.APPL_SEQ    != #{searchApplSeq}
+					   AND (    REPLACE( #{bizSdate} ,'-','') BETWEEN A.BIZ_SDATE AND A.BIZ_EDATE
+						      OR REPLACE( #{bizEdate} ,'-','') BETWEEN A.BIZ_SDATE AND A.BIZ_EDATE
+						      OR ( A.BIZ_SDATE > REPLACE( #{bizSdate} ,'-','') AND A.BIZ_EDATE  < REPLACE( #{bizEdate} ,'-','') )
+						     )
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD NOT IN ( '11', '23', '33', 'ZZ' )   -- 11:임시저장, 23:결재반려, 33:수신반려, ZZ:취소완료
+					   AND A.ENTER_CD  = C.ENTER_CD
+					   AND A.APPL_SEQ  = C.APPL_SEQ 
+					   AND C.EMP_SABUN = TRIM(#{sabun})
+					   AND B.APPL_CD = TRIM(#{searchApplCd})
+				]]>
+
+
+		</select>
+		
+				
+<!-- 	출장보고서 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAppDetMap">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.SABUN
+						     , A.BIZ_CD
+						     , A.BIZ_SDATE
+						     , A.BIZ_EDATE
+						     , A.BIZ_DAYS
+						     , A.BIZ_PURPOSE
+						     , A.BIZ_ON_REASON
+						     , A.BIZ_CONTENTS
+						     , A.BIZ_NOTE
+						     , A.EXCHG_RATE
+						     , A.BF_APPL_SEQ
+						  FROM TTIM851 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                           AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+
+				]]>
+
+
+		</select>
+		
+<!-- 	동행인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAppDetList1">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.EMP_SABUN
+						     , F_COM_GET_NAMES (A.ENTER_CD, A.EMP_SABUN, #{ssnLocaleCd}) AS EMP_NAME
+						     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.EMP_SABUN, TRIM(#{searchApplYmd}), #{ssnLocaleCd}) AS EMP_ORG_NM
+						 	 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.EMP_SABUN, TRIM(#{searchApplYmd}), #{ssnLocaleCd}) AS EMP_JIKGUB_NM
+						 	 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.EMP_SABUN, TRIM(#{searchApplYmd}), #{ssnLocaleCd}) AS EMP_JIKCHAK_NM
+						 	 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.EMP_SABUN, TRIM(#{searchApplYmd}), #{ssnLocaleCd}) AS EMP_JIKWEE_NM
+						     , A.EMP_NOTE
+						  FROM TTIM852 A 
+						  WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                           AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+                          ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.EMP_SABUN,TRIM(#{searchApplYmd}))
+
+				]]>
+
+
+		</select>
+		
+		
+<!-- 	출장일정상세 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAppDetList2">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.SEQ
+						     , A.WORK_SDATE
+						     , A.WORK_EDATE
+						     , A.WORK_S_PLACE
+						     , A.WORK_E_PLACE
+						     , A.WORK_COMPANY
+						     , A.WORK_NOTE
+						  FROM TTIM853 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                           AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+                         ORDER BY A.WORK_SDATE, A.SEQ
+
+				]]>
+
+
+		</select>
+		
+<!-- 	경비내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAppDetList3">
+
+				<![CDATA[
+						SELECT A.APPL_SEQ
+						     , A.PAY_SABUN
+						     , F_COM_GET_NAMES (A.ENTER_CD, A.PAY_SABUN, #{ssnLocaleCd}) AS PAY_NAME
+						     , A.PAY_GUBUN_CD
+						     , A.OIL_CARD_YN
+						     , A.OIL_TYPE_CD
+						     , A.DIST_DRIV
+						     , A.UNIT_PRICE
+						     , A.PAY_MON_US
+						     , A.PAY_MON
+						     , A.USE_MEMO
+						     , A.PAY_NOTE
+						     , DECODE(A.PAY_GUBUN_CD,'0', 1, 0) AS OIL_TYPE_CD_EDIT
+						     , DECODE(A.PAY_GUBUN_CD,'0', 1, 0) AS OIL_CARD_YN_EDIT
+						     , DECODE(A.PAY_GUBUN_CD,'0', 1, 0) AS DIST_DRIV_EDIT
+						     , DECODE(A.PAY_GUBUN_CD, '0', (SELECT MAX(LMT_DIST_DRIV) KEEP(DENSE_RANK FIRST ORDER BY SDATE DESC) AS LMT_DIST_DRIV
+															  FROM TTIM856
+															 WHERE ENTER_CD  = A.ENTER_CD
+															   AND GUBUN_CD  = A.OIL_TYPE_CD
+															   AND TRIM(#{searchApplYmd}) BETWEEN SDATE AND NVL(EDATE, '99991231')
+									   						)
+									 , NULL) AS LMT_DIST_DRIV
+						  FROM TTIM854 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                           AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+                         ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.PAY_SABUN,TRIM(#{searchApplYmd}))
+                         		, F_COM_GET_GRCODE_SEQ( ENTER_CD, 'T85101', PAY_GUBUN_CD)
+                                 
+
+				]]>
+
+
+		</select>
+
+<!--  세부내역 저장 -->
+		<update parameterType="map" id="saveBizTripExpenAppDet1">
+
+					 MERGE INTO TTIM851 T 
+					 USING 
+					( 
+						
+							 SELECT   TRIM( #{ssnEnterCd} )		AS ENTER_CD
+							   	 	, TRIM( #{searchApplSeq} )	AS APPL_SEQ
+									, TRIM( #{searchApplSabun} )	AS SABUN
+									
+						            , TRIM( #{bizCd} )  			AS  BIZ_CD
+						            , REPLACE(TRIM( #{bizSdate} ), '-','')  	AS  BIZ_SDATE
+						            , REPLACE(TRIM( #{bizEdate} ), '-','')  	AS  BIZ_EDATE
+						            , TRIM( #{bizDays} )  		AS  BIZ_DAYS
+						            , TRIM( #{bizPurpose} )  		AS  BIZ_PURPOSE
+						            , TRIM( #{bizOnReason} )  	AS  BIZ_ON_REASON
+						            , TRIM( #{bizContents} )  	AS  BIZ_CONTENTS
+						            , TRIM( #{bizNote} )  		AS  BIZ_NOTE
+						            , TRIM( #{exchgRate} )  		AS  EXCHG_RATE
+						            , TRIM( #{searchBfApplSeq} )  AS  BF_APPL_SEQ
+				        	     FROM  DUAL
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+					     AND  T.SABUN 		= S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+					            , T.BIZ_CD 			= S.BIZ_CD 
+					            , T.BIZ_SDATE 		= S.BIZ_SDATE 
+					            , T.BIZ_EDATE 		= S.BIZ_EDATE 
+					            , T.BIZ_DAYS 		= S.BIZ_DAYS 
+					            , T.BIZ_PURPOSE 	= S.BIZ_PURPOSE 
+					            , T.BIZ_ON_REASON 	= S.BIZ_ON_REASON
+					            , T.BIZ_CONTENTS 	= S.BIZ_CONTENTS
+					            , T.BIZ_NOTE 		= S.BIZ_NOTE 
+					            , T.EXCHG_RATE 		= S.EXCHG_RATE 
+					            , T.BF_APPL_SEQ 	= S.BF_APPL_SEQ 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+					            , T.BIZ_CD
+					            , T.BIZ_SDATE
+					            , T.BIZ_EDATE
+					            , T.BIZ_DAYS
+					            , T.BIZ_PURPOSE
+					            , T.BIZ_ON_REASON
+					            , T.BIZ_CONTENTS
+					            , T.BIZ_NOTE
+					            , T.EXCHG_RATE
+					            , T.BF_APPL_SEQ
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+					            , S.BIZ_CD
+					            , S.BIZ_SDATE
+					            , S.BIZ_EDATE
+					            , S.BIZ_DAYS
+					            , S.BIZ_PURPOSE
+					            , S.BIZ_ON_REASON
+					            , S.BIZ_CONTENTS
+					            , S.BIZ_NOTE
+					            , S.EXCHG_RATE
+					            , S.BF_APPL_SEQ
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+
+<!--  동행인 저장 -->
+		<update parameterType="map" id="saveBizTripExpenAppDet2">
+
+				<![CDATA[
+					    INSERT INTO TTIM852 T
+					    ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.EMP_SABUN
+					            , T.EMP_NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					     ) 
+					   
+						 SELECT   TRIM( #{ssnEnterCd} )		AS ENTER_CD
+						   	 	, TRIM( #{searchApplSeq} )	AS APPL_SEQ
+				                , TRIM( #{empSabun} )  		AS EMP_SABUN
+				                , TRIM( #{empNote} )  		AS EMP_NOTE
+						        , sysdate
+						        , #{ssnSabun}
+			              FROM DUAL
+			              WHERE TRIM( #{empSabun} ) IS NOT NULL
+				
+
+				]]>
+
+		</update>
+
+
+<!--  일정상세 저장 -->
+		<update parameterType="map" id="saveBizTripExpenAppDet3">
+
+				<![CDATA[
+
+					     INSERT INTO TTIM853 T 
+					     ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SEQ
+					            , T.WORK_SDATE
+					            , T.WORK_EDATE
+					            , T.WORK_S_PLACE
+					            , T.WORK_E_PLACE
+					            , T.WORK_COMPANY
+					            , T.WORK_NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					     ) 
+						 SELECT   TRIM( #{ssnEnterCd} )		AS ENTER_CD
+						   	 	, TRIM( #{searchApplSeq} )	AS APPL_SEQ
+		                        , (SELECT (NVL(MAX(SEQ),0) + 1) FROM TTIM853 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_SEQ = TRIM( #{searchApplSeq} ) )  AS SEQ
+					            , TRIM( #{workSdate} )  		AS  WORK_SDATE
+					            , TRIM( #{workEdate} )  		AS  WORK_EDATE
+					            , TRIM( #{workSPlace} )  		AS  WORK_S_PLACE
+					            , TRIM( #{workEPlace} )  		AS  WORK_E_PLACE
+					            , TRIM( #{workCompany} )  	AS  WORK_COMPANY
+					            , TRIM( #{workNote} )  		AS  WORK_NOTE
+						        , sysdate
+						        , #{ssnSabun}
+				          FROM DUAL
+			              WHERE TRIM( #{workSdate} ) IS NOT NULL
+				
+
+				]]>
+
+		</update>
+
+
+<!--  경비내역 저장 -->
+		<update parameterType="map" id="saveBizTripExpenAppDet4">
+
+				<![CDATA[
+					     INSERT INTO TTIM854 T 
+					     ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.PAY_SABUN
+					            , T.PAY_GUBUN_CD
+					            , T.OIL_CARD_YN
+					            , T.OIL_TYPE_CD
+					            , T.DIST_DRIV
+					            , T.UNIT_PRICE
+					            , T.PAY_MON
+					            , T.USE_MEMO
+					            , T.PAY_NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					     ) 
+						 SELECT   TRIM( #{ssnEnterCd} )		AS ENTER_CD
+						   	 	, TRIM( #{searchApplSeq} )	AS APPL_SEQ
+					            , TRIM( #{paySabun} )  		AS PAY_SABUN
+					            , TRIM( #{payGubunCd} )  		AS PAY_GUBUN_CD
+					            , TRIM( #{oilCardYn} )  		AS OIL_CARD_YN
+					            , TRIM( #{oilTypeCd} )  		AS OIL_TYPE_CD
+					            , TRIM( #{distDriv} )  		AS DIST_DRIV
+					            , TRIM( #{unitPrice} )  		AS UNIT_PRICE
+					            , TRIM( #{payMon} )  			AS PAY_MON
+					            , TRIM( #{useMemo} )  		AS USE_MEMO
+					            , TRIM( #{payNote} )  		AS PAY_NOTE
+						        , sysdate
+						        , #{ssnSabun}
+				          FROM DUAL
+			              WHERE TRIM( #{paySabun} ) IS NOT NULL
+
+				]]>
+
+		</update>
+
+<!-- 출장보고서 동행인 삭제  -->
+		<delete parameterType="map" id="deleteBizTripExpenAppDet2">
+
+				<![CDATA[
+					DELETE FROM TTIM852
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+		</delete>
+		
+<!-- 출장보고서 출장일정 삭제  -->
+		<delete parameterType="map" id="deleteBizTripExpenAppDet3">
+
+				<![CDATA[
+					DELETE FROM TTIM853
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+		</delete>
+		
+<!-- 출장보고서 정산내역 삭제  -->
+		<delete parameterType="map" id="deleteBizTripExpenAppDet4">
+
+				<![CDATA[
+					DELETE FROM TTIM854
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+		</delete>
+
+
+
+</mapper>

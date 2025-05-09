@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	정산자료입력현황
+ -->
+<root>
+
+	<!-- 정산자료입력현황 조회  -->
+	<query id="selectInputStatusList">
+		<![CDATA[
+			SELECT src.*
+			  FROM
+			 (
+				SELECT A.ENTER_CD
+					 , A.SABUN
+					 , A.ORG_NM
+					 , A.INPUT_CLOSE_YN
+					 , A.APPRV_YN
+					 , A.ADJUST_TYPE
+					 , A.PAY_ACTION_CD
+					 , A.WORK_YY
+					 , B.NAME
+					 , DECODE(A.RESULT_CONFIRM_YN,'Y','Y','N') RESULT_CONFIRM_YN
+					 , A.FINAL_CLOSE_YN
+					 , A.RESULT_OPEN_YN
+				 FROM TCPN811 A, THRM100 B
+				WHERE A.ENTER_CD = B.ENTER_CD(+)
+				  AND A.SABUN = B.SABUN(+)
+				  AND A.ENTER_CD = #ssnEnterCd#
+				  AND A.ADJUST_TYPE = '1'
+				  AND A.WORK_YY = #searchWorkYy#
+				  AND DECODE(#searchBizPlaceCd#, '', 'ALL', A.BUSINESS_PLACE_CD) = DECODE(#searchBizPlaceCd#, '', 'ALL', #searchBizPlaceCd#)
+				  AND (A.SABUN LIKE '%'||#searchSbNm#||'%'  OR B.NAME LIKE '%'||#searchSbNm#||'%')
+				  AND DECODE(#searchClosedType#, '', 'ALL','CLOSED', A.INPUT_CLOSE_YN,'OPENED',A.INPUT_CLOSE_YN
+					                             ,'MANAGE_CLOSED',A.APPRV_YN,'MANAGE_OPENED',A.APPRV_YN
+					                             ,'FINAL_CLOSE_CLOSED',A.FINAL_CLOSE_YN,'FINAL_CLOSE_OPENED',A.FINAL_CLOSE_YN, 'ALL') 
+					    = DECODE(#searchClosedType#, 'CLOSED', 'Y'
+				                    , 'OPENED', 'N'
+				                    , 'MANAGE_CLOSED', 'Y'
+				                    , 'MANAGE_OPENED', 'N'
+				                    , 'FINAL_CLOSE_CLOSED', 'Y'
+				                    , 'FINAL_CLOSE_OPENED', 'N', 'ALL')
+			 ) src
+			WHERE DECODE(#searchClosedType#, '', 'ALL', 'RESULT_CONFIRM',src.RESULT_CONFIRM_YN,'NON_RESULT_CONFIRM',src.RESULT_CONFIRM_YN,'ALL') 
+					    = DECODE(#searchClosedType#, '', 'ALL','RESULT_CONFIRM', 'Y', 'NON_RESULT_CONFIRM','N', 'ALL')
+	   ]]> 
+	</query>
+
+	<!-- 연말정산 코드 조회  -->
+	<query id="selectInputStatusActionCd">
+		<![CDATA[
+			SELECT PAY_ACTION_CD
+				 , PAY_ACTION_NM
+			  FROM tcpn201
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_YM  LIKE #searchWorkYy# || '%'
+			   AND PAY_CD = 'Y1'
+	   ]]> 
+	</query>
+	
+	<!-- 정산자료입력현황 저장  -->
+	<query id="updateInputStatus">
+		<![CDATA[
+			UPDATE TCPN811
+			SET APPRV_YN = #apprv_yn#
+				, INPUT_CLOSE_YN = #input_close_yn#
+				, RESULT_CONFIRM_YN = #result_confirm_yn# 
+				, FINAL_CLOSE_YN = #final_close_yn# 
+				, CHKDATE = SYSDATE 
+				, CHKID = #ssnSabun#
+				, RESULT_OPEN_YN = #result_open_yn#
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun#
+	   ]]> 
+	</query>
+	
+	<!-- 정산자료입력현황 저장-->
+	<query id="deleteFinalCloseTCPN981">
+		<![CDATA[
+			DELETE FROM TCPN981
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #pay_action_cd#
+		]]>
+	</query>
+
+	<!-- 정산자료입력현황 저장 -->
+	<query id="insertFinalCloseTCPN981">
+		<![CDATA[
+			INSERT INTO TCPN981
+			(
+				ENTER_CD
+				, PAY_ACTION_CD
+				, CLOSE_YN
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #pay_action_cd#
+				, (	SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0,'Y','N') FINAL_CLOSE_YN
+			  		  FROM TCPN811
+			 		 WHERE ENTER_CD       = #ssnEnterCd#
+			   		   AND WORK_YY  	  = #work_yy#
+			   		   AND ADJUST_TYPE    = #adjust_type#
+			   		   AND PAY_ACTION_CD  = #pay_action_cd#
+			   	  )
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+</root>

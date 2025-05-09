@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.empContractCre">
+	<!-- 계약서배포 다건 조회 -->
+	<select parameterType="map" resultType="cMap" id="getEmpContractCreList">
+
+				<![CDATA[
+		SELECT A.ENTER_CD
+			 , A.SABUN
+			 , B.NAME
+			 , F_COM_GET_ORG_NM2 (A.ENTER_CD, A.SABUN, A.STD_DATE, #{ssnLocaleCd}) AS ORG_NM
+			 , C.JIKWEE_NM
+			 , C.JIKGUB_NM
+			 , C.JIKCHAK_NM
+			 , A.STD_DATE
+			 , A.CONT_TYPE
+			 , A.AGREE_YN
+			 , DECODE ( A.AGREE_YN, NULL, '', 'N', '',  TO_CHAR( A.AGREE_DATE, 'YYYY-MM-DD hh:mi:ss' ) ) AS AGREE_DATE
+			 , C.STATUS_CD
+			 , A.DISTRIBUTE_YN
+			       ]]>
+			<choose><when test=' searchContType != null and !searchContType.equals("") '>
+					     , E.ELE_NM_ARR
+					     , E.ELE_CD_ARR
+					     , E.ELE_VALUE_ARR
+			</when><otherwise>
+					     , NULL AS ELE_NM_ARR
+					     , NULL AS ELE_CD_ARR
+					     , NULL AS ELE_VALUE_ARR
+			</otherwise>
+			</choose>
+					     , 0 AS DETAIL
+					     , S.PATH||S.FILE_NM AS RD_MRD
+					     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') AS MAIL_ID
+					  FROM THRM412 A
+					     , THRM410 S
+					     , THRM100 B
+					     , THRM151 C
+<if test=' searchContType != null and !searchContType.equals("") '>
+			 , (
+		SELECT V1.ENTER_CD
+				, V1.SABUN
+				, V1.STD_DATE
+				, V1.CONT_TYPE
+				, LISTAGG(V1.ELE_NM, '@') WITHIN GROUP (ORDER BY V1.ENTER_CD, V1.SABUN, V1.STD_DATE, V1.CONT_TYPE, E1.SEQ) ELE_NM_ARR
+				, LISTAGG(E1.ELE_CD, '@') WITHIN GROUP (ORDER BY V1.ENTER_CD, V1.SABUN, V1.STD_DATE, V1.CONT_TYPE, E1.SEQ) ELE_CD_ARR
+				, LISTAGG(NVL(V1.ELE_VALUE, ' '), '@') WITHIN GROUP (ORDER BY V1.ENTER_CD, V1.SABUN, V1.STD_DATE, V1.CONT_TYPE, E1.SEQ) ELE_VALUE_ARR
+		FROM THRM417 V1
+				, THRM415 E1
+		WHERE V1.ENTER_CD = E1.ENTER_CD
+		  AND V1.CONT_TYPE = E1.CONT_TYPE
+		  AND V1.ELE_NM = E1.ELE_NM
+		  AND V1.ENTER_CD = #{ssnEnterCd}
+		  AND V1.CONT_TYPE = TRIM( #{searchContType} )
+			<if test=' searchSabunNameAlias != null and !searchSabunNameAlias.equals("") '>
+					               AND (
+					                        V1.SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					                     OR F_COM_GET_NAMES (V1.ENTER_CD, V1.SABUN) LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					                     OR F_COM_GET_NAMES (V1.ENTER_CD, V1.SABUN, 'ALIAS') LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					                   )
+			</if>
+					             GROUP BY V1.ENTER_CD, V1.SABUN, V1.STD_DATE, V1.CONT_TYPE
+					       ) E
+</if>
+					 WHERE A.ENTER_CD  = S.ENTER_CD
+					   AND A.CONT_TYPE = S.CONT_TYPE
+					   AND A.STD_DATE BETWEEN S.SDATE AND NVL(S.EDATE, '99991231')
+					   AND A.ENTER_CD  = B.ENTER_CD
+					   AND A.SABUN     = B.SABUN
+					   AND B.ENTER_CD  = C.ENTER_CD
+					   AND B.SABUN     = C.SABUN
+					   AND A.STD_DATE BETWEEN C.SDATE AND NVL ( C.EDATE, '99991231')
+					   AND A.STD_DATE BETWEEN REPLACE( NVL(TRIM( #{searchStdDateFrom} ),'19000101'), '-', '') AND REPLACE(NVL(TRIM( #{searchStdDateTo} ),'99991231'), '-', '')
+					   AND A.ENTER_CD = #{ssnEnterCd}
+<if test=' searchSabunNameAlias != null and !searchSabunNameAlias.equals("") '>
+		  AND (
+			A.SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+		   OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN) LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+		   OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+			)
+</if>
+			<if test=' searchContType != null and !searchContType.equals("") '>
+					   AND A.ENTER_CD = E.ENTER_CD(+)
+					   AND A.SABUN = E.SABUN(+)
+					   AND A.STD_DATE = E.STD_DATE(+)
+					   AND A.CONT_TYPE = E.CONT_TYPE(+)
+					   AND A.CONT_TYPE = TRIM( #{searchContType} )
+			</if>
+<if test='searchStatusCd != null and !searchStatusCd.equals("")'>
+					   AND C.STATUS_CD = #{searchStatusCd}
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					   AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, NVL(A.STD_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'))) LIKE  '%'|| #{searchOrgNm} ||'%'
+</if>
+<if test=' searchAgreeYn != null and !searchAgreeYn.equals("") '>
+		  AND NVL(A.AGREE_YN, 'N') = #{searchAgreeYn}
+			</if>
+		ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), A.STD_DATE DESC
+
+
+
+		</select>
+
+
+	<!-- 계약서배포 저장 -->
+	<update parameterType="map" id="saveEmpContractCre">
+
+		MERGE INTO THRM412 T
+			USING (
+				SELECT
+					A.ENTER_CD
+					 , A.SABUN
+					 , A.STD_DATE
+					 , A.CONT_TYPE
+					 , A.AGREE_YN
+					 , A.DISTRIBUTE_YN
+				FROM  (
+						  SELECT
+							  NULL      AS ENTER_CD
+							   , NULL      AS SABUN
+							   , NULL      AS STD_DATE
+							   , NULL      AS CONT_TYPE
+							   , NULL      AS AGREE_YN
+							   , NULL 		AS DISTRIBUTE_YN
+						  FROM DUAL
+							  <bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+						  UNION ALL
+						  SELECT
+							  TRIM( #{ssnEnterCd} )    AS ENTER_CD
+							   , TRIM( #{rm.sabun} )    AS SABUN
+							   , TRIM( #{rm.stdDate} )  AS STD_DATE
+                          , TRIM( #{rm.contType} ) AS CONT_TYPE
+							   , TRIM( #{rm.agreeYn} )  AS AGREE_YN
+                          , TRIM( #{rm.distributeYn} )  AS DISTRIBUTE_YN
+						  FROM DUAL
+</foreach>
+					  ) A
+				WHERE 1=1
+				  AND A.ENTER_CD IS NOT NULL
+				  AND A.SABUN IS NOT NULL
+				  AND A.STD_DATE IS NOT NULL
+				  AND A.CONT_TYPE IS NOT NULL
+			) S
+			ON (
+						T.ENTER_CD = S.ENTER_CD
+					AND T.SABUN = S.SABUN
+					AND T.STD_DATE = S.STD_DATE
+					AND T.CONT_TYPE = S.CONT_TYPE
+				)
+			WHEN MATCHED THEN
+				UPDATE SET
+					T.AGREE_YN = S.AGREE_YN
+					, T.DISTRIBUTE_YN = S.DISTRIBUTE_YN
+					, T.CHKDATE = SYSDATE
+					, T.CHKID = #{ssnSabun}
+			WHEN NOT MATCHED THEN
+				INSERT
+					(
+					 T.ENTER_CD
+						, T.SABUN
+						, T.STD_DATE
+						, T.CONT_TYPE
+						, T.AGREE_YN
+						, T.DISTRIBUTE_YN
+						, CHKDATE
+						, CHKID
+						)
+					VALUES
+						(
+							S.ENTER_CD
+						, S.SABUN
+						, S.STD_DATE
+						, S.CONT_TYPE
+						, S.AGREE_YN
+						, S.DISTRIBUTE_YN
+						, SYSDATE
+						, #{ssnSabun}
+						)
+	</update>
+
+	<!-- 계약서배포 삭제 -->
+	<delete parameterType="map" id="deleteEmpContractCre">
+
+		DELETE FROM THRM412
+		WHERE ENTER_CD = #{ssnEnterCd}
+		  AND ENTER_CD||'_'||SABUN||'_'||STD_DATE||'_'||CONT_TYPE IN ( NULL
+																		   <foreach item="rm" collection="deleteRows" >
+			,
+			<if test='rm.sabun != null and !rm.sabun.equals("")
+      and rm.stdDate != null and !rm.stdDate.equals("")
+      and rm.contType != null and !rm.contType.equals("")'>
+																	   TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.stdDate})||'_'||TRIM(#{rm.contType})
+			</if>
+																		   </foreach>
+			)
+	</delete>
+
+	<!-- 계약서배포 전사원 생성 -->
+	<insert parameterType="map" id="createEmpContractCre">
+		<![CDATA[
+					INSERT INTO THRM412 (ENTER_CD, SABUN, STD_DATE, CONT_TYPE, AGREE_YN, DISTRIBUTE_YN, CHKDATE, CHKID)
+					SELECT ENTER_CD
+					     , SABUN
+					     , REPLACE(#{searchYmd}, '-', '') AS STD_DATE
+					     , #{searchContType} AS CONT_TYPE
+					     , 'N' AS AGREE_YN
+					     , 'N' AS DISTRIBUTE_YN
+					     , SYSDATE
+					     , #{ssnSabun}
+					  FROM THRM151
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL ( EDATE, '99991231')
+					   AND STATUS_CD NOT LIKE 'RA%'
+					   AND SABUN NOT IN (
+					           SELECT SABUN
+					             FROM THRM412
+					            WHERE ENTER_CD = #{ssnEnterCd}
+					              AND CONT_TYPE = #{searchContType}
+					       )
+				]]>
+
+
+	</insert>
+
+	<!-- 계약서 배포 입력 항목 데이터 저장 -->
+	<update parameterType="map" id="saveEmpContractCreEleVal">
+
+		MERGE INTO THRM417	T
+			USING (
+				SELECT	TRIM(#{ssnEnterCd})	AS	ENTER_CD
+					 ,	SABUN
+					 ,	STD_DATE
+					 ,	CONT_TYPE
+					 ,	ELE_NM
+					 ,	ELE_VALUE
+					 ,	SYSDATE				AS	CHKDATE
+					 ,	#{ssnSabun}			AS	CHKID
+				FROM	(
+							SELECT	NULL		AS	SABUN
+								 ,	NULL		AS	STD_DATE
+								 ,	NULL		AS	CONT_TYPE
+								 ,	NULL		AS	ELE_NM
+								 ,	NULL		AS	ELE_VALUE
+							FROM	DUAL
+								<foreach item="rm" collection="mergeRows" >
+
+								<foreach item="col" collection="saveEleColList"  index="index" >
+							UNION ALL
+							SELECT	TRIM(#{rm.sabun})	AS	SABUN
+								 ,	TRIM(#{rm.stdDate})	AS	STD_DATE
+											,	TRIM(#{rm.contType})	AS	CONT_TYPE
+								 ,	TRIM(#{saveEleNmList[${index}]})	AS	ELE_NM
+								 ,	TRIM(#{rm.${col}})	AS	ELE_VALUE
+							FROM	DUAL
+								</foreach>
+								</foreach>
+						)
+				WHERE	SABUN IS NOT NULL
+				  AND		STD_DATE IS NOT NULL
+				  AND		CONT_TYPE IS NOT NULL
+				  AND		ELE_NM IS NOT NULL
+			) S
+			ON	(
+						T.ENTER_CD	= S.ENTER_CD
+					AND	T.SABUN		= S.SABUN
+					AND	T.STD_DATE	= S.STD_DATE
+					AND	T.CONT_TYPE	= S.CONT_TYPE
+					AND T.ELE_NM	= S.ELE_NM
+				)
+			WHEN MATCHED THEN
+				UPDATE SET
+					T.CHKDATE		= S.CHKDATE
+					,	T.CHKID			= S.CHKID
+					,	T.ELE_VALUE		=	S.ELE_VALUE
+			WHEN NOT MATCHED THEN
+				INSERT
+					(
+					 T.ENTER_CD
+						,	T.SABUN
+						,	T.STD_DATE
+						,	T.CONT_TYPE
+						,	T.ELE_NM
+						,	T.ELE_VALUE
+						,	T.CHKDATE
+						,	T.CHKID
+						)
+					VALUES
+						(
+							 S.ENTER_CD
+						,	S.SABUN
+						,	S.STD_DATE
+						,	S.CONT_TYPE
+						,	S.ELE_NM
+						,	S.ELE_VALUE
+						,	S.CHKDATE
+						,	S.CHKID
+						)
+	</update>
+
+	<!-- 계약서 배포 입력 항목 데이터 삭제 -->
+	<delete parameterType="map" id="deleteEmpContractCreEleVal">
+
+		DELETE	FROM THRM417
+		WHERE	(ENTER_CD, SABUN, STD_DATE, CONT_TYPE) IN ((NULL, NULL, NULL, NULL)
+			<foreach item="rm" collection="deleteRows" >
+			<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.stdDate != null and !rm.stdDate.equals("") and rm.contType != null and !rm.contType.equals("") '>
+								, ( TRIM( #{ssnEnterCd} ), TRIM( #{rm.sabun} ), TRIM( #{rm.stdDate} ), TRIM( #{rm.contType} ) )
+			</if>
+			</foreach>
+			)
+	</delete>
+
+
+</mapper>

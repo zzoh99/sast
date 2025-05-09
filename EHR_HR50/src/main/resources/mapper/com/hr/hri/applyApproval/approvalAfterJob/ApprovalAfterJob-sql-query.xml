@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hri.applyApproval.approvalAfterJob">
+	<!-- [공통] 신청서 상세 정보 조회 -->
+	<select parameterType="map" resultType="cMap" id="getApplDetailData">
+		SELECT *
+		  FROM ${table} A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.APPL_SEQ = #{searchApplSeq}
+	</select>
+
+	<!-- [WTM 근무스케줄신청] 변경전 근무스케줄 삭제-->
+	<delete parameterType="map" id="deleteBeforeWorkSch">
+		DELETE TWTM102
+		 WHERE ENTER_CD = #{enterCd}
+		   AND (WRK_DTL_ID, YMD, SABUN, WORK_CD) IN ( (NULL,NULL,NULL,NULL)
+		<foreach collection="deleteList" item="item" >
+			 , (TRIM(#{item.wrkDtlId}), TRIM(#{item.ymd}), TRIM(#{item.sabun}), TRIM(#{item.workCd}))
+		</foreach>
+        		)
+	</delete>
+
+	<!-- [WTM 근무스케줄신청] 근무스케쥴 저장-->
+	<insert parameterType="map" id="saveWorkDetail">
+		INSERT INTO TWTM102 (ENTER_CD, WRK_DTL_ID, YMD, SABUN, WORK_CD,
+		                     PLAN_SYMD, PLAN_SHM, PLAN_EYMD, PLAN_EHM, PLAN_MM,
+		                     APPL_SEQ, INSDATE, INSID, CHKDATE, CHKID)
+		SELECT ENTER_CD, WRK_DTL_ID, YMD, SABUN, WORK_CD
+		     , SYMD, SHM, EYMD, EHM, MM
+		     , APPL_SEQ, SYSDATE, 'ATF_JOB', SYSDATE, 'ATF_JOB'
+		  FROM TWTM202
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND APPL_SEQ = #{searchApplSeq}
+	</insert>
+
+	<!-- [WTM 근태신청] 개인별근태스케쥴 정보 조회 -->
+	<select parameterType="map" resultType="cMap" id="getAttendPlanList">
+		SELECT *
+		  FROM TWTM103 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		<if test="searchBfApplSeq != null and searchBfApplSeq neq ''">
+			AND A.APPL_SEQ = #{searchBfApplSeq}
+		</if>
+		<if test="searchGntDtlId != null and searchGntDtlId neq ''">
+			AND A.GNT_DTL_ID = #{searchGntDtlId}
+		</if>
+	</select>
+
+	<!-- [WTM 근태신청] 개인별근태스케쥴 저장-->
+	<insert parameterType="map" id="saveAttendPlan">
+		INSERT INTO TWTM103 (ENTER_CD, GNT_DTL_ID, YMD, SABUN , GNT_CD,
+							 SYMD, SHM, EYMD, EHM, MM, APP_DAY,
+							 APPL_SEQ, INSDATE, INSID, CHKDATE, CHKID, SEQ)
+		SELECT #{enterCd}, #{gntDtlId}, #{ymd}, #{sabun}, #{gntCd}
+			 , #{ymd}, #{reqSHm}, #{ymd}, #{reqEHm}, #{appMm}, #{appDay}
+			 , #{applSeq}, SYSDATE, 'ATF_JOB', SYSDATE, 'ATF_JOB', #{seq}
+		  FROM DUAL
+	</insert>
+
+	<!-- [WTM 근태신청] 개인별근태스케쥴 삭제-->
+	<delete parameterType="map" id="deleteAttendPlan">
+		DELETE TWTM103
+		 WHERE ENTER_CD = #{enterCd}
+		   AND APPL_SEQ = #{bfApplSeq}
+   		   AND YMD BETWEEN #{sYmd} AND #{eYmd}
+		<if test="gntDtlId != null and gntDtlId neq ''">
+		   AND GNT_DTL_ID = #{gntDtlId}
+		</if>
+	</delete>
+
+	<!-- [WTM 근태신청] 근태신청 일자별 근무시간 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWorkHourMap">
+		<![CDATA[
+			WITH DATES AS (
+				SELECT TO_CHAR((TO_DATE(TRIM(#{ymd}), 'YYYYMMDD') + LEVEL - 1), 'YYYYMMDD') AS DT
+				  FROM DUAL
+			   CONNECT BY LEVEL <= TO_DATE (TRIM(#{ymd}), 'YYYYMMDD') - TO_DATE (TRIM(#{ymd}), 'YYYYMMDD')
+			)
+			SELECT A.DT, B.WORK_CLASS_CD, B.WORK_CLASS_NM, B.WORK_TYPE_CD, NVL(B.WORK_HOURS, 0) AS WORK_HOURS
+			     , F_WTM_GET_HOLIDAY_CNT( #{ssnEnterCd} , TRIM( #{sabun} ), TRIM( #{gntCd} ), 'GNT', A.DT, A.DT ) AS HOLIDAY_CNT
+			  FROM DATES A
+			  LEFT OUTER JOIN (
+								SELECT B.DT
+									 , B.WORK_CLASS_CD
+									 , A.WORK_CLASS_NM
+									 , A.WORK_TYPE_CD
+									 , A.WORK_HOURS
+								  FROM TWTM021 A
+								  JOIN (
+										SELECT ENTER_CD, DT, WORK_CLASS_CD, ROW_NUMBER() OVER (PARTITION BY DT ORDER BY PRIORITY) AS RN
+										  FROM (
+												/* TYPE: EMP */
+												SELECT 1 AS PRIORITY, B.ENTER_CD, A.DT, B.WORK_CLASS_CD
+												  FROM DATES A
+												  JOIN TWTM022 B
+													ON A.DT BETWEEN B.SDATE AND B.EDATE
+												 WHERE B.ENTER_CD = #{ssnEnterCd}
+												   AND B.SABUN = TRIM(#{sabun})
+												/* TYPE: 기본근무 */
+												 UNION ALL
+												SELECT 2 AS PRIORITY, B.ENTER_CD, A.DT, B.WORK_CLASS_CD
+												  FROM DATES A
+												  JOIN TWTM021 B
+													ON A.DT BETWEEN B.SDATE AND B.EDATE
+												 WHERE B.ENTER_CD = #{ssnEnterCd}
+												   AND B.WORK_CLASS_DEF_YN = 'Y'
+											   )
+									   ) B
+									ON A.ENTER_CD = B.ENTER_CD
+								   AND A.WORK_CLASS_CD = B.WORK_CLASS_CD
+								   AND B.RN = 1
+			  				  ) B
+				ON A.DT = B.DT
+		]]>
+	</select>
+
+	<!-- [WTM 근태신청] 근태코드 정보 조회-->
+	<select parameterType="map" resultType="cMap" id="getGunCdInfoMap">
+		SELECT A.GNT_CD
+		     , A.GNT_NM
+		     , A.GNT_GUBUN_CD
+		     , A.MINUS_ALLOW_YN
+			 , A.VACATION_YN
+		     , A.REQUEST_USE_TYPE
+		     , A.BASE_CNT
+		     , A.STD_APPLY_HOUR
+		     , B.GNT_CD AS BASIC_GNT_CD
+		  FROM TWTM041 A
+		  LEFT OUTER JOIN TWTM041 B
+		    ON A.ENTER_CD = B.ENTER_CD
+		   AND A.GNT_GUBUN_CD = B.GNT_GUBUN_CD
+		   AND B.BASIC_GNT_CD_YN = 'Y'
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.GNT_CD = #{searchGntCd}
+	</select>
+
+	<!-- [WTM 근태신청] 발생근태 정보 조회-->
+	<select parameterType="map" resultType="cMap" id="getVacationMap">
+		SELECT *
+		  FROM (
+				SELECT A.LEAVE_ID
+					 , A.SABUN
+					 , A.GNT_CD
+					 , A.USE_S_YMD
+					 , A.USE_E_YMD
+					 , A.USE_CNT
+					 , A.USED_CNT
+					 , A.REST_CNT
+					 , A.COM_CNT
+					 , ROW_NUMBER() OVER (ORDER BY USE_E_YMD ) AS RN
+				  FROM TWTM511 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = #{searchSabun}
+				<if test="searchLeaveId != null and searchLeaveId neq ''">
+				   AND A.LEAVE_ID = #{searchLeaveId}
+				</if>
+				<if test="searchGntCd != null and searchGntCd neq ''">
+				   AND A.GNT_CD = F_WTM_GET_BASIC_GNT_CD(A.ENTER_CD, #{searchGntCd}) -- 대표근태코드로 조회
+				</if>
+				<if test="searchYmd != null and searchYmd neq ''">
+				   AND #{searchYmd} BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+				</if>
+        	   )
+		 WHERE RN = 1
+
+	</select>
+
+	<!-- [WTM 근태신청] 발생근태 잔여 일수 변경-->
+	<update parameterType="map" id="updateVacationCnt">
+		UPDATE TWTM511
+		   SET USED_CNT  = USED_CNT + -(#{appCnt})  -- 사용일수
+			 , REST_CNT  = REST_CNT + #{appCnt} -- 잔여일수
+			 , COM_CNT   = COM_CNT  + #{appCnt} -- 보상일수
+			 , CHKDATE   = SYSDATE
+			 , CHKID     = 'ATF_JOB'
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND SABUN = #{searchSabun}
+		   AND LEAVE_ID = #{searchLeaveId}
+	</update>
+
+	<!-- [WTM 근태신청] 신청서 유효여부 값 변경-->
+	<update parameterType="map" id="updateAttendApplEnableYn">
+		UPDATE TWTM302
+		   SET ENABLE_YN = #{enableYn}
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND APPL_SEQ = #{searchApplSeq}
+		<if test="bfSeq != null and bfSeq neq ''">
+			AND SEQ = #{bfSeq}
+		</if>
+	</update>
+
+	<!-- [WTM 근무신청] 개인별근무스케쥴 저장-->
+	<insert parameterType="list" id="saveWorkPlan">
+		INSERT INTO TWTM102 (ENTER_CD, WRK_DTL_ID, YMD, SABUN, WORK_CD,
+							 PLAN_SYMD, PLAN_SHM, PLAN_EYMD, PLAN_EHM, PLAN_MM,
+							 APPL_SEQ, INSDATE, INSID, CHKDATE, CHKID)
+		<foreach collection="list" item="rm" separator=" UNION ALL ">
+		SELECT #{rm.enterCd}, #{rm.wrkDtlId}, #{rm.ymd}, #{rm.sabun}, #{rm.workCd}
+			 , #{rm.symd}, #{rm.reqSHm}, #{rm.eymd}, #{rm.reqEHm}, #{rm.requestMm}
+			 , #{rm.applSeq}, SYSDATE, 'ATF_JOB', SYSDATE, 'ATF_JOB'
+		  FROM DUAL
+		</foreach>
+	</insert>
+
+	<!-- [WTM 근무신청] 개인별근무스케쥴 삭제-->
+	<delete parameterType="map" id="deleteWorkPlan">
+		DELETE TWTM102
+		 WHERE ENTER_CD = #{enterCd}
+		   AND APPL_SEQ = #{bfApplSeq}
+		   AND YMD BETWEEN #{sYmd} AND #{eYmd}
+		<if test="wrkDtlId != null and wrkDtlId neq ''">
+		   AND WRK_DTL_ID = #{wrkDtlId}
+		</if>
+	</delete>
+
+	<!-- [WTM 근무신청] 신청서 유효여부 값 변경-->
+	<update parameterType="map" id="updateWorkApplEnableYn">
+		UPDATE TWTM312
+		   SET ENABLE_YN = #{enableYn}
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND APPL_SEQ = #{searchApplSeq}
+		<if test="bfSeq != null and bfSeq neq ''">
+			AND SEQ = #{bfSeq}
+		</if>
+	</update>
+
+	<!-- [WTM 출퇴근시간변경신청] 출퇴근시간 삭제-->
+	<delete parameterType="map" id="deleteInoutTime">
+		DELETE TWTM110
+		 WHERE ENTER_CD = #{enterCd}
+		   AND SABUN = #{sabun}
+		   AND YMD = #{ymd}
+	</delete>
+
+
+	<!-- [WTM 근무신청] 개인별근무스케쥴 저장-->
+	<insert parameterType="list" id="saveInoutTime">
+		INSERT INTO TWTM110 (ENTER_CD, YMD, SABUN, SEQ,
+							 IN_YMD, IN_HM, OUT_YMD, OUT_HM, AWAY_YN,
+							 INSDATE, INSID, CHKDATE, CHKID)
+		<foreach collection="list" item="rm" index="idx" separator=" UNION ALL ">
+		SELECT #{rm.enterCd}, #{rm.ymd}, #{rm.sabun}, (#{idx} + 1)
+			 , #{rm.inYmd}, #{rm.inHm}, #{rm.outYmd}, #{rm.outHm}, #{rm.awayYn}
+			 ,SYSDATE, 'ATF_JOB', SYSDATE, 'ATF_JOB'
+		  FROM DUAL
+		</foreach>
+	</insert>
+</mapper>

@@ -1,0 +1,286 @@
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="yjungsan.util.*"%>
+<%@ page import="yjungsan.exception.*"%>
+<%@ page import="java.sql.Connection"%>
+<%@ page import="java.util.List"%>
+<%@ page import="java.util.ArrayList"%>
+<%@ page import="java.util.Map"%>
+<%@ page import="java.util.HashMap"%>
+<%@ page import="java.net.URLDecoder"%>
+ 
+<%@ page import="org.json.JSONObject" %>
+<%@ page import="com.hr.common.logger.Log" %>
+<%@ include file="../common/include/session.jsp"%>
+
+<%!
+
+//수기등록내역 조회
+public List selectSelfInputHisMgrList(Map paramMap, String locPath) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+	List listData = null;
+	
+	String searchBizPlaceCd = String.valueOf(pm.get("searchBizPlaceCd"));
+	String searchAdjustType = String.valueOf(pm.get("searchAdjustType"));
+	String searchSbNm = String.valueOf(pm.get("searchSbNm"));
+	
+	String srhSelfInputYn = String.valueOf(pm.get("srhSelfInputYn")); //수기자료등록여부
+	String srhEvidYn 	  = String.valueOf(pm.get("srhEvidYn"));	  //증빙자료등록여부
+	String searchFileType = String.valueOf(pm.get("searchFileType1"));//구분
+	
+	StringBuffer query   = new StringBuffer();
+	query.setLength(0);
+
+	if(searchBizPlaceCd.trim().length() != 0){
+		query.append(" AND BUSINESS_PLACE_CD = #searchBizPlaceCd#");
+	}
+	if(searchAdjustType.trim().length() != 0){
+		query.append(" AND ADJUST_TYPE = #searchAdjustType#");
+	}else{
+		query.append(" AND ADJUST_TYPE IN ('1','3')");
+	}
+	if(searchSbNm.trim().length() != 0){
+		query.append("AND  ( SABUN LIKE '%'|| #searchSbNm# ||'%' OR NAME LIKE '%'|| #searchSbNm# ||'%' )");
+	}
+	//수기
+	if(srhSelfInputYn.trim().length() != 0){	
+		if(srhSelfInputYn.equals("1")){
+			query.append(" AND (INS_HIS_CNT != 0 OR HOUSE_HIS_CNT != 0 OR SAV_HIS_CNT != 0 OR PEN_HIS_CNT != 0 OR MED_HIS_CNT != 0 OR EDU_HIS_CNT != 0 OR DONA_HIS_CNT != 0 OR CARD_HIS_CNT != 0 OR BE_COM_HIS_CNT != 0 OR ETC_HIS_CNT != 0)");
+		}else{
+			query.append(" AND (INS_HIS_CNT = 0 OR HOUSE_HIS_CNT = 0 OR SAV_HIS_CNT = 0 OR PEN_HIS_CNT = 0 OR MED_HIS_CNT = 0 OR EDU_HIS_CNT = 0 OR DONA_HIS_CNT = 0 OR CARD_HIS_CNT = 0 OR BE_COM_HIS_CNT = 0 OR ETC_HIS_CNT = 0)");
+		}
+	}
+	//증빙
+	if(srhEvidYn.trim().length() != 0){		
+		if(srhEvidYn.equals("1")){
+			query.append(" AND (PER_EVD_DOC_CNT != 0 OR INS_EVD_DOC_CNT != 0 OR HOUSE_EVD_DOC_CNT != 0 OR SAV_EVD_DOC_CNT != 0 OR PEN_EVD_DOC_CNT != 0 OR MED_EVD_DOC_CNT != 0 OR EDU_EVD_DOC_CNT != 0 OR DONA_EVD_DOC_CNT != 0 OR CARD_EVD_DOC_CNT != 0 OR BE_COM_EVD_DOC_CNT != 0 OR ETC_EVD_DOC_CNT != 0)");
+		}else{
+			query.append(" AND (PER_EVD_DOC_CNT = 0 OR INS_EVD_DOC_CNT = 0 OR HOUSE_EVD_DOC_CNT = 0 OR SAV_EVD_DOC_CNT = 0 OR PEN_EVD_DOC_CNT = 0 OR MED_EVD_DOC_CNT = 0 OR EDU_EVD_DOC_CNT = 0 OR DONA_EVD_DOC_CNT = 0 OR CARD_EVD_DOC_CNT = 0 OR BE_COM_EVD_DOC_CNT = 0 OR ETC_EVD_DOC_CNT = 0)");
+		}
+	}
+	if(searchFileType.trim().length() != 0){
+		if(searchFileType.equals("5")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (PER_HIS_CNT != 0 AND PER_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (PER_HIS_CNT != 0 AND PER_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (PER_HIS_CNT = 0 AND PER_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (PER_HIS_CNT = 0 AND PER_EVD_DOC_CNT = 0)");
+		}	     
+		if(searchFileType.equals("10")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (INS_HIS_CNT != 0 AND INS_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (INS_HIS_CNT != 0 AND INS_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (INS_HIS_CNT = 0 AND INS_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (INS_HIS_CNT = 0 AND INS_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("15")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (HOUSE_HIS_CNT != 0 AND HOUSE_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (HOUSE_HIS_CNT != 0 AND HOUSE_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (HOUSE_HIS_CNT = 0 AND HOUSE_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (HOUSE_HIS_CNT = 0 AND HOUSE_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("20")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (SAV_HIS_CNT != 0 AND SAV_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (SAV_HIS_CNT != 0 AND SAV_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (SAV_HIS_CNT = 0 AND SAV_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (SAV_HIS_CNT = 0 AND SAV_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("25")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (PEN_HIS_CNT != 0 AND PEN_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (PEN_HIS_CNT != 0 AND PEN_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (PEN_HIS_CNT = 0 AND PEN_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (PEN_HIS_CNT = 0 AND PEN_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("30")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (MED_HIS_CNT != 0 AND MED_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (MED_HIS_CNT != 0 AND MED_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (MED_HIS_CNT = 0 AND MED_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (MED_HIS_CNT = 0 AND MED_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("35")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (EDU_HIS_CNT != 0 AND EDU_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (EDU_HIS_CNT != 0 AND EDU_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (EDU_HIS_CNT = 0 AND EDU_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (EDU_HIS_CNT = 0 AND EDU_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("40")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (DONA_HIS_CNT != 0 AND DONA_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (DONA_HIS_CNT != 0 AND DONA_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (DONA_HIS_CNT = 0 AND DONA_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (DONA_HIS_CNT = 0 AND DONA_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("42")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (CARD_HIS_CNT != 0 AND CARD_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (CARD_HIS_CNT != 0 AND CARD_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (CARD_HIS_CNT = 0 AND CARD_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (CARD_HIS_CNT = 0 AND CARD_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("45")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (BE_COM_HIS_CNT != 0 AND BE_COM_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (BE_COM_HIS_CNT != 0 AND BE_COM_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (BE_COM_HIS_CNT = 0 AND BE_COM_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (BE_COM_HIS_CNT = 0 AND BE_COM_EVD_DOC_CNT = 0)");
+		}
+		if(searchFileType.equals("50")) {
+			if(srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (ETC_HIS_CNT != 0 AND ETC_EVD_DOC_CNT != 0)");	
+			else if(srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (ETC_HIS_CNT != 0 AND ETC_EVD_DOC_CNT = 0)");
+			else if(!srhSelfInputYn.equals("1") && srhEvidYn.equals("1")) query.append(" AND (ETC_HIS_CNT = 0 AND ETC_EVD_DOC_CNT != 0)");
+			else if(!srhSelfInputYn.equals("1") && !srhEvidYn.equals("1")) query.append(" AND (ETC_HIS_CNT = 0 AND ETC_EVD_DOC_CNT = 0)");
+		}
+	}
+	
+	pm.put("query", query.toString());
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectSelfInputHisMgrList",pm);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+	
+	return listData;
+}
+//증빙자료 상세목록 조회
+public List selectSelfEvidDocMgrList(Map paramMap, String locPath) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+	List listData = null;
+	
+	String searchFileType = String.valueOf(pm.get("searchFileType"));
+	
+	StringBuffer query   = new StringBuffer();
+	query.setLength(0);
+
+	if(searchFileType.trim().length() != 0){
+		query.append("AND A.FILE_TYPE = #searchFileType#");
+	}
+	
+	pm.put("query", query.toString());
+	
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectSelfEvidDocMgrList",pm);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+	
+	return listData;
+}
+//연말정산 파일첨부탭 기능 사용 여부 조회 
+public Map getCpnYeaAddFileYn(Map paramMap, String locPath) throws Exception {
+
+    //파라메터 복사.
+    Map pm =  StringUtil.getParamMapData(paramMap);
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+    Map mp = null;
+
+    try{
+        //쿼리 실행및 결과 받기.
+        mp  = (queryMap==null) ? null : DBConn.executeQueryMap(queryMap,"getCpnYeaAddFileYn",pm);
+    } catch (Exception e) {
+        Log.Error("[Exception] " + e);
+        throw new Exception("조회에 실패하였습니다.");
+    } finally {
+		queryMap = null;
+	}
+
+    return mp;
+}
+%>
+
+<%
+	String locPath = xmlPath+"/selfInputHisMgr/selfInputHisMgr.xml";
+
+	String ssnEnterCd = (String)session.getAttribute("ssnEnterCd");
+	String ssnSabun = (String)session.getAttribute("ssnSabun");
+	String cmd = (String)request.getParameter("cmd");
+
+	if("selectSelfInputHisMgrList".equals(cmd)) {
+		//수기등록 내역 조회
+		
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+	
+		try {
+			listData = selectSelfInputHisMgrList(mp, locPath);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+		
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+		
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("Data", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+		
+	} else if("selectSelfEvidDocMgrList".equals(cmd)) {
+		//증빙자료 목록 조회
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+	
+		try {
+			listData = selectSelfEvidDocMgrList(mp, locPath);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+		
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+		
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("Data", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+		
+	} 
+	 else if("getCpnYeaAddFileYn".equals(cmd)) {
+
+	        Map mp = StringUtil.getRequestMap(request);
+	        mp.put("ssnEnterCd", ssnEnterCd);
+	        mp.put("ssnSabun", ssnSabun);
+
+	        Map mapData  = new HashMap();
+	        String message = "";
+	        String code = "1";
+
+	        try {
+	            mapData = getCpnYeaAddFileYn(mp, locPath);
+	        } catch(Exception e) {
+	            code = "-1";
+	            message = e.getMessage();
+	        }
+
+	        Map mapCode = new HashMap();
+	        mapCode.put("Code", code);
+	        mapCode.put("Message", message);
+
+	        Map rstMap = new HashMap();
+	        rstMap.put("Result", mapCode);
+	        rstMap.put("Data", (Map)mapData);
+	        out.print((new org.json.JSONObject(rstMap)).toString());
+
+	    } 	
+%>

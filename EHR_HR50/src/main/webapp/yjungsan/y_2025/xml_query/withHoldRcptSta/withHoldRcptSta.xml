@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    원천징수영수증
+ -->
+<root>
+
+    <!-- 원천징수영수증 대상자 조회  -->
+    <query id="selectWithHoldRcptStaList">
+        <![CDATA[
+            SELECT Z.*
+                 , ROWNUM AS SORT_NO
+              FROM (
+		            SELECT  A.ENTER_CD
+		                  , A.NAME
+		                  , A.SABUN
+		                  , F_COM_GET_BP_NM(A.ENTER_CD, A.SABUN, #searchWorkYy# || '1231') AS BP_NM
+		                  , A.ORG_NM
+		                  , A.MANAGE_NM
+		                  , '1' AS STAMP_CHK
+		                  , A.RET_YMD
+		                  , A.ADJUST_TYPE
+		                  , SUBSTR(A.ADJUST_TYPE, 1, 1) AS ADJUST_TYPE_NM
+			              , F_CPN_YEA_RECAL_SEQ_CHECK (A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, 'TCPN811', 'GUBUN')  AS GUBUN  -- 재정산 구분
+			              , F_CPN_YEA_RECAL_SEQ_CHECK (A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, 'TCPN811', 'RE_SEQ') AS RE_SEQ -- 재정산 차수
+		              FROM (
+		                    SELECT A.ENTER_CD
+		                         , B.NAME
+		                         , A.SABUN
+		                         , C.ORG_CD
+		                         , F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD,A.WORK_YY || '1231') AS ORG_NM
+		                         , 1 AS SORT_NO
+		                         , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10030', C.MANAGE_CD, NULL) AS MANAGE_NM
+		                         , B.RET_YMD
+		                         , A.ADJUST_TYPE
+		                         , A.WORK_YY
+		                      FROM TCPN811 A
+		                         , THRM100 B
+		                         ,(SELECT X.SABUN
+		                                , X.MANAGE_CD
+		                                , X.ORG_CD
+		                           FROM   THRM151 X
+		                                  ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+		                                      FROM THRM151
+		                                     WHERE ENTER_CD = #ssnEnterCd#
+		                                       AND #searchWorkYy# || '1231' BETWEEN SDATE AND NVL(EDATE,'99991231')
+		                                    GROUP BY ENTER_CD, SABUN
+		                                   ) Y
+		                             WHERE X.ENTER_CD = Y.ENTER_CD
+		                               AND X.SABUN    = Y.SABUN
+		                               AND X.SDATE    = Y.SDATE
+		                           ) C
+		                          , TCPN201 D
+		                     WHERE  A.ENTER_CD            = #ssnEnterCd#
+		                       AND  A.WORK_YY             = #searchWorkYy#
+			                   AND 1 = CASE WHEN #reCalc# = 'Y' THEN CASE WHEN A.ADJUST_TYPE LIKE #searchAdjustType# || '%' THEN 1 END
+			                                WHEN A.ADJUST_TYPE IN ('1', '3') AND A.ADJUST_TYPE LIKE #searchAdjustType# || '%' THEN 1
+			                           END
+		               		   AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+		                       AND  A.BUSINESS_PLACE_CD LIKE #searchBusinessPlaceCd#||'%' 
+		                       AND  ( A.SABUN LIKE '%'|| #searchSbNm# ||'%' OR B.NAME LIKE '%'|| #searchSbNm# ||'%' )
+		                       AND  NVL(A.ORG_NM, ' ') LIKE '%' || #searchOrgNm# || '%'
+		                       AND  B.ENTER_CD = A.ENTER_CD
+		                       AND  B.SABUN    = A.SABUN
+		                       AND  B.SABUN    = C.SABUN(+)
+		                       AND  A.ENTER_CD = D.ENTER_CD
+		                       AND  A.PAY_ACTION_CD = D.PAY_ACTION_CD
+		                       AND  D.PAY_YM LIKE #searchWorkYy# || #searchWorkMm# ||'%'
+		                   ) A
+		             ORDER BY DECODE(#searchSort#, NULL, NAME, '1', NAME, '2', SABUN, '3', ORG_NM, NAME)
+					        , ORG_CD, SABUN, TO_NUMBER(RE_SEQ) DESC
+					) Z
+       ]]> 
+    </query>
+ 	<!-- 원천징수영수증 대상자 조회 페이징  -->
+    <query id="selectWithHoldPaging">
+        <![CDATA[
+        SELECT *
+        FROM (
+	        SELECT ROWNUM AS NUM , T1.*
+		    FROM (        
+	            SELECT  A.ENTER_CD
+	                  , A.NAME
+	                  , A.SABUN
+	                  , F_COM_GET_BP_NM(A.ENTER_CD, A.SABUN, #searchWorkYy# || '1231') AS BP_NM
+	                  , A.ORG_NM
+	                  , ROWNUM AS SORT_NO
+	                  , A.MANAGE_NM
+	                  , '1' AS STAMP_CHK
+	                  , A.RET_YMD
+	                  , A.ADJUST_TYPE
+	                  , SUBSTR(A.ADJUST_TYPE, 1, 1) AS ADJUST_TYPE_NM
+		              , F_CPN_YEA_RECAL_SEQ_CHECK (A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, 'TCPN811', 'GUBUN')  AS GUBUN  -- 재정산 구분
+		              , F_CPN_YEA_RECAL_SEQ_CHECK (A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, 'TCPN811', 'RE_SEQ') AS RE_SEQ -- 재정산 차수
+	              FROM (
+		                    SELECT A.ENTER_CD
+	                         , B.NAME
+	                         , A.SABUN
+	                         , F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD,A.WORK_YY || '1231') AS ORG_NM
+	                         , 1 AS SORT_NO
+	                         , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10030', C.MANAGE_CD, NULL) AS MANAGE_NM
+	                         , B.RET_YMD
+	                         , A.ADJUST_TYPE
+	                         , A.WORK_YY
+	                      FROM TCPN811 A
+	                         , THRM100 B
+	                         ,(SELECT X.SABUN
+	                                , X.MANAGE_CD
+	                                , X.ORG_CD
+	                           FROM   THRM151 X
+	                                  ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+	                                      FROM THRM151
+	                                     WHERE ENTER_CD = #ssnEnterCd#
+	                                       AND #searchWorkYy# || '1231' BETWEEN SDATE AND NVL(EDATE,'99991231')
+	                                    GROUP BY ENTER_CD, SABUN
+	                                   ) Y
+	                             WHERE X.ENTER_CD = Y.ENTER_CD
+	                               AND X.SABUN    = Y.SABUN
+	                               AND X.SDATE    = Y.SDATE
+	                           ) C
+	                          , TCPN201 D
+	                     WHERE  A.ENTER_CD            = #ssnEnterCd#
+	                       AND  A.WORK_YY             = #searchWorkYy#
+		                   AND 1 = CASE WHEN #reCalc# = 'Y' THEN CASE WHEN A.ADJUST_TYPE LIKE #searchAdjustType# || '%' THEN 1 END
+		                                WHEN A.ADJUST_TYPE IN ('1', '3') AND A.ADJUST_TYPE LIKE #searchAdjustType# || '%' THEN 1
+		                           END
+						   AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+	                       AND  A.BUSINESS_PLACE_CD LIKE #searchBusinessPlaceCd#||'%' 
+	                       AND  ( A.SABUN LIKE '%'|| #searchSbNm# ||'%' OR B.NAME LIKE '%'|| #searchSbNm# ||'%' )
+	                       AND  NVL(A.ORG_NM, ' ') LIKE '%' || #searchOrgNm# || '%'
+	                       AND  B.ENTER_CD = A.ENTER_CD
+	                       AND  B.SABUN    = A.SABUN
+	                       AND  B.SABUN    = C.SABUN(+)
+	                       AND  A.ENTER_CD = D.ENTER_CD
+	                       AND  A.PAY_ACTION_CD = D.PAY_ACTION_CD
+	                       AND  D.PAY_YM LIKE #searchWorkYy# || #searchWorkMm# ||'%'
+	                     ORDER BY DECODE(#searchSort#, NULL, B.NAME, '1', B.NAME, '2', A.SABUN, '3', A.ORG_NM, B.NAME)
+						        , C.ORG_CD, SABUN
+	                   ) A
+	            ) T1
+				WHERE ROWNUM <= TO_NUMBER(#edNum#)
+			) T2
+			WHERE T2.NUM >= TO_NUMBER(#stNum#)                     
+       ]]> 
+    </query>    
+    <!-- 원천징수영수증 업로드시 사원정보 조회  -->
+    <query id="selectEmpInfoUsingSabun">
+        <![CDATA[
+            SELECT A.NAME, A.SABUN, C.ORG_NM, B.MANAGE_NM 
+              FROM THRM100 A, THRM151 B, TORG101 C
+             WHERE A.ENTER_CD = #ssnEnterCd# 
+               AND A.SABUN =  #searchSabun#
+               AND A.ENTER_CD = B.ENTER_CD
+               AND A.SABUN = B.SABUN
+               AND B.ENTER_CD = C.ENTER_CD
+               AND B.ORG_CD = C.ORG_CD 
+             ORDER BY A.NAME
+       ]]> 
+    </query>
+    <!-- 원천징수영수증 내역 총 건수 -->
+    <query id="selecWithHoldTotCnt">
+        <![CDATA[
+			  SELECT COUNT(*) AS CNT  
+                FROM TCPN811 A
+                   , THRM100 B
+                   ,(SELECT X.SABUN
+                          , X.MANAGE_CD
+                          , X.ORG_CD
+                     FROM   THRM151 X
+                            ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+                                FROM THRM151
+                               WHERE ENTER_CD = #ssnEnterCd#
+                                 AND #searchWorkYy# || '1231' BETWEEN SDATE AND NVL(EDATE,'99991231')
+                              GROUP BY ENTER_CD, SABUN
+                             ) Y
+                       WHERE X.ENTER_CD = Y.ENTER_CD
+                         AND X.SABUN    = Y.SABUN
+                         AND X.SDATE    = Y.SDATE
+                     ) C
+                    , TCPN201 D
+                WHERE A.ENTER_CD = #ssnEnterCd#
+                  AND A.WORK_YY  = #searchWorkYy#
+	              AND 1 = CASE WHEN #reCalc# = 'Y' THEN CASE WHEN A.ADJUST_TYPE LIKE #searchAdjustType# || '%' THEN 1 END
+	                           WHEN A.ADJUST_TYPE IN ('1', '3') AND A.ADJUST_TYPE LIKE #searchAdjustType# || '%' THEN 1
+	                      END
+	              AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+	              AND  A.BUSINESS_PLACE_CD LIKE #searchBusinessPlaceCd#||'%' 
+	              AND  ( A.SABUN LIKE '%'|| #searchSbNm# ||'%' OR B.NAME LIKE '%'|| #searchSbNm# ||'%' )
+	              AND  NVL(A.ORG_NM, ' ') LIKE '%' || #searchOrgNm# || '%'
+	              AND  B.ENTER_CD = A.ENTER_CD
+	              AND  B.SABUN    = A.SABUN
+	              AND  B.SABUN    = C.SABUN(+)
+	              AND  A.ENTER_CD = D.ENTER_CD
+	              AND  A.PAY_ACTION_CD = D.PAY_ACTION_CD
+	              AND  D.PAY_YM LIKE #searchWorkYy# || #searchWorkMm# ||'%'
+        ]]>
+    </query>
+    
+    <!-- 연말정산 RD 원천징수영수증 작성방법 출력 여부(CPN_YEA_RD_COMMENT_YN) 저장 -->	
+	<query id="SaveRdCmtYn">
+		<![CDATA[
+			MERGE INTO TSYS955 T
+			USING	(
+					SELECT	  A.ENTER_CD
+							, A.STD_CD
+							, A.STD_NM
+							, A.STD_CD_DESC
+							, A.DATA_TYPE
+							, A.STD_CD_VALUE
+							, A.BIZ_CD
+					FROM	(
+							SELECT	  NULL		AS ENTER_CD
+									, NULL		AS STD_CD
+									, NULL		AS STD_NM
+									, NULL		AS STD_CD_DESC
+									, NULL		AS DATA_TYPE
+									, NULL		AS STD_CD_VALUE
+									, NULL		AS BIZ_CD
+							FROM	DUAL
+					UNION ALL
+							SELECT	
+									  TRIM( #ssnEnterCd# )	            AS ENTER_CD
+									, TRIM( 'CPN_YEA_RD_COMMENT_YN' )	AS STD_CD
+									, TRIM( '연말정산 RD 원천징수영수증 작성방법 출력 여부(Y:출력, N:제외)' )	AS STD_NM
+									, TRIM( '연말정산 RD 원천징수영수증 작성방법 출력 여부(Y:출력, N:제외)' )	AS STD_CD_DESC
+									, TRIM( 'C' )	            AS DATA_TYPE
+									, TRIM( #searchRdCmtYn# )	AS STD_CD_VALUE
+									, TRIM( 'CPN' )          	AS BIZ_CD
+									FROM   DUAL
+							) A WHERE A.STD_CD IS NOT NULL
+					) S
+			ON ( T.ENTER_CD = S.ENTER_CD AND T.STD_CD = S.STD_CD )
+			WHEN MATCHED THEN
+				UPDATE SET T.STD_CD_VALUE = S.STD_CD_VALUE
+					 	 , T.CHKDATE	  = SYSDATE
+						 , T.CHKID	      = #ssnSabun#
+			WHEN NOT MATCHED THEN
+				INSERT 
+				(	
+				      T.ENTER_CD
+					, T.STD_CD
+					, T.STD_NM
+					, T.STD_CD_DESC
+					, T.DATA_TYPE
+					, T.STD_CD_VALUE
+					, T.BIZ_CD
+					, T.CHKDATE
+					, T.CHKID
+				) 
+				VALUES 
+				(
+					  S.ENTER_CD
+					, S.STD_CD
+					, S.STD_NM
+					, S.STD_CD_DESC
+					, S.DATA_TYPE
+					, S.STD_CD_VALUE
+					, S.BIZ_CD
+					, SYSDATE
+					, #ssnSabun#
+				)
+       ]]>
+   </query>
+</root>

@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalContact">
+<!-- 인사기본(신상) 유저정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnalContactUserList">
+
+				<![CDATA[
+					  SELECT A.ENTER_CD
+					        ,A.SABUN
+					        ,B.CODE AS CONT_TYPE
+					        ,A.CONT_ADDRESS
+					        ,NVL(F_COM_GET_LANGUAGE_MAPPING (B.ENTER_CD, 'tsys005',  B.LANGUAGE_CD, #{ssnLocaleCd}), B.CODE_NM) as CONT_TYPE_NM
+					        ,B.NOTE1 AS TYPE
+					        ,B.NOTE3 AS REF_CD -- 20200902 공통코드 참조 추가
+					    FROM THRM124 A
+					        ,TSYS005 B
+					   WHERE B.ENTER_CD = A.ENTER_CD(+)
+					     AND B.CODE = A.CONT_TYPE(+)
+					     AND B.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					     AND B.GRCODE_CD = 'H12410' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD
+					     AND B.USE_YN = 'Y'
+					     AND A.SABUN(+) = #{sabun}
+					ORDER BY SEQ
+
+				]]>
+
+
+		</select>
+
+<!-- 인사기본(신상) 주소 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnalContactAddressList">
+
+				<![CDATA[
+					SELECT A.SABUN
+					     , A.ADD_TYPE
+					     , A.ZIP
+					     , A.ADDR1
+					     , A.ADDR2
+					     , A.ADDR_ENG
+					     , A.NOTE
+					     , A.FILE_SEQ
+					  FROM THRM123 A
+					 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					   AND A.SABUN = #{sabun}
+					 ORDER BY A.ADD_TYPE
+				]]>
+
+
+		</select>
+
+<!-- 인사기본(신상) 유저정보 수정 -->
+		<update parameterType="map" id="updatePsnalContactUser">
+
+				<![CDATA[
+					UPDATE THRM100
+					SET WED_YN				= #{wedYn}
+						, REL_CD			= #{relCd}
+						, HOBBY				= #{hobby}
+						, WED_YMD			= #{wedYmd}
+						, BLOOD_CD			= #{bloodCd}
+						, SPECIALITY_NOTE	= #{specialityNote}
+						, CHKDATE			= SYSDATE
+						, CHKID				= #{ssnSabun}
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND SABUN = #{sabun}
+				]]>
+
+
+		</update>
+
+<!-- 인사기본(신상) 유저정보(연락처) 수정 -->
+		<update parameterType="map" id="savePsnalContactTel">
+
+					MERGE INTO THRM124 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.CONT_TYPE
+									, A.CONT_ADDRESS
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS CONT_TYPE
+											, NULL		AS CONT_ADDRESS
+									FROM	DUAL
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.sabun} )	AS SABUN
+											, TRIM( #{rm.contType} )	AS CONT_TYPE
+											, TRIM( #{rm.contAddress} )	AS CONT_ADDRESS
+											FROM   DUAL
+</foreach>
+									) A
+									WHERE A.ENTER_CD IS NOT NULL
+									  AND A.SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.CONT_TYPE = S.CONT_TYPE)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CONT_ADDRESS	= S.CONT_ADDRESS
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.CONT_TYPE
+							, T.CONT_ADDRESS
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.CONT_TYPE
+							, S.CONT_ADDRESS
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+		</update>
+
+<!-- 인사기본(신상) 주소 저장 -->
+		<update parameterType="map" id="savePsnalContactAddress">
+
+					MERGE INTO THRM123 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.ADD_TYPE
+									, A.ZIP
+									, A.ADDR1
+									, A.ADDR2
+									, A.ADDR_ENG
+									, A.NOTE
+									, A.FILE_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS ADD_TYPE
+											, NULL		AS ZIP
+											, NULL		AS ADDR1
+											, NULL		AS ADDR2
+											, NULL		AS ADDR_ENG
+											, NULL		AS NOTE
+											, NULL		AS FILE_SEQ
+									FROM	DUAL
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.sabun} )	AS SABUN
+											, TRIM( #{rm.addType} )	AS ADD_TYPE
+											, TRIM( #{rm.zip} )		AS ZIP
+											, TRIM( #{rm.addr1} )	AS ADDR1
+											, TRIM( #{rm.addr2} )	AS ADDR2
+											, TRIM( #{rm.addrEng} )	AS ADDR_ENG
+											, TRIM( #{rm.note} )	AS NOTE
+											, TRIM( #{rm.fileSeq} )	AS FILE_SEQ
+											FROM   DUAL
+</foreach>
+									) A
+									WHERE A.ENTER_CD IS NOT NULL
+									  AND A.SABUN IS NOT NULL
+									  AND A.ADD_TYPE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD AND T.SABUN = S.SABUN AND T.ADD_TYPE = S.ADD_TYPE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ZIP		= S.ZIP
+									, T.ADDR1	= S.ADDR1
+									, T.ADDR2	= S.ADDR2
+									, T.ADDR_ENG= S.ADDR_ENG
+									, T.NOTE	= S.NOTE
+									, T.FILE_SEQ = S.FILE_SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.ADD_TYPE
+							, T.ZIP
+							, T.ADDR1
+							, T.ADDR2
+							, T.ADDR_ENG
+							, T.NOTE
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.ADD_TYPE
+							, S.ZIP
+							, S.ADDR1
+							, S.ADDR2
+							, S.ADDR_ENG
+							, S.NOTE
+							, S.FILE_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 인사기본(신상) 주소 삭제 -->
+		<delete parameterType="map" id="deletePsnalContactAddress">
+
+					DELETE FROM THRM123
+					WHERE  ENTER_CD||'_'||SABUN||'_'||ADD_TYPE IN 	(  NULL
+							<foreach collection="deleteRows" item="rm" >
+
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sabun != null and !rm.sabun.equals("")
+											and rm.addType != null and !rm.addType.equals("")'>
+											, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.addType} )
+										</if>
+							</foreach>
+										)
+
+
+		</delete>
+
+	</mapper>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="pap.evaluation.mltsrcEvltSbj">
+<!--        조회 -->
+        <select parameterType="map" resultType="cMap" id="getMltsrcEvltSbjtList">
+
+                <![CDATA[
+                            SELECT '0' AS DETAIL
+                                   ,A.SABUN
+                                   ,A.NAME
+                                   ,A.APP_ORG_NM
+                                   ,A.JIKWEE_NM
+                                   ,A.WORK_TYPE_NM
+                                   ,A.JIKGUB_NM
+                                   ,A.JIKCHAK_NM
+                                   ,NVL(B.APPRAISAL_YN,'N') AS APPRAISAL_YN
+                                   ,A.ENTER_CD
+                                   ,A.APPRAISAL_CD
+                                   ,A.APP_ORG_CD
+                                   ,B.APP_SABUN
+                                   ,B.APP_SEQ_CD
+                                   ,B.APP_GROUP_CD
+                                   ,B.APP_STEP_CD
+                                   ,( SELECT APP_POINT
+                                        FROM TPAP406 C
+                                       WHERE A.ENTER_CD     = C.ENTER_CD
+                                         AND A.APPRAISAL_CD = C.APPRAISAL_CD
+                                         AND A.SABUN        = C.SABUN
+                                         AND A.APP_ORG_CD   = C.APP_ORG_CD
+                                         AND B.APP_SEQ_CD   = C.APP_SEQ_CD
+                                         AND B.APP_SABUN    = C.APP_SABUN  ) AS APP_POINT
+                              FROM TPAP201 A,
+                                   TPAP202 B
+                             WHERE A.ENTER_CD      = B.ENTER_CD
+                               AND A.APPRAISAL_CD  = B.APPRAISAL_CD
+                               AND A.APP_ORG_CD    = B.APP_ORG_CD
+                               AND A.APP_STEP_CD   = B.APP_STEP_CD
+                               AND A.SABUN         = B.SABUN
+                               AND B.ENTER_CD      = TRIM(#{ssnEnterCd})
+                               AND B.APPRAISAL_CD  = TRIM(#{searchAppraisalCd})
+                               AND B.APP_STEP_CD   = TRIM(#{searchAppStepCd})
+                               AND B.APP_SABUN     = TRIM(#{searchAppSabun})
+                               AND B.APP_SEQ_CD    IN ('3', '4', '5')
+                                       ]]>
+<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+                               AND B.APP_SEQ_CD    = TRIM(#{searchAppSeqCd})
+</if>
+                               AND A.APP_YN        = 'Y'
+                             ORDER BY B.APP_SEQ_CD, DECODE(A.SABUN, TRIM(#{searchAppSabun}), 1, 2 ), F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+        </select>
+
+        <select parameterType="map" resultType="cMap" id="getMltsrcEvltSbjtMap">
+
+                <![CDATA[
+                    SELECT COL1
+                         , COL2
+                         , COL3
+                         , COL4
+                         , COL5
+                    FROM   ZTST002
+                    WHERE  1 = 1
+                    AND    ROWNUM = 1
+                ]]>
+
+
+        </select>
+
+<!--        저장 -->
+        <update parameterType="map" id="saveMltsrcEvltSbjt">
+
+                    MERGE INTO TPAP202 T
+                    USING   (
+                            SELECT    A.ENTER_CD
+                                    , A.APPRAISAL_CD
+                                    , A.APP_STEP_CD
+                                    , A.SABUN
+                                    , A.APP_ORG_CD
+                                    , A.APP_SEQ_CD
+                                    , A.APP_SABUN
+                                    , A.APPRAISAL_YN
+                            FROM    (
+                                    SELECT    NULL      AS ENTER_CD
+                                            , NULL      AS APPRAISAL_CD
+                                            , NULL      AS APP_STEP_CD
+                                            , NULL      AS SABUN
+                                            , NULL      AS APP_ORG_CD
+                                            , NULL      AS APP_SEQ_CD
+                                            , NULL      AS APP_SABUN
+                                            , NULL      AS APPRAISAL_YN
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT    #{ssnEnterCd}                AS ENTER_CD
+                                            , TRIM( #{rm.appraisalCd} )  AS APPRAISAL_CD
+                                            , TRIM( #{rm.appStepCd} )    AS APP_STEP_CD
+                                            , TRIM( #{rm.sabun} )        AS SABUN
+                                            , TRIM( #{rm.appOrgCd} )     AS APP_ORG_CD
+                                            , TRIM( #{rm.appSeqCd} )     AS APP_SEQ_CD
+                                            , TRIM( #{rm.appSabun} )     AS APP_SABUN
+                                            , TRIM( #{rm.appraisalYn} )  AS APPRAISAL_YN
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.ENTER_CD IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD         = S.ENTER_CD
+                    AND  T.APPRAISAL_CD     = S.APPRAISAL_CD
+                    AND  T.APP_STEP_CD      = S.APP_STEP_CD
+                    AND  T.SABUN            = S.SABUN
+                    AND  T.APP_ORG_CD       = S.APP_ORG_CD
+                    AND  T.APP_SEQ_CD       = S.APP_SEQ_CD
+                    AND  T.APP_SABUN        = S.APP_SABUN
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.APPRAISAL_YN    = S.APPRAISAL_YN
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+        </update>
+<!--        삭제 -->
+        <delete parameterType="map" id="deleteMltsrcEvltSbjt">
+
+                    DELETE FROM ZTST002
+                    WHERE   COL1 IN     (  NULL
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='rm.col1 != null and !rm.col1.equals("")'>
+                                            TRIM( #{rm.col1} )
+                                        </if>
+</foreach>
+                                        )
+        </delete>
+<!--        생성 -->
+        <insert parameterType="map" id="insertMltsrcEvltSbjt">
+
+                        INSERT INTO MainMnMgrTable
+                        (
+                              COL1
+                            , COL2
+                            , COL3
+                            , COL4
+                            , COL5
+                            , COL6
+                            , CHKDATE
+                            , CHKID
+                        )
+                        SELECT    S.COL1
+                                , S.COL2
+                                , S.COL3
+                                , S.COL4
+                                , S.COL5
+                                , S.COL6
+                                , sysdate
+                                , #{ssnSabun}
+                        FROM (
+                                SELECT    NULL  AS COL1
+                                        , NULL  AS COL2
+                                        , NULL  AS COL3
+                                        , NULL  AS COL4
+                                        , NULL  AS COL5
+                                        , NULL  AS COL6
+                                FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+                    UNION ALL
+                                SELECT    TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )  AS COL1
+                                        <bind name="icnt" value="icnt + 1" />
+                                        , TRIM(#{rm.col2})  AS COL2
+                                        , TRIM(#{rm.col3})  AS COL3
+                                        , TRIM(#{rm.col4})  AS COL4
+                                        , TRIM(#{rm.col5})  AS COL5
+                                        , TRIM(#{rm.col6})  AS COL6
+                                FROM   DUAL
+</foreach>
+                            ) S
+                        WHERE S.COL1 IS NOT NULL
+        </insert>
+<!--        수정 -->
+        <update parameterType="map" id="updateMltsrcEvltSbjt">
+
+                <![CDATA[
+                    UPDATE ZTST002 T SET
+                    (     COL1
+                        , COL2
+                        , COL3
+                        , COL4
+                        , CHKDATE
+                        , CHKID
+                        )
+                    =
+                    (   SELECT    S.COL1
+                                , S.COL2
+                                , S.COL3
+                                , S.COL4
+                                , S.COL5
+                                , S.COL6
+                                , SYSDATE
+                                , #{ssnSabun}
+                        FROM (
+                            SELECT    NULL  AS COL1
+                                    , NULL  AS COL2
+                                    , NULL  AS COL3
+                                    , NULL  AS COL4
+                                    , NULL  AS COL5
+                                    , NULL  AS COL6
+                                    FROM   DUAL
+                                    ]]>
+<foreach item="rm" collection="updateRows" >
+                    UNION ALL
+                                SELECT
+                                          TRIM(#{rm.col1})  AS COL1
+                                        , TRIM(#{rm.col2})  AS COL2
+                                        , TRIM(#{rm.col3})  AS COL3
+                                        , TRIM(#{rm.col4})  AS COL4
+                                        , TRIM(#{rm.col5})  AS COL5
+                                        , TRIM(#{rm.col6})  AS COL6
+                                FROM   DUAL
+</foreach>
+                            ) S
+                        WHERE S.COL1 IS NOT NULL
+                    )
+                    WHERE EXISTS (
+                                    SELECT S.COL1
+                                    FROM (
+                                            SELECT  S.COL1
+                                            FROM (
+                                                SELECT  NULL                AS COL1 FROM    DUAL
+                <foreach item="rm" collection="updateRows" > UNION ALL        SELECT  TRIM(#{rm.col1})    AS COL1 FROM    DUAL  </foreach>
+                                                ) S
+                                            WHERE S.COL1 IS NOT NULL
+                                        )S
+                                    WHERE T.COL1 = S.COL1
+                                )
+        </update>
+
+</mapper>

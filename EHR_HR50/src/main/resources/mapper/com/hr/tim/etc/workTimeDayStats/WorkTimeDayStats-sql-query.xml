@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.etc.workTimeDayStats">
+
+	<!-- 헤더 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeDayStatsHeaderList">
+
+				<![CDATA[
+				SELECT A.SUN_DATE AS DAY
+				     , A.DAY_NM
+				     , SUBSTR(A.SUN_DATE, 1,4) || '년'		AS YEAR
+				     , TO_CHAR(TO_DATE(A.SUN_DATE,'YYYYMMDD'), 'MM/DD') || '(' || A.DAY_NM || ')'	AS SHORT_DAY_NM
+				     , 't' || A.SUN_DATE			AS SAVE_NAME
+				     , 'x' || A.SUN_DATE			AS EXT_SAVE_NAME
+				     , 'u' || A.SUN_DATE			AS TOT_SAVE_NAME
+				     , 'calcT'	|| A.SUN_DATE		AS CALC_SAVE_NAME
+				     , 'calcX'	|| A.SUN_DATE		AS CALC_EXT_SAVE_NAME
+				     , 'calcU'	|| A.SUN_DATE		AS CALC_TOT_SAVE_NAME
+				     , 'CALC_T'	|| A.SUN_DATE		AS CALC_COL_NAME
+				     , 'CALC_X'	|| A.SUN_DATE		AS CALC_COL_EXT_NAME
+				     , 'CALC_U'	|| A.SUN_DATE		AS CALC_COL_TOT_NAME
+				  FROM TSYS007 A
+				 WHERE A.SUN_DATE BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+				 ORDER BY A.SUN_DATE
+				]]>
+
+
+		</select>
+
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTimeDayStatsList">
+
+				<![CDATA[
+				WITH TEMP AS (
+					SELECT A.*
+					     , D.WORK_HH_A
+					     , D.WORK_HH_B
+					     , D.WORK_MM_A
+					     , D.WORK_MM_B
+					  FROM (
+							SELECT C.*
+							     , A1.NAME
+							     , B.ORG_CD
+							     , B.JIKGUB_NM
+							     , B.JIKCHAK_NM
+							     , B.MANAGE_NM
+							  FROM THRM100 A1
+							     , THRM151 B
+							     , TSYS007 A2
+							     , TTIM120_V C
+							 WHERE A2.SUN_DATE BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+							   AND A1.ENTER_CD = TRIM( #{ssnEnterCd} )
+			                   AND A1.ENTER_CD = B.ENTER_CD
+			                   AND A1.SABUN    = B.SABUN
+			                   /* AND A2.SUN_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231') */
+		                       AND B.SDATE = (SELECT MAX(SDATE)
+		                                        FROM THRM151
+		                                       WHERE ENTER_CD = B.ENTER_CD
+		                                         AND SABUN    = B.SABUN
+		                                         AND A2.SUN_DATE BETWEEN SDATE AND NVL(EDATE,'99991231'))  --INDEX 태우기 위함..
+		                                         
+		                       AND A1.ENTER_CD = C.ENTER_CD
+		                       AND A1.SABUN    = C.SABUN
+		                       AND A2.SUN_DATE = C.YMD
+		                               ]]>
+<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+			                   AND A1.SABUN IN (SELECT SABUN
+			                   					  FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+					   							)
+</if>
+<if test='searchName != null and !searchName.equals("")'>
+						       AND (A1.SABUN LIKE TRIM( #{searchName} ) OR A1.NAME LIKE '%'||TRIM( #{searchName} )||'%')
+</if>
+<if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+					           AND B.JIKGUB_CD   = #{searchJikgubCd}
+</if>
+<if test='searchManageCd != null and !searchManageCd.equals("")'>
+					           AND B.MANAGE_CD   = #{searchManageCd}
+</if>
+<if test='searchWorkGrpCd != null and !searchWorkGrpCd.equals("")'>
+								/* 근무그룹 */
+					           AND C.WORK_GRP_CD = #{searchWorkGrpCd}
+</if>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+		                       AND B.ORG_CD IN (SELECT #{searchOrgCd}
+                                                  FROM DUAL
+							<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+							 <![CDATA[
+	                                            UNION
+	                                            SELECT ORG_CD
+	                                              FROM (
+	                                                  	SELECT *
+														  FROM TORG105
+														 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+														   AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = #{ssnEnterCd} AND SDATE <= REPLACE( #{searchSymd},'-','') )
+	                                              	   )
+	                                             START WITH PRIOR_ORG_CD   =  #{searchOrgCd}
+	                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+	                                                    AND PRIOR SDATE    = SDATE
+	                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+							 ]]>
+							</if>
+											    )
+</if>
+<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+		                    AND B.ORG_CD IN (SELECT SCOPE_VALUE
+											   FROM TSYS319
+											  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+											    AND GRP_CD  = #{ssnGrpCd}
+											    AND AUTH_SCOPE_CD = 'W10'
+											    AND SABUN = #{ssnSabun}
+							<if test='searchOrgType and searchOrgType.equals("Y")'>
+                              /*하위조직포함일때 Y , 아닐때 N */
+							 <![CDATA[
+	                                            UNION
+	                                            SELECT ORG_CD
+	                                              FROM TORG105
+	                                             WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+	                                               AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SDATE <= REPLACE( #{searchSymd},'-','')  )
+	                                             START WITH PRIOR_ORG_CD   in (SELECT SCOPE_VALUE FROM TSYS319 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+																				 AND GRP_CD  = #{ssnGrpCd}
+																				 AND AUTH_SCOPE_CD = 'W10'
+																				 AND SABUN = #{ssnSabun})
+	                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+	                                                    AND PRIOR SDATE    = SDATE
+	                                                    AND PRIOR ORG_CD   = PRIOR_ORG_CD
+							     ]]>
+							</if>
+											  )
+</if>
+					  	    ) A
+						 , ( SELECT X.ENTER_CD, X.YMD, X.SABUN
+						          , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_HH, 0)),0) AS WORK_HH_A  -- 근무시간(시간)
+						          , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_HH)),0) AS WORK_HH_B  -- 연장시간(시간)
+						          , NVL(SUM(DECODE( Y.DAY_TYPE, '101', X.WORK_MM, 0)),0) AS WORK_MM_A  -- 근무시간(분)
+						          , NVL(SUM(DECODE( Y.DAY_TYPE, '101', 0, X.WORK_MM)),0) AS WORK_MM_B  -- 연장시간(분)
+						       FROM TTIM337 X, TTIM015 Y
+						      WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+						        AND X.YMD BETWEEN REPLACE(#{searchSymd},'-','') AND REPLACE(#{searchEymd},'-','')
+						        AND X.ENTER_CD = Y.ENTER_CD
+						        AND X.WORK_CD  = Y.WORK_CD
+						        AND Y.DAY_TYPE IN ('101', '103', '105', '203', '205' ) --  정규근무(101),야간근무(103),연장근무(105),휴일야간근무(203),휴일연장근무(205)
+						      GROUP BY X.ENTER_CD, X.YMD, X.SABUN
+						   ) D
+					 WHERE A.ENTER_CD    = D.ENTER_CD(+)
+					   AND A.SABUN       = D.SABUN(+)
+					   AND A.YMD         = D.YMD(+)
+
+				)
+				SELECT * 
+				  FROM (
+				
+				
+							SELECT 1 AS GUBUN
+							     , F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE(#{searchSymd},'-','')) AS SEQ
+							     , A.SABUN
+								, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'T11020', A.WORK_GRP_CD) AS WORK_GRP_NM
+							     , (SELECT MAP_NM FROM TORG109 WHERE ENTER_CD = A.ENTER_CD AND MAP_TYPE_CD = '500' AND MAP_CD = A.WORK_ORG_CD) AS WORK_ORG_NM
+							     , A.NAME
+							     , A.ORG_CD
+			                     , F_COM_GET_ORG_NM( A.ENTER_CD, A.ORG_CD, REPLACE(#{searchSymd},'-','')) AS ORG_NM
+							     , A.JIKGUB_NM
+							     , A.JIKCHAK_NM
+							     , A.MANAGE_NM
+<foreach item="rtitles" collection="titles" >
+					 			 , F_TIM_FMT_TIME( SUM(DECODE( A.YMD, #{rtitles.day}, WORK_HH_A, 0)), SUM(DECODE( A.YMD, #{rtitles.day}, WORK_MM_A, 0)) )  ${rtitles.saveName}
+					 			 , F_TIM_FMT_TIME( SUM(DECODE( A.YMD, #{rtitles.day}, WORK_HH_B, 0)), SUM(DECODE( A.YMD, #{rtitles.day}, WORK_MM_B, 0)) )  ${rtitles.extSaveName}
+					 			 , F_TIM_FMT_TIME( SUM(DECODE( A.YMD, #{rtitles.day}, WORK_HH_A+WORK_HH_B, 0)), SUM(DECODE( A.YMD, #{rtitles.day}, WORK_MM_A+WORK_MM_B, 0)) )  ${rtitles.totSaveName}
+
+</foreach>
+							  FROM TEMP A
+							GROUP BY A.ENTER_CD, A.SABUN, A.WORK_GRP_CD, A.WORK_ORG_CD, A.NAME, A.ORG_CD, A.JIKGUB_NM, A.JIKCHAK_NM, A.MANAGE_NM
+							UNION ALL
+							-- 합계
+							SELECT 2 AS GUBUN
+							     , NULL AS SEQ
+							     , NULL AS SABUN
+								 , NULL AS WORK_GRP_NM
+							     , NULL AS WORK_ORG_NM
+							     , NULL AS NAME
+							     , NULL AS ORG_CD
+			                     , NULL AS ORG_NM
+							     , NULL AS JIKGUB_NM
+							     , NULL AS JIKCHAK_NM
+							     , NULL AS MANAGE_NM
+<foreach item="rtitles" collection="titles" >
+					 			 , F_TIM_FMT_TIME( SUM(DECODE( A.YMD, #{rtitles.day}, WORK_HH_A, 0)), SUM(DECODE( A.YMD, #{rtitles.day}, WORK_MM_A, 0)) )  ${rtitles.saveName}
+					 			 , F_TIM_FMT_TIME( SUM(DECODE( A.YMD, #{rtitles.day}, WORK_HH_B, 0)), SUM(DECODE( A.YMD, #{rtitles.day}, WORK_MM_B, 0)) )  ${rtitles.extSaveName}
+					 			 , F_TIM_FMT_TIME( SUM(DECODE( A.YMD, #{rtitles.day}, WORK_HH_A+WORK_HH_B, 0)), SUM(DECODE( A.YMD, #{rtitles.day}, WORK_MM_A+WORK_MM_B, 0)) )  ${rtitles.totSaveName}
+</foreach>
+							     
+							  FROM TEMP A
+						)
+				  ORDER BY GUBUN, SEQ			
+				
+
+
+		</select>
+
+
+</mapper>

@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.retirementEtcReward">
+	
+<!-- 		퇴지계산관리  조회 -->
+		<select parameterType="map" resultType="cMap" id="getDayLatestCodePopup">
+
+				<![CDATA[
+				
+				  SELECT PAY_ACTION_CD, PAY_ACTION_NM, PAY_CD, PAY_YM
+				    FROM TCPN201
+				   WHERE ENTER_CD = #{ssnEnterCd}
+				     AND PAY_ACTION_CD = (
+				     					  SELECT PAY_ACTION_CD 
+				     						FROM (    -- 최근 급여일자 가져오는 방법 변경 PAY_ACTION_CD 기준에서 지급일자 기준으로(토다이수 요청) jylee 2016.10.19
+													  SELECT A.PAY_ACTION_CD, ROW_NUMBER()OVER(ORDER BY A.PAY_YM DESC, A.PAYMENT_YMD DESC, A.PAY_ACTION_CD DESC ) AS RN
+														FROM TCPN201 A, TCPN051 B, TCPN981 C
+													   WHERE A.ENTER_CD = #{ssnEnterCd}
+													     AND B.ENTER_CD = A.ENTER_CD
+														 AND B.PAY_CD   = A.PAY_CD
+														 AND B.RUN_TYPE LIKE '00004'
+														 AND C.ENTER_CD(+)      = A.ENTER_CD
+														 AND C.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+														 AND NVL(C.CLOSE_YN, 'N') LIKE '%'
+												 )
+										   WHERE RN = 1
+										 )
+
+				]]>
+
+
+		</select>
+		
+<!-- 		퇴지계산관리 팝업 리스트  조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetirementCalcPopupList">
+
+				<![CDATA[
+				
+					SELECT PAY_ACTION_CD, PAY_ACTION_NM, PAY_YM, PAY_CD, PAYMENT_YMD
+					  FROM (
+						SELECT ROWNUM AS RNUM, PAY_ACTION_CD, PAY_ACTION_NM, PAY_YM, PAY_CD, PAYMENT_YMD
+						  FROM (				
+								SELECT A.PAY_ACTION_CD, A.PAY_ACTION_NM, A.PAY_YM, A.PAY_CD, A.PAYMENT_YMD
+								  FROM TCPN201 A, TCPN051 B, TCPN203 C
+								 WHERE A.ENTER_CD = #{ssnEnterCd}
+								           		]]>
+								   <if test='searchPayCd != null and !searchPayCd.equals("")'>
+										AND A.PAY_CD LIKE #{searchPayCd}
+								   </if>
+								   AND A.PAY_YM BETWEEN NVL(REPLACE(#{searchPayYmFrom},'-',''), '000001') AND NVL(REPLACE(#{searchPayYmTo},'-',''), '999912')
+								   AND A.ENTER_CD = B.ENTER_CD
+								   AND A.PAY_CD   = B.PAY_CD
+								   AND B.RUN_TYPE LIKE '00004'
+								   AND A.ENTER_CD = C.ENTER_CD
+								   AND A.PAY_ACTION_CD = C.PAY_ACTION_CD
+								   AND C.SABUN LIKE '%'|| TRIM( #{ssnSabun} ) ||'%'
+								 ORDER BY A.PAY_YM DESC
+								) 
+					       ) 
+
+
+
+
+		</select>
+		
+<!-- 		 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetirementEtcRewardList">
+
+				<![CDATA[
+				
+					SELECT PAY_ACTION_CD, PAY_ACTION_NM, SABUN, ELEMENT_CD, ELEMENT_NM, BASE_MON, BASE_RATE, BON_MON, NAME, ORG_NM, JIKGUB_NM
+					FROM (
+					SELECT ROWNUM AS RNUM, PAY_ACTION_CD, PAY_ACTION_NM, SABUN, ELEMENT_CD, ELEMENT_NM, BASE_MON, BASE_RATE, BON_MON, NAME, ORG_NM, JIKGUB_NM
+					  FROM (				
+							SELECT A.PAY_ACTION_CD, E.PAY_ACTION_NM, A.SABUN, A.ELEMENT_CD, D.ELEMENT_NM, A.BASE_MON, A.BASE_RATE, A.BON_MON, B.NAME, F_COM_GET_ORG_NM(A.ENTER_CD, C.ORG_CD, #{ssnBaseDate}) AS ORG_NM, C.JIKGUB_NM
+							  FROM TCPN729 A, THRM100 B, 
+							  ( SELECT 
+									SUB1.* 
+								FROM THRM151 SUB1, ( SELECT 	
+														MAX(SDATE) AS SDATE, ENTER_CD, SABUN FROM THRM151
+													WHERE 	ENTER_CD = #{ssnEnterCd}
+													AND 	#{ssnBaseDate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+													GROUP BY ENTER_CD, SABUN) SUB2
+								WHERE 	SUB1.ENTER_CD   = #{ssnEnterCd}
+								AND 	SUB1.ENTER_CD	= SUB2.ENTER_CD
+								AND 	SUB1.SABUN	    = SUB2.SABUN
+								AND 	SUB1.SDATE      = SUB2.SDATE )  C, 
+								( SELECT 
+									SUB1.* 
+								FROM TCPN011 SUB1, ( SELECT 
+														MAX(SDATE) AS SDATE, ENTER_CD, ELEMENT_TYPE, ELEMENT_CD 
+													FROM TCPN011
+													WHERE ENTER_CD = #{ssnEnterCd}
+													AND #{ssnBaseDate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+													GROUP BY ENTER_CD, ELEMENT_TYPE, ELEMENT_CD) SUB2
+								WHERE SUB1.ENTER_CD      = #{ssnEnterCd}
+								AND SUB1.ENTER_CD      = SUB2.ENTER_CD
+								AND SUB1.ELEMENT_TYPE  = SUB2.ELEMENT_TYPE
+								AND SUB1.ELEMENT_CD    = SUB2.ELEMENT_CD
+								AND SUB1.SDATE         = SUB2.SDATE		 )  D, 
+								TCPN201 E
+							 WHERE A.ENTER_CD = #{ssnEnterCd}
+							   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+							           		]]>
+							<if test='searchSabunName != null and !searchSabunName.equals("")'>
+							   AND (LOWER(A.SABUN) LIKE '%'||LOWER(TRIM( #{searchSabunName} ))||'%' OR LOWER(B.NAME) LIKE '%'||LOWER(TRIM( #{searchSabunName} ))||'%')
+							</if>
+					
+							   AND B.ENTER_CD(+) = A.ENTER_CD
+							   AND B.SABUN(+)    = A.SABUN
+					
+							   AND C.ENTER_CD(+) = A.ENTER_CD
+							   AND C.SABUN(+)    = A.SABUN
+					
+							   AND D.ENTER_CD(+)   = A.ENTER_CD
+							   AND D.ELEMENT_CD(+) = A.ELEMENT_CD
+					
+							   AND E.ENTER_CD(+)      = A.ENTER_CD
+							   AND E.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+					
+							 ORDER BY A.PAY_ACTION_CD DESC
+						   ) 
+					   )
+
+
+
+
+		</select>
+		
+<!-- 		 저장 -->
+		<update parameterType="map" id="saveRetirementEtcReward">
+
+				
+					MERGE INTO TCPN729 T
+					USING (
+					    SELECT A.ENTER_CD
+					        , A.PAY_ACTION_CD
+					        , A.SABUN
+					        , A.ELEMENT_CD
+					        , A.BASE_MON
+					        , A.BASE_RATE
+							, A.BON_MON
+					     FROM ( 
+							SELECT NULL AS ENTER_CD
+								, NULL AS PAY_ACTION_CD
+								, NULL AS SABUN
+								, NULL AS ELEMENT_CD
+								, NULL AS BASE_MON
+								, NULL AS BASE_RATE
+								, NULL AS BON_MON
+							FROM DUAL 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					        UNION ALL
+					        SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+								, TRIM(#{rm.payActionCd}) AS PAY_ACTION_CD
+					            , TRIM(#{rm.sabun}) AS SABUN
+					            , TRIM(#{rm.elementCd}) AS ELEMENT_CD
+					            , TRIM(#{rm.baseMon}) AS BASE_MON
+					            , TRIM(#{rm.baseRate}) AS BASE_RATE
+					            , TRIM(#{rm.bonMon}) AS BON_MON
+					        FROM DUAL 
+</foreach>
+						) A WHERE 1 = 1 
+						AND A.ENTER_CD IS NOT NULL 
+						AND A.PAY_ACTION_CD IS NOT NULL 
+						AND A.SABUN IS NOT NULL 
+					) S     ON ( T.ENTER_CD = S.ENTER_CD
+					AND T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					AND T.SABUN = S.SABUN
+							)
+					WHEN MATCHED THEN
+					    UPDATE SET
+							T.ELEMENT_CD = S.ELEMENT_CD
+						  , T.BASE_MON = S.BASE_MON
+						  , T.BASE_RATE = S.BASE_RATE
+						  , T.BON_MON = S.BON_MON
+						  , T.CHKDATE = SYSDATE
+						  , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT ( T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.SABUN
+							, T.ELEMENT_CD
+							, T.BASE_MON
+							, T.BASE_RATE
+							, T.BON_MON
+							, T.CHKDATE
+							, T.CHKID
+					    ) VALUES ( 
+							  S.ENTER_CD
+							, S.PAY_ACTION_CD
+							, S.SABUN
+							, S.ELEMENT_CD
+							, S.BASE_MON
+							, S.BASE_RATE
+							, S.BON_MON
+							, SYSDATE
+							, #{ssnSabun}
+					    )
+
+
+
+
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteRetirementEtcReward">
+
+
+					DELETE FROM TCPN729
+					WHERE 	(ENTER_CD,PAY_ACTION_CD,SABUN) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.payActionCd != null and !rm.payActionCd.equals("")'>
+										, TRIM( #{rm.payActionCd} )
+										</if>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+										, TRIM( #{rm.sabun} )
+										</if>
+										)
+
+
+</foreach>
+										)
+
+
+
+		</delete>
+	
+	</mapper>

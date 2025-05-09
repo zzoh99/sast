@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.payPeakTargetMgr">
+		<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayPeakTargetMgrList">
+			
+				<![CDATA[
+					WITH DATA AS (
+				        SELECT	A.YY																			-- 기준년도
+						,		A.BIR_YMD																		-- 생년월일
+				        ,		B.WORK_TYPE																		-- 직군코드
+				        ,		B.WORK_TYPE_NM													 				-- 직군
+				        , 		F_COM_GET_ORG_NM(A.ENTER_CD,	B.ORG_CD, B.SDATE) 				AS ORG_NM		-- 소속
+				        ,		A.ENTER_CD																		-- 회사구분
+				        , 		A.SABUN																			-- 사번
+				        , 		F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) 				AS NAME		 	-- 성명
+				        ,		A.PEAK_CD																		-- 임금피크구분코드
+				        ,       A.YEAR_SEQ
+				        ,		A.MEMO																			-- 메모(비고)
+				        ,       A.BF_PEAK_MON
+				        ,       A.AF_PEAK_MON
+				        , 		A.SDATE
+				        , 		A.EDATE
+				        FROM 	TCPN129 A
+				        , 		(
+				            	 SELECT SUB1.*
+				                 FROM	THRM151 SUB1
+				                 ,		(
+				                 		 SELECT MAX(SDATE) AS SDATE
+				                 		 , 		ENTER_CD
+				                 		 , 		SABUN
+				                         FROM 	THRM151
+				                         WHERE 	ENTER_CD = #{ssnEnterCd}
+				                         AND 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				              		  GROUP BY  ENTER_CD, SABUN
+				              	 		) SUB2
+				                 WHERE	SUB1.ENTER_CD = #{ssnEnterCd}
+				                 AND 	SUB1.ENTER_CD = SUB2.ENTER_CD
+				                 AND 	SUB1.SABUN    = SUB2.SABUN
+				                 AND 	SUB1.SDATE    = SUB2.SDATE
+				          ) B
+				         WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				         AND A.ENTER_CD   = B.ENTER_CD
+				         AND A.SABUN      = B.SABUN
+				    )
+				         
+				    SELECT	A.YY
+				    ,		A.BIR_YMD
+				    ,		A.ENTER_CD
+				    ,		A.WORK_TYPE_NM
+				    ,		A.ORG_NM
+				    ,		A.SABUN
+					,		A.NAME
+				    ,		A.BIR_YMD
+				    ,		A.PEAK_CD
+					,		A.MEMO
+				    , 		A.SDATE
+				    , 		A.EDATE
+					,       A.BF_PEAK_MON
+				    ,       A.AF_PEAK_MON
+				    ,       A.YEAR_SEQ
+				    FROM	DATA A
+				    WHERE 	1=1 ]]>
+				    <if test="searchFromYear != null and searchFromYear neq ''">
+				    <![CDATA[
+				    	AND 	A.YY >= TRIM(#{searchFromYear})
+				    ]]>
+				    </if>
+					<if test="searchToYear != null and searchToYear neq ''">
+					<![CDATA[
+					AND 	A.YY <= TRIM(#{searchToYear})
+					]]>
+					</if>
+				    <if test="searchSaNm != null and searchSaNm neq ''">
+				    AND 	(A.SABUN LIKE TRIM(#{searchSaNm}) || '%' OR A.NAME LIKE TRIM(#{searchSaNm}) || '%')
+				    </if>
+				ORDER BY	F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.SDATE)
+		</select>
+
+		<!-- 저장 -->
+		<update parameterType="map" id="savePayPeakTargetMgr">
+					MERGE INTO TCPN129 T
+					USING	(
+							SELECT	YY
+							,		BIR_YMD
+							,		SABUN
+							, 		PEAK_CD
+							,       YEAR_SEQ
+							,       BF_PEAK_MON
+							,       AF_PEAK_MON
+							, 		SDATE
+							, 		EDATE
+							, 		MEMO
+							FROM	(
+									SELECT	NULL	AS YY
+									,		NULL	AS BIR_YMD
+									,		NULL	AS SABUN
+									, 		NULL	AS PEAK_CD
+									,       NULL	AS YEAR_SEQ
+									,       NULL	AS BF_PEAK_MON
+									,       NULL	AS AF_PEAK_MON
+									, 		NULL	AS SDATE
+									, 		NULL	AS EDATE
+									, 		NULL	AS MEMO
+									FROM	DUAL
+
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT  TRIM( #{rm.yy} )      AS YY
+									,		TRIM( #{rm.birYmd} )  AS BIR_YMD
+									,		TRIM( #{rm.sabun} )   AS SABUN
+									, 		TRIM( #{rm.peakCd} )  AS PEAK_CD
+									,       TRIM( #{rm.yearSeq} )  AS YEAR_SEQ
+									,       TRIM( #{rm.bfPeakMon} )  AS BF_PEAK_MON
+									,       TRIM( #{rm.afPeakMon} )  AS AF_PEAK_MON
+									, 		TRIM( #{rm.sdate} )   AS SDATE
+									, 		TRIM( #{rm.edate} )   AS EDATE
+									, 		TRIM( #{rm.memo} )    AS MEMO
+									FROM   	DUAL
+</foreach>
+									) WHERE SABUN IS NOT NULL
+							) S
+					ON (    T.ENTER_CD = #{ssnEnterCd}
+						AND T.SABUN    = S.SABUN
+						AND T.PEAK_CD  = S.PEAK_CD
+						AND T.SDATE    = S.SDATE
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	T.YY	  = S.YY
+						,			T.BIR_YMD = S.BIR_YMD
+						,			T.EDATE   = S.EDATE
+						, 			T.YEAR_SEQ   = S.YEAR_SEQ
+						, 			T.BF_PAEK_MON   = S.BF_PAEK_MON
+						, 			T.AF_PAEK_MON   = S.AF_PAEK_MON
+						, 			T.MEMO    = S.MEMO
+						, 			T.CHKDATE = SYSDATE
+						, 			T.CHKID	  = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.YY
+							, T.BIR_YMD
+							, T.ENTER_CD
+							, T.SABUN
+							, T.PEAK_CD
+							, T.YEAR_SEQ
+							, T.BF_PEAK_MON
+							, T.AF_PEAK_MON
+							, T.SDATE
+							, T.EDATE
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.YY
+							, S.BIR_YMD
+							, #{ssnEnterCd}
+							, S.SABUN
+							, S.PEAK_CD
+							, S.YEAR_SEQ
+							, S.BF_PEAK_MON
+							, S.AF_PEAK_MON
+							, S.SDATE
+							, S.EDATE
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		<!-- 삭제 -->
+		<delete parameterType="map" id="deletePayPeakTargetMgr">
+			
+					DELETE	FROM TCPN129
+					WHERE 	(ENTER_CD, SABUN, PEAK_CD, SDATE) IN ((NULL, NULL, NULL, NULL)
+
+					<foreach item="rm" collection="deleteRows">
+					,
+						<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+							<if test="rm.sabun != null and rm.sabun neq ''">
+								<if test="rm.peakCd != null and rm.peakCd neq ''">
+									<if test="rm.sdate != null and sdate neq ''">
+										(#{ssnEnterCd}, TRIM( #{rm.sabun} ) ,TRIM( #{rm.peakCd} ) ,TRIM( #{rm.sdate} ) )
+									</if>
+								</if>
+							</if>
+						</if>
+					</foreach>
+					)
+		</delete>
+		
+		<!-- 임금피크대상자생성 프로시저 -->
+		<update id="prcCreatePayPeakTarget" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_CPN_PEAK_EMP_CRE(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchFromYear,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+</mapper>

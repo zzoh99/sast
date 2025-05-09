@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.config.holidayMgr">
+
+    <!-- 휴일관리 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmHolidayMgrList">
+        <choose>
+            <when test="searchBizPlaceCd != null and !searchBizPlaceCd.equals('') and !searchBizPlaceCd.equals('all')">
+                SELECT A.ENTER_CD,
+                A.YY,
+                A.MM,
+                A.DD,
+                A.HOLIDAY_CD,
+                A.HOLIDAY_NM,
+                A.GUBUN,
+                A.FESTIVE_YN,
+                A.HOLIDAY_YN,
+                A.PAY_YN,
+                A.BUSINESS_PLACE_CD,
+                B.BUSINESS_PLACE_NM,
+                A.RP_YY,
+                A.RP_MM,
+                A.RP_DD,
+                A.REPEAT_YN,
+                A.SUBSTITUTE_TYPE,
+                A.INPUT_DATE,
+                A.ADD_DAYS_YN,
+                A.INPUT_GROUP_ID
+                FROM TWTM001 A LEFT JOIN (
+                SELECT
+                X.ENTER_CD,
+                X.BUSINESS_PLACE_CD,
+                X.BUSINESS_PLACE_NM
+                FROM TCPN121 X
+                WHERE X.ENTER_CD = #{ssnEnterCd}
+                AND X.SDATE = (
+                SELECT MAX(Y.SDATE)
+                FROM TCPN121 Y
+                WHERE Y.ENTER_CD = X.ENTER_CD
+                AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+                )
+                ) B
+                ON A.ENTER_CD = B.ENTER_CD
+                AND A.BUSINESS_PLACE_CD = B.BUSINESS_PLACE_CD
+                WHERE A.ENTER_CD = #{ssnEnterCd}
+                AND A.YY = #{searchYear}
+                AND A.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+                ORDER BY A.YY, A.MM, A.DD, A.HOLIDAY_NM, A.BUSINESS_PLACE_CD
+            </when>
+            <otherwise>
+                SELECT
+                A.ENTER_CD,
+                A.YY,
+                A.MM,
+                A.DD,
+                A.HOLIDAY_CD,
+                A.HOLIDAY_NM,
+                A.GUBUN,
+                A.FESTIVE_YN,
+                A.HOLIDAY_YN,
+                A.PAY_YN,
+                CASE WHEN COUNT(DISTINCT A.BUSINESS_PLACE_CD) > 1 THEN 'all'
+                ELSE MAX(A.BUSINESS_PLACE_CD)
+                END AS BUSINESS_PLACE_CD,
+                CASE
+                WHEN COUNT(DISTINCT A.BUSINESS_PLACE_CD) > 1 THEN '공통'
+                ELSE COALESCE(MAX(B.BUSINESS_PLACE_NM), 'Unknown')
+                END AS BUSINESS_PLACE_NM,
+                A.RP_YY,
+                A.RP_MM,
+                A.RP_DD,
+                A.REPEAT_YN,
+                A.SUBSTITUTE_TYPE,
+                A.INPUT_DATE,
+                A.ADD_DAYS_YN,
+                A.INPUT_GROUP_ID
+                FROM TWTM001 A LEFT JOIN (
+                SELECT
+                X.ENTER_CD,
+                X.BUSINESS_PLACE_CD,
+                X.BUSINESS_PLACE_NM
+                FROM TCPN121 X
+                WHERE X.ENTER_CD = #{ssnEnterCd}
+                AND X.SDATE = (
+                SELECT MAX(Y.SDATE)
+                FROM TCPN121 Y
+                WHERE Y.ENTER_CD = X.ENTER_CD
+                AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+                )
+                ) B
+                ON A.ENTER_CD = B.ENTER_CD
+                AND A.BUSINESS_PLACE_CD = B.BUSINESS_PLACE_CD
+                WHERE A.ENTER_CD = #{ssnEnterCd}
+                AND A.YY = #{searchYear}
+                GROUP BY
+                A.ENTER_CD,
+                A.YY,
+                A.MM,
+                A.DD,
+                A.HOLIDAY_CD,
+                A.HOLIDAY_NM,
+                A.GUBUN,
+                A.FESTIVE_YN,
+                A.HOLIDAY_YN,
+                A.PAY_YN,
+                A.RP_YY,
+                A.RP_MM,
+                A.RP_DD,
+                A.REPEAT_YN,
+                A.SUBSTITUTE_TYPE,
+                A.INPUT_DATE,
+                A.ADD_DAYS_YN,
+                A.INPUT_GROUP_ID
+                ORDER BY
+                A.YY,
+                A.MM,
+                A.DD,
+                A.HOLIDAY_NM
+            </otherwise>
+        </choose>
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmHolidayMgrById">
+        SELECT A.ENTER_CD, A.YY, A.MM, A.DD, A.HOLIDAY_CD
+             , A.HOLIDAY_NM, A.GUBUN, A.FESTIVE_YN, A.HOLIDAY_YN, A.PAY_YN
+             , CASE
+        WHEN COUNT(DISTINCT A.BUSINESS_PLACE_CD) > 1 THEN 'all'
+        ELSE MAX(A.BUSINESS_PLACE_CD)
+        END AS BUSINESS_PLACE_CD,
+        CASE
+        WHEN COUNT(DISTINCT A.BUSINESS_PLACE_CD) > 1 THEN '전체'
+        ELSE COALESCE(MAX(B.BUSINESS_PLACE_NM), 'Unknown')
+        END AS BUSINESS_PLACE_NM,
+        A.RP_YY,
+        A.RP_MM,
+        A.RP_DD,
+        A.REPEAT_YN,
+        A.SUBSTITUTE_TYPE,
+        A.INPUT_DATE,
+        A.ADD_DAYS_YN
+        FROM TWTM001 A
+        LEFT JOIN (
+        SELECT
+        X.ENTER_CD,
+        X.BUSINESS_PLACE_CD,
+        X.BUSINESS_PLACE_NM
+        FROM TCPN121 X
+        WHERE X.ENTER_CD = #{ssnEnterCd}
+        AND X.SDATE = (
+        SELECT MAX(Y.SDATE)
+        FROM TCPN121 Y
+        WHERE Y.ENTER_CD = X.ENTER_CD
+        AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+        )
+        ) B
+        ON A.ENTER_CD = B.ENTER_CD
+        AND A.BUSINESS_PLACE_CD = B.BUSINESS_PLACE_CD
+        WHERE A.ENTER_CD = #{ssnEnterCd}
+        AND A.HOLIDAY_CD = #{holidayCd}
+        <if test='searchYear != null and !searchYear.equals("")'>
+            AND A.YY = #{searchYear}
+        </if>
+        GROUP BY
+        A.ENTER_CD, A.YY, A.MM, A.DD, A.HOLIDAY_CD, A.HOLIDAY_NM,
+        A.GUBUN, A.FESTIVE_YN, A.HOLIDAY_YN, A.PAY_YN, A.RP_YY,
+        A.RP_MM, A.RP_DD, A.REPEAT_YN, A.SUBSTITUTE_TYPE,
+        A.INPUT_DATE,
+        A.ADD_DAYS_YN
+        ORDER BY
+        A.YY, A.MM, A.DD, A.HOLIDAY_NM
+    </select>
+
+    <delete parameterType="map" id="deleteWtmHolidayMgr">
+        DELETE FROM TWTM001
+         WHERE ENTER_CD = #{ssnEnterCd}
+        <if test="searchBizPlaceCd != null and searchBizPlaceCd neq '' and searchBizPlaceCd neq 'all'">
+            AND BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+        </if>
+        <choose>
+            <when test="inputGroupId != null and inputGroupId neq '' and deleteType != 'current'">
+                AND INPUT_GROUP_ID = #{inputGroupId}
+            </when>
+            <otherwise>
+                AND HOLIDAY_CD = #{holidayCd}
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="deleteType == 'current'">
+                AND YY = #{searchYear}
+            </when>
+            <when test="deleteType == 'current_future'">
+                AND yy >= #{searchYear}
+            </when>
+        </choose>
+    </delete>
+
+    <select parameterType="map" resultType="cMap" id="getWtmHolidayMgrCnt">
+        WITH HolidayCounts AS (SELECT A.BUSINESS_PLACE_CD,
+                                      COUNT(*) AS COUNT
+        FROM TWTM001 A
+        WHERE A.ENTER_CD = #{ssnEnterCd}
+          AND A.YY = #{searchYear}
+        GROUP BY A.BUSINESS_PLACE_CD
+            ),
+            HolidayAllCounts AS (
+        SELECT 'all' AS BUSINESS_PLACE_CD, COUNT (*) AS COUNT
+        FROM (
+            SELECT HOLIDAY_CD, COUNT (DISTINCT BUSINESS_PLACE_CD) AS BP_COUNT
+            FROM TWTM001
+            WHERE ENTER_CD = #{ssnEnterCd}
+            AND YY = #{searchYear}
+            GROUP BY HOLIDAY_CD
+            ) T
+        WHERE T.BP_COUNT
+            > 1
+            )
+            , CombinedCounts AS (
+        SELECT BUSINESS_PLACE_CD, COUNT
+        FROM HolidayCounts
+        UNION ALL
+        SELECT BUSINESS_PLACE_CD, COUNT
+        FROM HolidayAllCounts
+            ), BusinessPlaceNames AS (
+        SELECT X.BUSINESS_PLACE_CD AS CODE, X.BUSINESS_PLACE_NM AS CODE_NM
+        FROM TCPN121 X
+        WHERE X.ENTER_CD = #{ssnEnterCd}
+          AND X.SDATE = (SELECT MAX (Y.SDATE)
+            FROM TCPN121 Y
+            WHERE Y.ENTER_CD = X.ENTER_CD
+          AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+          AND TO_CHAR(SYSDATE
+            , 'YYYYMMDD') BETWEEN Y.SDATE
+          AND NVL(Y.EDATE
+            , '99991231'))
+            )
+        SELECT CC.BUSINESS_PLACE_CD,
+               CASE
+                   WHEN CC.BUSINESS_PLACE_CD = 'all' THEN '공통휴일'
+                   ELSE COALESCE(BPN.CODE_NM, 'N/A')
+                   END AS BUSINESS_PLACE_NM,
+               SUM(CC.COUNT) AS COUNT
+        FROM CombinedCounts CC
+            LEFT JOIN BusinessPlaceNames BPN
+        ON CC.BUSINESS_PLACE_CD = BPN.CODE
+        GROUP BY CC.BUSINESS_PLACE_CD, BPN.CODE_NM
+        ORDER BY CASE WHEN CC.BUSINESS_PLACE_CD = 'all' THEN '0' ELSE '1'
+        END, CC.BUSINESS_PLACE_CD
+    </select>
+
+    <insert parameterType="list" id="insertWtmHolidayMgr">
+        INSERT ALL
+        <foreach collection="list" item="holiday" separator="">
+            INTO TWTM001 (
+            ENTER_CD, YY, HOLIDAY_CD, HOLIDAY_NM, MM, DD, GUBUN,
+            FESTIVE_YN, PAY_YN, CHKDATE, CHKID, BUSINESS_PLACE_CD,
+            RP_YY, RP_MM, RP_DD, HOLIDAY_YN, REPEAT_YN, SUBSTITUTE_TYPE, INPUT_DATE,
+            ADD_DAYS_YN, INPUT_GROUP_ID
+            ) VALUES (
+            #{holiday.ssnEnterCd},
+            #{holiday.yy},
+            #{holiday.holidayCd},
+            #{holiday.holidayNm},
+            #{holiday.mm},
+            #{holiday.dd},
+            #{holiday.gubun},
+            NVL(#{holiday.festiveYn}, 'N'),
+            NVL(#{holiday.payYn}, 'N'),
+            SYSDATE,
+            #{holiday.ssnSabun},
+            #{holiday.bizPlace},
+            #{holiday.rpYy},
+            #{holiday.rpMm},
+            #{holiday.rpDd},
+            NVL(#{holiday.holidayYn}, 'Y'),
+            NVL(#{holiday.repeatYn}, 'N'),
+            NVL(#{holiday.substituteType}, 'N'),
+            #{holiday.inputDate},
+            NVL(#{holiday.addDaysYn}, 'N'),
+            #{holiday.inputGroupId}
+            )
+        </foreach>
+        SELECT 1 FROM DUAL
+    </insert>
+
+    <select parameterType="map" resultType="cMap" id="getSunDate">
+        SELECT SUN_DATE
+        FROM TSYS007
+        WHERE MOON_DATE = #{moonDate}
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmHolidayMgrGeoDate">
+        SELECT SUN_DATE, SUN_EVENT, MOON_DATE, MOON_EVENT
+        FROM TSYS007
+        <choose>
+            <when test='gubun.equals("1")'>
+                WHERE SUN_DATE = REPLACE(TRIM(#{searchAppYmd}), '-', '')
+            </when>
+            <when test='gubun.equals("2")'>
+                WHERE MOON_DATE = REPLACE(TRIM(#{searchAppYmd}), '-', '')
+            </when>
+            <otherwise>
+                WHERE 1=0
+            </otherwise>
+        </choose>
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getReplaceHoliday">
+        SELECT SUBSTR(SUN_DATE, 0, 4) AS RP_YY,
+               SUBSTR(SUN_DATE, 5, 2) AS RP_MM,
+               SUBSTR(SUN_DATE, 7, 2) AS RP_DD
+        FROM (SELECT MIN(A.SUN_DATE) AS SUN_DATE
+              FROM (SELECT SUN_DATE,
+                           TO_CHAR(TO_DATE(SUN_DATE, 'YYYYMMDD'), 'D') DAY,
+                           SUN_EVENT
+                    FROM TSYS007 A
+                    WHERE 1 = 1
+                      AND SUBSTR(SUN_DATE, 0, 4) = #{searchYear}
+                      AND SUN_DATE >= '20210815' -- 법령 개정에 따른 적용 시작일
+                   ) A
+              WHERE A.DAY NOT IN ('1', '7')
+                AND A.SUN_DATE NOT IN (SELECT YY || MM || DD
+                                       FROM TWTM001
+                                       WHERE ENTER_CD = #{ssnEnterCd}
+                                         AND YY = #{searchYear}
+                                         AND YY || MM || DD >= '20210815' -- 법령 개정에 따른 적용 시작일
+              )
+                AND A.SUN_DATE NOT IN (SELECT NVL(RP_YY, '0000') || NVL(RP_MM, '00') || NVL(RP_DD, '00')
+                                       FROM TWTM001
+                                       WHERE ENTER_CD = #{ssnEnterCd}
+                                         AND YY = #{searchYear}
+                                         AND YY || MM || DD >= '20210815' -- 법령 개정에 따른 적용 시작일
+              )
+                AND A.SUN_DATE > #{searchDate})
+    </select>
+
+    <delete parameterType="map" id="deleteWtmHolidayMgrAll">
+        DELETE FROM TWTM001
+         WHERE ENTER_CD = #{ssnEnterCd}
+           AND yy = #{searchYear}
+        <if test="searchBizPlaceCd != null and searchBizPlaceCd neq 'all'">
+            AND BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+        </if>
+    </delete>
+
+    <update parameterType="list" id="mergeWtmHolidayMgr">
+        MERGE INTO TWTM001 T
+        USING
+        (
+            SELECT ENTER_CD, YY, HOLIDAY_CD, HOLIDAY_NM, MM
+                 , DD, GUBUN, FESTIVE_YN, PAY_YN, CHKDATE
+                 , CHKID, BUSINESS_PLACE_CD, RP_YY, RP_MM, RP_DD
+                 , HOLIDAY_YN, REPEAT_YN, SUBSTITUTE_TYPE, INPUT_DATE
+                 , ADD_DAYS_YN, INPUT_GROUP_ID
+              FROM (
+                       SELECT NULL AS ENTER_CD, NULL AS YY, NULL AS HOLIDAY_CD, NULL AS HOLIDAY_NM, NULL AS MM
+                            , NULL AS DD, NULL AS GUBUN, NULL AS FESTIVE_YN, NULL AS PAY_YN, NULL AS CHKDATE
+                            , NULL AS CHKID, NULL AS BUSINESS_PLACE_CD, NULL AS RP_YY, NULL AS RP_MM, NULL AS RP_DD
+                            , NULL AS HOLIDAY_YN, NULL AS REPEAT_YN, NULL AS SUBSTITUTE_TYPE, NULL AS INPUT_DATE
+                            , NULL AS ADD_DAYS_YN, NULL AS INPUT_GROUP_ID
+                         FROM DUAL
+                       UNION ALL
+                       <foreach collection="list" item="holiday" separator=" UNION ALL ">
+                       SELECT NVL(#{holiday.ssnEnterCd}, #{holiday.enterCd}) AS ENTER_CD, #{holiday.yy} AS YY, #{holiday.holidayCd} AS HOLIDAY_CD, #{holiday.holidayNm} AS HOLIDAY_NM, #{holiday.mm} AS MM
+                            , #{holiday.dd} AS DD, #{holiday.gubun} AS GUBUN, NVL(#{holiday.festiveYn}, 'N') AS FESTIVE_YN, NVL(#{holiday.payYn}, 'N') AS PAY_YN, SYSDATE AS CHKDATE
+                            , #{holiday.ssnSabun} AS CHKID, #{holiday.bizPlace} AS BUSINESS_PLACE_CD, #{holiday.rpYy} AS RP_YY, #{holiday.rpMm} AS RP_MM, #{holiday.rpDd} AS RP_DD
+                            , NVL(#{holiday.holidayYn}, 'Y') AS HOLIDAY_YN, NVL(#{holiday.repeatYn}, 'N') AS REPEAT_YN, NVL(#{holiday.substituteType}, 'N') AS SUBSTITUTE_TYPE, #{holiday.inputDate} AS INPUT_DATE
+                            , NVL(#{holiday.addDaysYn}, 'N') AS ADD_DAYS_YN, #{holiday.inputGroupId} AS INPUT_GROUP_ID
+                         FROM DUAL
+                       </foreach>
+                   )
+             WHERE ENTER_CD IS NOT NULL
+               AND YY IS NOT NULL
+               AND HOLIDAY_CD IS NOT NULL
+               AND BUSINESS_PLACE_CD IS NOT NULL
+        ) S
+        ON (
+                  T.ENTER_CD = S.ENTER_CD
+              AND T.YY = S.YY
+              AND T.BUSINESS_PLACE_CD = S.BUSINESS_PLACE_CD
+              AND T.HOLIDAY_CD = S.HOLIDAY_CD
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.GUBUN = S.GUBUN
+                     , T.FESTIVE_YN = S.FESTIVE_YN
+                     , T.PAY_YN = S.PAY_YN
+                     , T.CHKDATE = S.CHKDATE
+                     , T.CHKID = S.CHKID
+                     , T.RP_YY = S.RP_YY
+                     , T.RP_MM = S.RP_MM
+                     , T.RP_DD = S.RP_DD
+                     , T.HOLIDAY_YN = S.HOLIDAY_YN
+                     , T.REPEAT_YN = S.REPEAT_YN
+                     , T.SUBSTITUTE_TYPE = S.SUBSTITUTE_TYPE
+                     , T.INPUT_DATE = S.INPUT_DATE
+                     , T.ADD_DAYS_YN = S.ADD_DAYS_YN
+                     , T.INPUT_GROUP_ID = S.INPUT_GROUP_ID
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                  T.ENTER_CD, T.YY, T.HOLIDAY_CD, T.HOLIDAY_NM, T.MM
+                , T.DD, T.GUBUN, T.FESTIVE_YN, T.PAY_YN, T.CHKDATE
+                , T.CHKID, T.BUSINESS_PLACE_CD, T.RP_YY, T.RP_MM, T.RP_DD
+                , T.HOLIDAY_YN, T.REPEAT_YN, T.SUBSTITUTE_TYPE, T.INPUT_DATE
+                , T.ADD_DAYS_YN, T.INPUT_GROUP_ID
+            )
+            VALUES
+            (
+                  S.ENTER_CD, S.YY, S.HOLIDAY_CD, S.HOLIDAY_NM, S.MM
+                , S.DD, S.GUBUN, S.FESTIVE_YN, S.PAY_YN, S.CHKDATE
+                , S.CHKID, S.BUSINESS_PLACE_CD, S.RP_YY, S.RP_MM, S.RP_DD
+                , S.HOLIDAY_YN, S.REPEAT_YN, S.SUBSTITUTE_TYPE, S.INPUT_DATE
+                , S.ADD_DAYS_YN, S.INPUT_GROUP_ID
+            )
+    </update>
+
+    <select parameterType="map" resultType="cMap" id="getWtmHolidayDeleteLayerDeleteType">
+        <choose>
+            <when test="searchBusinessPlaceCd != null and searchBusinessPlaceCd neq '' and searchBusinessPlaceCd neq 'all'">
+                <![CDATA[
+                SELECT CASE WHEN T.INPUT_GROUP_ID IS NULL THEN 'Y'
+                            WHEN NVL(( SELECT COUNT(1)
+                               FROM TWTM001
+                              WHERE ENTER_CD = T.ENTER_CD
+                                AND INPUT_GROUP_ID = T.INPUT_GROUP_ID ), 1) = 1 THEN 'Y' ELSE 'N' END AS SOLO_YN
+                     , CASE WHEN T.INPUT_GROUP_ID IS NULL THEN 'N'
+                            WHEN NVL(( SELECT COUNT(1)
+                               FROM TWTM001
+                              WHERE ENTER_CD = T.ENTER_CD
+                                AND BUSINESS_PLACE_CD = T.BUSINESS_PLACE_CD
+                                AND INPUT_GROUP_ID = T.INPUT_GROUP_ID
+                                AND YY > T.YY ), 0) = 0 THEN 'N' ELSE 'Y' END AS EXISTS_AFT_YN
+                  FROM TWTM001 T
+                 WHERE T.ENTER_CD = TRIM(#{ssnEnterCd})
+                   AND T.YY = TRIM(#{searchYear})
+                   AND T.HOLIDAY_CD = TRIM(#{searchHolidayCd})
+                   AND T.BUSINESS_PLACE_CD = TRIM(#{searchBusinessPlaceCd})
+                ]]>
+            </when>
+            <otherwise>
+                <![CDATA[
+                SELECT CASE WHEN T.INPUT_GROUP_ID IS NULL THEN 'Y'
+                            WHEN NVL(( SELECT COUNT(1)
+                               FROM TWTM001
+                              WHERE ENTER_CD = T.ENTER_CD
+                                AND INPUT_GROUP_ID = T.INPUT_GROUP_ID ), 1) = 1 THEN 'Y' ELSE 'N' END AS SOLO_YN
+                     , CASE WHEN T.INPUT_GROUP_ID IS NULL THEN 'N'
+                            WHEN NVL(( SELECT COUNT(1)
+                               FROM TWTM001
+                              WHERE ENTER_CD = T.ENTER_CD
+                                AND INPUT_GROUP_ID = T.INPUT_GROUP_ID
+                                AND YY > T.YY ), 0) = 0 THEN 'N' ELSE 'Y' END AS EXISTS_AFT_YN
+                  FROM (
+                           SELECT ENTER_CD, YY, MAX(INPUT_GROUP_ID) AS INPUT_GROUP_ID
+                             FROM TWTM001
+                            WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+                              AND YY = TRIM(#{searchYear})
+                              AND HOLIDAY_CD = TRIM(#{searchHolidayCd})
+                            GROUP BY ENTER_CD, YY, HOLIDAY_CD
+                       ) T
+                ]]>
+            </otherwise>
+        </choose>
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getWtmHolidayMgrMaxDate">
+        SELECT
+            MAX(SUN_DATE) AS MAX_SUN_DATE
+            ,MAX(MOON_DATE) AS MAX_MOON_DATE
+        FROM TSYS007
+    </select>
+
+</mapper>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.yearEduPlan.yearEduStd">
+		
+		<select parameterType="map" resultType="cMap" id="getYearEduStdList">
+			
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.YEAR
+						     , A.SDATE
+						     , A.EDATE
+						     , A.FILE_SEQ
+						     , A.NOTE
+						  FROM TTRA500 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                      ORDER BY A.YEAR DESC
+				]]>
+			
+			
+		</select>
+		
+		<update parameterType="map" id="saveYearEduStd">
+						 MERGE INTO TTRA500 T 
+						 USING 
+						( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+						   SELECT TRIM(#{ssnEnterCd})  		AS ENTER_CD
+					            , TRIM(#{rm.year}) 			AS YEAR
+				           		, TRIM(#{rm.sdate}) 		AS SDATE
+				            	, TRIM(#{rm.edate}) 		AS EDATE
+					            , TRIM(#{rm.fileSeq}) 		AS FILE_SEQ
+					            , TRIM(#{rm.note}) 			AS NOTE
+					        FROM DUAL
+</foreach>
+						) S 
+						ON ( 
+						          T.ENTER_CD = S.ENTER_CD 
+						     AND  T.YEAR = S.YEAR 
+						) 
+						WHEN MATCHED THEN 
+						   UPDATE SET T.CHKDATE		= sysdate 
+						            , T.CHKID	    = #{ssnSabun} 
+						            , T.SDATE		= S.SDATE 
+						            , T.EDATE 		= S.EDATE 
+						            , T.FILE_SEQ 	= S.FILE_SEQ 
+						            , T.NOTE 		= S.NOTE 
+						WHEN NOT MATCHED THEN 
+						   INSERT 
+						   ( 
+						              T.ENTER_CD
+						            , T.YEAR
+						            , T.SDATE
+						            , T.EDATE
+						            , T.FILE_SEQ
+						            , T.NOTE
+						            , T.CHKDATE
+						            , T.CHKID
+						   ) 
+						   VALUES 
+						   ( 
+						              S.ENTER_CD
+						            , S.YEAR
+						            , S.SDATE
+						            , S.EDATE
+						            , S.FILE_SEQ
+						            , S.NOTE
+						            , sysdate
+						            , #{ssnSabun}
+						   ) 
+		</update>
+		
+		<delete parameterType="map" id="deleteYearEduStd">
+			
+					DELETE FROM TTRA500
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+					   AND ( YEAR ) IN ( ( NULL) 
+<foreach item="rm" collection="deleteRows"> 
+    <if test="rm.year != null and rm.year neq ''">
+					     , ( TRIM( #{rm.year} ) ) 
+    </if>
+</foreach>
+					       )
+			
+			
+		</delete>
+		
+</mapper>

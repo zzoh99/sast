@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	사업소득관리 
+ -->
+<root>
+
+		
+		<!-- 		중복 사번 체크 -->
+		<query id="getSabunChk">
+			<![CDATA[
+					SELECT COUNT(*) AS CNT 
+					     , WM_CONCAT(SABUN) AS SABUNS
+					  FROM TYEA821
+					 WHERE ENTER_CD = #ssnEnterCd#
+					   AND INCOME_TYPE = '61'
+				   	   $query$
+				   	   
+				]]>
+		</query>	
+
+<!-- 		조회 -->
+		<query id="getSimplePymtBsnsIncp2Mgr">
+			<![CDATA[
+				SELECT   ENTER_CD
+					   , DECODE(FINAL_CLOSE_YN,'Y',1,0) AS FINAL_CLOSE_YN					-- 마감여부
+				       , WORK_YY															-- 년도
+				       , WORK_MM															-- 월
+					   , SABUN																-- 사번
+					   , NAME																-- 성명
+					   , BUSINESS_PLACE_CD													-- 사업장
+					   , SUBSTR(F_COM_DECRYPT (RES_NO, ENTER_CD),0,6)||'-'|| 
+						 SUBSTR(F_COM_DECRYPT (RES_NO, ENTER_CD),7,7) AS RES_NO			-- 주민등록번호
+					   , CITIZEN_TYPE														-- 내외국인(1:내국인/9:외국인)
+                 	   , RESIDENCY_TYPE 													-- 거주구분(1:거주자,2:비거주자)
+                 	   , RESIDENCY_CD AS RESIDENCY_NM										-- 거주지국   국가코드(H20290)
+					   , RESIDENCY_CD														-- 거주지국코드 국가코드(H20290)
+					   , ADJ_S_YMD															-- 발생기간
+                 	   , BUSINESS_CD														-- 사업별
+			           , TAX_MON															-- 과세소득(지급금액)
+					   , HALF_TYPE															-- 반기구분(1:상반기/2:하반기)
+					   , INCOME_TYPE														-- 소득구분(YEA003)
+					   , SEND_TYPE															-- 신고구분(1:정기/2:수정)
+					   , CRE_WORK_YY
+				  FROM TYEA821 A
+            	 WHERE 1=1
+            	   AND A.ENTER_CD = #ssnEnterCd#
+            	   AND INCOME_TYPE = '61'
+				   $query$
+				 ORDER BY FINAL_CLOSE_YN, HALF_TYPE, A.BUSINESS_PLACE_CD, SABUN
+					 
+				]]>
+		</query>
+		
+		
+<!-- 		저장 -->	
+		<query id="saveSimplePymtBsnsIncp2Mgr">
+				<![CDATA[
+					MERGE INTO TYEA821 T
+					USING	(
+							SELECT	  ENTER_CD			
+									, WORK_YY	
+									, WORK_MM	
+									, CRE_WORK_YY			
+									, HALF_TYPE			
+									, INCOME_TYPE			
+									, SABUN				
+									, NAME				
+									, BUSINESS_PLACE_CD		
+									, RES_NO				
+									, CITIZEN_TYPE			
+									, RESIDENCY_CD	
+									, BUSINESS_CD	
+									, RESIDENCY_NM		
+									, TAX_MON		
+									, FINAL_CLOSE_YN
+									, PAY_PEOPLE_STATUS
+									, SEND_TYPE
+									, RESIDENCY_TYPE
+									, ADJ_S_YMD
+									
+							FROM	(
+									SELECT    TRIM(#ssnEnterCd#)  		   											AS ENTER_CD			      
+											, TRIM(#searchYear#)  	   												AS WORK_YY	
+											, TRIM(#searchWorkMm#)  	   											AS WORK_MM	
+											, TRIM(#cre_work_yy#) 													AS CRE_WORK_YY		      
+											, TRIM(#searchHalfType#)      											AS HALF_TYPE			      
+											, '61'										 							AS INCOME_TYPE		      
+											, TRIM(#sabun#)     	   												AS SABUN				      
+											, TRIM(#name#)	   														AS NAME				      
+											, TRIM(#business_place_cd#)   											AS BUSINESS_PLACE_CD	 	      
+											, F_COM_ENCRYPT(TRIM(#res_no#), #ssnEnterCd#) 							AS RES_NO			      
+											, TRIM(#citizen_type#)      											AS CITIZEN_TYPE		      
+											, TRIM(#residency_nm#) 	   												AS RESIDENCY_CD	
+											, TRIM(#business_cd#) 	   												AS BUSINESS_CD	
+											, F_COM_GET_GRCODE_NAME(#ssnEnterCd#, 'H20290', TRIM(#residency_nm#), NULL, TO_CHAR(LAST_DAY(TO_DATE(#searchYear#||#searchWorkMm#||'01','YYYYMMDD')),'YYYYMMDD') )  AS RESIDENCY_NM				      
+											, TRIM(#tax_mon#)		   												AS TAX_MON	
+											, TRIM(#final_close_yn#)		   										AS FINAL_CLOSE_YN	
+											, DECODE(TRIM(#final_close_yn#),'Y','J','M')							AS PAY_PEOPLE_STATUS	
+											, TRIM(#send_type#)		   												AS SEND_TYPE
+											, TRIM(#residency_type#)                                                AS RESIDENCY_TYPE
+											, TRIM(#adj_s_ymd#)                                                     AS ADJ_S_YMD	
+											FROM   DUAL
+									)  WHERE ENTER_CD 		IS NOT NULL 
+										 AND WORK_YY 		IS NOT NULL 
+										 AND WORK_MM 		IS NOT NULL 
+										 AND HALF_TYPE 		IS NOT NULL
+										 AND INCOME_TYPE 	IS NOT NULL
+										 AND CRE_WORK_YY    IS NOT NULL
+										 AND SABUN 			IS NOT NULL
+										 AND SEND_TYPE 		IS NOT NULL
+							) S
+					ON ( T.ENTER_CD        	= #ssnEnterCd#
+					 AND T.WORK_YY  		= S.WORK_YY
+					 AND T.WORK_MM  		= S.WORK_MM
+					 AND T.HALF_TYPE  		= S.HALF_TYPE
+					 AND T.INCOME_TYPE		= S.INCOME_TYPE
+					 AND T.SABUN			= S.SABUN
+					 AND T.SEND_TYPE		= S.SEND_TYPE
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET				
+                                      T.BUSINESS_PLACE_CD	= S.BUSINESS_PLACE_CD	
+                                    , T.RES_NO				= S.RES_NO	
+                                    , T.CRE_WORK_YY			= S.CRE_WORK_YY		
+                                    , T.CITIZEN_TYPE		= S.CITIZEN_TYPE	
+                                    , T.RESIDENCY_CD		= S.RESIDENCY_CD		
+                                    , T.RESIDENCY_NM		= S.RESIDENCY_NM
+                                    , T.BUSINESS_CD			= S.BUSINESS_CD	
+                                    , T.RESIDENCY_TYPE		= S.RESIDENCY_TYPE
+									, T.ADJ_S_YMD			= S.ADJ_S_YMD	 	
+                                    , T.TAX_MON				= S.TAX_MON		
+                                    , T.FINAL_CLOSE_YN		= S.FINAL_CLOSE_YN	
+                                    , T.PAY_PEOPLE_STATUS	= S.PAY_PEOPLE_STATUS	
+									, T.CHKDATE	    		= SYSDATE
+									, T.CHKID    			= #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD			 
+							, T.WORK_YY		
+							, T.WORK_MM		
+							, T.CRE_WORK_YY	 
+                            , T.HALF_TYPE			 
+                            , T.INCOME_TYPE		 
+                            , T.SABUN				 
+                            , T.NAME				 
+                            , T.BUSINESS_PLACE_CD	 		 
+                            , T.RES_NO			 
+                            , T.CITIZEN_TYPE	 
+                            , T.RESIDENCY_CD	
+                            , T.BUSINESS_CD	 
+                            , T.RESIDENCY_NM			 
+                            , T.TAX_MON	
+                            , T.SEND_TYPE 	
+                            , T.FINAL_CLOSE_YN 
+                            , T.PAY_PEOPLE_STATUS
+                            , T.RESIDENCY_TYPE
+                            , T.ADJ_S_YMD
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #ssnEnterCd#
+							, S.WORK_YY	
+							, S.WORK_MM	
+							, S.CRE_WORK_YY		
+                            , S.HALF_TYPE			
+                            , S.INCOME_TYPE		
+                            , S.SABUN				
+                            , S.NAME				
+                            , S.BUSINESS_PLACE_CD		
+                            , S.RES_NO			
+                            , S.CITIZEN_TYPE	
+                            , S.RESIDENCY_CD	
+                            , S.BUSINESS_CD	
+                            , S.RESIDENCY_NM		
+                            , S.TAX_MON	
+                            , S.SEND_TYPE 	
+                            , S.FINAL_CLOSE_YN
+                            , S.PAY_PEOPLE_STATUS
+                            , S.RESIDENCY_TYPE
+                            , S.ADJ_S_YMD
+							, SYSDATE
+							, #ssnSabun#
+						)
+				]]>
+		</query>
+		
+		<!-- 		삭제 -->	
+		<query id="deleteSimplePymtBsnsIncp2Mgr">
+				<![CDATA[
+					DELETE FROM TYEA821
+					  WHERE ENTER_CD||'_'||WORK_YY||'_'||WORK_MM||'_'||CRE_WORK_YY||'_'||HALF_TYPE||'_'||INCOME_TYPE||'_'||SABUN||'_'||SEND_TYPE IN 	
+					 	(
+							TRIM( #ssnEnterCd# )||'_'||
+							TRIM( #work_yy# )||'_'||
+							TRIM( #work_mm# )||'_'||
+							TRIM( #cre_work_yy# )||'_'||
+							TRIM( #half_type# )||'_'||
+							TRIM( #income_type# )||'_'||
+							TRIM( #sabun# )||'_'||
+							TRIM( #send_type# )
+						)
+						AND INCOME_TYPE = '61'
+				]]>
+		</query>
+
+</root>

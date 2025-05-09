@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.promotion.promTargetMgr">
+	<!-- 승진기준관리 코드리스트 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPromTargetMgrStdCdList">
+
+				<![CDATA[
+		SELECT PMT_CD AS CODE
+			 , PMT_NM AS CODE_NM
+		FROM THRM440
+		WHERE ENTER_CD = #{ssnEnterCd}
+		ORDER BY PMT_YYYY DESC
+		]]>
+
+
+		</select>
+
+	<!-- 승진대상자명단 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPromTargetMgrList">
+
+		<![CDATA[
+					SELECT
+						 A.ENTER_CD
+						,A.PMT_CD
+					  	,A.POSITION_CD
+						,A.PMT_TYPE
+					  	, '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN ||  chr(38) || 'type=1' AS PHOTO
+					  	,A.SABUN
+					  	,A.NAME
+					  	,A.ORG_NM
+					  	,A.JIKCHAK_CD
+					  	,A.JIKGUB_CD       AS OLD_JIKGUB_CD
+					  	,A.JIKWEE_CD       AS OLD_JIKWEE_CD
+					  	,A.TAR_JIKGUB_CD   AS JIKGUB_CD
+					  	, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.TAR_JIKGUB_CD) AS JIKGUB_NM
+					  	,A.TAR_JIKWEE_CD   AS JIKWEE_CD
+					  	, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',A.TAR_JIKWEE_CD) AS JIKWEE_NM
+					  	,A.PMT_CURR_YEAR
+					  	,(CASE WHEN D.PMT_YEAR <= A.PMT_CURR_YEAR THEN 'Y' ELSE 'N' END) AS PMT_CURR_YEAR_YN
+					  	,F_COM_GET_AGE(B.ENTER_CD, B.BIR_YMD, B.RES_NO, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS INT_AGE
+					  	,B.GEMP_YMD
+					  	,B.EMP_YMD
+					    ,F_COM_GET_G_CAREER_CNT(A.ENTER_CD, A.SABUN,'W', 'YYMM', '1', NULL, #{ssnLocaleCd}) AS WORK_G_YYMM_CNT
+					  	,F_COM_GET_E_CAREER_CNT(A.ENTER_CD, A.SABUN,'W', 'YYMM', '1', NULL, #{ssnLocaleCd}) AS WORK_YYMM_CNT
+					  	,A.PMT_CURR_YMD
+					  	,C.PAY_TYPE_NM
+					  	,(SELECT ACA_CD FROM THRM115 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND ACA_TYPE = 'Y') AS ACA_CD
+					  	,(SELECT ACA_SCH_NM FROM THRM115 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND ACA_TYPE = 'Y') AS ACA_SCH_NM
+					  	,(SELECT ACAMAJ_NM FROM THRM115 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND ACA_TYPE = 'Y') AS ACAMAJ_NM
+					  	, F_HRM_GET_SCHOOL_HIS(A.ENTER_CD, A.SABUN, '999', NULL) AS SCHOOL_HIST
+					    , F_HRM_GET_CAREER_HIS(A.ENTER_CD, A.SABUN, '999', '0') AS CAREER_HIST
+					    , F_HRM_GET_LICENSE_HIS(A.ENTER_CD, A.SABUN, '999', '0') AS LICENSE_HIST
+					    , F_HRM_GET_PRIZE_HIS(A.ENTER_CD, A.SABUN, '999', '0') AS PRIZE_HIST
+					  	, F_HRM_GET_PUNISH_HIS(A.ENTER_CD, A.SABUN, '999', '0') AS PUNISH_HIST
+					  	,A.APP_CLASS_CD1
+						,A.APP_CLASS_CD2
+						,A.APP_CLASS_CD3
+						,A.APP_CLASS_CD4
+						,A.APP_CLASS_CD5
+						,A.APP_CLASS_CD6
+					  	,A.PMT_APP_JUMSU
+					  	,A.PRIZE_POINT
+					  	,A.PUNISH_POINT
+					  	,(A.PRIZE_POINT+A.PUNISH_POINT) AS PRIZE_PUNISH_POINT
+					  	,A.LICENSE_YN
+					  	,A.PMT_APP_POINT
+					  	,A.PMT_TARGET_YN
+					  	,A.PMT_YN
+					  	,A.PMT_POSITION_TYPE
+					  	,RANK() OVER(PARTITION BY A.PMT_POSITION_TYPE, A.PMT_TYPE, A.TAR_JIKWEE_CD ORDER BY A.PMT_APP_POINT DESC, A.PMT_CURR_YEAR DESC, B.BIR_YMD, B.EMP_YMD) AS POINT_RANK
+					  	,(SELECT DECODE(COUNT(*), 0, 'N', 'Y') FROM THRM191 X WHERE X.ENTER_CD = A.ENTER_CD AND X.SABUN = A.SABUN AND X.ORD_TYPE_CD = 'P' AND X.ORD_DETAIL_CD = 'MBA' AND X.ORD_YMD = A.BASE_YMD) AS ORD_YN_BAK
+					  	, DECODE(E.SABUN, NULL, 'N', 'Y') AS PRE_POST_YN
+						, DECODE(E.SABUN, NULL, 'N', 'Y') AS PRE_POST_YN2
+						, NVL(E.ORD_YN,'N') AS ORD_YN
+						, DECODE(NVL(E.ORD_YN, 'N'), 'N', '0', DECODE(E.ORD_YN,'Y','1','0')) AS IBS_IMAGE4
+						, NVL(A.ORD_TYPE_CD, 'F') AS ORD_TYPE_CD
+						, A.ORD_DETAIL_CD
+						, A.ORD_YMD
+					FROM (SELECT Y.*, Z.PMT_YYYY, Z.BASE_YMD FROM THRM449 Y, THRM440 Z WHERE Y.ENTER_CD = Z.ENTER_CD AND Y.PMT_CD = Z.PMT_CD) A
+						LEFT OUTER JOIN THRM100 B
+					  		ON A.ENTER_CD = B.ENTER_CD
+							AND A.SABUN = B.SABUN
+					  	LEFT OUTER JOIN THRM151 C
+					  		ON A.ENTER_CD = C.ENTER_CD
+							AND A.SABUN = C.SABUN
+					      	AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+					    LEFT OUTER JOIN THRM441 D
+					  		ON A.ENTER_CD = D.ENTER_CD
+							AND A.PMT_CD = D.PMT_CD
+							AND A.JIKWEE_CD = D.BASE_JIKWEE_CD
+					    LEFT OUTER JOIN THRM221 E
+					  		ON A.ENTER_CD = E.ENTER_CD
+							AND A.SABUN = E.SABUN
+							AND A.ORD_YMD = E.ORD_YMD
+							AND A.ORD_TYPE_CD = E.ORD_TYPE_CD
+							AND A.ORD_DETAIL_CD = E.ORD_DETAIL_CD
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					          ]]>
+		<if test='searchPmtCd != null and !searchPmtCd.equals("")'>
+			AND A.PMT_CD = #{searchPmtCd}
+		</if>
+		<if test='searchSabunName != null and !searchSabunName.equals("")'>
+			AND ( UPPER(A.SABUN) LIKE '%' || #{searchSabunName} || '%' OR UPPER(A.NAME) LIKE '%' || #{searchSabunName} || '%' )
+		</if>
+		<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+			AND UPPER(A.ORG_NM) LIKE '%' || #{searchOrgNm} || '%'
+		</if>
+		<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+			AND F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchYmd}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) IN
+			<foreach collection="businessPlaceCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+			</foreach>
+		</if>
+		<if test='locationCd != null and !locationCd.equals("")'>
+			AND F_COM_GET_LOCATION_CD3(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchYmd}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) IN
+			<foreach collection="locationCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+			</foreach>
+		</if>
+		<if test='searchIsDetYn != null and searchIsDetYn.equals("Y")'>
+			AND A.PMT_YN = 'Y'
+		</if>
+		<if test='searchCurrJikwee != null and !searchCurrJikwee.equals("")'>
+			AND A.JIKWEE_CD = #{searchCurrJikwee}
+		</if>
+		<if test='searchTarJikwee != null and !searchTarJikwee.equals("")'>
+			AND A.TAR_JIKWEE_CD = #{searchTarJikwee}
+		</if>
+		<if test='searchPmtTargetYn != null and !searchPmtTargetYn.equals("")'>
+			AND A.PMT_TARGET_YN = #{searchPmtTargetYn}
+		</if>
+		<if test='positionCd != null and !positionCd.equals("")'>
+			AND A.POSITION_CD IN
+			<foreach collection="positionCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+			</foreach>
+		</if>
+		<if test='searchPmtType != null and !searchPmtType.equals("")'>
+			AND A.PMT_TYPE = #{searchPmtType}
+		</if>
+		<if test='searchPmtPositionType != null and !searchPmtPositionType.equals("")'>
+			AND A.PMT_POSITION_TYPE = #{searchPmtPositionType}
+		</if>
+		<if test='searchPmtAppPointFrom != null and !searchPmtAppPointFrom.equals("") and searchPmtAppPointTo != null and !searchPmtAppPointTo.equals("")'>
+			AND A.PMT_APP_POINT BETWEEN TO_NUMBER(#{searchPmtAppPointFrom}) AND TO_NUMBER(#{searchPmtAppPointTo})
+		</if>
+		<if test='searchPmtCurrYearYn != null and !searchPmtCurrYearYn.equals("")'>
+			<![CDATA[	AND (CASE WHEN D.PMT_YEAR <= A.PMT_CURR_YEAR THEN 'Y' ELSE 'N' END) = #{searchPmtCurrYearYn} ]]>
+		</if>
+		<if test='searchLicenseYn != null and !searchLicenseYn.equals("")'>
+			AND A.LICENSE_YN = #{searchLicenseYn}
+		</if>
+		ORDER BY A.PMT_POSITION_TYPE, A.PMT_TYPE, A.TAR_JIKWEE_CD
+		, RANK() OVER(PARTITION BY A.PMT_POSITION_TYPE, A.PMT_TYPE, A.TAR_JIKWEE_CD ORDER BY A.PMT_APP_POINT DESC, A.PMT_CURR_YEAR DESC, B.BIR_YMD, B.EMP_YMD)
+
+	</select>
+
+	<!-- 승진대상자명단 저장 -->
+	<update parameterType="map" id="savePromTargetMgr">
+
+		MERGE INTO THRM449 T
+		USING (
+		SELECT A.ENTER_CD
+		, A.PMT_CD
+		, A.SABUN
+		, A.NAME
+		, A.ORG_CD
+		, A.ORG_NM
+		, A.JIKCHAK_CD
+		, A.JIKWEE_CD
+		, A.JIKGUB_CD
+		, A.POSITION_CD
+		, A.PMT_CURR_YMD
+		, A.PMT_CURR_YEAR
+		, A.TAR_JIKWEE_CD
+		, A.TAR_JIKGUB_CD
+		, A.APP_CLASS_CD1
+		, A.APP_CLASS_CD2
+		, A.APP_CLASS_CD3
+		, A.APP_CLASS_CD4
+		, A.APP_CLASS_CD5
+		, A.APP_CLASS_CD6
+		, A.PMT_APP_POINT
+		, A.PMT_APP_JUMSU
+		, A.PRIZE_POINT
+		, A.PUNISH_POINT
+		, A.LICENSE_YN
+		, A.PMT_TYPE
+		, A.PMT_TARGET_YN
+		, A.PMT_YN
+		, A.PMT_POSITION_TYPE
+		, A.NOTE
+		, A.ORD_TYPE_CD
+		, A.ORD_DETAIL_CD
+		, A.ORD_YMD
+		FROM (
+		SELECT NULL AS ENTER_CD
+		, NULL AS PMT_CD
+		, NULL AS SABUN
+		, NULL AS NAME
+		, NULL AS ORG_CD
+		, NULL AS ORG_NM
+		, NULL AS JIKCHAK_CD
+		, NULL AS JIKWEE_CD
+		, NULL AS JIKGUB_CD
+		, NULL AS POSITION_CD
+		, NULL AS PMT_CURR_YMD
+		, NULL AS PMT_CURR_YEAR
+		, NULL AS TAR_JIKWEE_CD
+		, NULL AS TAR_JIKGUB_CD
+		, NULL AS APP_CLASS_CD1
+		, NULL AS APP_CLASS_CD2
+		, NULL AS APP_CLASS_CD3
+		, NULL AS APP_CLASS_CD4
+		, NULL AS APP_CLASS_CD5
+		, NULL AS APP_CLASS_CD6
+		, NULL AS PMT_APP_POINT
+		, NULL AS PMT_APP_JUMSU
+		, NULL AS PRIZE_POINT
+		, NULL AS PUNISH_POINT
+		, NULL AS LICENSE_YN
+		, NULL AS PMT_TYPE
+		, NULL AS PMT_TARGET_YN
+		, NULL AS PMT_YN
+		, NULL AS PMT_POSITION_TYPE
+		, NULL AS NOTE
+		, NULL AS ORD_TYPE_CD
+		, NULL AS ORD_DETAIL_CD
+		, NULL AS ORD_YMD
+		FROM DUAL
+		<foreach item="rm" collection="mergeRows" >
+			UNION ALL
+			SELECT #{ssnEnterCd} 					AS ENTER_CD
+			, TRIM( #{rm.pmtCd} ) 			AS PMT_CD
+			, TRIM( #{rm.sabun} ) 			AS SABUN
+			, TRIM( #{rm.name} ) 			AS NAME
+			, TRIM( #{rm.orgCd}) 			AS ORG_CD
+			, TRIM( #{rm.orgNm}) 			AS ORG_NM
+			, TRIM( #{rm.jikchakCd}) 		AS JIKCHAK_CD
+			, TRIM( #{rm.oldJikweeCd}) 	AS JIKWEE_CD
+			, TRIM( #{rm.oldJikgubCd}) 	AS JIKGUB_CD
+			, TRIM( #{rm.positionCd}) 	AS POSITION_CD
+			, TRIM( #{rm.pmtCurrYmd}) 	AS PMT_CURR_YMD
+			, TRIM( #{rm.pmtCurrYear}) 	AS PMT_CURR_YEAR
+			, TRIM( #{rm.jikweeCd} ) 		AS TAR_JIKWEE_CD
+			, TRIM( #{rm.jikgubCd}) 		AS TAR_JIKGUB_CD
+			, TRIM( #{rm.appClassCd1}) 	AS APP_CLASS_CD1
+			, TRIM( #{rm.appClassCd2}) 	AS APP_CLASS_CD2
+			, TRIM( #{rm.appClassCd3}) 	AS APP_CLASS_CD3
+			, TRIM( #{rm.appClassCd4}) 	AS APP_CLASS_CD4
+			, TRIM( #{rm.appClassCd5}) 	AS APP_CLASS_CD5
+			, TRIM( #{rm.appClassCd6}) 	AS APP_CLASS_CD6
+			, TRIM( #{rm.pmtAppPoint}) 	AS PMT_APP_POINT
+			, TRIM( #{rm.pmtAppJumsu}) 	AS PMT_APP_JUMSU
+			, TRIM( #{rm.prizePoint}) 	AS PRIZE_POINT
+			, TRIM( #{rm.punishPoint}) 	AS PUNISH_POINT
+			, TRIM( #{rm.licenseYn}) 		AS LICENSE_YN
+			, TRIM( #{rm.pmtType}) 		AS PMT_TYPE
+			, TRIM( #{rm.pmtTargetYn}) 	AS PMT_TARGET_YN
+			, TRIM( #{rm.pmtYn}) 			 AS PMT_YN
+			, TRIM( #{rm.pmtPositionType}) AS PMT_POSITION_TYPE
+			, TRIM( #{rm.note} ) 			 AS NOTE
+			, TRIM( #{rm.ordTypeCd} ) 		AS ORD_TYPE_CD
+			, TRIM( #{rm.ordDetailCd} ) 	AS ORD_DETAIL_CD
+			, TRIM( #{rm.ordYmd} ) 		AS ORD_YMD
+			FROM	DUAL
+		</foreach>
+		) A WHERE A.ENTER_CD	IS NOT NULL
+		AND A.PMT_CD		IS NOT NULL
+		AND A.SABUN		IS NOT NULL
+		) S
+		ON (
+		T.ENTER_CD	=	S.ENTER_CD
+		AND	T.PMT_CD	=	S.PMT_CD
+		AND	T.SABUN		=	S.SABUN
+		)
+		WHEN MATCHED THEN
+		UPDATE SET T.NAME 				= S.NAME
+		, T.ORG_CD 			= S.ORG_CD
+		, T.ORG_NM             = S.ORG_NM
+		, T.JIKCHAK_CD         = S.JIKCHAK_CD
+		, T.JIKWEE_CD          = S.JIKWEE_CD
+		, T.JIKGUB_CD          = S.JIKGUB_CD
+		, T.POSITION_CD        = S.POSITION_CD
+		, T.PMT_CURR_YMD       = S.PMT_CURR_YMD
+		, T.PMT_CURR_YEAR      = S.PMT_CURR_YEAR
+		, T.TAR_JIKWEE_CD      = S.TAR_JIKWEE_CD
+		, T.TAR_JIKGUB_CD      = S.TAR_JIKGUB_CD
+		, T.APP_CLASS_CD1 		= S.APP_CLASS_CD1
+		, T.APP_CLASS_CD2 		= S.APP_CLASS_CD2
+		, T.APP_CLASS_CD3 		= S.APP_CLASS_CD3
+		, T.APP_CLASS_CD4 		= S.APP_CLASS_CD4
+		, T.APP_CLASS_CD5 		= S.APP_CLASS_CD5
+		, T.APP_CLASS_CD6 		= S.APP_CLASS_CD6
+		, T.PMT_APP_POINT      = S.PMT_APP_POINT
+		, T.PMT_APP_JUMSU      = S.PMT_APP_JUMSU
+		, T.PRIZE_POINT        = S.PRIZE_POINT
+		, T.PUNISH_POINT       = S.PUNISH_POINT
+		, T.LICENSE_YN       	= S.LICENSE_YN
+		, T.PMT_TYPE       	= S.PMT_TYPE
+		, T.PMT_TARGET_YN      = S.PMT_TARGET_YN
+		, T.PMT_YN             = S.PMT_YN
+		, T.PMT_POSITION_TYPE  = S.PMT_POSITION_TYPE
+		, T.NOTE               = S.NOTE
+		, T.ORD_TYPE_CD        = S.ORD_TYPE_CD
+		, T.ORD_DETAIL_CD      = S.ORD_DETAIL_CD
+		, T.ORD_YMD            = S.ORD_YMD
+		, T.CHKDATE			= SYSDATE
+		, T.CHKID				= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+		T.ENTER_CD
+		, T.PMT_CD
+		, T.SABUN
+		, T.NAME
+		, T.ORG_CD
+		, T.ORG_NM
+		, T.JIKCHAK_CD
+		, T.JIKWEE_CD
+		, T.JIKGUB_CD
+		, T.POSITION_CD
+		, T.PMT_CURR_YMD
+		, T.PMT_CURR_YEAR
+		, T.TAR_JIKWEE_CD
+		, T.TAR_JIKGUB_CD
+		, T.APP_CLASS_CD1
+		, T.APP_CLASS_CD2
+		, T.APP_CLASS_CD3
+		, T.APP_CLASS_CD4
+		, T.APP_CLASS_CD5
+		, T.APP_CLASS_CD6
+		, T.PMT_APP_POINT
+		, T.PMT_APP_JUMSU
+		, T.PRIZE_POINT
+		, T.PUNISH_POINT
+		, T.LICENSE_YN
+		, T.PMT_TYPE
+		, T.PMT_TARGET_YN
+		, T.PMT_YN
+		, T.PMT_POSITION_TYPE
+		, T.NOTE
+		, T.ORD_TYPE_CD
+		, T.ORD_DETAIL_CD
+		, T.ORD_YMD
+		, T.CHKDATE
+		, T.CHKID
+		)
+		VALUES
+		(
+		S.ENTER_CD
+		, S.PMT_CD
+		, S.SABUN
+		, S.NAME
+		, S.ORG_CD
+		, S.ORG_NM
+		, S.JIKCHAK_CD
+		, S.JIKWEE_CD
+		, S.JIKGUB_CD
+		, S.POSITION_CD
+		, S.PMT_CURR_YMD
+		, S.PMT_CURR_YEAR
+		, S.TAR_JIKWEE_CD
+		, S.TAR_JIKGUB_CD
+		, S.APP_CLASS_CD1
+		, S.APP_CLASS_CD2
+		, S.APP_CLASS_CD3
+		, S.APP_CLASS_CD4
+		, S.APP_CLASS_CD5
+		, S.APP_CLASS_CD6
+		, S.PMT_APP_POINT
+		, S.PMT_APP_JUMSU
+		, S.PRIZE_POINT
+		, S.PUNISH_POINT
+		, S.LICENSE_YN
+		, S.PMT_TYPE
+		, S.PMT_TARGET_YN
+		, S.PMT_YN
+		, S.PMT_POSITION_TYPE
+		, S.NOTE
+		, S.ORD_TYPE_CD
+		, S.ORD_DETAIL_CD
+		, S.ORD_YMD
+		, SYSDATE
+		, #{ssnSabun}
+		)
+	</update>
+
+	<!-- 승진대상자명단 삭제 -->
+	<delete parameterType="map" id="deletePromTargetMgr">
+
+		DELETE FROM THRM449
+		WHERE ENTER_CD||'_'||PMT_CD||'_'||SABUN IN 	(  NULL
+		<foreach item="rm" collection="deleteRows" >
+			,
+			<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.pmtCd != null and !rm.pmtCd.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+				TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.pmtCd} )||'_'||TRIM( #{rm.sabun} )
+			</if>
+		</foreach>
+
+		)
+	</delete>
+
+	<!-- 승진대상자명단(대상자생성) 프로시저 -->
+	<update parameterType="map" id="prcPromTargetMgr" statementType="CALLABLE">
+		<![CDATA[
+		{CALL P_HRM_PRM_CREATE(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{pmtCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+</mapper>

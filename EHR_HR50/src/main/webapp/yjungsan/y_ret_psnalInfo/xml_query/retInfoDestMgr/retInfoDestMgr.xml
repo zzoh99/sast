@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    개인정보파기기준 쿼리
+ -->
+<root>
+
+    <!-- 인적사항관리 조회  -->
+    <query id="getRetInfoDestMgrList1">
+        <![CDATA[
+                SELECT B.NAME, 
+				       A.SABUN, 
+				       B.RET_YMD, 
+				       A.DEST_STATUS_CD, 
+				       A.DEST_YN, 
+				       A.MOVE_DATE, 
+				       A.DEST_DATE 
+				  FROM TRET111 A ,
+				       THRM100 B 
+				 WHERE A.ENTER_CD = B.ENTER_CD 
+				       AND A.SABUN = B.SABUN 
+				       AND A.ENTER_CD = #ssnEnterCd# 
+				       AND NVL(A.DEST_STATUS_CD, 'A') LIKE '%' || #searchDestStatusCd# || '%'
+				       AND A.DEST_STATUS_CD <> 'A' -- [분리전] 자료는 제외 
+				       AND 
+				       (
+				           B.SABUN LIKE '%' || #searchSabunNm# || '%' 
+				           OR B.NAME LIKE '%' || #searchSabunNm# || '%'
+				       ) 
+				ORDER BY B.RET_YMD DESC 
+       ]]> 
+    </query>
+
+    <!-- 인적사항관리 중복체크 -->
+    <query id="getRetInfoDestMgrList2">
+        <![CDATA[
+				SELECT A.SABUN,
+				       A.ITEM_SEQ,
+				       A.TAB_NM,
+				       A.COL_NM,
+				       A.ITEM_NM,
+				       A.UPD_VAL,
+				       A.ORI_VAL,
+				       A.ERR_MSG
+				  FROM TRET113 A
+				 WHERE A.ENTER_CD = #ssnEnterCd#
+				   AND A.SABUN = #searchSabun#
+				  ORDER BY A.ITEM_SEQ
+        ]]> 
+    </query>    
+    
+    <!-- 개인정보파기기준설정 입력 -->
+    <query id="saveRetInfoDestMgr1">
+        <![CDATA[
+					MERGE INTO TRET111 T
+					USING	(
+							SELECT	#ssnEnterCd#		AS ENTER_CD   
+									, #sabun#			AS SABUN      
+									, #dest_yn#			AS DEST_YN
+									FROM   DUAL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					    AND T.SABUN		= S.SABUN )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.DEST_YN  	= S.DEST_YN     
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD   
+							, T.SABUN      
+							, T.DEST_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD   
+							, S.SABUN      
+							, S.DEST_YN    
+							, SYSDATE
+							, #ssnSabun#
+						)
+        ]]> 
+    </query>
+    
+	<query id="callP_HRM_RET_INFO_MOVE">
+		<statement>
+		<![CDATA[
+				CALL P_HRM_RET_INFO_MOVE(?,?,?,REPLACE(?,'-',''),REPLACE(?,'-',''),?,?)
+		]]>
+		</statement>
+		<param type="VARCHAR" binding="OUT" name="sqlCode" />
+		<param type="VARCHAR" binding="OUT" name="sqlErrm" />
+   		<param type="VARCHAR" binding="IN" name="ssnEnterCd" />
+   		<param type="VARCHAR" binding="IN" name="searchFromYmd" />
+   		<param type="VARCHAR" binding="IN" name="searchToYmd" />
+   		<param type="VARCHAR" binding="IN" name="execCfCd" />
+   		<param type="VARCHAR" binding="IN" name="ssnSabun" />
+		<result mapper="org.anyframe.query.impl.jdbc.mapper.CallbackResultSetMapper"/>
+	</query>
+	
+	<query id="callP_HRM_RET_INFO_DEST">
+		<statement>
+		<![CDATA[
+				CALL P_HRM_RET_INFO_DEST(?,?,?,?,?)
+		]]>
+		</statement>
+		<param type="VARCHAR" binding="OUT" name="sqlCode" />
+		<param type="VARCHAR" binding="OUT" name="sqlErrm" />
+   		<param type="VARCHAR" binding="IN" name="ssnEnterCd" />
+   		<param type="VARCHAR" binding="IN" name="execCfCd" />
+   		<param type="VARCHAR" binding="IN" name="ssnSabun" />
+		<result mapper="org.anyframe.query.impl.jdbc.mapper.CallbackResultSetMapper"/>
+	</query>
+    
+</root>

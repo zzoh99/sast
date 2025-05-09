@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.regWarkerStat">
+
+		<select parameterType="map" resultType="cMap" id="getRegWarkerStatList">
+
+				<![CDATA[
+				WITH T AS
+				(
+					SELECT TO_DATE(D.YMD, 'YYYYMMDD') AS YMD , 
+					       TO_CHAR(TO_DATE(D.YMD, 'YYYYMMDD'),'MM') AS MON , 
+					       A.SABUN , 
+					       C.NOTE1 , 
+					       F_COM_GET_BP_CD (A.ENTER_CD, A.SABUN, B.SDATE ) AS BP_CD , 
+					       B.STATUS_CD , 
+					       (
+					           CASE 
+					               WHEN RET_YMD IS NOT NULL 
+					                   AND RET_YMD <= D.YMD
+					               THEN 
+					                   (
+					                       CASE 
+					                           WHEN SUBSTR(A.EMP_YMD,1,6) = SUBSTR(D.YMD,1,6) 
+					                           THEN 
+					                               (SELECT (TO_DATE(A.RET_YMD,'YYYYMMDD') - TO_DATE(A.EMP_YMD,'YYYYMMDD') + 1) 
+					                                 FROM DUAL
+					                               ) 
+					                           ELSE 
+					                               (SELECT (TO_DATE(A.RET_YMD,'YYYYMMDD') - TO_DATE(SUBSTR(D.YMD,1,6)||01,'YYYYMMDD') + 1) 
+					                                 FROM DUAL
+					                               ) 
+					                       END
+					                   ) 
+					               ELSE 
+					                   (
+					                       CASE 
+					                           WHEN SUBSTR(A.EMP_YMD,1,6) = SUBSTR(D.YMD,1,6) 
+					                           THEN 
+					                               (SELECT (TO_DATE(D.YMD, 'YYYYMMDD') - TO_DATE(A.EMP_YMD,'YYYYMMDD') + 1) 
+					                                 FROM DUAL
+					                               ) 
+					                           ELSE 
+					                               (SELECT (TO_DATE(D.YMD,'YYYYMMDD') - TO_DATE(SUBSTR(D.YMD,1,6)||01,'YYYYMMDD') + 1) 
+					                                 FROM DUAL
+					                               ) 
+					                       END
+					                   ) 
+					           END 
+					       ) AS DATE_CNT 
+					FROM	THRM100 A
+						,	THRM151 B
+						,	TSYS005 C
+						,	(
+								SELECT	A.YMD
+								FROM	(
+											SELECT	TO_CHAR ( LAST_DAY ( TRUNC( ADD_MONTHS(TO_DATE(#{searchYyyy} || CASE WHEN #{searchYyyy} = TO_CHAR(SYSDATE, 'YYYY') THEN TO_CHAR(SYSDATE, 'MM') ELSE '12' END, 'YYYYMM'),- (LEVEL-1)) )) + 1 / 24, 'YYYYMMDD') AS YMD
+												,	TO_CHAR ( LAST_DAY ( TRUNC( ADD_MONTHS(TO_DATE(#{searchYyyy} || CASE WHEN #{searchYyyy} = TO_CHAR(SYSDATE, 'YYYY') THEN TO_CHAR(SYSDATE, 'MM') ELSE '12' END, 'YYYYMM'),- (LEVEL-1)) )) + 1 / 24, 'YYYYMM') AS YM
+											FROM	DUAL
+											CONNECT BY ADD_MONTHS(TO_DATE(#{searchYyyy} || CASE WHEN #{searchYyyy} = TO_CHAR(SYSDATE, 'YYYY') THEN TO_CHAR(SYSDATE, 'MM') ELSE '12' END , 'YYYYMM'),- (LEVEL-1)) >=  ADD_MONTHS(TO_DATE(#{searchYyyy} || CASE WHEN #{searchYyyy} = TO_CHAR(SYSDATE, 'YYYY') THEN TO_CHAR(SYSDATE, 'MM') ELSE '12' END, 'YYYYMM'),-11)
+										)	A
+									,	(
+											SELECT
+											#{searchYyyy} || LPAD(LEVEL, 2, '0') AS YM
+											FROM DUAL CONNECT BY LEVEL <= 12
+										) B
+								WHERE	A.YM	=	B.YM
+							)	D
+					WHERE	A.ENTER_CD		=	B.ENTER_CD
+					AND		A.SABUN			=	B.SABUN
+					AND		D.YMD BETWEEN B.SDATE AND NVL(B.EDATE, '29991231')
+					AND		B.STATUS_CD NOT IN ( 'RA', 'RAA' )
+					AND		B.ENTER_CD		=	C.ENTER_CD(+)
+					AND		B.JIKGUB_CD		=	C.CODE(+)
+					AND		C.GRCODE_CD(+)	=	'H20010' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.S_YMD AND C.E_YMD
+					AND		A.ENTER_CD		=	#{ssnEnterCd}
+				)
+				SELECT	'총근로자' AS GUBUN ,AA.*
+				FROM	(
+							SELECT	*
+							FROM	(
+										SELECT	MON, SABUN
+										FROM	T
+										WHERE	( NOTE1 <> '임원' OR NOTE1 IS NULL )
+										AND STATUS_CD NOT IN ('CA','EA')
+                                        AND DATE_CNT >= 16
+										]]>
+										<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+										AND		BP_CD	=	#{searchBusinessPlaceCd}
+										</if>
+									) A
+							PIVOT
+							( COUNT(SABUN) FOR MON IN ('01' AS JAN,'02' AS FEB, '03' AS MAR,'04' AS APR,'05' AS MAY,'06' AS JUN,'07' AS JUL,'08' AS AUG,'09' AS SEP,'10' AS OCT,'11' AS NOV,'12' AS DEC) )
+						)	AA
+				UNION	ALL
+				SELECT	'임원(-)' AS GUBUN ,AA.*
+				FROM	(
+							SELECT	*
+							FROM	(
+										SELECT	MON, SABUN
+										FROM	T
+										WHERE	NOTE1 = '임원'
+										<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+										AND		BP_CD	=	#{searchBusinessPlaceCd}
+										</if>
+									) A
+							PIVOT
+							( COUNT(SABUN) FOR MON IN ('01' AS JAN,'02' AS FEB, '03' AS MAR,'04' AS APR,'05' AS MAY,'06' AS JUN,'07' AS JUL,'08' AS AUG,'09' AS SEP,'10' AS OCT,'11' AS NOV,'12' AS DEC) )
+						)	AA
+				UNION	ALL
+				SELECT	'휴정직자(-)' AS GUBUN ,AA.*
+				FROM	(
+							SELECT	*
+							FROM	(
+										SELECT	MON, SABUN
+										FROM	T
+										<![CDATA[ WHERE	( NOTE1 <> '임원' OR NOTE1 IS NULL ) ]]>
+                      					AND STATUS_CD IN ('CA','EA')
+										<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+										AND		BP_CD	=	#{searchBusinessPlaceCd}
+										</if>
+										) A
+							PIVOT
+							( COUNT(SABUN) FOR MON IN ('01' AS JAN,'02' AS FEB, '03' AS MAR,'04' AS APR,'05' AS MAY,'06' AS JUN,'07' AS JUL,'08' AS AUG,'09' AS SEP,'10' AS OCT,'11' AS NOV,'12' AS DEC) )
+						)	AA
+		        UNION	ALL
+		        SELECT	'16일미만자(-)' AS GUBUN ,AA.*
+				FROM	(
+							SELECT	*
+							FROM	(
+										<![CDATA[
+										SELECT	MON, SABUN
+										FROM	T
+										WHERE	( NOTE1 <> '임원' OR NOTE1 IS NULL )
+				                        AND STATUS_CD NOT IN ('CA','EA')
+				                        AND DATE_CNT < 16
+				                                ]]>
+										<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+										AND		BP_CD	=	#{searchBusinessPlaceCd}
+										</if>
+									) A
+							PIVOT
+							( COUNT(SABUN) FOR MON IN ('01' AS JAN,'02' AS FEB, '03' AS MAR,'04' AS APR,'05' AS MAY,'06' AS JUN,'07' AS JUL,'08' AS AUG,'09' AS SEP,'10' AS OCT,'11' AS NOV,'12' AS DEC) )
+						)	AA
+				UNION	ALL
+				SELECT	'합계' AS GUBUN ,AA.*
+				FROM	(
+							SELECT	*
+							FROM	(
+										SELECT	MON, SABUN
+										FROM	T
+										WHERE	1=1
+										<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+										AND		BP_CD	=	#{searchBusinessPlaceCd}
+										</if>
+									) A
+							PIVOT
+							( COUNT(SABUN) FOR MON IN ('01' AS JAN,'02' AS FEB, '03' AS MAR,'04' AS APR,'05' AS MAY,'06' AS JUN,'07' AS JUL,'08' AS AUG,'09' AS SEP,'10' AS OCT,'11' AS NOV,'12' AS DEC) )
+						)	AA
+		</select>
+
+</mapper>

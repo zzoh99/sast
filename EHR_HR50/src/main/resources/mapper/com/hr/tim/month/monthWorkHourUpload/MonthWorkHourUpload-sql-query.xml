@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.month.monthWorkHourUpload">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getMonthWorkHourUploadList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.YM
+						     , A.SABUN
+						     , A.WORK_CD
+						     , A.WORK_HOUR
+						     , A.NOTE
+							 , F_COM_GET_NAMES( A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+							 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN,  DECODE(C.STATUS_CD, 'RA', TO_CHAR(TO_DATE(C.SDATE,'YYYYMMDD')-1,'YYYYMMDD'),C.SDATE )) AS ORG_NM
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030', C.JIKWEE_CD,  #{ssnLocaleCd}) AS JIKWEE_NM
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020', C.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010', C.JIKGUB_CD,  #{ssnLocaleCd}) AS JIKGUB_NM
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10010', C.STATUS_CD,  #{ssnLocaleCd}) AS STATUS_NM
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10050', C.WORK_TYPE,  #{ssnLocaleCd}) AS WORK_TYPE_NM
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10110', C.PAY_TYPE,   #{ssnLocaleCd}) AS PAY_TYPE_NM
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10030', C.MANAGE_CD,  #{ssnLocaleCd}) AS MANAGE_NM
+							
+						  FROM TTIM870 A, THRM151 C 
+					  	 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					       AND A.YM = REPLACE( #{searchYm} ,'-','')
+					       AND A.ENTER_CD = C.ENTER_CD
+					       AND A.SABUN = C.SABUN
+					       AND REPLACE( #{searchYm} ,'-','') || '01' BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+		      		    ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE( #{searchYm} ,'-','') || '01')
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveMonthWorkHourUpload">
+
+					 MERGE INTO TTIM870 T 
+					 USING 
+					( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD
+					            , REPLACE( #{searchYm} ,'-','') 	AS  YM
+					            , TRIM(#{rm.sabun})  	AS  SABUN
+					            , TRIM(#{rm.workCd})  	AS  WORK_CD
+					            , TRIM(#{rm.workHour})  AS  WORK_HOUR
+					            , TRIM(#{rm.note})  	AS  NOTE
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.YM = S.YM 
+					     AND  T.SABUN = S.SABUN 
+					     AND  T.WORK_CD = S.WORK_CD 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE	  = sysdate 
+					            , T.CHKID 	  = #{ssnSabun}
+					            , T.WORK_HOUR = S.WORK_HOUR 
+					            , T.NOTE      = S.NOTE 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.YM
+					            , T.SABUN
+					            , T.WORK_CD
+					            , T.WORK_HOUR
+					            , T.NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.YM
+					            , S.SABUN
+					            , S.WORK_CD
+					            , S.WORK_HOUR
+					            , S.NOTE
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteMonthWorkHourUpload">
+
+					DELETE FROM TTIM870
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND YM       = REPLACE( #{searchYm} ,'-','')
+					   AND (SABUN, WORK_CD) IN ( (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+    <if test='rm.sabun != null and !rm.sabun.equals("") and rm.workCd != null and !rm.workCd.equals("") '>
+					     , (TRIM( #{rm.sabun} ), TRIM( #{rm.workCd} ))
+	</if>
+</foreach>
+					       )
+
+		</delete>
+
+</mapper>

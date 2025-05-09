@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.buscard.buscardAppDet">
+			
+	<!-- 신청 정보 조회 -->
+	<select id="getBuscardAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT NULL AS CARD_TYPE_CD
+		     , NAME
+		     , NAME_EN
+		     , ORG_NM
+		     , ORG_NM_EN
+		     , JIKWEE_NM
+		     , JIKWEE_NM_EN
+		     , MAIL_ID
+		     , PHONE_NO, '82-' || SUBSTR(PHONE_NO,2) AS PHONE_NO_EN
+		     , TEL_NO, '82-' || SUBSTR(TEL_NO,2) AS TEL_NO_EN
+		     , FAX_NO, '82-' || SUBSTR(FAX_NO,2) AS FAX_NO_EN
+		     , B.ADDR || ' ' || DETAIL_ADDR AS COMP_ADDR
+		     , B.ENG_ADDR AS COMP_ADDR_EN
+		     , NULL AS NOTE
+		FROM (  SELECT A.ENTER_CD, A.SABUN, A.NAME
+		             , A.NAME_US AS NAME_EN
+		             , F_COM_GET_ORG_NM( B.ENTER_CD, B.ORG_CD, TO_CHAR(sysdate, 'yyyymmdd')) ORG_NM
+		             , F_COM_GET_ORG_ENG_NM( B.ENTER_CD, B.ORG_CD, TO_CHAR(sysdate, 'yyyymmdd')) ORG_NM_EN
+		             , F_COM_GET_GRCODE_NAME( B.ENTER_CD, 'H20030', B.JIKWEE_CD ) AS JIKWEE_NM
+		             , F_COM_GET_GRCODE_ENG_NM( B.ENTER_CD, 'H20030', B.JIKWEE_CD ) AS JIKWEE_NM_EN
+		             , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN,'HP') AS PHONE_NO
+		             , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN,'OT') AS TEL_NO
+		             , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN,'FT') AS FAX_NO
+		             , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN,'IM') AS MAIL_ID
+		             , F_COM_GET_MAP_CD (B.ENTER_CD,'600',A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS LOCATION_CD
+		          FROM THRM100 A, THRM151 B
+		         WHERE A.ENTER_CD = #{ssnEnterCd}
+		           AND A.SABUN    = TRIM( #{searchApplSabun} )
+		           AND A.ENTER_CD = B.ENTER_CD
+		           AND A.SABUN    = B.SABUN
+		           AND TO_CHAR(sysdate, 'yyyymmdd') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+		     ) A, TSYS015 B
+		WHERE A.ENTER_CD     = B.ENTER_CD(+)
+		  AND A.LOCATION_CD  = B.LOCATION_CD(+) 
+		  AND NOT EXISTS ( SELECT 1 FROM TBEN761 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_SEQ = TRIM( #{searchApplSeq} ) )
+		UNION ALL
+	   SELECT A.CARD_TYPE_CD
+		    , A.NAME
+		    , A.NAME_EN
+			, A.ORG_NM
+			, A.ORG_NM_EN
+			, A.JIKWEE_NM
+			, A.JIKWEE_NM_EN
+			, A.MAIL_ID
+			, A.PHONE_NO
+			, A.PHONE_NO_EN
+			, A.TEL_NO
+			, A.TEL_NO_EN
+			, A.FAX_NO
+			, A.FAX_NO_EN
+			, A.COMP_ADDR
+			, A.COMP_ADDR_EN
+			, A.NOTE
+	     FROM TBEN761 A
+	    WHERE A.ENTER_CD   = #{ssnEnterCd}
+		  AND A.APPL_SEQ   = TRIM( #{searchApplSeq} )
+	]]>
+	</select>
+                         
+	<!--  세부내역 저장 -->
+	<update id="saveBuscardAppDet" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN761 T
+		USING  ( ]]>
+			<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				 SELECT   TRIM( #{ssnEnterCd} )					AS ENTER_CD
+				   	 	, TRIM( #{rm.searchApplSeq} )			AS APPL_SEQ
+						, TRIM( #{rm.searchApplSabun} )			AS SABUN
+						, TRIM( #{rm.cardTypeCd} ) 				AS CARD_TYPE_CD
+						, TRIM(	#{rm.orgNm})					AS ORG_NM
+						, TRIM( #{rm.orgNmEn} )					AS ORG_NM_EN
+						, TRIM( #{rm.name} ) 					AS NAME
+						, TRIM( #{rm.nameEn} )					AS NAME_EN
+						, TRIM( #{rm.jikweeNm} ) 				AS JIKWEE_NM
+						, TRIM( #{rm.jikweeNmEn} ) 				AS JIKWEE_NM_EN
+						, TRIM( #{rm.phoneNo} ) 				AS PHONE_NO
+						, TRIM( #{rm.phoneNoEn} ) 				AS PHONE_NO_EN
+						, TRIM( #{rm.telNo} ) 					AS TEL_NO
+						, TRIM( #{rm.telNoEn} )					AS TEL_NO_EN
+						, TRIM( #{rm.mailId} ) 					AS MAIL_ID
+						, TRIM( #{rm.faxNo} ) 					AS FAX_NO
+						, TRIM( #{rm.faxNoEn} )					AS FAX_NO_EN
+						, TRIM( #{rm.compAddr} )				AS COMP_ADDR
+						, TRIM( #{rm.compAddrEn} )				AS COMP_ADDR_EN
+						, TRIM( #{rm.note} ) 					AS NOTE											
+					FROM DUAL
+			</foreach>
+		<![CDATA[
+				) S
+		ON (      T.ENTER_CD = S.ENTER_CD
+		      AND T.APPL_SEQ = S.APPL_SEQ
+		   )
+		WHEN MATCHED THEN
+			UPDATE SET	  T.CARD_TYPE_CD     		= S.CARD_TYPE_CD
+						, T.ORG_NM     	= S.ORG_NM
+						, T.ORG_NM_EN     		= S.ORG_NM_EN
+						, T.NAME     		= S.NAME
+						, T.NAME_EN     	= S.NAME_EN
+						, T.JIKWEE_NM     = S.JIKWEE_NM
+						, T.JIKWEE_NM_EN      = S.JIKWEE_NM_EN
+						, T.PHONE_NO     	= S.PHONE_NO
+						, T.PHONE_NO_EN     	= S.PHONE_NO_EN
+						, T.TEL_NO     	= S.TEL_NO
+						, T.TEL_NO_EN    		= S.TEL_NO_EN
+						, T.MAIL_ID    	= S.MAIL_ID
+						, T.FAX_NO     	= S.FAX_NO
+						, T.FAX_NO_EN     		= S.FAX_NO_EN
+						, T.COMP_ADDR     		= S.COMP_ADDR
+						, T.COMP_ADDR_EN     		= S.COMP_ADDR_EN
+						, T.NOTE     		= S.NOTE
+						, T.CHKDATE			= SYSDATE
+						, T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  T.ENTER_CD
+				, T.APPL_SEQ
+				, T.SABUN
+				, T.CARD_TYPE_CD
+				, T.ORG_NM
+				, T.ORG_NM_EN
+				, T.NAME
+				, T.NAME_EN
+				, T.JIKWEE_NM
+				, T.JIKWEE_NM_EN
+				, T.PHONE_NO
+				, T.PHONE_NO_EN
+				, T.TEL_NO
+				, T.TEL_NO_EN
+				, T.MAIL_ID
+				, T.FAX_NO
+				, T.FAX_NO_EN
+				, T.COMP_ADDR
+				, T.COMP_ADDR_EN
+				, T.NOTE
+				, T.CHKDATE
+				, T.CHKID
+	
+			)
+			VALUES
+			(
+				  S.ENTER_CD
+				, S.APPL_SEQ
+				, S.SABUN
+				, S.CARD_TYPE_CD
+				, S.ORG_NM
+				, S.ORG_NM_EN
+				, S.NAME
+				, S.NAME_EN
+				, S.JIKWEE_NM
+				, S.JIKWEE_NM_EN
+				, S.PHONE_NO
+				, S.PHONE_NO_EN
+				, S.TEL_NO
+				, S.TEL_NO_EN
+				, S.MAIL_ID
+				, S.FAX_NO
+				, S.FAX_NO_EN
+				, S.COMP_ADDR
+				, S.COMP_ADDR_EN
+				, S.NOTE
+				, SYSDATE
+				, #{ssnSabun}
+			)
+	]]>
+	</update>
+</mapper>

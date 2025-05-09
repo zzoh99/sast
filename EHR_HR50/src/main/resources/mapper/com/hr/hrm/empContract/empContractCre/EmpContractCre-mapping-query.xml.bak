@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<queryservice xmlns="http://www.anyframejava.org/schema/query/mapping"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.anyframejava.org/schema/query/mapping http://www.anyframejava.org/schema/query/mapping/anyframe-query-mapping-1.0.xsd ">
+	<queries>
+
+		<!-- 근로계약서배포 헤더 조회 -->
+		<query id="getEmpContractCreHeaderList">
+			<statement>
+				<![CDATA[
+				SELECT  X.ELE_CD
+				,       X.ELE_NM
+                ,       'ATTR' || LPAD(RK, 2, 0) AS ELE_COL_NM
+				,       'attr' || LPAD(RK, 2, 0) AS ELE_SAVE_NM
+                ,       X.TYPE
+                ,       X.WIDTH
+                ,       X.ALIGN
+                ,       X.FORMAT
+                FROM (
+					SELECT	CODE    AS ELE_CD
+					, 		CODE_NM AS ELE_NM
+					, 		NOTE1	AS TYPE
+					, 		NOTE2	AS WIDTH
+					, 		NOTE3	AS ALIGN
+					, 		NOTE4	AS FORMAT
+					, 		RANK() OVER(ORDER BY SEQ) AS RK
+					FROM 	TSYS005
+					WHERE ENTER_CD  = :ssnEnterCd
+					AND GRCODE_CD IN (SELECT NOTE2 
+										FROM TSYS005
+									   WHERE ENTER_CD = :ssnEnterCd AND GRCODE_CD = 'Z00001' AND CODE = :searchContType AND NVL(USE_YN,'N') = 'Y')
+					   AND NVL(USE_YN,'N') = 'Y'
+					 ORDER BY SEQ
+				) X
+				]]>
+			</statement>
+			<result mapper="org.anyframe.query.impl.jdbc.mapper.CallbackResultSetMapper"/>
+		</query>
+
+		<!-- 근로계약서배포 다건 조회 -->
+		<query id="getEmpContractCreList">
+			<statement>
+				<![CDATA[
+					SELECT	A.ENTER_CD
+					,		A.SABUN
+					,		F_COM_GET_ORG_NM2 (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), :ssnLocaleCd) AS ORG_NM
+					,		F_COM_GET_JIKCHAK_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), :ssnLocaleCd) AS JIKCHAK_NM
+					,		F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), :ssnLocaleCd) AS JIKGUB_NM
+					,		F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), :ssnLocaleCd) AS JIKWEE_NM
+					,		F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, :ssnLocaleCd) AS NAME
+					,		F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+					,		A.STD_DATE
+					,		A.CONT_TYPE
+					,		A.AGREE_YN
+					, 		TO_CHAR(A.AGREE_DATE,'YYYY-MM-DD HH24:MI:SS') AS AGREE_DATE
+					, 		0 AS DETAIL
+					, 		B.PATH||B.FILE_NM AS RD_MRD
+					, 		F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+#foreach( $rtitles in $titles )
+		            , 		(SELECT ELE_VALUE FROM THRM413 X WHERE X.ENTER_CD = A.ENTER_CD AND X.SABUN = A.SABUN AND X.STD_DATE = A.STD_DATE AND X.CONT_TYPE = A.CONT_TYPE AND X.ELE_CD = '$rtitles.eleCd') AS "$rtitles.eleColNm"
+#end
+					,		A.UPDATE_REASON
+					FROM THRM412 A
+					INNER JOIN THRM410 B
+					   ON B.ENTER_CD = A.ENTER_CD
+					  AND B.CONT_TYPE = A.CONT_TYPE
+					  AND A.STD_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					WHERE 1=1
+					  AND A.ENTER_CD = :ssnEnterCd
+#if( $searchSabunNameAlias && !$searchSabunNameAlias.equals('') )
+					  AND ( A.SABUN LIKE '%'||TRIM( :searchSabunNameAlias )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, :ssnLocaleCd) LIKE '%'||TRIM( :searchSabunNameAlias )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') LIKE '%'||TRIM( :searchSabunNameAlias )||'%' )
+#end
+#if( $searchContType && !$searchContType.equals('') )
+					  AND A.CONT_TYPE = :searchContType
+#end
+#if( $searchAgreeYn && !$searchAgreeYn.equals('') )
+					  AND A.AGREE_YN = :searchAgreeYn
+#end
+					  AND A.STD_DATE BETWEEN TRIM(REPLACE(NVL(:searchStdSymd,'00000101'), '-', '')) AND TRIM(REPLACE(NVL(:searchStdEymd,'99991231'), '-', ''))
+					ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), A.STD_DATE DESC
+				]]>
+			</statement>
+			<result mapper="org.anyframe.query.impl.jdbc.mapper.CallbackResultSetMapper"/>
+		</query>
+
+
+		<!-- 근로계약서배포 저장 -->
+		<query id="saveEmpContractCre">
+			<statement>
+				<![CDATA[
+              MERGE INTO THRM412 T
+              USING (
+                  SELECT
+                        A.ENTER_CD
+                      , A.SABUN
+                      , A.STD_DATE
+                      , A.CONT_TYPE
+                      , A.AGREE_YN
+                      , A.AGREE_DATE
+					  , A.ATTR01
+					  , A.ATTR02
+					  , A.ATTR03
+					  , A.ATTR04
+					  , A.ATTR05
+					  , A.ATTR06
+					  , A.ATTR07
+					  , A.ATTR08
+					  , A.ATTR09
+					  , A.ATTR10
+					  , A.ATTR11
+					  , A.ATTR12
+					  , A.ATTR13
+					  , A.ATTR14
+					  , A.ATTR15
+					  , A.ATTR16
+					  , A.ATTR17
+					  , A.ATTR18
+					  , A.ATTR19
+					  , A.ATTR20
+					  , A.ATTR21
+					  , A.ATTR22
+					  , A.ATTR23
+					  , A.ATTR24
+					  , A.ATTR25
+					  , A.ATTR26
+					  , A.ATTR27
+					  , A.ATTR28
+					  , A.ATTR29
+					  , A.ATTR30
+					  , A.UPDATE_REASON
+                  FROM  (
+#set($icnt = 1)
+#foreach( $rm in $mergeRows )
+                      SELECT
+                            TRIM( :ssnEnterCd )		AS ENTER_CD
+                          , TRIM( '$rm.sabun' )		AS SABUN
+                          , TRIM( '$rm.stdDate' )	AS STD_DATE
+                          , TRIM( '$rm.contType' )	AS CONT_TYPE
+                          , TRIM( '$rm.agreeYn' )	AS AGREE_YN
+                          #if ($rm.agreeYn && $rm.agreeYn.equals("Y") && $rm.sStatus && $rm.sStatus.equals("I"))
+						  , SYSDATE AS AGREE_DATE
+						  #else
+						  , NULL					AS AGREE_DATE
+						  #end
+					      , TRIM(#if($rm.attr01) '$rm.attr01'#else NULL #end)		AS ATTR01
+					      , TRIM(#if($rm.attr02) '$rm.attr02'#else NULL #end)		AS ATTR02
+					      , TRIM(#if($rm.attr03) '$rm.attr03'#else NULL #end)		AS ATTR03
+					      , TRIM(#if($rm.attr04) '$rm.attr04'#else NULL #end)		AS ATTR04
+					      , TRIM(#if($rm.attr05) '$rm.attr05'#else NULL #end)		AS ATTR05
+					      , TRIM(#if($rm.attr06) '$rm.attr06'#else NULL #end)		AS ATTR06
+					      , TRIM(#if($rm.attr07) '$rm.attr07'#else NULL #end)		AS ATTR07
+					      , TRIM(#if($rm.attr08) '$rm.attr08'#else NULL #end)		AS ATTR08
+					      , TRIM(#if($rm.attr09) '$rm.attr09'#else NULL #end)		AS ATTR09
+					      , TRIM(#if($rm.attr10) '$rm.attr10'#else NULL #end)		AS ATTR10
+					      , TRIM(#if($rm.attr11) '$rm.attr11'#else NULL #end)		AS ATTR11
+					      , TRIM(#if($rm.attr12) '$rm.attr12'#else NULL #end)		AS ATTR12
+					      , TRIM(#if($rm.attr13) '$rm.attr13'#else NULL #end)		AS ATTR13
+					      , TRIM(#if($rm.attr14) '$rm.attr14'#else NULL #end)		AS ATTR14
+					      , TRIM(#if($rm.attr15) '$rm.attr15'#else NULL #end)		AS ATTR15
+					      , TRIM(#if($rm.attr16) '$rm.attr16'#else NULL #end)		AS ATTR16
+					      , TRIM(#if($rm.attr17) '$rm.attr17'#else NULL #end)		AS ATTR17
+					      , TRIM(#if($rm.attr18) '$rm.attr18'#else NULL #end)		AS ATTR18
+					      , TRIM(#if($rm.attr19) '$rm.attr19'#else NULL #end)		AS ATTR19
+					      , TRIM(#if($rm.attr20) '$rm.attr20'#else NULL #end)		AS ATTR20
+					      , TRIM(#if($rm.attr21) '$rm.attr21'#else NULL #end)		AS ATTR21
+					      , TRIM(#if($rm.attr22) '$rm.attr22'#else NULL #end)		AS ATTR22
+					      , TRIM(#if($rm.attr23) '$rm.attr23'#else NULL #end)		AS ATTR23
+					      , TRIM(#if($rm.attr24) '$rm.attr24'#else NULL #end)		AS ATTR24
+					      , TRIM(#if($rm.attr25) '$rm.attr25'#else NULL #end)		AS ATTR25
+					      , TRIM(#if($rm.attr26) '$rm.attr26'#else NULL #end)		AS ATTR26
+					      , TRIM(#if($rm.attr27) '$rm.attr27'#else NULL #end)		AS ATTR27
+					      , TRIM(#if($rm.attr28) '$rm.attr28'#else NULL #end)		AS ATTR28
+					      , TRIM(#if($rm.attr29) '$rm.attr29'#else NULL #end)		AS ATTR29
+					      , TRIM(#if($rm.attr30) '$rm.attr30'#else NULL #end)		AS ATTR30
+					      , TRIM( '$rm.updateReason' )								AS UPDATE_REASON
+                      FROM DUAL
+	#if(!$mergeRows.size().equals(${velocityCount}) ) UNION ALL #end
+#end
+                  ) A
+                  WHERE 1=1
+                    AND A.ENTER_CD IS NOT NULL
+                    AND A.SABUN IS NOT NULL
+                    AND A.STD_DATE IS NOT NULL
+                    AND A.CONT_TYPE IS NOT NULL
+              ) S
+              ON (
+                      T.ENTER_CD = S.ENTER_CD
+                  AND T.SABUN = S.SABUN
+                  AND T.STD_DATE = S.STD_DATE
+                  AND T.CONT_TYPE = S.CONT_TYPE
+              )
+              WHEN MATCHED THEN
+                  UPDATE SET
+					    T.ATTR01		= S.ATTR01
+					  , T.ATTR02		= S.ATTR02
+					  , T.ATTR03		= S.ATTR03
+					  , T.ATTR04		= S.ATTR04
+					  , T.ATTR05		= S.ATTR05
+					  , T.ATTR06		= S.ATTR06
+					  , T.ATTR07		= S.ATTR07
+					  , T.ATTR08		= S.ATTR08
+					  , T.ATTR09		= S.ATTR09
+					  , T.ATTR10		= S.ATTR10
+					  , T.ATTR11		= S.ATTR11
+					  , T.ATTR12		= S.ATTR12
+					  , T.ATTR13		= S.ATTR13
+					  , T.ATTR14		= S.ATTR14
+					  , T.ATTR15		= S.ATTR15
+					  , T.ATTR16		= S.ATTR16
+					  , T.ATTR17		= S.ATTR17
+					  , T.ATTR18		= S.ATTR18
+					  , T.ATTR19		= S.ATTR19
+					  , T.ATTR20		= S.ATTR20
+					  , T.ATTR21		= S.ATTR21
+					  , T.ATTR22		= S.ATTR22
+					  , T.ATTR23		= S.ATTR23
+					  , T.ATTR24		= S.ATTR24
+					  , T.ATTR25		= S.ATTR25
+					  , T.ATTR26		= S.ATTR26
+					  , T.ATTR27		= S.ATTR27
+					  , T.ATTR28		= S.ATTR28
+					  , T.ATTR29		= S.ATTR29
+					  , T.ATTR30		= S.ATTR30
+					  , T.UPDATE_REASON = S.UPDATE_REASON
+                      , T.CHKDATE 		= SYSDATE
+                      , T.CHKID 		= :ssnSabun
+              WHEN NOT MATCHED THEN
+                  INSERT
+                  (
+                        T.ENTER_CD
+                      , T.SABUN
+                      , T.STD_DATE
+                      , T.CONT_TYPE
+                      , T.AGREE_YN
+                      , T.AGREE_DATE
+					  , T.ATTR01
+					  , T.ATTR02
+					  , T.ATTR03
+					  , T.ATTR04
+					  , T.ATTR05
+					  , T.ATTR06
+					  , T.ATTR07
+					  , T.ATTR08
+					  , T.ATTR09
+					  , T.ATTR10
+					  , T.ATTR11
+					  , T.ATTR12
+					  , T.ATTR13
+					  , T.ATTR14
+					  , T.ATTR15
+					  , T.ATTR16
+					  , T.ATTR17
+					  , T.ATTR18
+					  , T.ATTR19
+					  , T.ATTR20
+					  , T.ATTR21
+					  , T.ATTR22
+					  , T.ATTR23
+					  , T.ATTR24
+					  , T.ATTR25
+					  , T.ATTR26
+					  , T.ATTR27
+					  , T.ATTR28
+					  , T.ATTR29
+					  , T.ATTR30
+					  ,	T.UPDATE_REASON
+                      , CHKDATE
+                      , CHKID
+                  )
+                  VALUES
+                  (
+                        S.ENTER_CD
+                      , S.SABUN
+                      , S.STD_DATE
+                      , S.CONT_TYPE
+                      , S.AGREE_YN
+                      , S.AGREE_DATE
+					  , S.ATTR01
+					  , S.ATTR02
+					  , S.ATTR03
+					  , S.ATTR04
+					  , S.ATTR05
+					  , S.ATTR06
+					  , S.ATTR07
+					  , S.ATTR08
+					  , S.ATTR09
+					  , S.ATTR10
+					  , S.ATTR11
+					  , S.ATTR12
+					  , S.ATTR13
+					  , S.ATTR14
+					  , S.ATTR15
+					  , S.ATTR16
+					  , S.ATTR17
+					  , S.ATTR18
+					  , S.ATTR19
+					  , S.ATTR20
+					  , S.ATTR21
+					  , S.ATTR22
+					  , S.ATTR23
+					  , S.ATTR24
+					  , S.ATTR25
+					  , S.ATTR26
+					  , S.ATTR27
+					  , S.ATTR28
+					  , S.ATTR29
+					  , S.ATTR30
+					  , S.UPDATE_REASON
+                      , SYSDATE
+                      , :ssnSabun
+                  )
+				]]>
+			</statement>
+			<result mapper="org.anyframe.query.impl.jdbc.mapper.CallbackResultSetMapper"/>
+		</query>
+
+		<!-- 근로계약서배포 삭제 -->
+		<query id="deleteEmpContractCre">
+			<statement>
+				<![CDATA[
+          DELETE FROM THRM412
+          WHERE ENTER_CD = :ssnEnterCd
+            AND ENTER_CD||'_'||SABUN||'_'||STD_DATE IN ( NULL
+#foreach( $rm in $deleteRows )
+              ,
+    #if ($rm.sabun && !$rm.sabun.equals("")
+      && $rm.stdDate && !$rm.stdDate.equals(""))
+                  TRIM(:ssnEnterCd)||'_'||TRIM('$rm.sabun')||'_'||TRIM('$rm.stdDate')
+    #end
+#end
+            )
+				]]>
+			</statement>
+			<result mapper="org.anyframe.query.impl.jdbc.mapper.CallbackResultSetMapper"/>
+		</query>
+
+	</queries>
+</queryservice>

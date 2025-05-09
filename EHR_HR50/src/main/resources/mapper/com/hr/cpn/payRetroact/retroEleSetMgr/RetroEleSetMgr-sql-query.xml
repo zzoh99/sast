@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 소급대상소득선정
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetroact.retroEleSetMgr">
+		<select parameterType="map" resultType="cMap" id="getRetroEleSetMgrList">
+
+				<![CDATA[
+					SELECT PAY_ACTION_CD
+						 , RTR_PAY_ACTION_CD
+						 , TRIM(PAY_ACTION_NM) AS PAY_ACTION_NM
+						 , PAY_YM
+						 , PAY_CD
+						 , PAYMENT_YMD
+					  FROM TCPN503
+					 WHERE ENTER_CD			= #{ssnEnterCd}
+					   AND PAY_ACTION_CD	= #{payActionCd}
+					ORDER BY PAY_ACTION_CD, RTR_PAY_ACTION_CD
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getRetroEleSetMgrDtlList">
+
+				<![CDATA[
+					SELECT PAY_ACTION_CD
+						 , RTR_PAY_ACTION_CD
+						 , ELEMENT_CD
+						 , TRIM(ELEMENT_NM) AS ELEMENT_NM
+					  FROM TCPN504
+					 WHERE ENTER_CD			= #{ssnEnterCd}
+					   AND PAY_ACTION_CD	= #{payActionCd}
+					   AND RTR_PAY_ACTION_CD= #{rtrPayActionCd}
+					ORDER BY ELEMENT_CD
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveRetroEleSetMgr">
+
+
+					MERGE INTO TCPN503 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.RTR_PAY_ACTION_CD
+								 , A.PAY_ACTION_NM
+								 , A.PAY_YM
+								 , A.PAY_CD
+								 , A.PAYMENT_YMD
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS RTR_PAY_ACTION_CD
+										 , NULL		AS PAY_ACTION_NM
+										 , NULL		AS PAY_YM
+										 , NULL		AS PAY_CD
+										 , NULL		AS PAYMENT_YMD
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.rtrPayActionCd})	AS RTR_PAY_ACTION_CD
+										 , TRIM(#{rm.payActionNm})		AS PAY_ACTION_NM
+										 , TRIM(#{rm.payYm})			AS PAY_YM
+										 , TRIM(#{rm.payCd})			AS PAY_CD
+										 , TRIM(#{rm.paymentYmd})		AS PAYMENT_YMD
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.RTR_PAY_ACTION_CD IS NOT NULL
+							) S
+					ON (	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD		= S.PAY_ACTION_CD
+						AND	T.RTR_PAY_ACTION_CD	= S.RTR_PAY_ACTION_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.PAY_ACTION_NM	= S.PAY_ACTION_NM
+								 , T.PAY_YM			= S.PAY_YM
+								 , T.PAY_CD			= S.PAY_CD
+								 , T.PAYMENT_YMD	= S.PAYMENT_YMD
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.RTR_PAY_ACTION_CD
+							, T.PAY_ACTION_NM
+							, T.PAY_YM
+							, T.PAY_CD
+							, T.PAYMENT_YMD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.RTR_PAY_ACTION_CD
+							, S.PAY_ACTION_NM
+							, S.PAY_YM
+							, S.PAY_CD
+							, S.PAYMENT_YMD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+		<update parameterType="map" id="saveRetroEleSetMgrDtl">
+
+
+					MERGE INTO TCPN504 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.RTR_PAY_ACTION_CD
+								 , A.ELEMENT_CD
+								 , A.ELEMENT_NM
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS RTR_PAY_ACTION_CD
+										 , NULL		AS ELEMENT_CD
+										 , NULL		AS ELEMENT_NM
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.rtrPayActionCd})	AS RTR_PAY_ACTION_CD
+										 , TRIM(#{rm.elementCd})		AS ELEMENT_CD
+										 , TRIM(#{rm.elementNm})		AS ELEMENT_NM
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.RTR_PAY_ACTION_CD IS NOT NULL
+							   AND A.ELEMENT_CD IS NOT NULL
+							) S
+					ON (	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD		= S.PAY_ACTION_CD
+						AND	T.RTR_PAY_ACTION_CD	= S.RTR_PAY_ACTION_CD
+						AND	T.ELEMENT_CD		= S.ELEMENT_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.ELEMENT_NM	= S.ELEMENT_NM
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.RTR_PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.ELEMENT_NM
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.RTR_PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, S.ELEMENT_NM
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" statementType="CALLABLE" id="RetroEleSetMgrP_CPN_RETRO_ELE_INS">
+
+				<![CDATA[
+					CALL P_CPN_RETRO_ELE_INS(
+
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+
+		</update>
+		<delete parameterType="map" id="deleteRetroEleSetMgr">
+
+
+					DELETE FROM TCPN503
+					 WHERE ENTER_CD||'_'||PAY_ACTION_CD||'_'||RTR_PAY_ACTION_CD IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+							,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.payActionCd != null and !rm.payActionCd.equals("") and rm.rtrPayActionCd != null and !rm.rtrPayActionCd.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.payActionCd})||'_'||TRIM(#{rm.rtrPayActionCd})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteRetroEleSetMgrDtl">
+
+
+					DELETE FROM TCPN504
+					 WHERE ENTER_CD||'_'||PAY_ACTION_CD||'_'||RTR_PAY_ACTION_CD ||'_'||ELEMENT_CD IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+							,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.payActionCd != null and !rm.payActionCd.equals("") and rm.rtrPayActionCd != null and !rm.rtrPayActionCd.equals("") and rm.elementCd != null and !rm.elementCd.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.payActionCd})||'_'||TRIM(#{rm.rtrPayActionCd})||'_'||TRIM(#{rm.elementCd})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

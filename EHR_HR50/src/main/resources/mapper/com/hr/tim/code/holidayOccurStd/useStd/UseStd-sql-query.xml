@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.holidayOccurStd.useStd">
+
+<!-- 근태신청 근태코드 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getUseStdGntCdList">
+
+				<![CDATA[
+					SELECT A.GNT_CD AS CODE, A.GNT_NM AS CODE_NM
+					 FROM TTIM014 A
+					 WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					   AND A.VACATION_YN   = 'Y'
+					 ORDER BY A.SEQ
+				]]>
+
+
+		</select>
+
+
+<!-- 휴가 사용기준 조회 -->
+		<select parameterType="map" resultType="cMap" id="getUseStdList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GNT_CD
+					     , DECODE(A.ALLOW_YN,'Y','1','0') AS ALLOW_YN
+					     , A.GNT_CD_DEL1
+					     , A.GNT_CD_DEL2
+					     , A.GNT_CD_DEL3
+					     , A.GNT_CD_DEL4
+					  FROM TTIM007 A, TTIM014 B
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+  					   AND A.ENTER_CD = B.ENTER_CD
+  					   AND A.GNT_CD = B.GNT_CD
+					 ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+<!-- 휴가 사용기준 저장 -->
+		<update parameterType="map" id="saveUseStd">
+
+					MERGE INTO TTIM007 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.GNT_CD
+							     , A.ALLOW_YN
+							     , A.GNT_CD_DEL1
+							     , A.GNT_CD_DEL2
+							     , A.GNT_CD_DEL3
+							     , A.GNT_CD_DEL4
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS GNT_CD
+										 , NULL AS ALLOW_YN
+										 , NULL AS GNT_CD_DEL1
+										 , NULL AS GNT_CD_DEL2
+									     , NULL AS GNT_CD_DEL3
+									     , NULL AS GNT_CD_DEL4
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.gntCd} )			AS  GNT_CD
+										 , TRIM( #{rm.allowYn})		AS  ALLOW_YN
+										 , TRIM( #{rm.gntCdDel1})		AS  GNT_CD_DEL1
+										 , TRIM( #{rm.gntCdDel2})		AS  GNT_CD_DEL2
+										 , TRIM( #{rm.gntCdDel3})		AS  GNT_CD_DEL3
+										 , TRIM( #{rm.gntCdDel4})		AS  GNT_CD_DEL4
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GNT_CD = S.GNT_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ALLOW_YN       	= DECODE(S.ALLOW_YN,'1','Y','N')
+									, T.GNT_CD_DEL1   	= S.GNT_CD_DEL1
+									, T.GNT_CD_DEL2    	= S.GNT_CD_DEL2
+									, T.GNT_CD_DEL3    	= S.GNT_CD_DEL3
+									, T.GNT_CD_DEL4    	= S.GNT_CD_DEL4
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.GNT_CD
+							, T.ALLOW_YN
+							, T.GNT_CD_DEL1
+							, T.GNT_CD_DEL2
+							, T.GNT_CD_DEL3
+							, T.GNT_CD_DEL4
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.GNT_CD
+							, DECODE(S.ALLOW_YN,'1','Y','N')
+							, S.GNT_CD_DEL1
+							, S.GNT_CD_DEL2
+							, S.GNT_CD_DEL3
+							, S.GNT_CD_DEL4
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 휴가 사용기준 삭제 -->
+		<delete parameterType="map" id="deleteUseStd">
+
+					DELETE FROM TTIM007
+					 WHERE ENTER_CD||'_'||GNT_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.gntCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

@@ -1,0 +1,879 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 월별급여지급현황
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayPartiUserSta">
+		<select parameterType="map" resultType="cMap" id="getLatestPaymentInfoMap">
+			
+				<![CDATA[
+					SELECT PAY_ACTION_CD
+					     , PAY_ACTION_NM
+					  FROM TCPN201
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND PAY_ACTION_CD = (SELECT MAX(A.PAY_ACTION_CD)
+					                          FROM TCPN201 A
+					                             , TCPN051 B
+					                             , TCPN981 C
+					                             , TCPN203 D
+					                             , TCPN991 E
+					                         WHERE A.ENTER_CD        = B.ENTER_CD
+					                           AND A.PAY_CD          = B.PAY_CD
+					                           AND A.ENTER_CD        = C.ENTER_CD
+					                           AND A.PAY_ACTION_CD   = C.PAY_ACTION_CD
+					                           AND A.ENTER_CD        = D.ENTER_CD
+					                           AND A.PAY_ACTION_CD   = D.PAY_ACTION_CD
+					                           AND A.PAY_CD          = E.PAY_CD(+)
+					                           AND A.ENTER_CD        = E.ENTER_CD(+)
+					                           AND A.ENTER_CD        = #{ssnEnterCd}
+					                           AND NVL(C.CLOSE_YN, 'N') = 'Y'
+					                           AND D.SABUN              = #{sabun}
+                                               AND A.PAYMENT_YMD = (SELECT MAX(AA.PAYMENT_YMD)
+                                                                    FROM TCPN201 AA, TCPN203 BB
+                                                                    WHERE AA.ENTER_CD = A.ENTER_CD
+                                                                       AND AA.PAY_YM   = A.PAY_YM
+                                                                       AND AA.ENTER_CD = BB.ENTER_CD
+                                                                       AND AA.PAY_ACTION_CD = BB.PAY_ACTION_CD
+                                                                       AND BB.SABUN = D.SABUN
+                                                                       AND ROWNUM   = 1
+                                                                       )
+					                           AND B.RUN_TYPE NOT IN ('00004', 'Y0001', 'TEMP')
+					                           AND (CASE WHEN B.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+					                                     ELSE CASE WHEN TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD) + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') THEN -1
+					                                               WHEN TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD) + TO_NUMBER(NVL(E.OPEN_DD,0))),'YYYYMMDD') THEN
+					                                                    CASE WHEN E.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+					                                               ELSE 0
+					                                           END
+					                                 END
+					                               ) < 0)
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiUserStaList">
+			
+				<![CDATA[
+					SELECT	'PAY' AS GUBUN
+					, 		REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(RESULT_MON,0),'999,999,999,990')) AS RESULT_MON
+					FROM 	(
+								SELECT	TRIM(B.REPORT_NM) AS REPORT_NM
+					            , 		MIN(B.PRIORITY)   AS PRIORITY
+					            , 		SUM(A.RESULT_MON) AS RESULT_MON
+					          	FROM 	(
+					                		SELECT	ENTER_CD
+					                     	, 		PAY_ACTION_CD
+					                     	, 		SABUN
+					                     	, 		ELEMENT_CD
+					                     	, 		RESULT_MON
+					                  		FROM 	TCPN205
+					                 		WHERE 	ENTER_CD      = #{ssnEnterCd}
+					                   		AND 	PAY_ACTION_CD = #{payActionCd}
+					                   		AND 	SABUN         = #{sabun}
+
+					                   		MINUS
+
+					                		SELECT	ENTER_CD
+					                     	, 		PAY_ACTION_CD
+					                     	, 		SABUN
+					                     	, 		ELEMENT_CD
+					                     	, 		RESULT_MON
+					                  		FROM (
+						                        	SELECT	A.ENTER_CD
+						                            , 		A.PAY_ACTION_CD
+						                            , 		A.SABUN
+						                            , 		A.ELEMENT_CD
+						                            , 		A.RESULT_MON
+						                          	FROM 	TCPN205 A
+						                            , 		(
+						                            			SELECT	SUB1.ENTER_CD
+						                                     	, 		SUB1.ELEMENT_CD
+						                                     	, 		SUB1.ELEMENT_TYPE
+						                                     	, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+						                                     	, 		SUB1.PRIORITY
+						                                     	, 		SUB1.DEDUCTION_TYPE
+						                                  		FROM 	TCPN011 SUB1
+						                                 		WHERE 	SUB1.ENTER_CD   = #{ssnEnterCd}
+						                                   		AND 	SUB1.ELEMENT_CD IN (
+							                                   									SELECT	ELEMENT_CD
+							                                                             		FROM 	TCPN071 X
+							                                                                	, 		TCPN072 Y
+							                                                            		WHERE 	X.ENTER_CD       = Y.ENTER_CD
+							                                                              		AND 	X.ELEMENT_SET_CD = Y.ELEMENT_SET_CD
+							                                                              		AND 	X.ENTER_CD       = #{ssnEnterCd}
+							                                                              		AND 	X.ELEMENT_SET_CD = '30'
+							                                                              		AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+						                                                            	   )
+						                                   		AND (SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+						                             		) B
+						                         	WHERE 	A.ENTER_CD      = #{ssnEnterCd}
+						                           	AND 	A.PAY_ACTION_CD = #{payActionCd}
+						                           	AND 	A.SABUN         = #{sabun}
+						                           	AND 	A.ENTER_CD      = B.ENTER_CD
+						                           	AND 	A.ELEMENT_CD    = B.ELEMENT_CD
+
+						                           	UNION
+
+						                        	SELECT	A.ENTER_CD
+						                            , 		A.PAY_ACTION_CD
+						                            , 		A.SABUN
+						                            , 		A.ELEMENT_CD
+						                            , 		A.RESULT_MON
+						                          	FROM	TCPN205 A
+						                            , 		(
+																SELECT	SUB1.ENTER_CD
+						                                     	, 		SUB1.ELEMENT_CD
+						                                     	, 		SUB1.ELEMENT_TYPE
+						                                     	, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+						                                     	, 		SUB1.PRIORITY
+						                                     	, 		SUB1.DEDUCTION_TYPE
+						                                  		FROM 	TCPN011 SUB1
+						                                     	, 		(
+						                                     				SELECT	B.CODE
+						                                             		, 		TRIM(B.CODE_NM) AS CODE_NM
+						                                          			FROM 	TSYS001 A
+						                                             		, 		TSYS005 B
+						                                         			WHERE 	A.GRCODE_CD      = B.GRCODE_CD
+						                                           			AND 	B.ENTER_CD       = #{ssnEnterCd}
+						                                           			AND 	A.GRCODE_CD      = 'C00011'
+						                                           			AND 	NVL(B.NOTE1,'0') = '1'
+						                                        		) B
+						                                 		WHERE	SUB1.ENTER_CD    = #{ssnEnterCd}
+						                                   		AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+						                                   		AND 	SUB1.ATTRIBUTE_3 = B.CODE
+						                             		) B
+						                         	WHERE 	A.ENTER_CD      = #{ssnEnterCd}
+						                           	AND 	A.PAY_ACTION_CD = #{payActionCd}
+						                           	AND 	A.SABUN         = #{sabun}
+						                           	AND 	A.ENTER_CD      = B.ENTER_CD
+						                           	AND 	A.ELEMENT_CD    = B.ELEMENT_CD
+					                       		 )
+					               		) A
+								, 		(
+											SELECT	SUB1.ENTER_CD
+					                       	, 		SUB1.ELEMENT_CD
+					                       	, 		SUB1.ELEMENT_TYPE
+					                       	, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+					                       	, 		SUB1.PRIORITY
+					                       	, 		SUB1.DEDUCTION_TYPE
+					                    	FROM 	TCPN011 SUB1
+					                   		WHERE 	SUB1.ENTER_CD     = #{ssnEnterCd}
+					                     	AND 	SUB1.ELEMENT_TYPE = 'A'
+					                     	AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+					               		) B
+					           WHERE 	A.ENTER_CD   = B.ENTER_CD
+					           AND 		A.ELEMENT_CD = B.ELEMENT_CD
+					           GROUP BY B.REPORT_NM
+					           ORDER BY PRIORITY
+					        )
+
+					UNION ALL
+
+					SELECT	'PAY_TOT' AS GUBUN
+					, 		'' AS REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(SUM(A.RESULT_MON),0),'999,999,999,990')) AS RESULT_MON
+					FROM 	(
+						        SELECT	ENTER_CD
+								, 		PAY_ACTION_CD
+						        , 		SABUN
+						        , 		ELEMENT_CD
+						        , 		RESULT_MON
+						        FROM 	TCPN205
+						        WHERE 	ENTER_CD      = #{ssnEnterCd}
+						        AND 	PAY_ACTION_CD = #{payActionCd}
+						        AND 	SABUN         = #{sabun}
+
+						        MINUS
+
+						        SELECT	ENTER_CD
+						        , 		PAY_ACTION_CD
+						        , 		SABUN
+						        , 		ELEMENT_CD
+						        , 		RESULT_MON
+						        FROM (
+										SELECT	A.ENTER_CD
+										, 		A.PAY_ACTION_CD
+						                , 		A.SABUN
+						                , 		A.ELEMENT_CD
+						                , 		A.RESULT_MON
+						                FROM 	TCPN205 A
+						                , 		(
+													SELECT	SUB1.ENTER_CD
+						                            , 		SUB1.ELEMENT_CD
+						                            , 		SUB1.ELEMENT_TYPE
+						                            , 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+						                            , 		SUB1.PRIORITY
+						                            , 		SUB1.DEDUCTION_TYPE
+						                          	FROM 	TCPN011 SUB1
+						                         	WHERE 	SUB1.ENTER_CD   = #{ssnEnterCd}
+						                           	AND 	SUB1.ELEMENT_CD IN (
+						                           								SELECT 	ELEMENT_CD
+						                                                    	FROM 	TCPN071 X, TCPN072 Y
+						                                                    	WHERE 	X.ENTER_CD       = Y.ENTER_CD
+						                                                    	AND 	X.ELEMENT_SET_CD = Y.ELEMENT_SET_CD
+						                                                    	AND 	X.ENTER_CD       = #{ssnEnterCd}
+						                                                    	AND 	X.ELEMENT_SET_CD = '30'
+						                                                    	AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+						                                                   		)
+						                           AND 		(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+						                     	) B
+						                WHERE	A.ENTER_CD      = #{ssnEnterCd}
+						                AND 	A.PAY_ACTION_CD = #{payActionCd}
+						                AND 	A.SABUN         = #{sabun}
+						                AND 	A.ENTER_CD      = B.ENTER_CD
+						                AND 	A.ELEMENT_CD    = B.ELEMENT_CD
+
+						                UNION
+
+										SELECT	A.ENTER_CD
+						                , 		A.PAY_ACTION_CD
+						                , 		A.SABUN
+						                , 		A.ELEMENT_CD
+						                , 		A.RESULT_MON
+						                FROM 	TCPN205 A
+						                , 		(
+													SELECT	SUB1.ENTER_CD
+						                            , 		SUB1.ELEMENT_CD
+						                            , 		SUB1.ELEMENT_TYPE
+						                            , 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+						                            , 		SUB1.PRIORITY
+						                            , 		SUB1.DEDUCTION_TYPE
+						                          	FROM 	TCPN011 SUB1
+						                            , 		(
+						                            			SELECT	B.CODE
+						                                     	, 		TRIM(B.CODE_NM) AS CODE_NM
+						                                  		FROM 	TSYS001 A
+						                                     	, 		TSYS005 B
+						                                 		WHERE 	A.GRCODE_CD      = B.GRCODE_CD
+						                                   		AND 	B.ENTER_CD       = #{ssnEnterCd}
+						                                   		AND 	A.GRCODE_CD      = 'C00011'
+						                                   		AND 	NVL(B.NOTE1,'0') = '1'
+						                             		) B
+						                         	WHERE	SUB1.ENTER_CD    = #{ssnEnterCd}
+						                           	AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+						                           	AND 	SUB1.ATTRIBUTE_3 = B.CODE
+						                     	) B
+						                 WHERE	A.ENTER_CD      = #{ssnEnterCd}
+						                 AND 	A.PAY_ACTION_CD = #{payActionCd}
+						                 AND 	A.SABUN         = #{sabun}
+						                 AND 	A.ENTER_CD      = B.ENTER_CD
+						                 AND 	A.ELEMENT_CD    = B.ELEMENT_CD
+										)
+							) A
+					, 		(
+								SELECT	SUB1.ENTER_CD
+								, 		SUB1.ELEMENT_CD
+								, 		SUB1.ELEMENT_TYPE
+								, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+								, 		SUB1.PRIORITY
+								, 		SUB1.DEDUCTION_TYPE
+								FROM 	TCPN011 SUB1
+								WHERE 	SUB1.ENTER_CD	  = #{ssnEnterCd}
+								AND 	SUB1.ELEMENT_TYPE = 'A'
+								AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+							) B
+					WHERE 	A.ENTER_CD	 = B.ENTER_CD
+					AND 	A.ELEMENT_CD = B.ELEMENT_CD
+
+					UNION ALL
+
+					SELECT	'DEDUCT' AS GUBUN
+					, 		REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(RESULT_MON,0),'999,999,999,990')) AS RESULT_MON
+					FROM 	(
+								SELECT	TRIM(B.REPORT_NM)	AS REPORT_NM
+								, 		MIN(B.PRIORITY)		AS PRIORITY
+								, 		SUM(A.RESULT_MON)	AS RESULT_MON
+								FROM (
+										SELECT	ENTER_CD
+										, 		PAY_ACTION_CD
+										, 		SABUN
+										, 		ELEMENT_CD
+										, 		RESULT_MON
+										FROM 	TCPN205
+										WHERE 	ENTER_CD	  = #{ssnEnterCd}
+										AND 	PAY_ACTION_CD = #{payActionCd}
+										AND 	SABUN		  = #{sabun}
+
+										MINUS
+
+										SELECT	ENTER_CD
+										, 		PAY_ACTION_CD
+										, 		SABUN
+										, 		ELEMENT_CD
+										, 		RESULT_MON
+										FROM (
+												SELECT	A.ENTER_CD
+												, 		A.PAY_ACTION_CD
+												,		A.SABUN
+												, 		A.ELEMENT_CD
+												, 		A.RESULT_MON
+												FROM 	TCPN205 A
+												, 		(
+															SELECT	SUB1.ENTER_CD
+															, 		SUB1.ELEMENT_CD
+															, 		SUB1.ELEMENT_TYPE
+															, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+															, 		SUB1.PRIORITY
+															, 		SUB1.DEDUCTION_TYPE
+															FROM 	TCPN011 SUB1
+															WHERE 	SUB1.ENTER_CD = #{ssnEnterCd}
+														 	AND 	SUB1.ELEMENT_CD	IN (
+														 								SELECT	ELEMENT_CD
+																						FROM 	TCPN071 X, TCPN072 Y
+																						WHERE 	X.ENTER_CD		 = Y.ENTER_CD
+																					 	AND 	X.ELEMENT_SET_CD = Y.ELEMENT_SET_CD
+																					 	AND 	X.ENTER_CD		 = #{ssnEnterCd}
+																					 	AND 	X.ELEMENT_SET_CD = '30'
+																					 	AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+																						)
+														 	AND (SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+														) B
+												WHERE 	A.ENTER_CD		= #{ssnEnterCd}
+												AND 	A.PAY_ACTION_CD	= #{payActionCd}
+												AND 	A.SABUN			= #{sabun}
+												AND 	A.ENTER_CD		= B.ENTER_CD
+												AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+
+												UNION
+
+												SELECT	A.ENTER_CD
+												, 		A.PAY_ACTION_CD
+												, 		A.SABUN
+												, 		A.ELEMENT_CD
+												, 		A.RESULT_MON
+												FROM 	TCPN205 A
+												, 		(
+															SELECT	SUB1.ENTER_CD
+															, 		SUB1.ELEMENT_CD
+															, 		SUB1.ELEMENT_TYPE
+															, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}),SUB1.REPORT_NM) AS REPORT_NM
+															, 		SUB1.PRIORITY
+															, 		SUB1.DEDUCTION_TYPE
+															FROM 	TCPN011 SUB1
+															, 		(
+																		SELECT	B.CODE
+																		, 		TRIM(B.CODE_NM) AS CODE_NM
+																		FROM 	TSYS001 A
+																		, 		TSYS005 B
+																		WHERE 	A.GRCODE_CD		 = B.GRCODE_CD
+																 		AND 	B.ENTER_CD		 = #{ssnEnterCd}
+																 		AND 	A.GRCODE_CD		 = 'C00011'
+																 		AND 	NVL(B.NOTE1,'0') = '1'
+																	) B
+															WHERE	SUB1.ENTER_CD    = #{ssnEnterCd}
+														 	AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+														 	AND 	SUB1.ATTRIBUTE_3 = B.CODE
+														) B
+												WHERE	A.ENTER_CD		= #{ssnEnterCd}
+												AND 	A.PAY_ACTION_CD	= #{payActionCd}
+												AND 	A.SABUN			= #{sabun}
+												AND 	A.ENTER_CD		= B.ENTER_CD
+												AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+											 )
+										) A
+								, 		(
+											SELECT	SUB1.ENTER_CD
+											, 		SUB1.ELEMENT_CD
+											, 		SUB1.ELEMENT_TYPE
+											, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+											, 		SUB1.PRIORITY
+											, 		SUB1.DEDUCTION_TYPE
+											FROM 	TCPN011 SUB1
+											WHERE 	SUB1.ENTER_CD	  = #{ssnEnterCd}
+										 	AND 	SUB1.ELEMENT_TYPE = 'D'
+										 	AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+										) B
+								WHERE 	A.ENTER_CD		= B.ENTER_CD
+								AND 	A.ELEMENT_CD		= B.ELEMENT_CD
+							 GROUP BY 	B.REPORT_NM
+							 ORDER BY 	PRIORITY
+							)
+
+					UNION ALL
+
+					SELECT	'DEDUCT_TOT' AS GUBUN
+					, 		'' AS REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(SUM(A.RESULT_MON),0),'999,999,999,990')) AS RESULT_MON
+					FROM 	(
+								SELECT	ENTER_CD
+								, 		PAY_ACTION_CD
+								, 		SABUN
+								, 		ELEMENT_CD
+								, 		RESULT_MON
+								FROM 	TCPN205
+								WHERE 	ENTER_CD	  = #{ssnEnterCd}
+								AND 	PAY_ACTION_CD = #{payActionCd}
+								AND 	SABUN		  =	 #{sabun}
+
+								MINUS
+
+								SELECT	ENTER_CD
+								, 		PAY_ACTION_CD
+								, 		SABUN
+								, 		ELEMENT_CD
+								, 		RESULT_MON
+								FROM 	(
+											SELECT	A.ENTER_CD
+											, 		A.PAY_ACTION_CD
+											, 		A.SABUN
+											, 		A.ELEMENT_CD
+											, 		A.RESULT_MON
+											FROM 	TCPN205 A
+											, 		(
+														SELECT	SUB1.ENTER_CD
+														, 		SUB1.ELEMENT_CD
+														, 		SUB1.ELEMENT_TYPE
+														, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}),SUB1.REPORT_NM) AS REPORT_NM
+														, 		SUB1.PRIORITY
+														, 		SUB1.DEDUCTION_TYPE
+														FROM 	TCPN011 SUB1
+														WHERE 	SUB1.ENTER_CD = #{ssnEnterCd}
+												 		AND 	SUB1.ELEMENT_CD	IN (
+												 									SELECT	ELEMENT_CD
+																					FROM 	TCPN071 X, TCPN072 Y
+																					WHERE 	X.ENTER_CD		= Y.ENTER_CD
+																			 		AND 	X.ELEMENT_SET_CD	= Y.ELEMENT_SET_CD
+																			 		AND 	X.ENTER_CD		    = #{ssnEnterCd}
+																			 		AND 	X.ELEMENT_SET_CD	= '30'
+																				   )
+												 		AND (SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+											) B
+											WHERE	A.ENTER_CD		= #{ssnEnterCd}
+											AND 	A.PAY_ACTION_CD	= #{payActionCd}
+											AND 	A.SABUN			= #{sabun}
+											AND	 	A.ENTER_CD		= B.ENTER_CD
+											AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+
+											UNION
+
+											SELECT	A.ENTER_CD
+											, 		A.PAY_ACTION_CD
+											, 		A.SABUN
+											, 		A.ELEMENT_CD
+											, 		A.RESULT_MON
+											FROM 	TCPN205 A
+											, 		(
+														SELECT	SUB1.ENTER_CD
+														, 		SUB1.ELEMENT_CD
+														, 		SUB1.ELEMENT_TYPE
+														, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}),SUB1.REPORT_NM) AS REPORT_NM
+														, 		SUB1.PRIORITY
+														, 		SUB1.DEDUCTION_TYPE
+														FROM 	TCPN011 SUB1
+														, 		(
+																	SELECT	B.CODE
+																	, 		TRIM(B.CODE_NM) AS CODE_NM
+																	FROM 	TSYS001 A
+																	, 		TSYS005 B
+																	WHERE 	A.GRCODE_CD		 = B.GRCODE_CD
+																 	AND 	B.ENTER_CD		 = #{ssnEnterCd}
+																 	AND 	A.GRCODE_CD		 = 'C00011'
+																 	AND 	NVL(B.NOTE1,'0') = '1'
+																) B
+														WHERE 	SUB1.ENTER_CD = #{ssnEnterCd}
+														AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+														AND 	SUB1.ATTRIBUTE_3 = B.CODE
+													) B
+											WHERE	A.ENTER_CD		= #{ssnEnterCd}
+											AND 	A.PAY_ACTION_CD	= #{payActionCd}
+											AND 	A.SABUN			= #{sabun}
+											AND 	A.ENTER_CD		= B.ENTER_CD
+											AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+										)
+							) A
+					, 		(
+								SELECT	SUB1.ENTER_CD
+								, 		SUB1.ELEMENT_CD
+								, 		SUB1.ELEMENT_TYPE
+								, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}),SUB1.REPORT_NM) AS REPORT_NM
+								, 		SUB1.PRIORITY
+								, 		SUB1.DEDUCTION_TYPE
+								FROM 	TCPN011 SUB1
+								WHERE 	SUB1.ENTER_CD	  = #{ssnEnterCd}
+								AND 	SUB1.ELEMENT_TYPE = 'D'
+								AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+							) B
+					WHERE 	A.ENTER_CD	 = B.ENTER_CD
+					AND 	A.ELEMENT_CD = B.ELEMENT_CD
+
+					UNION ALL
+
+					SELECT	'BASIC' AS GUBUN
+					, 		REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(RESULT_MON,0),'999,999,999,990')) AS RESULT_MON
+					FROM	(
+								SELECT	TRIM(A.REPORT_NM) AS REPORT_NM
+            					, 		SUM(A.RESULT_MON) AS RESULT_MON
+            					,		MAX(SEQ)		  AS SEQ
+          						FROM 	(
+											SELECT 	Z.REPORT_NM2 			 AS REPORT_NM
+											, 		SUM(NVL(Y.RESULT_MON,0)) AS RESULT_MON
+											, 		MAX(Z.GRP_SORT) 		 AS SEQ
+											FROM 	TCPN201 X
+											, 		TCPN294 Y
+											, 		(
+														SELECT	SUB1.*
+													 	, 		NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM2
+													 	FROM	TCPN011 SUB1
+														, 		(
+																	SELECT	MAX(SDATE) AS SDATE
+																	, 		ELEMENT_CD
+																	FROM 	TCPN011
+																	WHERE 	ENTER_CD = #{ssnEnterCd}
+																	AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+															     GROUP BY	ELEMENT_CD
+																) SUB2
+														WHERE	SUB1.ENTER_CD	= SUB1.ENTER_CD
+														AND 	SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+														AND 	SUB1.SDATE		= SUB2.SDATE
+													) Z
+											WHERE 	X.ENTER_CD		= Y.ENTER_CD
+											AND 	X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+											AND 	Y.ENTER_CD		= Z.ENTER_CD
+											AND 	Y.ELEMENT_CD	= Z.ELEMENT_CD
+											AND 	X.ENTER_CD		= #{ssnEnterCd}
+											AND 	X.PAY_ACTION_CD	= #{payActionCd}
+											AND		Y.SABUN			= #{sabun}
+											AND     Y.ELEMENT_CD IN (
+																		SELECT	AA.ELEMENT_CD
+											                         	FROM 	TCPN072 AA
+											                         	, 		TCPN071 BB
+											                         	, 		TCPN051 CC
+											                         	WHERE 	AA.ENTER_CD 	  = BB.ENTER_CD
+											                         	AND 	AA.ELEMENT_SET_CD = BB.ELEMENT_SET_CD
+											                         	AND 	AA.ENTER_CD 	  = CC.ENTER_CD
+											                         	AND 	BB.ELEMENT_SET_CD = CC.ELEMENT_SET_CD
+											                         	AND 	CC.PAY_CD 		  = X.PAY_CD
+											                         	AND 	AA.BASE_SHOW_YN   = 'Y'
+																	)
+										 GROUP BY 	Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD, Z.REPORT_NM2
+										) A
+							  GROUP BY 	A.REPORT_NM, A.SEQ
+							  ORDER BY 	A.SEQ
+          					)
+
+					UNION ALL
+
+					SELECT	'BASIC_TOT' AS GUBUN
+					, 		'' 			AS REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(SUM(RESULT_MON),0),'999,999,999,990')) AS RESULT_MON
+					FROM 	(
+								SELECT 	Z.REPORT_NM2 AS REPORT_NM
+								, 		Y.RESULT_MON AS RESULT_MON
+								FROM 	TCPN201 X
+								, 		TCPN294 Y
+								, 		(
+											SELECT	SUB1.*
+										 	, 		NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM2
+										 	FROM	TCPN011 SUB1
+											, 		(
+														SELECT	MAX(SDATE) AS SDATE
+														, 		ELEMENT_CD
+														FROM 	TCPN011
+														WHERE 	ENTER_CD = #{ssnEnterCd}
+														AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+												     GROUP BY	ELEMENT_CD
+													) SUB2
+											WHERE	SUB1.ENTER_CD	= SUB1.ENTER_CD
+											AND 	SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+											AND 	SUB1.SDATE		= SUB2.SDATE
+										) Z
+								WHERE 	X.ENTER_CD		= Y.ENTER_CD
+								AND 	X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+								AND 	Y.ENTER_CD		= Z.ENTER_CD
+								AND 	Y.ELEMENT_CD	= Z.ELEMENT_CD
+								AND 	X.ENTER_CD		= #{ssnEnterCd}
+								AND 	X.PAY_ACTION_CD	= #{payActionCd}
+								AND		Y.SABUN			= #{sabun}
+								AND     Y.ELEMENT_CD IN (
+															SELECT	AA.ELEMENT_CD
+								                         	FROM 	TCPN072 AA
+								                         	, 		TCPN071 BB
+								                         	, 		TCPN051 CC
+								                         	WHERE 	AA.ENTER_CD 	  = BB.ENTER_CD
+								                         	AND 	AA.ELEMENT_SET_CD = BB.ELEMENT_SET_CD
+								                         	AND 	AA.ENTER_CD 	  = CC.ENTER_CD
+								                         	AND 	BB.ELEMENT_SET_CD = CC.ELEMENT_SET_CD
+								                         	AND 	CC.PAY_CD 		  = X.PAY_CD
+								                         	AND 	AA.BASE_SHOW_YN   = 'Y'
+														)
+							)
+
+					UNION ALL
+
+					SELECT	'TAX' AS GUBUN
+					, 		REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(RESULT_MON,0),'999,999,999,990')) AS RESULT_MON
+					FROM 	(
+								SELECT 	TRIM(B.REPORT_NM)	AS REPORT_NM
+								, 		MIN(B.PRIORITY)		AS PRIORITY
+								, 		SUM(A.RESULT_MON)	AS RESULT_MON
+								FROM 	TCPN205 A
+								, 		(
+											SELECT	SUB1.ENTER_CD
+											, 		SUB1.ELEMENT_CD
+											, 		SUB1.ELEMENT_TYPE
+											, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+											, 		SUB1.PRIORITY
+											, 		SUB1.DEDUCTION_TYPE
+											FROM 	TCPN011 SUB1
+											WHERE 	SUB1.ENTER_CD	= #{ssnEnterCd}
+										 	AND 	SUB1.ELEMENT_CD	IN (
+										 								SELECT	ELEMENT_CD
+																		FROM 	TCPN071 X, TCPN072 Y
+																		WHERE 	X.ENTER_CD		 = Y.ENTER_CD
+																 		AND 	X.ELEMENT_SET_CD = Y.ELEMENT_SET_CD
+																 		AND 	X.ENTER_CD		 = #{ssnEnterCd}
+																 		AND 	X.ELEMENT_SET_CD = '30'
+																 		AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+																		)
+										 	AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+										) B
+								WHERE 	A.ENTER_CD		= #{ssnEnterCd}
+								AND 	A.PAY_ACTION_CD	= #{payActionCd}
+								AND 	A.SABUN			= #{sabun}
+								AND 	A.ENTER_CD		= B.ENTER_CD
+								AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+							GROUP BY B.REPORT_NM
+							ORDER BY PRIORITY
+							)
+
+					UNION ALL
+
+					SELECT	'TAX_TOT' AS GUBUN
+					, 		'' AS REPORT_NM
+					, 		DECODE(TRIM(TO_CHAR(NVL(SUM(A.BASIC_MON),0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(SUM(A.BASIC_MON),0),'999,999,999,990'))) AS RESULT_MON
+					FROM 	TCPN205 A
+					, 		(
+								SELECT	SUB1.ENTER_CD
+								, 		SUB1.ELEMENT_CD
+								, 		SUB1.ELEMENT_TYPE
+								, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM)  AS REPORT_NM
+								, 		SUB1.PRIORITY
+								, 		SUB1.DEDUCTION_TYPE
+								FROM 	TCPN011 SUB1
+								WHERE 	SUB1.ENTER_CD = #{ssnEnterCd}
+								AND 	SUB1.ELEMENT_CD	IN (
+															SELECT	ELEMENT_CD
+															FROM 	TCPN071 X, TCPN072 Y
+															WHERE 	X.ENTER_CD		 = Y.ENTER_CD
+															AND 	X.ELEMENT_SET_CD = Y.ELEMENT_SET_CD
+															AND 	X.ENTER_CD		 = #{ssnEnterCd}
+															AND 	X.ELEMENT_SET_CD = '30'
+															AND 	TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')
+														   )
+								 AND (SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+							) B
+					WHERE 	A.ENTER_CD		= #{ssnEnterCd}
+					AND 	A.PAY_ACTION_CD	= #{payActionCd}
+					AND 	A.SABUN			= #{sabun}
+					AND 	A.ENTER_CD		= B.ENTER_CD
+					AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+
+					UNION ALL
+
+					SELECT	'TAX_FREE' AS GUBUN
+					, 		REPORT_NM
+					, 		TRIM(TO_CHAR(NVL(RESULT_MON,0),'999,999,999,990')) AS RESULT_MON
+					FROM 	(
+								SELECT	TRIM(B.REPORT_NM)	AS REPORT_NM
+								, 		MIN(B.PRIORITY)		AS PRIORITY
+								, 		SUM(A.RESULT_MON)	AS RESULT_MON
+								FROM 	TCPN205 A
+								, 		(
+											SELECT	SUB1.ENTER_CD
+											, 		SUB1.ELEMENT_CD
+											, 		SUB1.ELEMENT_TYPE
+											, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}), SUB1.REPORT_NM) AS REPORT_NM
+											, 		SUB1.PRIORITY
+											, 		SUB1.DEDUCTION_TYPE
+											FROM 	TCPN011 SUB1
+											, 		(
+														SELECT	B.CODE
+														, 		TRIM(B.CODE_NM) AS CODE_NM
+														FROM 	TSYS001 A
+														, 		TSYS005 B
+														WHERE 	A.GRCODE_CD		 = B.GRCODE_CD
+												 		AND 	B.ENTER_CD		 = #{ssnEnterCd}
+												 		AND 	A.GRCODE_CD		 = 'C00011'
+												 		AND 	NVL(B.NOTE1,'0') = '1') B
+											WHERE 	SUB1.ENTER_CD    = #{ssnEnterCd}
+										 	AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+										 	AND 	SUB1.ATTRIBUTE_3 = B.CODE
+										) B
+								WHERE	A.ENTER_CD		= #{ssnEnterCd}
+								AND 	A.PAY_ACTION_CD	= #{payActionCd}
+								AND 	A.SABUN			= #{sabun}
+								AND 	A.ENTER_CD		= B.ENTER_CD
+								AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+							GROUP BY B.REPORT_NM
+							ORDER BY PRIORITY
+							)
+
+					UNION ALL
+
+					SELECT	'TAX_FREE_TOT' AS GUBUN
+					, 		'' AS REPORT_NM
+					, 		DECODE(TRIM(TO_CHAR(NVL(SUM(A.BASIC_MON),0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(SUM(A.BASIC_MON),0),'999,999,999,990'))) AS RESULT_MON
+					FROM 	TCPN205 A
+					, 		(
+								SELECT	SUB1.ENTER_CD
+								, 		SUB1.ELEMENT_CD
+								, 		SUB1.ELEMENT_TYPE
+								, 		NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD2, #{ssnLocaleCd}),SUB1.REPORT_NM) AS REPORT_NM
+								, 		SUB1.PRIORITY
+								, 		SUB1.DEDUCTION_TYPE
+								FROM 	TCPN011 SUB1
+								, 		(
+											SELECT	B.CODE
+											, 		TRIM(B.CODE_NM) AS CODE_NM
+											FROM 	TSYS001 A
+											, 		TSYS005 B
+											WHERE 	A.GRCODE_CD		 = B.GRCODE_CD
+										 	AND 	B.ENTER_CD		 = #{ssnEnterCd}
+										 	AND 	A.GRCODE_CD		 = 'C00011'
+										 	AND 	NVL(B.NOTE1,'0') = '1'
+										 ) B
+								WHERE	SUB1.ENTER_CD = #{ssnEnterCd}
+								AND 	(SUB1.DEDUCTION_TYPE IS NULL OR SUB1.DEDUCTION_TYPE <> 'ER_CAG')
+								AND SUB1.ATTRIBUTE_3 = B.CODE
+							) B
+					WHERE	A.ENTER_CD		= #{ssnEnterCd}
+					AND 	A.PAY_ACTION_CD	= #{payActionCd}
+					AND 	A.SABUN			= #{sabun}
+					AND 	A.ENTER_CD		= B.ENTER_CD
+					AND 	A.ELEMENT_CD	= B.ELEMENT_CD
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiUserStaTaxMap">
+			
+				<![CDATA[
+					WITH T201 AS
+					(
+					    SELECT ENTER_CD, PAY_ACTION_CD, ORD_EYMD
+					      FROM TCPN201
+					     WHERE ENTER_CD = #{ssnEnterCd}
+					       AND PAY_ACTION_CD = #{payActionCd}
+					)
+					SELECT DECODE(TRIM(TO_CHAR(NVL(A.TOT_EARNING_MON,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(A.TOT_EARNING_MON,0),'999,999,999,990'))) AS TOT_EARNING_MON
+					     , (SELECT TRIM(TO_CHAR(SUM(RESULT_MON),'999,999,999,990'))
+					          FROM TCPN205
+					         WHERE ENTER_CD = A.ENTER_CD
+					           AND PAY_ACTION_CD = A.PAY_ACTION_CD
+					           AND SABUN = A.SABUN
+					           AND ELEMENT_CD IN (SELECT ELEMENT_CD FROM TCPN072 WHERE ENTER_CD = A.ENTER_CD AND ELEMENT_SET_CD = '30')
+					       ) AS TAX_BASE_MON
+					     , DECODE(TRIM(TO_CHAR(NVL(A.NOTAX_TOT_MON,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(A.NOTAX_TOT_MON,0),'999,999,999,990'))) AS NOTAX_TOT_MON
+					     , DECODE(TRIM(TO_CHAR(NVL(A.TAXIBLE_EARN_MON,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(A.TAXIBLE_EARN_MON,0),'999,999,999,990'))) AS TAXIBLE_EARN_MON
+					     , DECODE(TRIM(TO_CHAR(NVL(B.FAMILY_CNT_1,0)+NVL(B.FAMILY_CNT_2,0)+1,'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(B.FAMILY_CNT_1,0)+NVL(B.FAMILY_CNT_2,0)+1,'999,999,999,990'))) AS FAMILY_CNT
+					     , DECODE(TRIM(TO_CHAR(NVL(B.ADD_CHILD_CNT,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(B.ADD_CHILD_CNT,0),'999,999,999,990'))) AS ADD_CHILD_CNT
+					     , DECODE(TRIM(TO_CHAR(NVL(A.ITAX_MON,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(A.ITAX_MON,0),'999,999,999,990'))) AS ITAX_MON
+					     , DECODE(TRIM(TO_CHAR(NVL(A.RTAX_MON,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(A.RTAX_MON,0),'999,999,999,990'))) AS RTAX_MON
+					     , DECODE(TRIM(TO_CHAR(NVL(A.TOT_DED_MON,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(A.TOT_DED_MON,0),'999,999,999,990'))) AS TOT_DED_MON
+					     , DECODE(TRIM(TO_CHAR(NVL(A.PAYMENT_MON,0),'999,999,999,990')),'0',NULL,TRIM(TO_CHAR(NVL(A.PAYMENT_MON,0),'999,999,999,990'))) AS PAYMENT_MON
+					  FROM TCPN303 A
+					  LEFT OUTER JOIN
+                           (
+                               SELECT *
+                                 FROM TCPN101
+                                WHERE (ENTER_CD, SABUN, SDATE) IN
+                                      (
+                                          SELECT ENTER_CD, SABUN, MAX(SDATE)
+                                            FROM TCPN101
+                                           WHERE ( SELECT ORD_EYMD FROM T201 ) BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                           GROUP BY ENTER_CD, SABUN
+                                      )
+                           ) B
+					    ON B.ENTER_CD = A.ENTER_CD
+					   AND B.SABUN = A.SABUN
+					 WHERE A.ENTER_CD      = #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD = #{payActionCd}
+					   AND A.SABUN         = #{sabun}
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiUserStaEtcList">
+			
+				<![CDATA[
+					SELECT TRIM(BIZ_NM)			AS BIZ_NM
+						, TRIM(ELEMENT_NM)		AS ELEMENT_NM
+						, ELE_VALUE
+						, UNIT
+						, TRIM(BIZ_NM2)		AS BIZ_NM2
+						, TRIM(ELEMENT_NM2)	AS ELEMENT_NM2
+						, ELE_VALUE2
+						, UNIT2
+						FROM (SELECT RANK() OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS RK
+								, F_COM_GET_GRCODE_NAME(ENTER_CD,'C00400',BIZ_CD, #{ssnLocaleCd}) AS BIZ_NM
+								, ELEMENT_NM
+								, ELE_VALUE
+								, UNIT
+								, LEAD(F_COM_GET_GRCODE_NAME(ENTER_CD,'C00400',BIZ_CD, #{ssnLocaleCd})) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS BIZ_NM2
+								, LEAD(ELEMENT_NM) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS ELEMENT_NM2
+								, LEAD(ELE_VALUE) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS ELE_VALUE2
+								, LEAD(UNIT) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS UNIT2
+								FROM (SELECT ENTER_CD
+										, BIZ_CD
+										, F_COM_GET_GRCODE_NAME(X.ENTER_CD,'C00400',X.BIZ_CD, #{ssnLocaleCd}) AS BIZ_NM
+										, ELEMENT_CD
+										, ELEMENT_NM
+										, ELE_VALUE
+										, UNIT
+										FROM TCPN295 X
+									WHERE ENTER_CD			= #{ssnEnterCd}
+										 AND PAY_ACTION_CD	= #{payActionCd}
+										 AND SABUN			= #{sabun}
+									UNION
+									SELECT ENTER_CD
+										, BIZ_CD
+										, F_COM_GET_GRCODE_NAME(X.ENTER_CD,'C00400',X.BIZ_CD, #{ssnLocaleCd}) AS BIZ_NM
+										, ELEMENT_CD
+										, ELEMENT_NM
+										, ELE_VALUE
+										, UNIT
+										FROM TCPN296 X
+									WHERE ENTER_CD			= #{ssnEnterCd}
+										 AND PAY_ACTION_CD	= #{payActionCd}
+										 AND SABUN			= #{sabun}
+									)
+							)
+					WHERE MOD(RK,2) = 1
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiUserStaDtlList">
+			
+				<![CDATA[
+					SELECT B.ELEMENT_TYPE
+						, B.ELEMENT_CD
+						, NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}),B.ELEMENT_NM) AS ELEMENT_NM
+						, TRIM(B.REPORT_NM)	AS REPORT_NM
+						, A.BASIC_MON
+						, A.RESULT_MON
+						, C.NOTE
+						FROM TCPN205 A
+						, TCPN011 B
+						, TCPN110 C
+					WHERE A.ENTER_CD		= #{ssnEnterCd}
+						 AND A.PAY_ACTION_CD	= #{payActionCd}
+						 AND A.SABUN			= #{sabun}
+						 AND A.ELEMENT_CD		= B.ELEMENT_CD
+						 AND A.ENTER_CD		= B.ENTER_CD
+						 AND A.ENTER_CD		= C.ENTER_CD(+)
+						 AND A.SABUN			= C.SABUN(+)
+						 AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD(+)
+						 AND A.ELEMENT_CD		= C.ELEMENT_CD(+)
+						 AND A.RESULT_MON		= C.PAYMENT_MON(+)
+					ORDER BY ELEMENT_TYPE, ELEMENT_CD
+				]]>
+			
+		</select>
+</mapper>

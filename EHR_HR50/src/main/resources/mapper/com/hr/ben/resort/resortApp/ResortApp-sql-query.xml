@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 리조트신청
+ * @author KSJ
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.resort.resortApp">
+
+	<!-- 성수기 리조트신청기간 조회 -->
+	<select id="getResortAppPlanList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT A.ENTER_CD
+			     , A.PLAN_SEQ
+			     , A.SEASON_CD
+			     , A.APP_SDATE
+			     , A.APP_EDATE
+			     , A.TITLE
+			     , A.USE_SDATE
+			     , A.USE_EDATE
+			     , A.CLOSE_YN
+			     , A.NOTE
+				 , '<a class="btn filled">신청</a>' AS BTN_APP
+				 , DECODE( A.SEASON_CD, 'N', '108', '109' ) AS APPL_CD
+			  FROM TBEN492 A
+			 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.APP_SDATE AND A.APP_EDATE
+			   AND (A.TARGET_YN = TRIM(#{targetYn}) OR NVL(A.TARGET_YN, 'N') = 'N')
+			   AND NVL(A.CLOSE_YN, 'N') = 'N'
+	 		 ORDER BY A.USE_SDATE DESC
+	]]>
+	</select>
+
+	<!-- 리조트 신청 내역 조회 -->	
+	<select id="getResortAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT A.ENTER_CD
+			     , A.APPL_SEQ
+			     , A.SABUN
+			     , A.PLAN_SEQ
+			     , A.COMPANY_CD
+			     , A.RESORT_NM
+			     , A.ROOM_TYPE
+			     , A.SDATE
+			     , A.EDATE
+			     , A.DAYS
+			     , A.WAIT_YN
+			     , A.CNT
+			     , A.PHONE_NO
+			     , A.MAIL_ID
+			     , A.NOTE
+			     , A.STATUS_CD
+			     , A.RESORT_MON
+			     , A.COM_MON
+			     , A.PSNAL_MON
+			     , DECODE(A.STATUS_CD,'Y',A.RSV_NO1,'') AS RSV_NO1
+			     , DECODE(A.STATUS_CD,'Y',A.RSV_NO2,'') AS RSV_NO2
+			     , NVl(C.SEASON_CD, '') AS SEASON_CD
+			     , A.HOPE_CD
+			     , B.APPL_CD
+				 , B.APPL_SEQ
+				 , B.APPL_YMD
+				 , B.APPL_SABUN
+				 , B.APPL_IN_SABUN
+				 , B.APPL_STATUS_CD
+				 , DECODE(B.APPL_STATUS_CD, '11', '<a class="basic">삭제</a>', '') AS BTN_DEL
+				 , '0' AS DETAIL
+			  FROM THRI103 B, TBEN491 A
+			  LEFT OUTER JOIN TBEN492 C
+			  ON ( A.ENTER_CD   = C.ENTER_CD AND A.PLAN_SEQ   = C.PLAN_SEQ)
+			 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+               AND A.ENTER_CD   = B.ENTER_CD
+               AND A.APPL_SEQ   = B.APPL_SEQ
+               AND A.SABUN      = TRIM( #{searchSabun} )
+             ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+	]]>
+	</select>
+		
+	<select id="getResortAppTargetYn" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT 
+			COUNT(1) AS CNT 
+		  FROM TBEN496 A
+		 WHERE A.ENTER_CD =	#{ssnEnterCd}
+	       AND A.YEAR 	  = TO_CHAR(SYSDATE,'YYYY')
+	       AND A.SABUN	  = TRIM( #{searchSabun} )
+	]]>
+	</select>
+
+	<delete id="deleteResortApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN491
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( APPL_SEQ ) IN ( ( NULL) ]]>
+		<foreach item="rm" collection="deleteRows"> 
+			<if test="rm.applSeq != null and rm.applSeq neq ''">
+				, ( TRIM( #{rm.applSeq} ) ) 
+			</if>
+		</foreach>
+		       )
+	</delete>
+</mapper>

@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	수기등록내역관리
+ -->
+<root>
+	<!--  수기등록내역 조회  -->
+	<query id="selectSelfInputHisMgrList">
+		<![CDATA[
+				SELECT ENTER_CD
+				      ,WORK_YY
+				      ,ADJUST_TYPE
+				      ,SABUN
+				      ,NAME
+				      ,BUSINESS_PLACE_CD
+				      ,BUSINESS_PLACE_NM
+				      ,DPNDNT_CNT			-- 인적기본공제건수
+				      ,PER_HIS_CNT			-- 인적공제내역건수
+				      ,PER_EVD_DOC_CNT		-- 인정공제증빙건수
+				      ,INS_HIS_CNT			-- 보험료내역건수
+				      ,INS_EVD_DOC_CNT		-- 보험료증빙건수
+				      ,HOUSE_HIS_CNT        -- 주택자금내역건수
+				      ,HOUSE_EVD_DOC_CNT    -- 주택자금증빙건수
+				      ,SAV_HIS_CNT          -- 저축내역건수
+				      ,SAV_EVD_DOC_CNT      -- 저축증빙건수
+				      ,PEN_HIS_CNT          -- 연금계좌내역건수
+				      ,PEN_EVD_DOC_CNT      -- 연금계좌증빙건수
+				      ,MED_HIS_CNT          -- 의료비내역건수
+				      ,MED_EVD_DOC_CNT      -- 의료비증빙건수
+				      ,EDU_HIS_CNT          -- 교육비내역건수
+				      ,EDU_EVD_DOC_CNT      -- 교육비증빙건수
+				      ,DONA_HIS_CNT         -- 기부금내역건수
+				      ,DONA_EVD_DOC_CNT     -- 기부금증빙건수
+				      ,CARD_HIS_CNT         -- 신용카드내역건수
+				      ,CARD_EVD_DOC_CNT     -- 신용카드증빙건수
+				      ,BE_COM_HIS_CNT		-- 종전근무지내역건수
+				      ,BE_COM_EVD_DOC_CNT	-- 종전근무지증빙건수
+				      ,ETC_HIS_CNT          -- 기타소득건수
+				      ,ETC_EVD_DOC_CNT      -- 기타증빙건수
+				FROM
+				(
+				    SELECT A.ENTER_CD
+				         , A.WORK_YY
+				         , A.ADJUST_TYPE
+				         , A.SABUN
+				         , B.NAME
+				         , A.BUSINESS_PLACE_CD
+				         , (SELECT BUSINESS_PLACE_NM
+				            FROM TCPN121
+				            WHERE ENTER_CD = A.ENTER_CD
+				              AND BUSINESS_PLACE_CD = A.BUSINESS_PLACE_CD
+				            ) AS BUSINESS_PLACE_NM
+                    	, (SELECT COUNT(DPNDNT_YN)
+				            FROM TCPN823
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				            )AS DPNDNT_CNT 	-- 기본공제
+				         , (SELECT COUNT(*)
+				            FROM TCPN823
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				            )AS PER_HIS_CNT -- 인적공제내역건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '5'
+				         )   AS PER_EVD_DOC_CNT -- 인적공제증빙건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN828
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				            )AS INS_HIS_CNT -- 보험료내역건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '10'
+				         )   AS INS_EVD_DOC_CNT -- 보험료증빙건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN839
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				            )AS HOUSE_HIS_CNT   -- 주택자금내역건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '15'
+				         )   AS HOUSE_EVD_DOC_CNT -- 주택자금증빙 건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN830 
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				              AND SAVING_DEDUCT_TYPE  IN
+							                   (SELECT CODE
+							                      FROM TSYS005
+							                     WHERE ENTER_CD = A.ENTER_CD
+							                       AND GRCODE_CD = 'C00317'
+							                       AND NOTE1 IN ('3', '4')
+							                       AND #searchYear#||'1231' BETWEEN S_YMD AND E_YMD)              
+				            )AS SAV_HIS_CNT     -- 저축내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '20'
+				         )   AS SAV_EVD_DOC_CNT -- 저축 증빙 건수				                  
+				         , (SELECT COUNT(*)
+				            FROM TCPN830
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY      
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				              AND SAVING_DEDUCT_TYPE  IN
+							                   (SELECT CODE
+							                      FROM TSYS005
+							                     WHERE ENTER_CD = A.ENTER_CD
+							                       AND GRCODE_CD = 'C00317'
+							                       AND NOTE1 IN ('2') 
+							                       AND #searchYear#||'1231' BETWEEN S_YMD AND E_YMD) --  비고1=>기타소득공제구분(퇴직연금_2，연급저축_3，주택마련저축_4，장기주식형저축_5)
+				            )AS PEN_HIS_CNT -- 연금계좌내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '25'
+				         )   AS PEN_EVD_DOC_CNT -- 연금계좌 증빙 건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN825
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				            )AS MED_HIS_CNT -- 의료비 내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '30'
+				         )   AS MED_EVD_DOC_CNT -- 의료비 증빙 건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN829
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				            )AS EDU_HIS_CNT     -- 교육비내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '35'
+				         )   AS EDU_EVD_DOC_CNT -- 교육비증빙 건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN827
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				            )AS DONA_HIS_CNT -- 기부금 내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '40'
+				         )   AS DONA_EVD_DOC_CNT -- 기부금 증빙 건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN821
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND DECODE('',#searchInputType#,'A',ADJ_INPUT_TYPE) IN DECODE('',#searchInputType#,'A',#searchInputType#)  -- 01: 직원입력, 02: 담당자변경
+				            )AS CARD_HIS_CNT    -- 신용카드내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '42'
+				         )   AS CARD_EVD_DOC_CNT -- 신용카드증빙 건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN817
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+               				  AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+	           				  AND ( #searchAdjustType# IS NULL OR A.ADJUST_TYPE = #searchAdjustType# ) -- 조회조건 : 작업구분
+				            )AS BE_COM_HIS_CNT     -- 종전근무지내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '45'
+				         )   AS BE_COM_EVD_DOC_CNT -- 종전근무지증빙 건수
+				         , (SELECT COUNT(*)
+				            FROM TCPN815
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+               				  AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+	           				  AND ( #searchAdjustType# IS NULL OR A.ADJUST_TYPE = #searchAdjustType# ) -- 조회조건 : 작업구분
+				            )AS ETC_HIS_CNT     -- 기타소득내역 건수
+				         , (SELECT COUNT(*)
+				            FROM TYEA105
+				            WHERE ENTER_CD    = A.ENTER_CD
+				              AND SABUN       = A.SABUN
+				              AND ADJUST_TYPE = A.ADJUST_TYPE
+				              AND WORK_YY     = A.WORK_YY
+				              AND FILE_TYPE = '50'
+				         )   AS ETC_EVD_DOC_CNT -- 기타증빙 건수				         				         				         				                    
+				    FROM TCPN811 A
+				        ,THRM100 B
+				    WHERE A.ENTER_CD = B.ENTER_CD
+				      AND A.SABUN = B.SABUN
+				 )
+				 WHERE 1 = 1
+				   AND ENTER_CD = #ssnEnterCd#
+				   AND WORK_YY  = #searchYear#
+				   $query$
+			ORDER BY ADJUST_TYPE, SABUN
+	   ]]>
+	</query>	
+	<!-- 증빙자료 상세목록 조회  -->
+	<query id="selectSelfEvidDocMgrList">
+		<![CDATA[
+			SELECT A.ENTER_CD     	/* 회사구분 */
+			     , B.NAME         	/* 이름 */
+			     , B.SABUN        	/* 사번 */
+			     , F_COM_GET_ORG_NM21(B.ENTER_CD,B.SABUN,TO_CHAR(A.UPLOAD_DATE,'YYYYMMDD')) AS ORG_NM 	/* 조직명 */
+			     , F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN) AS BIZ_PLACE_CD 			/* 사업장 */
+			     , A.WORK_YY      	/* 귀속년도 */
+			     , A.ADJUST_TYPE  	/* 정산구분 */
+			     , A.FILE_TYPE    	/* 파일구분 */
+			     , A.UPLOAD_DATE  	/* 업로드일자 */
+			     , A.FILE_SEQ     	/* 파일순번 */
+			     , A.FILE_PATH    	/* 파일경로정보 */
+			     , A.FILE_NAME    	/* 파일명 */
+			     , A.ATTR1			/* ATTR1 */
+			     , A.ATTR2    		/* ATTR2 */
+			     , A.ATTR3    		/* ATTR3 */
+			     , A.ATTR4    		/* ATTR4 */
+			FROM TYEA105 A /* 연말정산_증빙자료관리 */
+			   , THRM100 B /* 인사마스타 */
+			WHERE A.ENTER_CD = B.ENTER_CD
+			  AND A.SABUN = B.SABUN
+			  AND A.ENTER_CD = #ssnEnterCd#
+			  AND A.WORK_YY = #searchYear#
+			  AND A.ADJUST_TYPE LIKE #searchAdjustType# ||'%'
+			  AND (A.SABUN LIKE '%'||#searchSbNm#||'%' OR B.NAME LIKE '%'||#searchSbNm#||'%')			  			  
+			  AND (DECODE(A.SABUN,NULL,'%',A.SABUN) = DECODE(#searchSb#,NULL,'%',#searchSb#)) 
+			  AND A.FILE_TYPE IN (SELECT B.CODE
+								    FROM TSYS005 B
+								   WHERE B.ENTER_CD = #ssnEnterCd# 
+								     AND B.GRCODE_CD = 'YEA001'
+								     AND B.USE_YN = 'Y'
+								     AND #searchYear#||'1231' BETWEEN B.S_YMD AND B.E_YMD
+								     $query$
+								  )
+			
+	   ]]> 
+	</query>
+    <!--  연말정산 파일첨부탭 기능 사용 여부 조회  -->
+    <query id="getCpnYeaAddFileYn">
+        <![CDATA[
+            SELECT STD_CD_VALUE
+              FROM TSYS955
+             WHERE ENTER_CD = #ssnEnterCd#
+               AND STD_CD = 'CPN_YEA_ADD_FILE_YN'        
+        ]]>
+    </query>        
+</root>

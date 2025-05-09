@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.upload.imageUpload">
+
+	<select id="getEmpImgStdCdValue" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT NVL(F_COM_GET_STD_CD_VALUE(#{ssnEnterCd}, 'HRM_EMP_IMG_THUM_YN'),'Y') AS IMG_THUM_YN
+			 , NVL(F_COM_GET_STD_CD_VALUE(#{ssnEnterCd}, 'HRM_EMP_IMG_LIMIT_SIZE'), '100') AS IMG_LIMIT_SIZE
+		  FROM DUAL
+	]]>
+	</select>
+
+	<select id="thrm911ImageSelect" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	  IMAGE_TYPE
+				, FILENAME
+				, TO_CHAR( CHKDATE,'YYYY-MM-DD HH:MM:SS') AS CHKDATE
+				, CHKID
+				, SIGN
+	 	FROM THRM911_ALL -- 전사 조회를 위하여 THRM911_ALL뷰에서 가져옴
+		WHERE	ENTER_CD = NVL(#{enterCd}, #{ssnEnterCd})
+		AND	SABUN 	= #{sabun}
+		AND ROWNUM = 1
+	]]>
+	</select>
+
+	<!-- 저장 -->
+	<update id="thrm911ImageInsert" parameterType="map">
+	<![CDATA[
+		MERGE INTO THRM911 T
+                 USING   (
+	                SELECT    TRIM(#{gubun})     		AS IMAGE_TYPE
+	                        , TRIM(#{orgFileNm})      AS FILENAME
+					FROM   DUAL
+
+                         ) S
+                 ON (    T.ENTER_CD  = #{ssnEnterCd}
+                     AND T.SABUN = #{sabun}
+                    )
+                 WHEN MATCHED THEN
+                     UPDATE SET    T.IMAGE_TYPE       = S.IMAGE_TYPE
+						, T.FILENAME         = S.FILENAME
+						, T.CHKDATE        = SYSDATE
+						, T.CHKID          = #{ssnSabun}
+                 WHEN NOT MATCHED THEN
+                     INSERT
+                     (
+				  T.ENTER_CD
+				, T.SABUN
+				, T.IMAGE_TYPE
+				, T.FILENAME
+				, T.CHKDATE
+				, T.CHKID
+                     )
+                     VALUES
+                     (
+                           #{ssnEnterCd}
+                         , #{sabun}
+						, S.IMAGE_TYPE
+						, S.FILENAME
+						, SYSDATE
+                         , #{ssnSabun}
+                     )
+	]]>
+	</update>
+
+	<update id="thrm911SignImageInsert" parameterType="map">
+	<![CDATA[
+		MERGE INTO THRM911 T
+           USING   (
+           SELECT   TRIM(#{signFileNm})      AS SIGN
+           		,TRIM(#{gubun})     		AS IMAGE_TYPE
+		  FROM   DUAL
+                   ) S
+           ON (    T.ENTER_CD  = #{ssnEnterCd}
+               AND T.SABUN = #{sabun}
+              )
+           WHEN MATCHED THEN
+               UPDATE SET    T.SIGN      = S.SIGN
+						, T.CHKDATE        = SYSDATE
+						, T.CHKID          = #{ssnSabun}
+           	WHEN NOT MATCHED THEN
+               INSERT
+               (
+				  T.ENTER_CD
+				, T.IMAGE_TYPE
+				, T.SABUN
+				, T.SIGN
+				, T.CHKDATE
+				, T.CHKID
+               )
+               VALUES
+               (
+                     #{ssnEnterCd}
+                   , S.IMAGE_TYPE
+                   , #{sabun}
+ 					, S.SIGN
+ 					, SYSDATE
+                   , #{ssnSabun}
+               )
+	]]>
+	</update>
+
+	<!--delete id="thrm911ImageDelete" parameterType="map">
+		DELETE FROM TSYS911
+		WHERE	ENTER_CD= #{enterCd}
+		AND	SABUN 	= #{sabun}
+	</delete-->
+
+	<update id="thrm911SignImageDelete" parameterType="map">
+	<![CDATA[
+		UPDATE TSYS911
+		SET SIGN = ''
+		WHERE	ENTER_CD = #{enterCd}
+		AND	SABUN 	= #{sabun}
+	]]>
+	</update>
+
+	<select id="imageExistYn" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	DECODE(COUNT(1),1,'Y','N') AS EXGST_YN
+	 	FROM    THRM911_ALL -- 전사 조회를 위하여 THRM911_ALL뷰에서 가져옴
+		WHERE	ENTER_CD = #{ssnEnterCd}
+		AND	    SABUN 	 = #{sabun}
+		AND     IMAGE_TYPE = '1'
+		AND     ROWNUM = 1
+	]]>
+	</select>
+
+	<select id="imageSignExistYn" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	DECODE(COUNT(1),1,'Y','N') AS EXGST_YN
+	 	FROM    THRM911_ALL -- 전사 조회를 위하여 THRM911_ALL뷰에서 가져옴
+		WHERE	ENTER_CD = #{ssnEnterCd}
+		AND	    SABUN 	 = #{sabun}
+		AND     IMAGE_TYPE = '2'
+		AND     ROWNUM = 1
+	]]>
+	</select>
+	
+</mapper>
+

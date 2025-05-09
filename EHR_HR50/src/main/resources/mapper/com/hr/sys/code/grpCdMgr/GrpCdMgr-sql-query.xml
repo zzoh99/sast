@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.code.grpCdMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getGrpCdMgrGrpCdList">
+
+				<![CDATA[
+					SELECT GRP_CD AS CODE
+				          , NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys307', LANGUAGE_CD, #{ssnLocaleCd}), GRP_NM) AS CODE_NM
+ 					FROM TSYS307
+ 					WHERE ENTER_CD = #{ssnEnterCd}
+ 					ORDER BY SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getGrpCdMgrList">
+
+				<![CDATA[
+					SELECT    DISTINCT NVL(B.ENTER_CD, #{ssnEnterCd}) AS ENTER_CD
+							, A.GRCODE_CD
+							, A.GRCODE_NM
+							, A.GRCODE_FULL_NM
+							, A.GRCODE_ENG_NM
+							, A.TYPE
+							, A.BIZ_CD
+							, (SELECT COUNT (*) FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = A.GRCODE_CD AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD) AS SUB_CNT
+							, A.LANGUAGE_CD
+							, F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys001',  A.LANGUAGE_CD,#{ssnLocaleCd}) AS LANGUAGE_NM
+					FROM 	TSYS001 A ,
+						(	SELECT * FROM TSYS005
+							WHERE ENTER_CD = #{ssnEnterCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+						) B
+					WHERE A.GRCODE_CD   = B.GRCODE_CD(+)
+					          ]]>
+					<if test='srchGrpCd != null and !srchGrpCd.equals("")'>
+						AND A.GRCODE_CD   LIKE '%'|| TRIM( #{srchGrpCd} ) ||'%'
+					</if>
+					<if test='srchGrpCodeNm != null and !srchGrpCodeNm.equals("")'>
+						AND A.GRCODE_NM   LIKE '%'|| TRIM( #{srchGrpCodeNm} ) ||'%'
+					</if>
+					<if test='srchBizCd != null and !srchBizCd.equals("")'>
+						AND A.BIZ_CD  = TRIM( #{srchBizCd} )
+					</if>
+					<if test='srchType != null and !srchType.equals("")'>
+						AND A.TYPE  = TRIM( #{srchType} )
+					</if>
+					<if test='srchWithDetailCodeNm != null and !srchWithDetailCodeNm.equals("")'>
+                   		AND A.GRCODE_CD IN (SELECT DISTINCT GRCODE_CD
+	              							FROM TSYS005
+	              							WHERE ENTER_CD =  #{ssnEnterCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+	                                    	 AND CODE_NM LIKE'%'|| TRIM( #{srchWithDetailCodeNm} ) ||'%')
+                    </if>
+					<if test='selectMagamCode != null and selectMagamCode.equals("1")'>
+						AND A.GRCODE_CD IN('S90001', 'B10230')
+					</if>
+					ORDER BY  GRCODE_CD
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getGrpCdMgrDetailList">
+
+					SELECT    B.GRCODE_CD
+							, B.GRCODE_NM
+							, A.CODE
+							, A.CODE_NM
+							, A.CODE_IDX
+							, A.SEQ
+							, A.CODE_FULL_NM
+							, A.CODE_ENG_NM
+							, A.MEMO
+							, A.VISUAL_YN
+							, A.USE_YN
+							, A.NOTE1
+							, A.NOTE2
+							, A.NOTE3
+							, A.NOTE4
+							, A.S_YMD
+							, A.E_YMD
+							, A.NUM_NOTE
+							, A.CHKDATE
+							, A.CHKID
+							, A.LANGUAGE_CD
+							, F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys005',  A.LANGUAGE_CD,#{ssnLocaleCd}) AS LANGUAGE_NM
+					FROM TSYS005 A , TSYS001 B
+					WHERE A.GRCODE_CD	= B.GRCODE_CD
+					AND A.ENTER_CD		= #{ssnEnterCd}
+					AND A.GRCODE_CD		= #{selectGroupCode}
+					<if test='srchDetailCode != null and !srchDetailCode.equals("")'>
+						AND NVL(A.CODE,' ')	LIKE '%'|| TRIM(#{srchDetailCode}) ||'%'
+					</if>
+					<if test='srchDetailCodeNm != null and !srchDetailCodeNm.equals("")'>
+						AND NVL(A.CODE_NM,' ')	LIKE '%'|| TRIM(#{srchDetailCodeNm}) ||'%'
+					</if>
+					<if test='srchUseYn != null and !srchUseYn.equals("")'>
+						AND NVL(A.USE_YN,' ')	LIKE '%'|| TRIM(#{srchUseYn}) ||'%'
+					</if>
+					ORDER BY TO_NUMBER(A.SEQ), A.S_YMD
+
+
+
+		</select>
+<!-- 		저장 -->
+		<update parameterType="map" id="saveGrpCdMgr">
+
+                <![CDATA[
+                    MERGE INTO TSYS001 T
+                    USING   (
+                            SELECT    A.GRCODE_CD
+                                    , A.GRCODE_NM
+                                    , A.GRCODE_FULL_NM
+                                    , A.GRCODE_ENG_NM
+                                    , A.TYPE
+                                    , A.BIZ_CD
+                                    , A.LANGUAGE_CD
+                            FROM    (
+                                    SELECT    NULL      AS GRCODE_CD
+                                            , NULL      AS GRCODE_NM
+                                            , NULL      AS GRCODE_FULL_NM
+                                            , NULL      AS GRCODE_ENG_NM
+                                            , NULL      AS TYPE
+                                            , NULL 		AS BIZ_CD
+                                            , NULL 		AS LANGUAGE_CD
+                                    FROM    DUAL
+                                        ]]>
+		<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT
+                                              TRIM(#{rm.grcodeCd})      AS GRCODE_CD
+                                            , TRIM(#{rm.grcodeNm})      AS GRCODE_NM
+                                            , TRIM(#{rm.grcodeFullNm})  AS GRCODE_FULL_NM
+                                            , TRIM(#{rm.grcodeEngNm})   AS GRCODE_ENG_NM
+                                            , TRIM(#{rm.type})          AS TYPE
+                                            , TRIM(#{rm.bizCd})          AS BIZ_CD
+                                            , TRIM(#{rm.languageCd})          AS LANGUAGE_CD
+                                            FROM   DUAL
+		</foreach>
+                                    ) A WHERE A.GRCODE_CD IS NOT NULL
+                            ) S
+            ON ( T.GRCODE_CD = S.GRCODE_CD )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.GRCODE_NM       = S.GRCODE_NM
+                                    , T.GRCODE_FULL_NM  = S.GRCODE_FULL_NM
+                                    , T.GRCODE_ENG_NM   = S.GRCODE_ENG_NM
+                                    , T.TYPE            = S.TYPE
+                                    , T.BIZ_CD          = S.BIZ_CD
+                                    , T.LANGUAGE_CD          = S.LANGUAGE_CD
+                                    , T.CHKDATE         = SYSDATE
+                                    , T.CHKID           =  #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.GRCODE_CD
+                            , T.GRCODE_NM
+                            , T.GRCODE_FULL_NM
+                            , T.GRCODE_ENG_NM
+                            , T.TYPE
+                            , T.BIZ_CD
+                            , T.LANGUAGE_CD
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.GRCODE_CD
+                            , S.GRCODE_NM
+                            , S.GRCODE_FULL_NM
+                            , S.GRCODE_ENG_NM
+                            , S.TYPE
+                            , S.BIZ_CD
+                            , S.LANGUAGE_CD
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+        </update>
+        
+        <update parameterType="map" id="saveGrpCdMgrDetail">
+		<![CDATA[
+                    MERGE INTO TSYS005 T
+                    USING   (
+                            SELECT    A.CODE
+                                    , A.CODE_NM
+                                    , A.CODE_IDX
+                                    , A.CODE_FULL_NM
+                                    , A.CODE_ENG_NM
+									, A.SEQ
+									, A.VISUAL_YN
+									, A.USE_YN
+									, A.NOTE1
+									, A.NOTE2
+									, A.NOTE3
+									, A.NOTE4
+									, A.NUM_NOTE
+									, A.MEMO
+									, A.LANGUAGE_CD
+									, A.S_YMD
+									, A.E_YMD
+                            FROM    (
+                                    SELECT    NULL      AS CODE
+                                            , NULL      AS CODE_NM
+                                            , NULL		AS CODE_IDX
+                                            , NULL      AS CODE_FULL_NM
+                                            , NULL      AS CODE_ENG_NM
+                                            , NULL      AS SEQ
+                                            , NULL      AS VISUAL_YN
+                                            , NULL      AS USE_YN
+                                            , NULL      AS NOTE1
+                                            , NULL      AS NOTE2
+                                            , NULL      AS NOTE3
+                                            , NULL      AS NOTE4
+                                            , NULL      AS NUM_NOTE
+                                            , NULL      AS MEMO
+                                            , NULL      AS LANGUAGE_CD
+                                            , NULL		AS S_YMD
+                                            , NULL		AS E_YMD
+                                    FROM    DUAL ]]>
+					<foreach item="rm" collection="mergeRows" >
+                            		UNION ALL
+                                    SELECT	  TRIM(#{rm.code})      	AS CODE
+                                            , TRIM(#{rm.codeNm})  		AS CODE_NM
+											, TO_NUMBER(TRIM(#{rm.codeIdx}))  AS CODE_IDX
+                                            , TRIM(#{rm.codeFullNm})   	AS CODE_FULL_NM
+                                            , TRIM(#{rm.codeEngNm})		AS CODE_ENG_NM
+                                            , TO_NUMBER( TRIM(#{rm.seq}))          	AS SEQ
+                                            , TRIM(#{rm.visualYn})		AS VISUAL_YN
+                                            , TRIM(#{rm.useYn})         AS USE_YN
+                                            , TRIM(#{rm.note1})         AS NOTE1
+                                            , TRIM(#{rm.note2})			AS NOTE2
+                                            , TRIM(#{rm.note3})			AS NOTE3
+                                            , TRIM(#{rm.note4})			AS NOTE4
+                                            , TRIM(#{rm.numNote})		AS NUM_NOTE
+                                            , TRIM(#{rm.memo})			AS MEMO
+                                            , TRIM(#{rm.languageCd})	AS LANGUAGE_CD
+                                            , TRIM(#{rm.sYmd})			AS S_YMD
+                                            , TRIM(#{rm.eYmd})			AS E_YMD
+                                            FROM   DUAL
+					</foreach>
+                                    ) A WHERE A.CODE IS NOT NULL
+                            ) S
+            ON ( 	  T.ENTER_CD 	= #{ssnEnterCd}
+            	 AND  T.GRCODE_CD 	= #{selectGroupCode}
+            	 AND  T.CODE 		= S.CODE
+            	 AND  T.CODE_IDX	= S.CODE_IDX
+            )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.CODE_NM     = S.CODE_NM
+                                    , T.CODE_FULL_NM= S.CODE_FULL_NM
+                                    , T.CODE_ENG_NM = S.CODE_ENG_NM
+                                    , T.SEQ         = S.SEQ
+									, T.VISUAL_YN   = S.VISUAL_YN
+									, T.USE_YN      = S.USE_YN
+									, T.NOTE1       = S.NOTE1
+									, T.NOTE2       = S.NOTE2
+									, T.NOTE3       = S.NOTE3
+									, T.NOTE4       = S.NOTE4
+									, T.S_YMD		= S.S_YMD
+									, T.E_YMD		= S.E_YMD
+									, T.NUM_NOTE    = S.NUM_NOTE
+									, T.MEMO        = S.MEMO
+									, T.LANGUAGE_CD  = S.LANGUAGE_CD
+                                    , T.CHKDATE		= SYSDATE
+                                    , T.CHKID       =  #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.GRCODE_CD
+                            , T.CODE
+                            , T.CODE_NM
+                            , T.CODE_IDX
+                            , T.CODE_FULL_NM
+                            , T.CODE_ENG_NM
+                            , T.SEQ
+                            , T.VISUAL_YN
+                            , T.USE_YN
+                            , T.NOTE1
+                            , T.NOTE2
+                            , T.NOTE3
+                            , T.NOTE4
+                            , T.S_YMD
+                            , T.E_YMD
+                            , T.NUM_NOTE
+                            , T.MEMO
+                            , T.LANGUAGE_CD
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              #{ssnEnterCd}
+                            , #{selectGroupCode}
+                            , S.CODE
+                            , S.CODE_NM
+                            , S.CODE_IDX
+                            , S.CODE_FULL_NM
+                            , S.CODE_ENG_NM
+                            , S.SEQ
+                            , S.VISUAL_YN
+                            , S.USE_YN
+                            , S.NOTE1
+                            , S.NOTE2
+                            , S.NOTE3
+                            , S.NOTE4
+                            , S.S_YMD
+                            , S.E_YMD
+                            , S.NUM_NOTE
+                            , S.MEMO
+                            , S.LANGUAGE_CD
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+        </update>
+        
+        <update id="updateGrpCdMgrDetailEYmd" parameterType="map">
+        <![CDATA[
+        	UPDATE TSYS005 c
+			   SET c.E_YMD = NVL(
+			   					(SELECT TO_CHAR(TO_DATE(MIN(S_YMD), 'YYYYMMDD') - (INTERVAL '1' DAY), 'YYYYMMDD') 
+			   					   FROM TSYS005 cc 
+			   					  WHERE cc.ENTER_CD = #{ssnEnterCd}
+			   					  	AND cc.GRCODE_CD = #{selectGroupCode}
+			   					  	AND cc.CODE = c.CODE 
+			   					  	AND cc.S_YMD > c.S_YMD), '29991231')
+			 WHERE c.ENTER_CD = #{ssnEnterCd} AND c.GRCODE_CD = #{selectGroupCode}
+        ]]>
+        </update>
+        
+		<!-- 		삭제  -->
+		<delete parameterType="map" id="deleteGrpCdMgr">
+
+            		DELETE FROM TSYS001
+					WHERE	1 = 1
+            		AND GRCODE_CD IN (  NULL
+					<foreach item="rm" collection="deleteRows" >
+										, TRIM( #{rm.grcodeCd} )
+					</foreach>
+										)
+
+
+        </delete>
+		<delete parameterType="map" id="deleteGrpCdMgrDetail">
+            DELETE FROM TSYS005
+            WHERE   1 = 1
+            AND ( ENTER_CD, GRCODE_CD, CODE, CODE_IDX) IN (  (NULL,NULL,NULL,NULL)
+			<foreach item="rm" collection="deleteRows" >
+              , ( #{ssnEnterCd}, TRIM( #{rm.grcodeCd}), TRIM( #{rm.code}), TO_NUMBER(TRIM(#{rm.codeIdx}))  )
+			</foreach>
+            )
+        </delete>
+        
+        <select id="countGrpCdMgrDeail" parameterType="map" resultType="int">
+        <![CDATA[
+        	SELECT MAX(CODE_IDX) FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = #{grcodeCd} AND CODE = #{code}
+        ]]>
+        </select>
+        
+        
+
+</mapper>

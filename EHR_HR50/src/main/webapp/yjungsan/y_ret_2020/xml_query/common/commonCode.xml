@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	공통 코드 쿼리 
+ -->
+<root>
+
+	<!-- 공통코드 조회  -->
+	<query id="getCommonCodeList">
+	   <![CDATA[
+			SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+			  FROM TSYS005
+			WHERE ENTER_CD = #ssnEnterCd#
+				AND GRCODE_CD = trim( #grpCd# )
+				AND VISUAL_YN LIKE #visualYn# ||'%'
+				AND USE_YN LIKE #useYn# ||'%'
+				AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+			ORDER BY USE_YN DESC
+			       , DECODE(#orderBy#, '0', '', CODE_NM), SEQ, CODE, CODE_NM 
+	   ]]> 
+	</query>
+	
+	<!-- 공통코드 조회  -->
+	<query id="getCommonCodeNote1List">
+		<![CDATA[
+			SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+			   FROM TSYS005
+			  WHERE ENTER_CD = #ssnEnterCd#
+			    AND GRCODE_CD = trim( #grpCd# )
+			    -- dynamic query 보안 이슈 때문에 수정
+			    AND NOTE1 IN ('2','3')
+			    AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+			 ORDER BY SEQ
+	   ]]> 
+	</query>
+	
+	<!-- 연말정산 항목 -->
+	<query id="getYearEndItemList">
+	   <![CDATA[
+			SELECT ADJ_ELEMENT_CD AS CODE, ADJ_ELEMENT_NM AS CODE_NM, MAX(LEN) OVER() AS MAX_LEN
+			  FROM (
+					SELECT ADJ_ELEMENT_CD, ADJ_ELEMENT_NM, LENGTH(ADJ_ELEMENT_CD||' ('||ADJ_ELEMENT_NM||')') AS LEN
+					  FROM TCPN803
+					 WHERE ENTER_CD       	 		= #ssnEnterCd#
+					     AND WORK_YY LIKE '%'|| TRIM(#srchWorkYy#)
+					  	 AND INCOME_DATA_YN    = 'Y'
+					     AND ADJ_PROCESS_CD 	= 'C010'
+					ORDER BY SEQ
+			  )
+	   ]]> 
+	</query>	
+
+	<!-- 세금항목 -->
+	<query id="getTaxList">
+	   <![CDATA[
+			SELECT TAX_RATE_CD AS CODE, TAX_RATE_NM AS CODE_NM
+			  FROM TCPN501
+			 WHERE ENTER_CD = #ssnEnterCd#
+		       AND WORK_YY = #srchWorkYy#
+	   ]]> 
+	</query>
+	
+	<!-- 시스템기준 -->
+	<query id="getSystemStdData">
+		<![CDATA[
+			SELECT STD_CD AS CODE, STD_CD_VALUE AS CODE_NM
+			  FROM TSYS955
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND STD_CD = #searchStdCd#
+		]]> 
+	</query>
+	
+	<!-- 가족사항 코드 리스트 -->
+	<query id="getFamCodeList">
+		<![CDATA[
+			SELECT DISTINCT F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS CODE, A.FAM_NM AS CODE_NM
+				 , A.SABUN, B.SEQ
+			  FROM TCPN823 A ,(SELECT * FROM TSYS005 WHERE ENTER_CD = #ssnEnterCd# AND GRCODE_CD='C00309' AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN S_YMD AND E_YMD) B
+			 WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.WORK_YY  	  = #searchWorkYy#
+			   AND A.ADJUST_TYPE  = #searchAdjustType#
+			   AND A.SABUN        = #searchSabun#
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.FAM_CD = B.CODE
+			   AND A.DPNDNT_YN LIKE #searchDpndntYn# ||'%'
+			   AND A.FAM_CD NOT IN ('Z') -- dynamic query 보안 이슈 때문에 수정
+			 ORDER BY A.SABUN, B.SEQ
+		]]>
+	</query>
+	
+	<!-- 가족사항 코드 리스트  dynamic query 보안 이슈 때문에 queryId=getFamCodeList2 분기 처리 -->
+	<query id="getFamCodeList2">
+		<![CDATA[
+			SELECT DISTINCT F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS CODE, A.FAM_NM AS CODE_NM
+				 , A.SABUN, B.SEQ
+			  FROM TCPN823 A ,(SELECT * FROM TSYS005 WHERE ENTER_CD = #ssnEnterCd# AND GRCODE_CD='C00309' AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN S_YMD AND E_YMD) B
+			 WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.WORK_YY  	  = #searchWorkYy#
+			   AND A.ADJUST_TYPE  = #searchAdjustType#
+			   AND A.SABUN        = #searchSabun#
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.FAM_CD = B.CODE
+			   AND A.DPNDNT_YN LIKE #searchDpndntYn# ||'%'
+			   -- dynamic query 보안 이슈 때문에 수정
+			   AND A.FAM_CD NOT IN ('Z', '6', '7' ,'8') 
+			 ORDER BY A.SABUN, B.SEQ
+		]]>
+	</query>
+	
+	<!-- 가족사항 코드 리스트(교육) -->
+	<query id="getFamCodeEduList">
+		<![CDATA[
+			SELECT F_COM_DECRYPT( FAMRES , ENTER_CD ) AS CODE, FAM_NM AS CODE_NM
+			  FROM (
+			            SELECT A.FAMRES, A.FAM_NM, B.SEQ , A.ENTER_CD
+			              FROM TCPN823 A , TSYS005 B
+			             WHERE A.ENTER_CD     = #ssnEnterCd#
+									   AND A.WORK_YY  	  = #searchWorkYy#
+									   AND A.ADJUST_TYPE  = #searchAdjustType#
+									   AND A.SABUN        = #searchSabun#
+			               AND A.ENTER_CD = B.ENTER_CD
+			               AND A.FAM_CD = B.CODE
+			               AND B.GRCODE_CD = 'C00309'
+			               AND A.DPNDNT_YN = 'Y'  
+			               AND A.FAM_CD NOT IN ('1', '2') -- 직계존속 제외
+			               AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD
+			            UNION
+			            SELECT A.FAMRES, A.FAM_NM, B.SEQ , A.ENTER_CD
+			              FROM TCPN823 A , TSYS005 B
+			             WHERE A.ENTER_CD     = #ssnEnterCd#
+									   AND A.WORK_YY  	  = #searchWorkYy#
+									   AND A.ADJUST_TYPE  = #searchAdjustType#
+									   AND A.SABUN        = #searchSabun#
+			               AND A.ENTER_CD = B.ENTER_CD
+			               AND A.FAM_CD = B.CODE
+			               AND B.GRCODE_CD = 'C00309'
+			               AND A.HNDCP_TYPE IS NOT NULL -- 장애인은 전체 다 체크(직계비속과 며느리나 사위가 둘 다 장애인일 경우 가능하나 판단하기 어려우므로 장애인일 경우 모두 디스플레이)
+			               AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD
+			            UNION
+			            SELECT A.FAMRES, A.FAM_NM, B.SEQ , A.ENTER_CD
+			              FROM TCPN823 A , TSYS005 B
+			             WHERE A.ENTER_CD     = #ssnEnterCd#
+									   AND A.WORK_YY  	  = #searchWorkYy#
+									   AND A.ADJUST_TYPE  = #searchAdjustType#
+									   AND A.SABUN        = #searchSabun#
+			               AND A.ENTER_CD = B.ENTER_CD
+			               AND A.FAM_CD = B.CODE
+			               AND B.GRCODE_CD = 'C00309'
+			               AND A.DPNDNT_YN = 'N' 
+			               AND A.FAM_CD IN ('4', '5')  -- 직계비속,입양자의 경우 20세 초과인데 기본공제대상자로 체크되지 않은 경우
+			                                                      -- (기본공제 대상자가 아니어도 교육비를 제출할 수 있다. 
+			                                                      -- 20세이하 이면서 기본공제로 체크되어 있지 않은 경우는 타인의 기본공제 대상자로 간주해야 한다.)
+			               AND #searchWorkYy# - TO_NUMBER(DECODE(SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 7, 1), 3, 20, 4, 20, 7, 20, 8, 20, 19)||SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 1, 2)) > 20
+			               AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD
+			            UNION
+			            SELECT A.FAMRES, A.FAM_NM, B.SEQ , A.ENTER_CD
+			              FROM TCPN823 A , TSYS005 B
+			             WHERE A.ENTER_CD     = #ssnEnterCd#
+									   AND A.WORK_YY  	  = #searchWorkYy#
+									   AND A.ADJUST_TYPE  = #searchAdjustType#
+									   AND A.SABUN        = #searchSabun#
+			               AND A.ENTER_CD = B.ENTER_CD
+			               AND A.FAM_CD = B.CODE
+			               AND B.GRCODE_CD = 'C00309'
+			               AND A.DPNDNT_YN = 'N' 
+			               AND A.FAM_CD IN ('6')  -- 형제자매의 경우 20세 초과 60세 미만인데 기본공제대상자로 체크되지 않은 경우
+			                                                      -- (기본공제 대상자가 아니어도 교육비를 제출할 수 있다. 
+			                                                      -- 20세이하이거나 60세이상일 경우 기본공제로 체크되어 있지 않은 경우는 타인의 기본공제 대상자로 간주해야 한다.)               
+			               AND #searchWorkYy# - TO_NUMBER(DECODE(SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 7, 1), 3, 20, 4, 20, 7, 20, 8, 20, 19)||SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 1, 2)) > 20
+			               AND #searchWorkYy# - TO_NUMBER(DECODE(SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 7, 1), 3, 20, 4, 20, 7, 20, 8, 20, 19)||SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 1, 2)) < 60
+			               AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD               
+			          )
+			 ORDER BY SEQ 
+		]]>
+	</query>
+	
+	<!-- 가족사항 코드 리스트(신용카드) -->
+	<query id="getFamCodeCardList">
+		<![CDATA[
+		    SELECT F_COM_DECRYPT( A.FAMRES , A.ENTER_CD ) AS CODE, A.FAM_NM AS CODE_NM, B.SEQ , A.ENTER_CD
+		      FROM TCPN823 A , TSYS005 B
+		     WHERE A.ENTER_CD       = #ssnEnterCd#
+		       AND A.WORK_YY        = #searchWorkYy#
+		       AND A.ADJUST_TYPE    = #searchAdjustType#
+		       AND A.SABUN          = #searchSabun#
+		       AND A.ENTER_CD = B.ENTER_CD
+		       AND A.FAM_CD = B.CODE
+		       AND B.GRCODE_CD = 'C00309'
+		       AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD    
+		       AND A.FAMRES NOT IN    
+		                           (
+		                            SELECT A.FAMRES
+		                              FROM TCPN823 A , TSYS005 B
+		                             WHERE A.ENTER_CD       = #ssnEnterCd#
+		                               AND A.WORK_YY        = #searchWorkYy#
+		                               AND A.ADJUST_TYPE    = #searchAdjustType#
+		                               AND A.SABUN          = #searchSabun#
+		                               AND A.ENTER_CD = B.ENTER_CD
+		                               AND A.FAM_CD = B.CODE
+		                               AND B.GRCODE_CD = 'C00309'
+		                               AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD
+		                               AND (A.FAM_CD IN ('6','7','8')  -- 형제자매,수급자,위탁아동 제외
+		                                   /* [신용카드] 관계코드가 (3, 배우자) 이면서 기본공제 체크가 안되어 있으면서 금액이 입력되어 있으면 안됨.
+		                                                          이는 배우자가 연말정산 신고를 통해  본인공제를 한다는 의미이다.
+		                                                          이럴 경우 근로자 본인이 신용카드 금액을 신고하면 안된다.(타인의 기본공제대상자는 신용카드 공제 금액을 신고할 수 없다.)
+		                                   */                                 
+		                                    OR (A.FAM_CD IN ('3') AND A.DPNDNT_YN = 'N'
+		                                       )                              
+		                                    /*[신용카드] 직계존속의 기본공제 체크가 No이면서 60세이상은 신용카드등대상자가 아님
+		                                                            이는  가족 중 누군가가 60세 이상의 직계존속에 대해 기본공제를 한다는 의미이다.
+		                                                            이럴 경우 근로자 본인이 신용카드 금액을 신고하면 안된다.  (타인의 기본공제대상자는 신용카드 공제 금액을 신고할 수 없다.)
+		                                    */                                  
+		                                    OR (A.FAM_CD IN ('1', '2') AND A.DPNDNT_YN = 'N' 
+		                                        AND #searchWorkYy# - TO_NUMBER(DECODE(SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 7, 1), 3, 20, 4, 20, 7, 20, 8, 20, 19)||SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 1, 2)) >= 60
+		                                        )
+		                                    /*[신용카드]  직계비속의 기본공제 체크가 No이면서 20세이하는 신용카드등대상자가 아님
+		                                                            이는  가족 중 누군가가 20세 이하의 직계존속에 대해 기본공제를 한다는 의미이다.
+		                                                            이럴 경우 근로자 본인이 신용카드 금액을 신고하면 안된다.  (타인의 기본공제대상자는 신용카드 공제 금액을 신고할 수 없다.)
+		                                    */                                        
+		                                    OR (A.FAM_CD IN ('4', '5') AND A.DPNDNT_YN = 'N' 
+		                                        AND #searchWorkYy# - TO_NUMBER(DECODE(SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 7, 1), 3, 20, 4, 20, 7, 20, 8, 20, 19)||SUBSTR(F_COM_DECRYPT( a.FAMRES , a.ENTER_CD ), 1, 2)) <= 20
+		                                        )
+		                                    )
+		                             )         
+		    ORDER BY SEQ
+		]]>
+	</query>
+	
+	<!-- 연말정산 코드 리스트 -->
+	<query id="getSavingDeductList">
+		<![CDATA[
+			SELECT CODE, CODE_NM
+			  FROM TSYS005
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND GRCODE_CD = 'C00317'
+			   AND NOTE1 = #searchGubun# 
+			   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+			 ORDER BY SEQ
+		]]>
+	</query>
+	
+	<!-- pdf 업무구분 코드 조회 -->
+	<query id="getPdfFormCdList">
+		<![CDATA[
+			SELECT 'A102Y' AS CODE, F_CPN_PDF_DATASPEC_NM('A102Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'B101Y' AS CODE, F_CPN_PDF_DATASPEC_NM('B101Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'C101Y' AS CODE, F_CPN_PDF_DATASPEC_NM('C101Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'C202Y' AS CODE, F_CPN_PDF_DATASPEC_NM('C202Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'C301Y' AS CODE, F_CPN_PDF_DATASPEC_NM('C301Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'D101Y' AS CODE, F_CPN_PDF_DATASPEC_NM('D101Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'E102Y' AS CODE, F_CPN_PDF_DATASPEC_NM('E102Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'F102Y' AS CODE, F_CPN_PDF_DATASPEC_NM('F102Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'G102Y' AS CODE, F_CPN_PDF_DATASPEC_NM('G102Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'G203M' AS CODE, F_CPN_PDF_DATASPEC_NM('G203M') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'G302Y' AS CODE, F_CPN_PDF_DATASPEC_NM('G302Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'J101Y' AS CODE, F_CPN_PDF_DATASPEC_NM('J101Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'J203Y' AS CODE, F_CPN_PDF_DATASPEC_NM('J203Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'J301Y' AS CODE, F_CPN_PDF_DATASPEC_NM('J301Y') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'K101M' AS CODE, F_CPN_PDF_DATASPEC_NM('K101M') AS CODE_NM FROM DUAL
+			UNION ALL
+			SELECT 'L101Y' AS CODE, F_CPN_PDF_DATASPEC_NM('L101Y') AS CODE_NM FROM DUAL
+		]]>
+	</query>	
+	
+	<!-- 연말정산 납입횟수 코드 -->
+	<query id="getPayingNumCdList">
+		<![CDATA[
+			 SELECT CODE, CODE_NM
+			    FROM TSYS005
+			   WHERE ENTER_CD = #ssnEnterCd#
+			     AND GRCODE_CD = 'C00321'
+			     AND CODE <> '00' --해당사항없음 제외
+			     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+			  ORDER BY SEQ
+		]]> 
+    </query>
+    
+	<!-- 재계산 일자 코드 조회 -->
+	<query id="getReCalcCodeList">
+		<![CDATA[
+			SELECT RE_CALC_CD AS CODE
+			     , RE_CALC_NM AS CODE_NM
+			  FROM TCPN881
+			 WHERE ENTER_CD = #ssnEnterCd#
+			 ORDER BY RE_WORK_YY DESC, RE_BELONG_YM DESC
+		]]> 
+    </query>
+    
+	<!-- 사업장코드 조회  -->
+	<query id="getBizPlaceCdList">
+		<![CDATA[
+			SELECT X.BUSINESS_PLACE_CD AS CODE, X.BUSINESS_PLACE_NM AS CODE_NM
+			  FROM TCPN121 X
+			 WHERE X.ENTER_CD = #ssnEnterCd#
+			   AND X.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+			                   WHERE Y.ENTER_CD = X.ENTER_CD
+			                     AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+			                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+			ORDER BY 1
+	   ]]> 
+	</query>
+	
+	<!-- 급여코드 -->
+	<query id="getCpnPayCdList">
+	   <![CDATA[
+ 	       SELECT DISTINCT  PAY_CD AS CODE, PAY_NM AS CODE_NM 
+ 	       FROM TCPN051 
+ 	       WHERE ENTER_CD = #ssnEnterCd#
+ 	       ORDER BY PAY_CD ASC 
+ 	   ]]> 
+	</query>
+
+</root>

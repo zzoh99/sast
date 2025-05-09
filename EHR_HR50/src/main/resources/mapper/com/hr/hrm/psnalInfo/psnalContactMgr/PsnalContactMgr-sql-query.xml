@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalContact">
+		<!-- 개인별연락처관리 다건 조회 -->
+		<select id="getPsnalContactMgrList" resultType="cMap">
+
+					SELECT
+					     A.ENTER_CD
+					   , A.SABUN
+					   , F_COM_GET_ORG_NM2 (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					   , F_COM_GET_JIKCHAK_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+					   , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					   , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+					   , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+             		   , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+					   , A.CONT_TYPE
+					   , A.CONT_ADDRESS
+					FROM THRM124 A
+<if test='ssnSearchType != null and ssnSearchType.equals("O")' >
+-- 관리자 권한범위 체크
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = A.ENTER_CD
+  AND AUTH.SABUN = A.SABUN
+</if>
+					WHERE 1=1
+					  AND A.ENTER_CD = #{ssnEnterCd}
+<if test='searchSabunNameAlias != null and !searchSabunNameAlias.equals("")' >
+					  AND ( A.SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%' )
+</if>
+<if test='searchMultiContType != null and !searchMultiContType.equals("")' >
+					  AND A.CONT_TYPE IN
+					<foreach collection="searchMultiContType" item="item" index="index" open="(" close=")" separator=",">
+										 #{item}
+					</foreach>
+</if>
+					ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+					       , F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H12410', A.CONT_TYPE)
+
+
+		</select>
+
+
+		<!-- 개인별연락처관리 단건 조회 -->
+		<select id="getPsnalContactMgrMap">
+
+				<![CDATA[
+					SELECT *
+					FROM DUAL
+				]]>
+
+
+		</select>
+
+
+		<!-- 개인별연락처관리 저장 -->
+		<update id="savePsnalContactMgr" parameterType="map">
+
+					MERGE INTO THRM124 T
+					USING (
+					    SELECT
+					          A.ENTER_CD
+					        , A.SABUN
+					        , A.CONT_TYPE
+					        , A.CONT_ADDRESS
+					    FROM  (
+					        SELECT
+					              NULL      AS ENTER_CD
+					            , NULL      AS SABUN
+					            , NULL      AS CONT_TYPE
+					            , NULL      AS CONT_ADDRESS
+					        FROM DUAL
+<bind name="icnt" value="1" />
+<foreach collection="mergeRows" item="rm" >
+					        UNION ALL
+					        SELECT
+					              TRIM( #{ssnEnterCd} )   AS ENTER_CD
+					            , TRIM( #{rm.sabun} ) AS SABUN
+					            , TRIM( #{rm.contType} ) AS CONT_TYPE
+					            , TRIM( #{rm.contAddress} ) AS CONT_ADDRESS
+					        FROM DUAL
+</foreach>
+					    ) A
+					    WHERE 1=1
+					      AND A.ENTER_CD IS NOT NULL
+					      AND A.SABUN IS NOT NULL
+					      AND A.CONT_TYPE IS NOT NULL
+					) S
+					ON (
+					        T.ENTER_CD = S.ENTER_CD
+					    AND T.SABUN = S.SABUN
+					    AND T.CONT_TYPE = S.CONT_TYPE
+					)
+					WHEN MATCHED THEN
+					    UPDATE SET
+					          T.CONT_ADDRESS = S.CONT_ADDRESS
+					        , T.CHKDATE = SYSDATE
+					        , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					    INSERT
+					    (
+					          T.ENTER_CD
+					        , T.SABUN
+					        , T.CONT_TYPE
+					        , T.CONT_ADDRESS
+					        , CHKDATE
+					        , CHKID
+					    )
+					    VALUES
+					    (
+					          S.ENTER_CD
+					        , S.SABUN
+					        , S.CONT_TYPE
+					        , S.CONT_ADDRESS
+					        , SYSDATE
+					        , #{ssnSabun}
+					    )
+
+
+
+		</update>
+
+		<!-- 개인별연락처관리 삭제 -->
+		<delete id="deletePsnalContactMgr" parameterType="map">
+
+
+					DELETE FROM THRM124
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||SABUN||'_'||CONT_TYPE IN ( NULL
+<foreach collection="deleteRows" item="rm" >
+
+    <if test='rm.sabun != null and !rm.sabun.equals("")
+      and rm.contType != null and !rm.contType.equals("")' >
+					    ,    TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.contType})
+	</if>
+</foreach>
+					  )
+
+
+
+		</delete>
+
+		<!-- 개인별연락처관리 프로시저 -->
+		<select id="PsnalContactMgrPrcP_PROCEDURE" parameterType="map" resultType="cMap">
+			{
+
+			CALL P_PROCEDURE(
+					#{sqlcodem, mode=OUT, jdbcType=VARCHAR},
+					#{sqlerrm, mode=OUT, jdbcType=VARCHAR},
+					#{ssnEnterCd, mode=IN, jdbcType=VARCHAR},
+					#{ssnSabun, mode=IN, jdbcType=VARCHAR}
+					)
+			}
+
+		</select>
+
+	</mapper>

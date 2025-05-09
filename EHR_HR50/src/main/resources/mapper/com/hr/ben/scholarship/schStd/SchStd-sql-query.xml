@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.scholarship.schStd">
+
+	<select id="getSchStdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		   SELECT ENTER_CD
+				, SCH_TYPE_CD
+				, SCH_SUP_TYPE_CD
+				, FAM_CD
+				, SDATE
+				, EDATE
+				, WORK_YEAR
+				, LMT_APP_CNT
+				, LMT_YEAR_MON
+				, ST_AGE
+				, ED_AGE
+				, APPL_MON
+				, PAY_RATE
+				, NOTE
+				, EVIDENCE_DOC
+				, ELEMENT_CD
+				, ( SELECT MAX(X.ELEMENT_NM) KEEP(DENSE_RANK FIRST ORDER BY X.SDATE DESC)
+				      FROM TCPN011 X
+				     WHERE X.ENTER_CD   = A.ENTER_CD
+					   AND X.ELEMENT_CD = A.ELEMENT_CD ]]>
+				<choose>
+					<when test="searchYmd != null and searchYmd neq ''">
+					   AND REPLACE(#{searchYmd},'-','') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+					</when>
+					<otherwise>
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+					</otherwise>
+				</choose>
+				  ) AS ELEMENT_NM
+				, CHKDATE
+				, CHKID
+			 FROM TBEN750 A
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		<if test="searchYmd != null and searchYmd neq ''">
+			   AND REPLACE(#{searchYmd},'-','') BETWEEN SDATE AND NVL(EDATE,'29991231')
+		</if>
+		 ORDER BY F_COM_GET_GRCODE_SEQ( ENTER_CD, 'B60050', SCH_TYPE_CD)
+                   , F_COM_GET_GRCODE_SEQ( ENTER_CD, 'B60051', SCH_SUP_TYPE_CD)
+                   , F_COM_GET_GRCODE_SEQ( ENTER_CD, 'B60030', FAM_CD)
+	</select>
+
+	<update id="saveSchStd" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN750 T 	
+		 USING 	( ]]>
+			<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+			   SELECT TRIM(#{ssnEnterCd})		AS	ENTER_CD
+		            , TRIM(#{rm.schTypeCd})  	AS  SCH_TYPE_CD	
+		            , TRIM(#{rm.schSupTypeCd})  AS  SCH_SUP_TYPE_CD	
+		            , TRIM(#{rm.famCd})  		AS  FAM_CD	
+		            , TRIM(#{rm.sdate})  		AS  SDATE	
+		            , TRIM(#{rm.edate})  		AS  EDATE	
+		            , TRIM(#{rm.workYear})  	AS  WORK_YEAR	
+		            , TRIM(#{rm.lmtAppCnt})  	AS  LMT_APP_CNT	
+		            , TRIM(#{rm.lmtYearMon})  	AS  LMT_YEAR_MON	
+		            , TRIM(#{rm.stAge})  		AS  ST_AGE	
+		            , TRIM(#{rm.edAge})  		AS  ED_AGE	
+		            , TRIM(#{rm.applMon})  		AS  APPL_MON	
+		            , TRIM(#{rm.payRate})  		AS  PAY_RATE	
+		            , TRIM(#{rm.note})  		AS  NOTE	
+		            , TRIM(#{rm.elementCd})  	AS  ELEMENT_CD
+		            , TRIM(#{rm.evidenceDoc})  	AS  EVIDENCE_DOC
+		        FROM DUAL	
+			</foreach>
+	<![CDATA[
+		) S 	
+		ON ( 	
+		          T.ENTER_CD 		= S.ENTER_CD 	
+		     AND  T.SCH_TYPE_CD 	= S.SCH_TYPE_CD 	
+		     AND  T.SCH_SUP_TYPE_CD = S.SCH_SUP_TYPE_CD
+		     AND  T.FAM_CD 			= S.FAM_CD 	
+		     AND  T.SDATE 			= S.SDATE 	
+		) 	
+		WHEN MATCHED THEN 	
+		   UPDATE SET T.EDATE 			= S.EDATE 	
+		            , T.WORK_YEAR 		= S.WORK_YEAR 	
+		            , T.LMT_APP_CNT 	= S.LMT_APP_CNT 	
+		            , T.LMT_YEAR_MON 	= S.LMT_YEAR_MON 	
+		            , T.ST_AGE 			= S.ST_AGE 	
+		            , T.ED_AGE 			= S.ED_AGE 	
+		            , T.APPL_MON 		= S.APPL_MON 	
+		            , T.PAY_RATE 		= S.PAY_RATE 	
+		            , T.NOTE 			= S.NOTE 	
+		            , T.ELEMENT_CD 		= S.ELEMENT_CD
+		            , T.EVIDENCE_DOC	= S.EVIDENCE_DOC
+		            , T.CHKDATE			= sysdate
+					, T.CHKID 			= #{ssnSabun}
+		WHEN NOT MATCHED THEN 	
+		   INSERT 	
+		   ( 	
+		              T.ENTER_CD	
+		            , T.SCH_TYPE_CD	
+		            , T.SCH_SUP_TYPE_CD
+		            , T.FAM_CD	
+		            , T.SDATE	
+		            , T.EDATE	
+		            , T.WORK_YEAR	
+		            , T.LMT_APP_CNT	
+		            , T.LMT_YEAR_MON	
+		            , T.ST_AGE	
+		            , T.ED_AGE	
+		            , T.APPL_MON	
+		            , T.PAY_RATE	
+		            , T.NOTE	
+		            , T.ELEMENT_CD
+		            , T.EVIDENCE_DOC
+		            , T.CHKDATE	
+		            , T.CHKID	
+		   ) 	
+		   VALUES 	
+		   ( 	
+		              S.ENTER_CD	
+		            , S.SCH_TYPE_CD	
+		            , S.SCH_SUP_TYPE_CD
+		            , S.FAM_CD	
+		            , S.SDATE	
+		            , S.EDATE	
+		            , S.WORK_YEAR	
+		            , S.LMT_APP_CNT	
+		            , S.LMT_YEAR_MON	
+		            , S.ST_AGE	
+		            , S.ED_AGE	
+		            , S.APPL_MON	
+		            , S.PAY_RATE	
+		            , S.NOTE	
+		            , S.ELEMENT_CD
+		            , S.EVIDENCE_DOC
+		            , sysdate	
+		            , #{ssnSabun}	
+		   ) 	
+	]]>
+	</update>
+
+	<delete id="deleteSchStd" parameterType="map">
+	<![CDATA[
+		DELETE 
+		  FROM TBEN750
+ 	 	 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+   		   AND ( SCH_TYPE_CD,SCH_SUP_TYPE_CD,FAM_CD,SDATE ) IN ( ( NULL,NULL,NULL,NULL) ]]> 
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.schTypeCd != null and rm.schTypeCd neq '' and rm.schSupTypeCd != null and rm.schSupTypeCd neq '' 
+					and rm.famCd != null and rm.famCd neq '' and rm.sdate != null and rm.sdate neq ''">
+					, ( TRIM( #{rm.schTypeCd} ),TRIM( #{rm.schSupTypeCd} ),TRIM( #{rm.famCd} ),TRIM( #{rm.sdate} ) )
+			</if> 		
+		</foreach>
+       )
+	</delete>
+</mapper>

@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.etc.psnlTimeCalendar">
+
+
+<!-- 부서원연차사용현황 조직코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeCalendarOrgList">
+
+					--조직가져오기
+<choose><when test='ssnSearchType != null and ssnSearchType.equals("A")'>
+						SELECT '전체' AS CODE_NM, '0' AS CODE FROM DUAL
+						UNION ALL
+						SELECT ORG_NM AS CODE_NM, ORG_CD AS CODE
+						FROM
+							(
+							 SELECT *
+	   						   FROM (
+									SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+									     , A.*
+									  FROM TORG105 A, TORG101 B
+									 WHERE A.ENTER_CD = B.ENTER_CD
+									   AND A.ORG_CD = B.ORG_CD
+									   AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+									   AND A.ENTER_CD = #{ssnEnterCd}
+									   AND A.SDATE = (SELECT MAX(SDATE)
+									                    FROM TORG103
+													   WHERE ENTER_CD = A.ENTER_CD
+		<if test='searchYmd != null and !searchYmd.equals("")'>
+													     AND CASE WHEN LENGTH(REPLACE(#{searchYmd},'-','')) = 6 THEN TO_CHAR(LAST_DAY(TO_DATE(REPLACE(#{searchYmd},'-',''),'YYYYMM')), 'YYYYMMDD')
+																   ELSE REPLACE(#{searchYmd},'-','') END BETWEEN SDATE AND NVL(EDATE,'29991231')
+		</if>
+													  )
+									) A
+								START WITH A.PRIOR_ORG_CD = '0'
+								CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+									AND PRIOR A.SDATE = A.SDATE
+									AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+								ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+							)
+
+		</when><otherwise>
+						SELECT F_COM_GET_ORG_NM(ENTER_CD,SCOPE_VALUE,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CODE_NM, SCOPE_VALUE AS CODE
+						FROM TSYS319
+						WHERE ENTER_CD = #{ssnEnterCd}
+							AND AUTH_SCOPE_CD ='W10'
+							AND GRP_CD = #{ssnGrpCd}
+							AND SABUN = #{ssnSabun}
+</otherwise>
+</choose>
+
+		</select>
+		
+<!-- 조직원근태출장현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeCalendarList">
+
+				<![CDATA[
+				WITH TEMP AS (
+						SELECT A.ENTER_CD 
+						     , A.SABUN
+						     -- 전달과 이어지는 날짜를 캘린더가 표시 못해서 전달꺼는 표시 안함.
+				             , CASE WHEN A.S_YMD < TRIM(#{searchYm}) ||'01' THEN SUBSTR(TRIM(#{searchYm}),1,4)||'-'||SUBSTR(TRIM(#{searchYm}),5,6) ||'-01' ELSE TO_CHAR(TO_DATE(A.S_YMD,'YYYYMMDD'),'YYYY-MM-DD') END AS S_YMD
+				             , CASE WHEN A.E_YMD > TO_CHAR(ADD_MONTHS(TO_DATE(TRIM(#{searchYm})||'01', 'YYYYMMDD'), 1)-1, 'YYYYMMDD')
+				                    THEN TO_CHAR(ADD_MONTHS(TO_DATE(TRIM(#{searchYm})||'01', 'YYYYMMDD'), 1), 'YYYY-MM-DD')
+				                    ELSE TO_CHAR(TO_DATE(A.E_YMD,'YYYYMMDD') + 1,'YYYY-MM-DD') END AS E_YMD
+						     , CASE WHEN A.S_YMD <> A.E_YMD THEN A.TITLE || ' ( '||TO_CHAR(TO_DATE(A.S_YMD,'YYYYMMDD'),'MM.DD')||' ~ '|| TO_CHAR(TO_DATE(A.E_YMD,'YYYYMMDD'),'MM.DD')||' )' 
+						            ELSE A.TITLE END AS TITLE 
+						  FROM (
+						        -----------------------------------------------------------------------------------------------------------------
+						        --근태
+						        SELECT A.ENTER_CD
+						             , A.SABUN AS SABUN
+						             , A.S_YMD
+	                                 , A.E_YMD
+						             , C.GNT_NM AS TITLE
+						          FROM TTIM301 A
+						             , THRI103 B
+						             , TTIM014 C
+						         WHERE A.ENTER_CD = #{ssnEnterCd}
+						           AND A.ENTER_CD = B.ENTER_CD
+						           AND A.APPL_SEQ = B.APPL_SEQ
+						           AND B.APPL_STATUS_CD = '99'
+						           AND B.APPL_CD IN ('22' , '121') /*근태신청, 대체휴가신청*/
+						           AND ( SUBSTR(A.S_YMD,1,6) = TRIM(#{searchYm}) OR SUBSTR(A.E_YMD,1,6) = TRIM(#{searchYm}) )
+						           AND A.ENTER_CD = C.ENTER_CD
+						           AND A.GNT_CD   = C.GNT_CD
+						         UNION ALL
+						        ----------------------------------------------------------------------------------------------------------------
+						        --당직신청
+						        SELECT A.ENTER_CD
+						             , A.SABUN AS SABUN
+						             , A.YMD AS S_YMD
+						             , A.YMD AS E_YMD
+						             , '당직 ' || SUBSTR(A.REQ_S_HM,0,2)||':'||SUBSTR(A.REQ_S_HM,3,2) 
+						               || ' ~ '||SUBSTR(A.REQ_E_HM,0,2)||':'||SUBSTR(A.REQ_E_HM,3,2) AS TITLE
+						          FROM TTIM621 A, THRI103 B
+						         WHERE A.ENTER_CD = #{ssnEnterCd}
+						           AND A.ENTER_CD = B.ENTER_Cd
+						           AND A.APPL_SEQ = B.APPL_SEQ
+						           AND B.APPL_STATUS_CD = '99'
+						           AND SUBSTR(A.YMD,1,6) = TRIM(#{searchYm})
+
+					         ) A 
+					       , THRM151 B
+					  WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND A.ENTER_CD = B.ENTER_CD
+              			AND A.SABUN    = B.SABUN
+              			AND B.SDATE    = (SELECT MAX(SDATE)
+                               			    FROM THRM151
+                              		   	   WHERE ENTER_CD = B.ENTER_CD
+                                		     AND SABUN    = B.SABUN 
+                                		     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231') )
+                                		     
+                                		     
+  			            AND A.SABUN IN (SELECT SABUN
+                                          FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD'))) )
+                                          ]]>
+<if test='searchMultiManageCd != null and !searchMultiManageCd.equals("")'>
+					    AND B.WORK_TYPE	IN
+		<foreach collection="searchMultiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					    AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgCd != null and !searchOrgCd.equals("0")'>
+					    AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, #{searchYm} || '15') IN (
+																	        SELECT   ORG_CD
+																	          FROM (
+																	                SELECT ENTER_CD, SDATE, PRIOR_ORG_CD, ORG_CD, SEQ
+																	                  FROM TORG105 X
+																	                 WHERE ENTER_CD     = #{ssnEnterCd}
+																	                   AND SDATE        = (SELECT MAX(S.SDATE)
+																	                                         FROM TORG103 S
+																	                                        WHERE S.ENTER_CD = X.ENTER_CD
+																	                                          AND #{searchYm} || '15' BETWEEN S.SDATE AND NVL(S.EDATE,'99991231'))
+																	                )
+																	         START WITH ORG_CD = TRIM(#{searchOrgCd})
+																	         CONNECT BY PRIOR ENTER_CD = ENTER_CD
+																	                 AND PRIOR SDATE   = SDATE
+																	                 AND PRIOR ORG_CD  = PRIOR_ORG_CD
+																	    )
+</if>
+<if test='searchYmd != null and !searchYmd.equals("")'>
+						 AND A.S_YMD = #{searchYmd}
+</if>
+				)
+					SELECT S_YMD
+					     , E_YMD
+					     , TITLE
+					     , GUBUN
+                         , ROW_NUMBER() OVER (ORDER BY A.ENTER_CD, A.S_YMD, A.GUBUN , A.SEQ) AS SEQ
+					  FROM (
+						 	--회사휴일 (본인사업장)
+					        SELECT A.ENTER_CD
+					             , NULL		AS SABUN
+					             , YY||'-'||MM||'-'||DD AS S_YMD
+					             , YY||'-'||MM||'-'||DD AS E_YMD
+                                 , HOLIDAY_NM AS TITLE
+					             , 1 AS GUBUN
+					             , '0' AS SEQ
+					          FROM TTIM001 A
+					         WHERE A.ENTER_CD = #{ssnEnterCd}
+<choose><when test='searchOrgCd != null and !searchOrgCd.equals("0")'>
+					           AND A.BUSINESS_PLACE_CD = F_COM_GET_ORG_MAP_CD(#{ssnEnterCd}, '100', #{searchOrgCd}, #{searchYm} || '15' )
+		</when><otherwise>
+					           AND A.BUSINESS_PLACE_CD = '100'  -- 본사
+</otherwise>
+</choose>
+					           AND YY||MM = TRIM(#{searchYm})
+					        UNION
+					        SELECT ENTER_CD
+					             , SABUN 
+					             , S_YMD 
+					             , E_YMD
+<choose><when test='searchOrgCd != null and !searchOrgCd.equals("0")'>
+					             , '[ ' || F_COM_GET_NAMES(ENTER_CD, SABUN, #{ssnLocaleCd}) || ' ] '  || TITLE AS TITLE
+		</when><otherwise>
+					             , '[ ' || F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) || ' ' || F_COM_GET_NAMES(ENTER_CD, SABUN, #{ssnLocaleCd}) || ' ] '  || TITLE AS TITLE
+</otherwise>
+</choose>
+					             , 2 AS GUBUN
+					             , F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS SEQ
+					          FROM TEMP A
+					      ) A
+					  ORDER BY A.ENTER_CD, A.S_YMD, A.GUBUN , A.SEQ 
+					
+
+
+		</select>
+		
+<!-- 조직원근태출장현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeCalendarList_bk20200908">
+
+				<![CDATA[
+				WITH TEMP AS (
+						SELECT A.* FROM (
+					        --근태
+					        SELECT T3.SUN_DATE
+					             , T4.SABUN
+					             , '' AS IN_TITLE
+					             , '' AS OUT_TITLE
+					             , (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD = T4.ENTER_CD AND GNT_CD = T4.GNT_CD) AS GNT_NM
+					             , (SELECT SEQ FROM TTIM014 WHERE ENTER_CD = T4.ENTER_CD AND GNT_CD = T4.GNT_CD) AS GNT_SEQ
+					             , '' AS COST_KIND_NM
+					             , T4.ENTER_CD
+					             , '' AS DEC
+					          FROM TSYS007 T3
+					              ,TTIM405 T4
+					              ,THRI103 S1
+					         WHERE T3.SUN_DATE = T4.YMD
+					           AND T4.ENTER_CD = #{ssnEnterCd}
+					           AND T4.ENTER_CD = S1.ENTER_CD
+					           AND T4.APPL_SEQ = S1.APPL_SEQ
+					           AND S1.APPL_CD IN ('22', '121')
+					           AND S1.APPL_STATUS_CD = '99'
+					           AND TO_DATE(T3.SUN_DATE) BETWEEN TO_DATE(TRIM(#{searchYm})||'01') AND ADD_MONTHS(TO_DATE(TRIM(#{searchYm})||'01'),2)
+					        UNION ALL
+					        --당직신청
+					        SELECT T3.YMD
+					              ,T3.SABUN
+                                  , SUBSTR(T3.REQ_S_HM,0,2)||':'||SUBSTR(T3.REQ_S_HM,3,2) AS IN_TITLE
+                                  , SUBSTR(T3.REQ_E_HM,0,2)||':'||SUBSTR(T3.REQ_E_HM,3,2) AS OUT_TITLE
+					              ,'당직' AS GNT_NM
+					             , 999999999999 AS GNT_SEQ
+					             , '' AS COST_KIND_NM
+					             , T3.ENTER_CD
+					             , '' AS DEC
+					          FROM TTIM621 T3, THRI103 T4
+					         WHERE T3.ENTER_CD = #{ssnEnterCd}
+					           AND T3.ENTER_CD = T4.ENTER_Cd
+					           AND T3.APPL_SEQ = T4.APPL_SEQ
+					           AND T4.APPL_STATUS_CD = '99'
+					           AND TO_DATE(T3.YMD) BETWEEN TO_DATE(TRIM(#{searchYm})||'01') AND ADD_MONTHS(TO_DATE(TRIM(#{searchYm})||'01'),2)
+					         ) A , THRM151 B
+					         
+					  WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND A.ENTER_CD = B.ENTER_CD
+              			AND A.SABUN    = B.SABUN
+              			AND B.SDATE    = (SELECT MAX(SDATE)
+                               			    FROM THRM151
+                              		   	   WHERE ENTER_CD = B.ENTER_CD
+                                		     AND SABUN    = B.SABUN 
+                                		     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231') )
+  			            AND A.SABUN IN (SELECT SABUN
+                                          FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD'))) )
+                                          ]]>
+<if test='searchMultiManageCd != null and !searchMultiManageCd.equals("")'>
+					    AND B.WORK_TYPE	IN
+		<foreach collection="searchMultiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					    AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+					    AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, #{searchYm} || '15') IN (
+																	        SELECT   ORG_CD
+																	          FROM (
+																	                SELECT ENTER_CD, SDATE, PRIOR_ORG_CD, ORG_CD, SEQ
+																	                  FROM TORG105 X
+																	                 WHERE ENTER_CD     = #{ssnEnterCd}
+																	                   AND SDATE        = (SELECT MAX(S.SDATE)
+																	                                         FROM TORG103 S
+																	                                        WHERE S.ENTER_CD = X.ENTER_CD
+																	                                          AND #{searchYm} || '15' BETWEEN S.SDATE AND NVL(S.EDATE,'99991231'))
+																	                )
+																	         START WITH ORG_CD = NVL(#{searchOrgCd}, '00000') OR  PRIOR_ORG_CD =  NVL(#{searchOrgCd}, '00000')
+																	         CONNECT BY PRIOR ENTER_CD = ENTER_CD
+																	                 AND PRIOR SDATE = SDATE
+																	                 AND PRIOR ORG_CD =   PRIOR_ORG_CD
+																	    )
+						AND (#{searchYmd} IS NULL OR	A.SUN_DATE = #{searchYmd})
+					  --GROUP BY A.ENTER_CD, A.SUN_DATE
+					  ORDER BY A.ENTER_CD, A.SUN_DATE
+				)
+					SELECT F_COM_GET_NAMES(A.ENTER_CD,A.SABUN, #{ssnLocaleCd}) AS NAME
+				         , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					     , TO_CHAR(TO_DATE(A.SUN_DATE,'YYYYMMDD'),'YYYY-MM-DD') AS S_YMD
+					     , HOL_DAY_YN
+	                     , A.IN_TITLE AS IN_TITLE
+	                     , A.OUT_TITLE AS OUT_TITLE
+	                     , CASE WHEN A.GNT_NM IS NULL AND A.SABUN IS NULL THEN NULL
+	                            ELSE '[ ' || RPAD(A.GNT_NM,20,' ') || ' ]        ' || F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) END AS GNT_NM
+
+	                     , A.GNT_NM AS HOL_DIV
+	                     , A.COST_KIND_NM AS COST_KIND_NM
+	                     , 'tempUrl' AS URL
+	                     , A.DEC AS DEC
+	                     , A.GNT_SEQ
+						FROM (
+							--회사휴일
+					        SELECT T3.SUN_DATE
+					              -- ,TRIM( #{sabun} ) AS SABUN -- 2020.02.05 막음
+					             , NULL		AS SABUN
+					             , '' AS IN_TITLE
+					             , '' AS OUT_TITLE
+					             , '' AS GNT_NM
+					             , '' AS COST_KIND_NM
+					             , T4.ENTER_CD
+					             , '' AS DEC
+					             , T4.HOLIDAY_NM AS HOL_DAY_YN
+					             , 1 AS SEQ
+					             , 1 AS GNT_SEQ
+					          FROM TSYS007 T3
+					              ,TTIM001 T4
+					         WHERE T3.SUN_DATE = T4.YY||T4.MM||T4.DD
+					           AND T4.ENTER_CD = #{ssnEnterCd}
+					           AND TO_DATE(T3.SUN_DATE) BETWEEN TO_DATE(TRIM(#{searchYm})||'01') AND ADD_MONTHS(TO_DATE(TRIM(#{searchYm})||'01'),2)
+					           AND BUSINESS_PLACE_CD= F_COM_GET_ORG_MAP_CD(T4.ENTER_CD, '100',  #{searchOrgCd}, #{searchYm} || '15', 'ko_KR')
+					        UNION
+					        SELECT T.SUN_DATE
+					             , T.SABUN
+					             , T.IN_TITLE
+					             , T.OUT_TITLE
+					             , T.GNT_NM
+					             , T.COST_KIND_NM
+					             , T.ENTER_CD
+					             , T.DEC
+					             , 'N' AS HOL_DAY_YN
+					             , 2 AS SEQ
+					             , T.GNT_SEQ
+					          FROM TEMP T
+					        ) A
+					        ORDER BY A.ENTER_CD, A.SUN_DATE, A.SEQ, A.GNT_SEQ
+		</select>
+
+
+</mapper>

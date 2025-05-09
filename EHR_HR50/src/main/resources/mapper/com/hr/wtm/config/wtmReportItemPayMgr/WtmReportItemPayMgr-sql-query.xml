@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.config.wtmReportItemPayMgr">
+
+	<!-- 리포트항목지급관리 리스트 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmReportItemPayMgrList">
+		<![CDATA[
+			SELECT A.ENTER_CD, A.REPORT_ITEM_CD, A.ELEMENT_CD, A.APPLY_RATE
+			     , B.DAYS_COUNT_YN
+			     , NVL(F_COM_GET_LANGUAGE_MAPPING(C.ENTER_CD, 'tcpn011', C.LANGUAGE_CD, #{ssnLocaleCd}), C.ELEMENT_NM) AS ELEMENT_NM
+			  FROM TWTM062 A
+			 INNER JOIN TWTM061 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.REPORT_ITEM_CD = A.REPORT_ITEM_CD
+			 INNER JOIN TCPN011 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.ELEMENT_CD = A.ELEMENT_CD
+			   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+		]]>
+	</select>
+
+	<!-- 리포트항목지급관리 삭제 -->
+	<delete parameterType="map" id="deleteWtmReportItemPayMgr">
+		<![CDATA[
+			DELETE FROM TWTM062
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			   AND (REPORT_ITEM_CD, ELEMENT_CD) IN
+		]]>
+			       <foreach collection="deleteRows" item="rm" separator=", " open="(" close=")">
+					   (TRIM(#{rm.reportItemCd}), TRIM(#{rm.elementCd}))
+				   </foreach>
+	</delete>
+
+	<!-- 리포트항목코드 저장 -->
+	<update parameterType="map" id="saveWtmReportItemPayMgr">
+		<![CDATA[
+			MERGE INTO TWTM062 T
+			USING
+			(
+				SELECT ENTER_CD, REPORT_ITEM_CD, ELEMENT_CD, APPLY_RATE, INSDATE, INSID, CHKDATE, CHKID
+				  FROM (
+				           SELECT NULL AS ENTER_CD
+				                , NULL AS REPORT_ITEM_CD
+				                , NULL AS ELEMENT_CD
+				                , NULL AS APPLY_RATE
+				                , NULL AS INSDATE
+				                , NULL AS INSID
+				                , NULL AS CHKDATE
+				                , NULL AS CHKID
+				             FROM DUAL
+		]]>
+				           <foreach collection="mergeRows" item="rm">
+							   UNION ALL
+							   SELECT #{ssnEnterCd} AS ENTER_CD
+							        , #{rm.reportItemCd} AS REPORT_ITEM_CD
+							        , #{rm.elementCd} AS ELEMENT_CD
+							        , #{rm.applyRate} AS APPLY_RATE
+							        , SYSDATE AS INSDATE
+							        , #{ssnSabun} AS INSID
+							        , SYSDATE AS CHKDATE
+							        , #{ssnSabun} AS CHKID
+							     FROM DUAL
+						   </foreach>
+					  )
+				 WHERE ENTER_CD IS NOT NULL
+				   AND REPORT_ITEM_CD IS NOT NULL
+				   AND ELEMENT_CD IS NOT NULL
+			) S
+			ON
+			(
+			    T.ENTER_CD = S.ENTER_CD
+			    AND T.REPORT_ITEM_CD = S.REPORT_ITEM_CD
+			    AND T.ELEMENT_CD = S.ELEMENT_CD
+			)
+			WHEN MATCHED THEN
+				UPDATE SET T.APPLY_RATE = S.APPLY_RATE
+			             , T.CHKDATE = S.CHKDATE
+			             , T.CHKID = S.CHKID
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+				      T.ENTER_CD, T.REPORT_ITEM_CD, T.ELEMENT_CD, T.APPLY_RATE
+				    , T.INSDATE, T.INSID, T.CHKDATE, T.CHKID
+				)
+				VALUES
+				(
+				      S.ENTER_CD, S.REPORT_ITEM_CD, S.ELEMENT_CD, S.APPLY_RATE
+				    , S.INSDATE, S.INSID, S.CHKDATE, S.CHKID
+				)
+	</update>
+
+	<!-- 리포트항목지급관리 리포트항목 코드리스트 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmReportItemPayMgrItemCdList">
+		SELECT REPORT_ITEM_CD AS CODE, REPORT_ITEM_NM AS CODE_NM
+		     , DAYS_COUNT_YN
+		  FROM TWTM061
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND USE_YN = 'Y'
+	</select>
+</mapper>

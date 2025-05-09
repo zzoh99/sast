@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 과세이연기초
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepTaxDefMgr">
+		<select parameterType="map" resultType="cMap" id="getSepTaxDefMgrList">
+
+					SELECT A.PAY_ACTION_CD
+						 , C.PAY_ACTION_NM
+						 , A.SABUN
+						 , (SELECT F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , B.JIKGUB_CD
+						 , B.JIKWEE_CD
+						 , A.CUR_DEFER_MON
+						 , A.H_CUR_DEFER_MON
+						 , A.PRE_DEFER_MON
+						 , A.H_PRE_DEFER_MON
+						 , A.BANK_NM
+						 , CRYPTIT.DECRYPT(A.BANK_ACCOUNT,A.ENTER_CD) AS BANK_ACCOUNT
+						 , A.DEFER_YMD
+						 , A.BANK_ENTER_NO
+						 , A.ETC1
+						 , A.ETC2
+						 , A.ETC3
+						 , A.ETC4
+						 , A.ETC5
+						 , A.END_YMD
+						 , A.CAL_DEFER_TAX_MON
+						 , F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN,A.DEFER_YMD, #{ssnLocaleCd}) AS ORG_NM
+						 , A.SEQ
+					  FROM TCPN777 A
+						 , (
+							SELECT X.ENTER_CD
+								 , Y.ORG_CD
+								 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE, #{ssnLocaleCd})) AS ORG_NM
+								 , Y.WORK_TYPE
+								 , Y.JIKCHAK_CD
+								 , Y.JIKGUB_CD
+								 , Y.JIKWEE_CD
+								 , Y.MANAGE_CD
+								 , Y.STATUS_CD
+								 , X.SABUN
+								 , X.EMP_YMD
+								 , X.GEMP_YMD
+								 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+								 , X.RET_YMD
+							  FROM THRM100 X
+								 , THRM151 Y
+							 WHERE X.ENTER_CD	= Y.ENTER_CD
+							   AND X.SABUN		= Y.SABUN
+							   AND X.ENTER_CD	= #{ssnEnterCd}
+							   AND Y.SDATE		= (	SELECT MAX(SDATE)
+													  FROM THRM151
+													 WHERE ENTER_CD	= Y.ENTER_CD
+													   AND SABUN	= Y.SABUN
+													   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+							) B
+						 , TCPN201 C
+					 WHERE A.ENTER_CD		= B.ENTER_CD
+					   AND A.SABUN			= B.SABUN
+					   AND A.ENTER_CD		= C.ENTER_CD(+)
+					   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD(+)
+					   AND A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND (UPPER(A.SABUN) LIKE '%' || UPPER(TRIM(#{sabunName})) || '%' OR (SELECT F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%' || UPPER(TRIM(#{sabunName})) || '%')
+					</if>
+					ORDER BY A.PAY_ACTION_CD DESC, B.ORG_NM, (SELECT F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) FROM DUAL)
+
+
+
+		</select>
+		<update parameterType="map" id="saveSepTaxDefMgr">
+
+
+										MERGE INTO TCPN777 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.CUR_DEFER_MON
+								 , A.H_CUR_DEFER_MON
+								 , A.PRE_DEFER_MON
+								 , A.H_PRE_DEFER_MON
+								 , A.BANK_NM
+								 , A.BANK_ACCOUNT
+								 , A.DEFER_YMD
+								 , A.BANK_ENTER_NO
+								 , A.ETC1
+								 , A.ETC2
+								 , A.ETC3
+								 , A.ETC4
+								 , A.ETC5
+								 , A.END_YMD
+								 , A.CAL_DEFER_TAX_MON
+								 , A.SEQ
+							  FROM (
+									SELECT NULL	AS PAY_ACTION_CD
+										 , NULL	AS SABUN
+										 , NULL	AS CUR_DEFER_MON
+										 , NULL	AS H_CUR_DEFER_MON
+										 , NULL	AS PRE_DEFER_MON
+										 , NULL	AS H_PRE_DEFER_MON
+										 , NULL	AS BANK_NM
+										 , NULL	AS BANK_ACCOUNT
+										 , NULL	AS DEFER_YMD
+										 , NULL	AS BANK_ENTER_NO
+										 , NULL	AS ETC1
+										 , NULL	AS ETC2
+										 , NULL	AS ETC3
+										 , NULL	AS ETC4
+										 , NULL	AS ETC5
+										 , NULL	AS END_YMD
+										 , NULL	AS CAL_DEFER_TAX_MON
+										 , NULL AS SEQ
+									  FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})					AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})						AS SABUN
+										 , TO_NUMBER(TRIM(#{rm.curDeferMon}))		AS CUR_DEFER_MON
+										 , TO_NUMBER(TRIM(#{rm.hCurDeferMon}))		AS H_CUR_DEFER_MON
+										 , TO_NUMBER(TRIM(#{rm.preDeferMon}))		AS PRE_DEFER_MON
+										 , TO_NUMBER(TRIM(#{rm.hPreDeferMon}))		AS H_PRE_DEFER_MON
+										 , TRIM(#{rm.bankNm})						AS BANK_NM
+										 , CRYPTIT.ENCRYPT(TRIM(#{rm.bankAccount}), #{ssnEnterCd}) AS BANK_ACCOUNT
+										 , TRIM(#{rm.deferYmd})						AS DEFER_YMD
+										 , TRIM(#{rm.bankEnterNo})					AS BANK_ENTER_NO
+										 , TO_NUMBER(TRIM(#{rm.etc1}))				AS ETC1
+										 , TO_NUMBER(TRIM(#{rm.etc2}))				AS ETC2
+										 , TO_NUMBER(TRIM(#{rm.etc3}))				AS ETC3
+										 , TO_NUMBER(TRIM(#{rm.etc4}))				AS ETC4
+										 , TO_NUMBER(TRIM(#{rm.etc5}))				AS ETC5
+										 , TRIM(#{rm.endYmd})						AS END_YMD
+										 , TO_NUMBER(TRIM(#{rm.calDeferTaxMon}))	AS CAL_DEFER_TAX_MON
+									     <choose>
+
+										 <when test='rm.seq != null and !rm.seq.equals("")'>
+											, TRIM(#{rm.seq}) 			AS SEQ
+										 </when>
+										 <when test='rm.seq != null and rm.seq.equals("")' >
+											, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+											FROM TCPN777
+											WHERE ENTER_CD = #{ssnEnterCd}
+											AND SABUN = #{rm.sabun}
+											AND PAY_ACTION_CD = #{rm.payActionCd}
+											) )	AS SEQ
+											<bind name="icnt" value="icnt + 1" />
+										 </when>
+										 </choose>
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.PAY_ACTION_CD	IS NOT NULL
+							  AND A.SABUN			IS NOT NULL
+							  AND A.SEQ			    IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						AND	T.SEQ			= S.SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.CUR_DEFER_MON		= S.CUR_DEFER_MON
+								 , T.H_CUR_DEFER_MON	= S.H_CUR_DEFER_MON
+								 , T.PRE_DEFER_MON		= S.PRE_DEFER_MON
+								 , T.H_PRE_DEFER_MON	= S.H_PRE_DEFER_MON
+								 , T.BANK_NM			= S.BANK_NM
+								 , T.BANK_ACCOUNT		= S.BANK_ACCOUNT
+								 , T.DEFER_YMD			= S.DEFER_YMD
+								 , T.BANK_ENTER_NO		= S.BANK_ENTER_NO
+								 , T.ETC1				= S.ETC1
+								 , T.ETC2				= S.ETC2
+								 , T.ETC3				= S.ETC3
+								 , T.ETC4				= S.ETC4
+								 , T.ETC5				= S.ETC5
+								 , T.END_YMD			= S.END_YMD
+								 , T.CAL_DEFER_TAX_MON	= S.CAL_DEFER_TAX_MON
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.PAY_ACTION_CD
+						  , T.SABUN
+						  , T.CUR_DEFER_MON
+						  , T.H_CUR_DEFER_MON
+						  , T.PRE_DEFER_MON
+						  , T.H_PRE_DEFER_MON
+						  , T.BANK_NM
+						  , T.BANK_ACCOUNT
+						  , T.DEFER_YMD
+						  , T.BANK_ENTER_NO
+						  , T.ETC1
+						  , T.ETC2
+						  , T.ETC3
+						  , T.ETC4
+						  , T.ETC5
+						  , T.END_YMD
+						  , T.CAL_DEFER_TAX_MON
+						  , T.CHKDATE
+						  , T.CHKID
+						  , T.SEQ
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.PAY_ACTION_CD
+						  , S.SABUN
+						  , S.CUR_DEFER_MON
+						  , S.H_CUR_DEFER_MON
+						  , S.PRE_DEFER_MON
+						  , S.H_PRE_DEFER_MON
+						  , S.BANK_NM
+						  , S.BANK_ACCOUNT
+						  , S.DEFER_YMD
+						  , S.BANK_ENTER_NO
+						  , S.ETC1
+						  , S.ETC2
+						  , S.ETC3
+						  , S.ETC4
+						  , S.ETC5
+						  , S.END_YMD
+						  , S.CAL_DEFER_TAX_MON
+						  , SYSDATE
+						  , #{ssnSabun}
+						  , S.SEQ
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepTaxDefMgr">
+
+
+					DELETE FROM TCPN777
+					 WHERE ENTER_CD||'_'||PAY_ACTION_CD||'_'||SABUN IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.payActionCd != null and !rm.payActionCd.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.payActionCd})||'_'||TRIM(#{rm.sabun})
+							</if>
+</foreach>
+							)
+
+		</delete>
+	</mapper>

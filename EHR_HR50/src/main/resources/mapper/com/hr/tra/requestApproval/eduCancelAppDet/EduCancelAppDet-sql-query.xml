@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.requestApproval.eduCancelAppDet">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduCancelAppDetMap">
+			
+				<![CDATA[
+				   SELECT A.EDU_SEQ
+				        , A.EDU_EVENT_SEQ
+				        , DECODE(A.YEAR_PLAN_YN,'Y', '입안', '미입안') AS  YEAR_PLAN_YN
+					    , ( SELECT MAX(JOB_NM) KEEP(DENSE_RANK FIRST ORDER BY X.SDATE DESC)
+					          FROM TORG201 X
+					         WHERE X.ENTER_CD  = A.ENTER_CD
+					           AND X.JOB_CD    = A.JOB_CD
+					           --AND X.JOB_TYPE  = '10030'
+					           AND TRIM(#{searchApplYmd}) BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+					      ) AS JOB_NM     
+				        , B.EDU_COURSE_NM
+						, C.EDU_EVENT_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10010', B.EDU_BRANCH_CD) AS EDU_BRANCH_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10015', B.EDU_M_BRANCH_CD) AS EDU_M_BRANCH_NM
+						, (SELECT X.EDU_ORG_NM FROM TTRA001 X WHERE X.ENTER_CD = C.ENTER_CD AND X.EDU_ORG_CD = C.EDU_ORG_CD) AS EDU_ORG_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L20020', B.IN_OUT_TYPE) AS IN_OUT_TYPE_NM
+						, B.EDU_MEMO
+						, TO_CHAR(TO_DATE(C.EDU_S_YMD,'YYYYMMDD'),'YYYY-MM-DD') || ' ~ ' ||TO_CHAR(TO_DATE(C.EDU_E_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS EDU_YMD
+						, C.REAL_EXPENSE_MON
+						, DECODE(C.LABOR_APPLY_YN,'Y', '환급', '미환급') AS  LABOR_APPLY_YN
+						, C.EDU_PLACE
+						, NVL( E.AP_APPL_SEQ, TRIM(#{searchApApplSeq}) ) AS AP_APPL_SEQ
+						, E.GUBUN_CD
+						, E.APP_MEMO
+					FROM TTRA201 A
+					   , TTRA101 B
+					   , TTRA121 C
+					   , ( SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD, TRIM(#{searchApApplSeq}) AS AP_APPL_SEQ, NULL AS GUBUN_CD, NULL AS APP_MEMO
+					         FROM DUAL
+					        WHERE NOT EXISTS ( SELECT 1 FROM TTRA205 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) AND APPL_SEQ = TRIM(#{searchApplSeq})  )
+					        UNION 
+					       SELECT ENTER_CD, TO_CHAR(AP_APPL_SEQ) AS AP_APPL_SEQ, GUBUN_CD, APP_MEMO
+					         FROM TTRA205
+					        WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					          AND APPL_SEQ = TRIM(#{searchApplSeq})  
+					     ) E
+			       WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+			         AND A.ENTER_CD      = B.ENTER_CD
+					 AND A.EDU_SEQ    	 = B.EDU_SEQ
+					 AND A.ENTER_CD      = C.ENTER_CD
+					 AND A.EDU_SEQ	     = C.EDU_SEQ
+					 AND A.EDU_EVENT_SEQ = C.EDU_EVENT_SEQ
+					 /*교육결과 보고 관련 시작*/
+					 AND A.ENTER_CD      = E.ENTER_CD
+					 AND A.APPL_SEQ	     = E.AP_APPL_SEQ
+				]]>
+		</select>
+
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveEduCancelAppDet">
+			
+					 MERGE INTO TTRA205 T 
+					 USING 
+					( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+					       SELECT TRIM(#{ssnEnterCd})  			AS  ENTER_CD 
+					            , TRIM(#{rm.searchApplSeq}) 	AS  APPL_SEQ
+					            , TRIM(#{rm.searchApplSabun})  	AS  SABUN
+					            , TRIM(#{rm.searchApApplSeq})  	AS  AP_APPL_SEQ
+					            , TRIM(#{rm.gubunCd})  			AS  GUBUN_CD
+					            , TRIM(#{rm.appMemo})  			AS  APP_MEMO
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+					     AND  T.SABUN 		= S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun} 
+					            , T.AP_APPL_SEQ 	= S.AP_APPL_SEQ 
+					            , T.GUBUN_CD 		= S.GUBUN_CD 
+					            , T.APP_MEMO 		= S.APP_MEMO 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+					            , T.AP_APPL_SEQ
+					            , T.GUBUN_CD
+					            , T.APP_MEMO
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+					            , S.AP_APPL_SEQ
+					            , S.GUBUN_CD
+					            , S.APP_MEMO
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+</mapper>

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	일용소득
+ -->
+<root>
+
+	<!-- 일용소득 조회  -->
+	<query id="selectDayIncomeMgrList">
+		<![CDATA[
+			SELECT A.SABUN
+				 , B.NAME
+				 , CRYPTIT.DECRYPT (B.RES_NO, A.ENTER_CD)	AS RES_NO
+				 , B.SDATE
+				 , B.EDATE
+				 , B.EARNER_CD
+				 , B.BUSINESS_PLACE_CD
+				 , B.EARNER_TYPE
+				 , B.REGINO
+				 , B.EARNER_NM
+				 , B.EARNER_ENG_NM
+				 , DECODE(B.CITIZEN_TYPE, '9', '1', '0')	AS CITIZEN_TYPE
+				 , DECODE(B.RESIDENCY_TYPE, '2', '1', '0')	AS RESIDENCY_TYPE
+				 , B.RESIDENCE_CD
+				 , DECODE(B.BI_NAME_YN, 'Y', '1', '0')		AS BI_NAME_YN
+				 , B.TEL_NO
+				 , B.ADDR
+				 , B.BANK_CD
+				 , CRYPTIT.DECRYPT (B.ACCOUNT_NO, A.ENTER_CD) AS ACCOUNT_NO
+				 , B.MEMO
+				 , '0' AS DETAIL
+				 , A.PAYMENT_YMD
+				 , A.BELONG_YM
+				 , A.WKP_CNT
+				 , A.TOT_MON
+				 , A.NTAX_EARN_MON
+				 , A.ITAX_MON
+				 , A.RTAX_MON
+				 , B.LOCATION_CD
+				 , A.LAST_WORK_YMD
+			  FROM TCPN905 A
+				 , TCPN903 B
+			WHERE A.ENTER_CD	= #ssnEnterCd#
+			  AND A.ENTER_CD	= B.ENTER_CD(+)
+			  AND A.SABUN		= B.SABUN(+)
+		   	  AND SUBSTR(A.PAYMENT_YMD,1,6) LIKE TRIM(REPLACE(#paymentYm#,'-',''))||'%'
+			  AND A.BELONG_YM LIKE TRIM(REPLACE(#belongYm#,'-',''))||'%'
+			  AND (NVL(B.NAME,' ') LIKE '%'||trim(#searchSbNm#)||'%'
+			  	   OR NVL(A.SABUN,' ') LIKE '%'||trim(#searchSbNm#)||'%')
+			  AND B.EARNER_CD(+) LIKE '%'||trim(#searchEarnerCd#)||'%'
+			  AND DECODE(#searchBusinessPlaceCd#, NULL, '%', B.BUSINESS_PLACE_CD) = DECODE(#searchBusinessPlaceCd#, NULL, '%', #searchBusinessPlaceCd#)
+			  AND DECODE(#searchLocationCd#, NULL, '%', B.LOCATION_CD) = DECODE(#searchLocationCd#, NULL, '%', #searchLocationCd#)
+			ORDER BY CRYPTIT.DECRYPT (B.RES_NO, A.ENTER_CD), A.SABUN, A.PAYMENT_YMD
+		]]>
+	</query>
+
+	<!-- 일용소득 중복 조회  -->
+	<query id="selectDayIncomeMgrCnt">
+		<![CDATA[
+			SELECT COUNT(*) AS CNT
+			FROM TCPN905 A
+			WHERE A.ENTER_CD = #ssnEnterCd#
+			  AND A.BELONG_YM LIKE TRIM(REPLACE(#belong_ym#,'-',''))||'%'
+			  AND A.PAYMENT_YMD = TRIM(REPLACE(#payment_ymd#,'-',''))
+			  AND A.SABUN = #sabun#
+		]]>
+	</query>
+
+	<!-- 일용소득 삭제 -->
+	<query id="deleteDayIncomeMgr">
+		<![CDATA[
+			DELETE FROM TCPN905
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND BELONG_YM = TRIM(REPLACE(#belong_ym#,'-',''))
+			   AND PAYMENT_YMD = TRIM(REPLACE(#payment_ymd#,'-',''))
+			   AND SABUN = #sabun#
+		]]>
+	</query>
+
+	<!-- 일용소득 저장 -->
+	<query id="mergeDayIncomeMgr">
+		<![CDATA[
+			MERGE INTO TCPN905 T
+			USING	(
+					SELECT ENTER_CD
+						, SABUN
+						, PAYMENT_YMD
+						, BELONG_YM
+						, WKP_CNT
+						, TOT_MON
+						, NTAX_EARN_MON
+						, ITAX_MON
+						, RTAX_MON
+						, LAST_WORK_YMD
+					  FROM (
+							SELECT   #ssnEnterCd#      AS ENTER_CD
+									, #sabun#         AS SABUN
+									, #payment_ymd#   AS PAYMENT_YMD
+									, #belong_ym#     AS BELONG_YM
+									, #wkp_cnt#       AS WKP_CNT
+									, #tot_mon#       AS TOT_MON
+									, #ntax_earn_mon# AS NTAX_EARN_MON
+									, #itax_mon#      AS ITAX_MON
+									, #rtax_mon#      AS RTAX_MON
+									, #last_work_ymd#      AS LAST_WORK_YMD
+							  FROM DUAL
+							) A
+					 WHERE A.SABUN	IS NOT NULL
+					) S
+			ON (	T.ENTER_CD		= #ssnEnterCd#
+				AND	T.SABUN			= S.SABUN
+				AND	T.PAYMENT_YMD	= S.PAYMENT_YMD
+				AND	T.BELONG_YM		= S.BELONG_YM
+				)
+			WHEN MATCHED THEN
+				UPDATE SET    T.WKP_CNT       = S.WKP_CNT
+							, T.TOT_MON       = S.TOT_MON
+							, T.NTAX_EARN_MON = S.NTAX_EARN_MON
+							, T.ITAX_MON      = S.ITAX_MON
+							, T.RTAX_MON      = S.RTAX_MON
+							, T.LAST_WORK_YMD = S.LAST_WORK_YMD
+						    , T.CHKDATE		  = SYSDATE
+						    , T.CHKID		  = #ssnSabun#
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					  T.ENTER_CD
+					, T.SABUN
+					, T.PAYMENT_YMD
+					, T.BELONG_YM
+					, T.WKP_CNT
+					, T.TOT_MON
+					, T.NTAX_EARN_MON
+					, T.ITAX_MON
+					, T.RTAX_MON
+					, T.CHKDATE
+					, T.CHKID
+					, T.LAST_WORK_YMD
+				)
+				VALUES
+				(
+					  #ssnEnterCd#
+					, S.SABUN
+					, S.PAYMENT_YMD
+					, S.BELONG_YM
+					, S.WKP_CNT
+					, S.TOT_MON
+					, S.NTAX_EARN_MON
+					, S.ITAX_MON
+					, S.RTAX_MON
+					, SYSDATE
+					, #ssnSabun#
+					, S.LAST_WORK_YMD
+				)
+		]]>
+	</query>
+
+	<!-- 사업자등록 사번 조회  -->
+	<query id="selectDayIncomeMgrSabun">
+		<![CDATA[
+			SELECT DECODE(MAX(A.SABUN), NULL, F_CPN_OTAX_SABUN(#ssnEnterCd#, 'A'), MAX(A.SABUN)) AS SABUN
+			     , DECODE(MAX(A.SABUN), NULL, 'Y', 'N') AS INSERT_OWNER_YN
+			  FROM TCPN903 A
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD) = #res_no#
+			   AND A.BUSINESS_PLACE_CD = #business_place_cd#
+			   AND A.EARNER_CD = #earner_cd#
+		]]>
+	</query>
+
+	<!-- 사업자 저장 -->
+	<query id="mergeDayIncomeMgrOwner">
+		<![CDATA[
+			INSERT INTO TCPN903
+			(
+				ENTER_CD
+				, SABUN
+				, NAME
+				, RES_NO
+				, BUSINESS_PLACE_CD
+				, LOCATION_CD
+				, EARNER_CD
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #sabun#
+				, #name#
+				, CRYPTIT.ENCRYPT (#res_no#,  #ssnEnterCd#)
+				, #business_place_cd#
+				, #location_cd#
+				, #earner_cd#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+</root>

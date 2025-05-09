@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산 기타소득 쿼리
+ -->
+<root>
+
+	<!-- pdf 자료등록 현황 조회 -->
+	<query id="selectPdfRegMgr">
+		<![CDATA[
+
+			  SELECT *
+              FROM
+              (
+                SELECT A.ENTER_CD
+                     , A.WORK_YY
+                     , A.ADJUST_TYPE
+                     , A.SABUN
+                     , A.SEQ
+                     , A.DOC_TYPE
+                     , A.DOC_SEQ
+                     , A.FORM_CD
+                     , F_CPN_PDF_DATASPEC_NM(A.FORM_CD) AS FORM_NM
+                     --dynamic query 보안 이슈 수정
+                     , F_CPN_GET_851_DESC_2021(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN,A.SEQ) AS CONTENTS
+                     , A.EXCEPT_GUBUN
+                     , A.STATUS_CD
+                     , A.ERROR_LOG
+                     , B.NAME
+                     , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+                  FROM TCPN851 A
+                      ,THRM100 B
+                 WHERE A.ENTER_CD    = #ssnEnterCd#
+                   AND A.ADJUST_TYPE = '1'
+                   AND A.WORK_YY     = #searchWorkYy#
+                   AND A.ENTER_CD    = B.ENTER_CD
+                   AND A.SABUN       = B.SABUN
+                   AND    ( A.SABUN LIKE '%' || TRIM(#srchSbNm#) || '%' OR B.NAME LIKE '%' || TRIM(#srchSbNm#) || '%' )
+                   AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+              )
+             WHERE NVL(STATUS_CD,'N') LIKE '%'||#searchStatusCd#||'%'
+               AND FORM_CD IN (NVL(#searchFormCd0#, FORM_CD), #searchFormCd1#, #searchFormCd2#, #searchFormCd3#, #searchFormCd4#, #searchFormCd5#
+			   			, #searchFormCd6#, #searchFormCd7#, #searchFormCd8#, #searchFormCd9#
+			   		)
+
+
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 중복 조회 -->
+	<query id="selectPdfRegMgrCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TCPN815 A
+			 WHERE A.ENTER_CD			= #ssnEnterCd#
+			   AND A.WORK_YY  	     	= #work_yy#
+			   AND A.ADJUST_TYPE    	= #adjust_type#
+			   AND A.SABUN          	= #sabun#
+			   AND A.YM					= #ym#
+			   AND A.ADJ_ELEMENT_CD 	= #adj_element_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 입력 -->
+	<query id="insertPdfRegMgr">
+		<![CDATA[
+			INSERT INTO TCPN815
+			(
+			      ENTER_CD
+				, WORK_YY
+				, ADJUST_TYPE
+				, SABUN
+				, YM
+				, ADJ_ELEMENT_CD
+				, MON
+				, NOTAX_MON
+				, TAX_MON
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #ym#
+				, #adj_element_cd#
+				, #mon#
+				, #notax_mon#
+				, #tax_mon#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 수정 -->
+	<query id="updatePdfRegMgr">
+		<![CDATA[
+			UPDATE TCPN815
+			SET MON					= #mon#
+				, NOTAX_MON			= #notax_mon#
+				, TAX_MON 			= #tax_mon#
+				, CHKDATE 			= SYSDATE
+				, CHKID				= #ssnSabun#
+			WHERE ENTER_CD			= #ssnEnterCd#
+			  AND WORK_YY  	    	= #work_yy#
+			  AND ADJUST_TYPE   	= #adjust_type#
+			  AND SABUN         	= #sabun#
+			  AND YM				= #ym#
+			  AND ADJ_ELEMENT_CD 	= #adj_element_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산 기타소득 삭제 -->
+	<query id="deletePdfRegMgr">
+		<![CDATA[
+			DELETE FROM TCPN815 A
+			 WHERE A.ENTER_CD			= #ssnEnterCd#
+				 AND A.WORK_YY  	    = #work_yy#
+			     AND A.ADJUST_TYPE    	= #adjust_type#
+			     AND A.SABUN          	= #sabun#
+			     AND A.YM				= #ym#
+			     AND A.ADJ_ELEMENT_CD 	= #adj_element_cd#
+		]]>
+	</query>
+</root>

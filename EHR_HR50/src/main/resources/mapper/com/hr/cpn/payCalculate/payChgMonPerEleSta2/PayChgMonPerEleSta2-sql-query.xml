@@ -1,0 +1,616 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급여변동내역(개인별-항목별)
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payChgMonPerEleSta2">
+		<select parameterType="map" resultType="cMap" id="getPayChgMonPerEleSta2List">
+
+
+
+             select nvl(x.sabun,y.sabun) sabun,
+             		nvl(x.name , y.name) name,
+             		nvl(x.alias , y.alias) alias,
+             		nvl(x.org_nm , y.org_nm) org_nm,
+             		nvl(x.jikchak_cd, y.jikchak_cd) jikchak_cd,
+             		nvl(x.jikgub_cd, y.jikgub_cd) jikgub_cd,
+             		nvl(x.jikwee_cd, y.jikwee_cd) jikwee_cd
+			<foreach item="tCnt" collection="titles" >
+				   ,NVL(X.${tCnt.elementCd},0) AS "${tCnt.elementCd}"
+				   ,NVL(Y.${tCnt.elementCd},0) AS "${tCnt.elementCd}${B}"
+				   ,NVL(X.${tCnt.elementCd},0) - NVL(Y.${tCnt.elementCd},0) AS "${tCnt.elementCd}${C}"
+			</foreach>
+               from
+               (
+                SELECT B.ORG_CD, B.ORG_NM, B.JIKGUB_CD, B.MANAGE_CD, B.STATUS_CD, B.SABUN, B.NAME, B.WORK_TYPE, B.JIKCHAK_CD, B.ALIAS
+                   , B.JIKWEE_CD, B.EMP_YMD, B.GEMP_YMD, B.RET_YMD, B.LOCATION_CD, D.PAY_ACTION_NM, D.PAY_YM
+			<foreach item="tCnt" collection="titles" >
+				   , MAX(DECODE(C.ELEMENT_NM, TRIM(#{tCnt.elementNm}), C.MON, NULL)) AS "${tCnt.elementCd}"
+			</foreach>
+                  FROM TCPN203 A
+                   , (
+                        SELECT X.ENTER_CD, Y.ORG_CD, TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE, #{ssnLocaleCd})) AS ORG_NM, Y.WORK_TYPE, Y.JIKGUB_CD, Y.JIKCHAK_CD
+                           , Y.JIKWEE_CD, Y.MANAGE_CD, Y.STATUS_CD, X.SABUN, F_COM_GET_NAMES(X.ENTER_CD,X.SABUN) AS NAME, X.EMP_YMD, X.GEMP_YMD, CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+                           , X.RET_YMD, Y.SAL_CLASS_NM, Y.LOCATION_CD, F_COM_GET_NAMES (X.ENTER_CD,X.SABUN, 'ALIAS') AS ALIAS
+                          FROM THRM100 X
+                           , THRM151 Y
+                         WHERE X.ENTER_CD	= Y.ENTER_CD
+                           AND X.SABUN		= Y.SABUN
+                           AND X.ENTER_CD	= #{ssnEnterCd}
+                           AND Y.SDATE		= (	SELECT MAX(SDATE)
+                                                FROM THRM151
+                                               WHERE ENTER_CD	= Y.ENTER_CD
+                                                 AND SABUN	= Y.SABUN
+                                                 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+                    ) B
+                   , (
+                    SELECT ENTER_CD, PAY_ACTION_CD, SABUN, 'ELEMENT_'||ELEMENT_CD AS ELEMENT_CD, ELEMENT_NM, MON
+                      FROM (
+                            SELECT 11 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                              FROM (
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD, Z.ELEMENT_NM2 AS ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                   , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM) AS ELEMENT_NM2
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                              ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'A'
+                                         AND X.PAY_ACTION_CD = #{payActionCd1}
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN,Y.ELEMENT_CD,Z.ELEMENT_NM2
+                                    )
+                             UNION
+                             SELECT 23 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                               FROM (
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD , Z.ELEMENT_NM2 AS ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                   , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM) AS ELEMENT_NM2
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                               ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'D'
+                                         AND X.PAY_ACTION_CD = #{payActionCd1}
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD ,Z.ELEMENT_NM2
+                                     )
+
+                                )
+						 WHERE ELEMENT_NM	IN (NULL
+							<foreach item="tCnt" collection="titles" >
+															,TRIM(#{tCnt.elementNm})
+                            </foreach>
+															)
+                    ) C
+                   , TCPN201 D
+                 WHERE A.ENTER_CD			= B.ENTER_CD
+                   AND A.SABUN				= B.SABUN
+                   AND A.ENTER_CD			= D.ENTER_CD
+                   AND A.PAY_ACTION_CD		= D.PAY_ACTION_CD
+                   AND A.ENTER_CD			= C.ENTER_CD(+)
+                   AND A.PAY_ACTION_CD		= C.PAY_ACTION_CD(+)
+                   AND A.SABUN				= C.SABUN(+)
+                   AND A.ENTER_CD			= #{ssnEnterCd}
+                   AND A.PAY_ACTION_CD = #{payActionCd1}
+                GROUP BY A.ENTER_CD,A.SABUN,B.ORG_CD,B.ORG_NM,B.JIKGUB_CD,B.MANAGE_CD,B.STATUS_CD
+                    ,B.SABUN,B.NAME,B.WORK_TYPE,B.JIKCHAK_CD,B.ALIAS,B.JIKWEE_CD,B.EMP_YMD,B.GEMP_YMD,B.RET_YMD,B.LOCATION_CD
+                    --,A.CC_CD
+                    ,D.PAY_ACTION_NM,D.PAY_YM,B.RET_YMD,A.PAY_ACTION_CD,A.PAY_PEOPLE_STATUS
+               --ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+               )X
+               full outer join
+               (
+
+              SELECT B.ORG_CD, B.ORG_NM, B.JIKGUB_CD, B.MANAGE_CD, B.STATUS_CD, B.SABUN, B.NAME, B.WORK_TYPE, B.JIKCHAK_CD, B.ALIAS
+                   , B.JIKWEE_CD, B.EMP_YMD, B.GEMP_YMD, B.RET_YMD, B.LOCATION_CD, D.PAY_ACTION_NM, D.PAY_YM
+			<foreach item="tCnt" collection="titles" >
+				   , MAX(DECODE(C.ELEMENT_NM, TRIM(#{tCnt.elementNm}), C.MON, NULL)) AS "${tCnt.elementCd}"
+            </foreach>
+                  FROM TCPN203 A
+                   , (
+                        SELECT X.ENTER_CD, Y.ORG_CD, TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE, #{ssnLocaleCd})) AS ORG_NM, Y.WORK_TYPE, Y.JIKGUB_CD, Y.JIKCHAK_CD
+                           , Y.JIKWEE_CD, Y.MANAGE_CD, Y.STATUS_CD, X.SABUN, F_COM_GET_NAMES(X.ENTER_CD,X.SABUN) AS NAME, X.EMP_YMD, X.GEMP_YMD, CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+                           , X.RET_YMD, Y.SAL_CLASS_NM, Y.LOCATION_CD, F_COM_GET_NAMES (X.ENTER_CD,X.SABUN, 'ALIAS') AS ALIAS
+                          FROM THRM100 X
+                           , THRM151 Y
+                         WHERE X.ENTER_CD	= Y.ENTER_CD
+                           AND X.SABUN		= Y.SABUN
+                           AND X.ENTER_CD	= #{ssnEnterCd}
+                           AND Y.SDATE		= (	SELECT MAX(SDATE)
+                                                FROM THRM151
+                                               WHERE ENTER_CD	= Y.ENTER_CD
+                                                 AND SABUN	= Y.SABUN
+                                                 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+                    ) B
+                   , (
+                    SELECT ENTER_CD, PAY_ACTION_CD, SABUN, 'ELEMENT_'||ELEMENT_CD AS ELEMENT_CD, ELEMENT_NM, MON
+                      FROM (
+                            SELECT 11 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                              FROM (
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD, Z.ELEMENT_NM2 AS ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                   , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM) AS ELEMENT_NM2
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                              ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'A'
+                                         AND X.PAY_ACTION_CD = #{payActionCd2}
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN,Y.ELEMENT_CD,Z.ELEMENT_NM2
+                                    )
+                             UNION
+                             SELECT 23 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                               FROM (
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD , Z.ELEMENT_NM2 AS ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                  , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM) AS ELEMENT_NM2
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                               ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'D'
+                                         AND X.PAY_ACTION_CD = #{payActionCd2}
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD ,Z.ELEMENT_NM2
+                                     )
+
+                                )
+						 WHERE ELEMENT_NM	IN (NULL
+							<foreach item="tCnt" collection="titles" >
+															,TRIM(#{tCnt.elementNm})
+                            </foreach>
+															)
+                    ) C
+                   , TCPN201 D
+                 WHERE A.ENTER_CD			= B.ENTER_CD
+                   AND A.SABUN				= B.SABUN
+                   AND A.ENTER_CD			= D.ENTER_CD
+                   AND A.PAY_ACTION_CD		= D.PAY_ACTION_CD
+                   AND A.ENTER_CD			= C.ENTER_CD(+)
+                   AND A.PAY_ACTION_CD		= C.PAY_ACTION_CD(+)
+                   AND A.SABUN				= C.SABUN(+)
+                   AND A.ENTER_CD			= #{ssnEnterCd}
+                   AND A.PAY_ACTION_CD = #{payActionCd2}
+                GROUP BY A.ENTER_CD,A.SABUN,B.ORG_CD,B.ORG_NM,B.JIKGUB_CD,B.MANAGE_CD,B.STATUS_CD
+                    ,B.SABUN,B.NAME,B.WORK_TYPE,B.JIKCHAK_CD,B.ALIAS,B.JIKWEE_CD,B.EMP_YMD,B.GEMP_YMD,B.RET_YMD,B.LOCATION_CD
+                    --,A.CC_CD
+                    ,D.PAY_ACTION_NM,D.PAY_YM,B.RET_YMD,A.PAY_ACTION_CD,A.PAY_PEOPLE_STATUS
+               --ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))
+               )Y
+               on x.sabun = y.sabun
+               WHERE 1=1
+			<if test='searchNm != null and !searchNm.equals("")'>
+			   AND (X.SABUN LIKE '%' || #{searchNm} || '%' OR X.NAME LIKE '%' || #{searchNm} || '%' or
+			          Y.SABUN LIKE '%' || #{searchNm} || '%' OR Y.NAME LIKE '%' || #{searchNm} || '%' )
+            </if>
+		ORDER BY F_COM_JIKJE_SORT(#{ssnEnterCd}, nvl(x.sabun,y.sabun),TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPayChgMonPerEleSta2TitleList">
+
+
+
+
+					SELECT 'ELEMENT_10'||ROWNUM AS ELEMENT_CD, ELEMENT_NM
+
+					  FROM (
+                            SELECT DISTINCT 11 AS NUM
+                                 , MAX(SEQ) AS SEQ
+                                 , ELEMENT_CD
+                                 , ELEMENT_NM
+                                 , ELEMENT_TYPE
+                            FROM (
+                                SELECT Y.ELEMENT_CD
+                                     , Z.ELEMENT_NM2 AS ELEMENT_NM
+                                     , MAX(Z.PRIORITY) AS SEQ
+                                     , Z.ELEMENT_TYPE
+                                  FROM TCPN201 X
+                                     , TCPN205 Y
+                                     , (
+                                        SELECT SUB1.*
+                                             , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}),ELEMENT_NM) AS ELEMENT_NM2
+                                          FROM TCPN011 SUB1
+                                             , (SELECT MAX(SDATE) AS SDATE
+                                                 , ELEMENT_CD
+                                                  FROM TCPN011
+                                                 WHERE ENTER_CD	= #{ssnEnterCd}
+                                                   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                GROUP BY ELEMENT_CD
+                                                ) SUB2
+                                         WHERE SUB1.ENTER_CD    = SUB1.ENTER_CD
+                                           AND SUB1.ELEMENT_CD    = SUB2.ELEMENT_CD
+                                           AND SUB1.SDATE        = SUB2.SDATE
+                                    ) Z
+                                  WHERE X.ENTER_CD        = Y.ENTER_CD
+                                    AND X.PAY_ACTION_CD    = Y.PAY_ACTION_CD
+                                    AND Y.ENTER_CD        = Z.ENTER_CD
+                                    AND Y.ELEMENT_CD    = Z.ELEMENT_CD
+                                    AND X.ENTER_CD		= #{ssnEnterCd}
+                                    AND X.PAY_ACTION_CD IN
+            <foreach collection="payActionCds" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+                                    AND Z.ELEMENT_TYPE    = 'A'
+																   GROUP BY Y.ENTER_CD
+                                              , Z.PRIORITY
+                                              , Y.ELEMENT_CD
+                                              , Z.ELEMENT_NM2
+                                              , z.ELEMENT_TYPE
+                                 ORDER BY Z.PRIORITY
+                                ) GROUP BY ELEMENT_CD, ELEMENT_NM, ELEMENT_TYPE
+							UNION
+                            SELECT DISTINCT 23 AS NUM
+                                 , MAX(SEQ) AS SEQ
+                                 , ELEMENT_CD
+                                 , ELEMENT_NM
+                                 , ELEMENT_TYPE
+                            FROM (
+                                SELECT Y.ELEMENT_CD
+                                     , Z.ELEMENT_NM2 AS ELEMENT_NM
+                                     , MAX(Z.PRIORITY) AS SEQ
+                                     , Z.ELEMENT_TYPE
+                                  FROM TCPN201 X
+                                     , TCPN205 Y
+                                     , (
+                                        SELECT SUB1.*
+                                        	 , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', SUB1.LANGUAGE_CD, #{ssnLocaleCd}), ELEMENT_NM) AS ELEMENT_NM2
+                                          FROM TCPN011 SUB1
+                                             , (SELECT MAX(SDATE) AS SDATE
+                                                 , ELEMENT_CD
+                                                  FROM TCPN011
+                                                 WHERE ENTER_CD	= #{ssnEnterCd}
+                                                   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                GROUP BY ELEMENT_CD
+                                                ) SUB2
+                                         WHERE SUB1.ENTER_CD    = SUB1.ENTER_CD
+                                           AND SUB1.ELEMENT_CD    = SUB2.ELEMENT_CD
+                                           AND SUB1.SDATE        = SUB2.SDATE
+                                    ) Z
+                                  WHERE X.ENTER_CD        = Y.ENTER_CD
+                                    AND X.PAY_ACTION_CD    = Y.PAY_ACTION_CD
+                                    AND Y.ENTER_CD        = Z.ENTER_CD
+                                    AND Y.ELEMENT_CD    = Z.ELEMENT_CD
+                                    AND X.ENTER_CD		= #{ssnEnterCd}
+                                    AND X.PAY_ACTION_CD IN
+            <foreach collection="payActionCds" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+            AND Z.ELEMENT_TYPE    = 'D'
+																   GROUP BY Y.ENTER_CD
+                                              , Z.PRIORITY
+                                              , Y.ELEMENT_CD
+                                              , Z.ELEMENT_NM2
+                                              , Z.ELEMENT_TYPE
+                                 ORDER BY Z.PRIORITY
+                                ) GROUP BY ELEMENT_CD, ELEMENT_NM, ELEMENT_TYPE
+
+						)
+					WHERE 1=1
+					<if test='elementType != null and !elementType.equals("")'>
+						AND ELEMENT_TYPE = #{elementType}
+					</if>
+					ORDER BY NUM, SEQ
+
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPayChgMonPerEleMltSta2List">
+
+
+               
+             select nvl(x.sabun,y.sabun) sabun, 
+             		nvl(x.name , y.name) name, 
+             		nvl(x.org_nm , y.org_nm) org_nm, 
+             		nvl(x.jikchak_cd, y.jikchak_cd) jikchak_cd, 
+             		nvl(x.jikwee_cd, y.jikwee_cd) jikwee_cd
+			<foreach item="tCnt" collection="titles" >
+				   ,NVL(X.${tCnt.elementCd},0) AS "${tCnt.elementCd}"
+				   ,NVL(Y.${tCnt.elementCd},0) AS "${tCnt.elementCd}${B}"
+				   ,NVL(X.${tCnt.elementCd},0) - NVL(Y.${tCnt.elementCd},0) AS "${tCnt.elementCd}${C}"
+            </foreach>
+               from
+               (
+                SELECT B.ORG_CD, B.ORG_NM, B.JIKGUB_CD, B.MANAGE_CD, B.SABUN, B.NAME, B.WORK_TYPE, B.JIKCHAK_CD
+                   , B.JIKWEE_CD
+			<foreach item="tCnt" collection="titles" >
+				   , MAX(DECODE(C.ELEMENT_NM, TRIM(#{tCnt.elementNm}), C.MON, NULL)) AS "${tCnt.elementCd}"
+            </foreach>
+                  FROM TCPN203 A
+                   , (
+                        SELECT X.ENTER_CD, Y.ORG_CD, TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM, Y.WORK_TYPE, Y.JIKGUB_CD, Y.JIKCHAK_CD
+                           , Y.JIKWEE_CD, Y.MANAGE_CD, Y.STATUS_CD, X.SABUN, TRIM(X.NAME) AS NAME                           
+                          FROM THRM100 X
+                           , THRM151 Y
+                         WHERE X.ENTER_CD	= Y.ENTER_CD
+                           AND X.SABUN		= Y.SABUN
+                           AND X.ENTER_CD	= #{ssnEnterCd}
+                           AND Y.SDATE		= (	SELECT MAX(SDATE)
+                                                FROM THRM151
+                                               WHERE ENTER_CD	= Y.ENTER_CD
+                                                 AND SABUN	= Y.SABUN
+                                                 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+                    ) B
+                   , (
+                    SELECT ENTER_CD, PAY_ACTION_CD, SABUN, 'ELEMENT_'||ELEMENT_CD AS ELEMENT_CD, ELEMENT_NM, MON
+                      FROM (
+                            SELECT 11 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                              FROM (   
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD, Z.ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                              ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'A'
+                                         AND X.PAY_ACTION_CD IN
+                        <foreach collection="payActionCd1" item="item" index="index" open="(" close=")" separator=",">
+                            #{item}
+                        </foreach>
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN,Y.ELEMENT_CD,Z.ELEMENT_NM
+                                    )
+                             UNION
+                             SELECT 23 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                               FROM (
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD , Z.ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                               ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'D'
+                                         AND X.PAY_ACTION_CD IN
+            <foreach collection="payActionCd1" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD ,Z.ELEMENT_NM 
+                                     )
+      
+                                )
+						 WHERE ELEMENT_NM	IN (NULL
+							<foreach item="tCnt" collection="titles" >
+															,TRIM(#{tCnt.elementNm})
+                            </foreach>
+															)                                    
+                    ) C
+                   , TCPN201 D
+                 WHERE A.ENTER_CD			= B.ENTER_CD
+                   AND A.SABUN				= B.SABUN
+                   AND A.ENTER_CD			= D.ENTER_CD
+                   AND A.PAY_ACTION_CD		= D.PAY_ACTION_CD
+                   AND A.ENTER_CD			= C.ENTER_CD(+)
+                   AND A.PAY_ACTION_CD		= C.PAY_ACTION_CD(+)
+                   AND A.SABUN				= C.SABUN(+)
+                   AND A.ENTER_CD			= #{ssnEnterCd}
+                   AND A.PAY_ACTION_CD IN
+            <foreach collection="payActionCd1" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+                GROUP BY A.ENTER_CD,A.SABUN,B.ORG_CD,B.ORG_NM,B.JIKGUB_CD,B.MANAGE_CD
+                    ,B.SABUN,B.NAME,B.WORK_TYPE,B.JIKCHAK_CD,B.JIKWEE_CD               
+               )X
+               full outer join
+               (
+
+              SELECT B.ORG_CD, B.ORG_NM, B.JIKGUB_CD, B.MANAGE_CD, B.SABUN, B.NAME, B.WORK_TYPE, B.JIKCHAK_CD
+                   , B.JIKWEE_CD
+			<foreach item="tCnt" collection="titles" >
+				   , MAX(DECODE(C.ELEMENT_NM, TRIM(#{tCnt.elementNm}), C.MON, NULL)) AS "${tCnt.elementCd}"
+            </foreach>
+                  FROM TCPN203 A
+                   , (
+                        SELECT X.ENTER_CD, Y.ORG_CD, TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM, Y.WORK_TYPE, Y.JIKGUB_CD, Y.JIKCHAK_CD
+                           , Y.JIKWEE_CD, Y.MANAGE_CD, X.SABUN, TRIM(X.NAME) AS NAME
+                          FROM THRM100 X
+                           , THRM151 Y
+                         WHERE X.ENTER_CD	= Y.ENTER_CD
+                           AND X.SABUN		= Y.SABUN
+                           AND X.ENTER_CD	= #{ssnEnterCd}
+                           AND Y.SDATE		= (	SELECT MAX(SDATE)
+                                                FROM THRM151
+                                               WHERE ENTER_CD	= Y.ENTER_CD
+                                                 AND SABUN	= Y.SABUN
+                                                 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+                    ) B
+                   , (
+                    SELECT ENTER_CD, PAY_ACTION_CD, SABUN, 'ELEMENT_'||ELEMENT_CD AS ELEMENT_CD, ELEMENT_NM, MON
+                      FROM (
+                            SELECT 11 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                              FROM (   
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD, Z.ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                              ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'A'
+                                         AND X.PAY_ACTION_CD IN
+            <foreach collection="payActionCd2" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN,Y.ELEMENT_CD,Z.ELEMENT_NM
+                                    )
+                             UNION
+                             SELECT 23 AS NUM, ENTER_CD, PAY_ACTION_CD, SABUN, ELEMENT_CD, ELEMENT_NM, MON
+                               FROM (
+                                      SELECT Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD , Z.ELEMENT_NM, SUM(NVL(Y.RESULT_MON,0)) AS MON
+                                        FROM TCPN201 X
+                                           , TCPN205 Y
+                                           , (
+                                              SELECT SUB1.*
+                                                FROM TCPN011 SUB1
+                                                 , (SELECT MAX(SDATE) AS SDATE
+                                                   , ELEMENT_CD
+                                                    FROM TCPN011
+                                                   WHERE ENTER_CD	= #{ssnEnterCd}
+                                                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                                  GROUP BY ELEMENT_CD
+                                                  ) SUB2
+                                               WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+                                                 AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+                                                 AND SUB1.SDATE		= SUB2.SDATE
+                                               ) Z
+                                       WHERE X.ENTER_CD		= Y.ENTER_CD
+                                         AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+                                         AND Y.ENTER_CD		= Z.ENTER_CD
+                                         AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+                                         AND X.ENTER_CD		= #{ssnEnterCd}
+                                         AND Z.ELEMENT_TYPE	= 'D'
+                                         AND X.PAY_ACTION_CD IN
+            <foreach collection="payActionCd2" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+                                      GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD ,Z.ELEMENT_NM 
+                                     )
+      
+                                )
+						 WHERE ELEMENT_NM	IN (NULL
+							<foreach item="tCnt" collection="titles" >
+															,TRIM(#{tCnt.elementNm})
+                            </foreach>
+															)  
+                    ) C
+                   , TCPN201 D
+                 WHERE A.ENTER_CD			= B.ENTER_CD
+                   AND A.SABUN				= B.SABUN
+                   AND A.ENTER_CD			= D.ENTER_CD
+                   AND A.PAY_ACTION_CD		= D.PAY_ACTION_CD
+                   AND A.ENTER_CD			= C.ENTER_CD(+)
+                   AND A.PAY_ACTION_CD		= C.PAY_ACTION_CD(+)
+                   AND A.SABUN				= C.SABUN(+)
+                   AND A.ENTER_CD			= #{ssnEnterCd}
+                   AND A.PAY_ACTION_CD IN
+            <foreach collection="payActionCd2" item="item" index="index" open="(" close=")" separator=",">
+                #{item}
+            </foreach>
+                GROUP BY A.ENTER_CD,A.SABUN,B.ORG_CD,B.ORG_NM,B.JIKGUB_CD,B.MANAGE_CD
+                    ,B.SABUN,B.NAME,B.WORK_TYPE,B.JIKCHAK_CD,B.JIKWEE_CD 
+               )Y
+               on x.sabun = y.sabun
+               WHERE 1=1
+			<if test='searchNm != null and !searchNm.equals("")'>
+			   AND (X.SABUN LIKE '%' || #{searchNm} || '%' OR X.NAME LIKE '%' || #{searchNm} || '%' or
+			          Y.SABUN LIKE '%' || #{searchNm} || '%' OR Y.NAME LIKE '%' || #{searchNm} || '%' )
+            </if>
+		ORDER BY F_COM_JIKJE_SORT(#{ssnEnterCd}, nvl(x.sabun,y.sabun),TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+
+		</select>
+	</mapper>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appOrgResultMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppOrgResultMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					, A.APPRAISAL_CD
+					, A.GRP_ID
+					, A.GRP_NM
+					, A.APP_CLASS_CD
+					, A.NOTE
+				FROM TPAP144 A
+				WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					        ]]>
+					<if test='searchGrpId != null and !searchGrpId.equals("")'>
+						AND A.GRP_ID = TRIM(#{searchGrpId})
+					</if>
+					<if test='searchGrpNm != null and !searchGrpNm.equals("")'>
+						AND A.GRP_NM LIKE #{searchGrpNm} ||'%'
+					</if>
+
+				ORDER BY A.GRP_ID, A.GRP_NM, A.APP_CLASS_CD
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppOrgResultMgrMap">
+
+				<![CDATA[
+					SELECT  NVL(CLOSE_YN,'N') AS CLOSE_YN 
+					FROM TPAP101
+					WHERE ENTER_CD = TRIM(#{ssnEnterCd}) AND APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+				]]>
+
+
+		</select>
+		
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppOrgResultMgr">
+
+					MERGE INTO TPAP144 T
+					USING	(
+							SELECT		A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.GRP_ID
+									, A.GRP_NM
+									, A.APP_CLASS_CD
+									, A.NOTE
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										, NULL AS APPRAISAL_CD
+										, NULL AS GRP_ID
+										, NULL AS GRP_NM
+										, NULL AS APP_CLASS_CD
+										, NULL AS NOTE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}						AS	ENTER_CD
+										, TRIM(#{rm.appraisalCd}) AS APPRAISAL_CD
+										, TRIM(#{rm.grpId}) AS GRP_ID
+										, TRIM(#{rm.grpNm}) AS GRP_NM
+										, TRIM(#{rm.appClassCd}) AS APP_CLASS_CD
+										, TRIM(#{rm.note}) AS NOTE
+									FROM	DUAL
+</foreach>
+									) A WHERE	A.ENTER_CD		IS NOT NULL
+										AND		A.APPRAISAL_CD	IS NOT NULL
+										AND		A.GRP_ID		IS NOT NULL
+							) S
+					ON	(
+								T.ENTER_CD			=	S.ENTER_CD
+							AND	T.APPRAISAL_CD		=	S.APPRAISAL_CD
+							AND	T.GRP_ID				=	S.GRP_ID
+						)
+					WHEN MATCHED THEN
+						UPDATE SET
+							  T.GRP_NM = S.GRP_NM
+							, T.APP_CLASS_CD = S.APP_CLASS_CD
+							, T.NOTE = S.NOTE
+							,	T.CHKDATE				=	SYSDATE
+							,	T.CHKID					=	#{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(	  T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.GRP_ID
+							, T.GRP_NM
+							, T.APP_CLASS_CD
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.GRP_ID
+							, S.GRP_NM
+							, S.APP_CLASS_CD
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppOrgResultMgr">
+
+					DELETE FROM TPAP144
+					WHERE	(ENTER_CD, APPRAISAL_CD, GRP_ID) IN 	( (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											, TRIM( #{rm.appraisalCd} )
+										</if>
+										
+										<if test='rm.grpId != null and !rm.grpId.equals("")'>
+											, TRIM( #{rm.grpId} )
+										</if>
+										
+										
+										)
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

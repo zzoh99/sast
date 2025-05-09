@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.payWayMgr.payTimeWayTab">
+
+<!-- 근태사항 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayTimeWayTabList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GNT_CD
+					     , A.SEARCH_SEQ
+					     ,(SELECT SEARCH_DESC FROM THRI201 WHERE ENTER_CD = A.ENTER_CD AND SEARCH_SEQ = A.SEARCH_SEQ) AS SEARCH_NM
+					     , A.ELEMENT_CD
+					     , F_CPN_GET_ELEMENT_NM(A.ENTER_CD,A.ELEMENT_CD,TO_CHAR(SYSDATE,'YYYYMMDD')) AS ELEMENT_NM
+					     , A.GIVE_GUBUN
+					     , A.MM
+					     , A.DUTY_DAY
+					     , A.COM_TYPE
+					  FROM TTIM010 A
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					 ORDER BY A.GNT_CD
+				]]>
+
+
+		</select>
+
+<!-- 근태사항 저장 -->
+		<update parameterType="map" id="savePayTimeWayTab">
+
+					MERGE INTO TTIM010 T
+					USING	(
+							SELECT A.ENTER_CD  
+								 , A.GNT_CD    
+							     , A.SEARCH_SEQ
+							     , A.ELEMENT_CD
+							     , A.GIVE_GUBUN
+							     , A.MM        
+							     , A.DUTY_DAY  
+							     , A.COM_TYPE
+							FROM	(
+									SELECT NULL AS ENTER_CD  
+										 , NULL AS GNT_CD    
+										 , NULL AS SEARCH_SEQ
+										 , NULL AS ELEMENT_CD
+										 , NULL AS GIVE_GUBUN
+									     , NULL AS MM        
+									     , NULL AS DUTY_DAY  
+									     , NULL AS COM_TYPE  
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.gntCd} )			AS  GNT_CD
+										 , TRIM( #{rm.searchSeq})		AS  SEARCH_SEQ
+										 , TRIM( #{rm.elementCd})		AS  ELEMENT_CD
+										 , TRIM( #{rm.giveGubun})		AS  GIVE_GUBUN
+										 , TRIM( #{rm.mm})				AS  MM
+										 , TRIM( #{rm.dutyDay})		AS  DUTY_DAY
+										 , TRIM( #{rm.comType})		AS  COM_TYPE
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+										  AND A.SEARCH_SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GNT_CD = S.GNT_CD AND T.SEARCH_SEQ = S.SEARCH_SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ELEMENT_CD      = S.ELEMENT_CD
+									, T.GIVE_GUBUN      = S.GIVE_GUBUN
+									, T.MM            	= S.MM        
+									, T.DUTY_DAY        = S.DUTY_DAY  
+									, T.COM_TYPE        = S.COM_TYPE
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD  
+							, T.GNT_CD    
+							, T.SEARCH_SEQ
+							, T.ELEMENT_CD
+							, T.GIVE_GUBUN
+							, T.MM        
+							, T.DUTY_DAY  
+							, T.COM_TYPE  
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD  
+							, S.GNT_CD    
+							, S.SEARCH_SEQ
+							, S.ELEMENT_CD
+							, S.GIVE_GUBUN
+							, S.MM        
+							, S.DUTY_DAY  
+							, S.COM_TYPE  
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 근태사항 삭제 -->
+		<delete parameterType="map" id="deletePayTimeWayTab">
+
+					DELETE FROM TTIM010
+					 WHERE ENTER_CD||'_'||GNT_CD||'_'||SEARCH_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")
+												and rm.searchSeq != null and !rm.searchSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.gntCd} )||'_'||TRIM( #{rm.searchSeq})
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

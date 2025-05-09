@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급여계산
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payCalcCre">
+		<select parameterType="map" resultType="cMap" id="getPayCalcCreBasicMap">
+
+				<![CDATA[
+					SELECT DISTINCT A.PAY_ACTION_CD
+						 , TRIM(A.PAY_ACTION_NM) AS PAY_ACTION_NM
+						 , SUBSTR(A.PAY_YM,1,4)||'-'||SUBSTR(A.PAY_YM,5,2) AS PAY_YM
+						 , B.RUN_TYPE
+						 , A.PAY_CD
+						 , TRIM(B.PAY_NM) AS PAY_NM
+						 , DECODE(TRIM(NVL(A.ORD_SYMD,'')),'','',
+										SUBSTR(A.ORD_SYMD,1,4)||'-'||SUBSTR(A.ORD_SYMD,5,2)||'-'||SUBSTR(A.ORD_SYMD,7,2))
+						   ||'~'||
+						   DECODE(TRIM(NVL(A.ORD_EYMD,'')),'','',
+										SUBSTR(A.ORD_EYMD,1,4)||'-'||SUBSTR(A.ORD_EYMD,5,2)||'-'||SUBSTR(A.ORD_EYMD,7,2)) AS ORD_YMD
+						 , SUBSTR(A.PAYMENT_YMD,1,4)||'-'||SUBSTR(A.PAYMENT_YMD,5,2)||'-'||SUBSTR(A.PAYMENT_YMD,7,2) AS PAYMENT_YMD
+						 , SUBSTR(A.TIME_YM,1,4)||'-'||SUBSTR(A.TIME_YM,5,2) AS TIME_YM
+						 , NVL(A.ADD_TAX_RATE,0)||' %' AS ADD_TAX_RATE
+						 , TRIM(F_COM_GET_GRCODE_NAME(A.ENTER_CD,'C00110',A.CAL_TAX_METHOD)) AS CAL_TAX_METHOD
+						 , NVL(D.CLOSE_YN,'N') AS CLOSE_YN
+						 , F_CPN_GET_EMP_STATUS(A.ENTER_CD,A.PAY_ACTION_CD,'ALL') EMP_STATUS
+					  FROM TCPN201 A
+						 , TCPN051 B
+						 , TCPN981 D
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					   AND A.ENTER_CD		= B.ENTER_CD
+					   AND A.PAY_CD			= B.PAY_CD
+					   AND A.ENTER_CD		= D.ENTER_CD(+)
+					   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD(+)
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayCalcCrePeopleMap">
+
+				<![CDATA[
+					SELECT A.PEOPLE_TOT_CNT
+					     , B.PEOPLE_SUB_CNT
+					     , B.PEOPLE_P_CNT
+					     , B.PEOPLE_J_CNT
+					     , C.CNT
+					     , C.WORK_CLOSE_YN
+					     , C.WORK_STATUS
+					  FROM (SELECT ENTER_CD
+					             , PAY_ACTION_CD
+					             , COUNT(*) AS PEOPLE_TOT_CNT
+					          FROM TCPN203
+					         GROUP BY ENTER_CD, PAY_ACTION_CD
+					       ) A
+					  LEFT OUTER JOIN
+					       (SELECT ENTER_CD
+					             , PAY_ACTION_CD
+					             , COUNT(*) AS PEOPLE_SUB_CNT
+					             , SUM(DECODE(UPPER(PAY_PEOPLE_STATUS),'P',1,0)) PEOPLE_P_CNT
+					             , SUM(DECODE(UPPER(PAY_PEOPLE_STATUS),'J',1,0)) PEOPLE_J_CNT
+					          FROM TCPN203
+					         WHERE 1=1
+					                   	]]>
+					           <if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					               AND BUSINESS_PLACE_CD= #{businessPlaceCd}
+							   </if>
+					         GROUP BY ENTER_CD, PAY_ACTION_CD
+					       ) B
+					    ON B.ENTER_CD = A.ENTER_CD
+					   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+					  LEFT OUTER JOIN
+					       (SELECT A.ENTER_CD
+					             , B.PAY_ACTION_CD
+					             , COUNT(*) AS CNT
+					             , MAX(b.WORK_CLOSE_YN) AS WORK_CLOSE_YN
+					             , MAX(B.WORK_STATUS) AS WORK_STATUS
+							  FROM TSYS904 B
+					         INNER JOIN TSYS903 A
+					            ON A.ENTER_CD = B.ENTER_CD
+							   AND A.BIZ_CD = B.BIZ_CD
+							   AND A.CHKDATE BETWEEN B.WORK_SDATE AND B.WORK_EDATE
+					         GROUP BY A.ENTER_CD, B.PAY_ACTION_CD
+						      ) C
+					     ON C.ENTER_CD      = A.ENTER_CD
+					    AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+					  WHERE A.ENTER_CD      = #{ssnEnterCd}
+						AND A.PAY_ACTION_CD = #{payActionCd}
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPayCalcCreCloseList">
+
+				<![CDATA[
+					SELECT A.BUSINESS_PLACE_CD
+						 , A.BENEFIT_BIZ_CD
+						 , A.CLOSE_ST
+						 , TO_CHAR(A.CHKDATE,'YYYY-MM-DD  HH24:MI:SS') AS CHKDATE
+					  FROM TBEN991 A
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					           		]]>
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND A.BUSINESS_PLACE_CD	= #{businessPlaceCd}
+					</if>
+					ORDER BY A.BUSINESS_PLACE_CD, A.BENEFIT_BIZ_CD
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPayCalcCreErrorList">
+
+				<![CDATA[
+				SELECT A.SEQ, A.OBJECT_NM, A.ERR_LOCATION, A.ERR_LOG
+				      FROM TSYS903 A, TSYS904 B
+				     WHERE A.ENTER_CD = B.ENTER_CD
+				       AND A.BIZ_CD = B.BIZ_CD
+				       AND A.ENTER_CD = #{ssnEnterCd}
+				       AND B.PAY_ACTION_CD = #{payActionCd}
+				       AND A.CHKDATE BETWEEN B.WORK_SDATE AND B.WORK_EDATE
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayCalcCrePeopleSetList">
+				<![CDATA[
+					SELECT A.ORG_NM
+						 , A.WORK_TYPE
+						 , A.JIKCHAK_CD
+						 , A.JIKWEE_CD
+						 , A.JIKGUB_CD
+						 , A.SABUN
+						 , A.NAME
+						 , A.MANAGE_CD
+						 , A.PAY_TYPE
+						 , A.STATUS_CD
+						 , A.EMP_YMD
+						 , A.RET_YMD
+						 , A.RES_NO
+						 , A.PAY_ACTION_CD
+						 , A.BUSINESS_PLACE_CD
+						 , A.PAY_PEOPLE_STATUS AS STATUS
+						 , CASE WHEN A.PAY_PEOPLE_STATUS = 'J' AND #{closeYn} = 'N' THEN '<a class="basic" onClick="calcCancel('''||A.SABUN||''')">계산취소</a>'
+						        WHEN A.PAY_PEOPLE_STATUS = 'P' AND #{closeYn} = 'N' THEN '<a class="basic" onClick="calc('''||A.SABUN||''')">계산</a>'
+						        ELSE '' END AS BTN_PRT
+						 , DECODE(A.PAY_PEOPLE_STATUS,'P','1','J','1','PM','1','M','1','0') AS PAY_PEOPLE_STATUS
+						 , DECODE(A.PAY_PEOPLE_STATUS,'J','완료','M','재계산',' ') AS PAY_PEOPLE_STATUS_TEXT
+						 , DECODE(A.PAY_PEOPLE_STATUS,'P','P','J','J','PM','PM','M','M','0') AS OLD_PAY_PEOPLE_STATUS
+						 , A.CC_CD
+						 , A.JOB_NM
+						 , TO_CHAR(A.CHKDATE,'YYYY-MM-DD  HH24:MI:SS') AS CHKDATE
+						 , A.SAL_CLASS
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'A') AS CALC_YN_A
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'B') AS CALC_YN_B
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'C') AS CALC_YN_C
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'D') AS CALC_YN_D
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'E') AS CALC_YN_E
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'F') AS CALC_YN_F
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'G') AS CALC_YN_G
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'H') AS CALC_YN_H
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'I') AS CALC_YN_I
+						 , F_CPN_PRO_CALC_YN(A.ENTER_CD, A.SABUN, A.PAY_ACTION_CD, 'J') AS CALC_YN_J
+					     , ROW_NUMBER() OVER (PARTITION BY A.ENTER_CD, A.PAY_ACTION_CD ORDER BY A.PAY_PEOPLE_STATUS DESC, A.CHKDATE, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS RNUM
+					  FROM TCPN203 A
+					 WHERE A.ENTER_CD			= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD		= #{payActionCd}
+					           ]]>
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND A.BUSINESS_PLACE_CD	= #{businessPlaceCd}
+					</if>
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND A.SABUN||A.NAME LIKE '%'||trim(#{sabunName})||'%'
+					</if>
+					--ORDER BY A.PAY_PEOPLE_STATUS DESC, A.CHKDATE, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+
+		</select>
+		<update parameterType="map" id="savePayCalcCrePeopleSet">
+
+
+					MERGE INTO TCPN203 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.PAY_PEOPLE_STATUS
+								 , A.BUSINESS_PLACE_CD
+								 , A.CC_CD
+							  FROM (
+									SELECT NULL	AS PAY_ACTION_CD
+										 , NULL	AS SABUN
+										 , NULL	AS PAY_PEOPLE_STATUS
+										 , NULL	AS BUSINESS_PLACE_CD
+										 , NULL	AS CC_CD
+									  FROM DUAL
+<foreach item="rm" collection="updateRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})			AS SABUN
+										 , (CASE WHEN #{rm.payPeopleStatus} = '1' THEN DECODE(#{rm.oldPayPeopleStatus},'0','P',#{rm.oldPayPeopleStatus})
+												ELSE DECODE(#{rm.oldPayPeopleStatus},'J',#{rm.oldPayPeopleStatus},'M',#{rm.oldPayPeopleStatus},'C') END) AS PAY_PEOPLE_STATUS
+										 , TRIM(#{rm.businessPlaceCd})	AS BUSINESS_PLACE_CD
+										 , TRIM(#{rm.ccCd})				AS CC_CD
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.PAY_ACTION_CD IS NOT NULL
+							  AND A.SABUN IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.PAY_PEOPLE_STATUS	= S.PAY_PEOPLE_STATUS
+								 , T.BUSINESS_PLACE_CD	= S.BUSINESS_PLACE_CD
+								 , T.CC_CD				= S.CC_CD
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+
+
+
+		</update>
+	<update parameterType="map" statementType="CALLABLE" id="PayCalcCreP_CPN_CAL_PAY_CANCEL">
+
+				<![CDATA[
+		CALL P_CPN_CAL_PAY_CANCEL(
+		    #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{payActionCd,mode=IN,jdbcType=VARCHAR},
+			#{businessPlaceCd,mode=IN,jdbcType=VARCHAR},
+			#{sabun,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+		]]>
+
+
+		</update>
+
+	<update parameterType="map" statementType="CALLABLE" id="PayCalcCreP_CPN_BON_PAY_CANCEL">
+
+				<![CDATA[
+		CALL P_CPN_BON_PAY_CANCEL(
+		    #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{payActionCd,mode=IN,jdbcType=VARCHAR},
+			#{businessPlaceCd,mode=IN,jdbcType=VARCHAR},
+			#{sabun,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+		]]>
+
+		</update>
+
+	<update parameterType="map" statementType="CALLABLE" id="PayCalcCreP_CPN_CAL_EMP_INS">
+	<![CDATA[
+		CALL P_CPN_CAL_EMP_INS(
+			#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{cnt,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{payActionCd,mode=IN,jdbcType=VARCHAR},
+			#{businessPlaceCd,mode=IN,jdbcType=VARCHAR},
+		    0,
+			#{sabun,mode=IN,jdbcType=VARCHAR},
+			NULL,
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+	]]>
+	</update>
+	
+	<update parameterType="map" statementType="CALLABLE" id="PayCalcCreP_BEN_PAY_DATA_CREATE_ALL">
+
+				<![CDATA[
+		CALL P_BEN_PAY_DATA_CREATE_ALL(
+		    #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{payActionCd,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+		]]>
+
+		</update>
+		
+		<!-- 	삭제 -->
+		<delete parameterType="map" id="deleteTSYS904ForPayCalcCre">
+
+				<![CDATA[
+					DELETE FROM TSYS904
+					WHERE 	ENTER_CD = #{ssnEnterCd}
+					AND		BIZ_CD = 'CPN'
+					AND		PRG_CD = 'P_CPN_CAL_PAY_MAIN'
+					AND 	PAY_ACTION_CD = #{searchPayActionCd}
+				]]>
+
+		</delete>
+	</mapper>

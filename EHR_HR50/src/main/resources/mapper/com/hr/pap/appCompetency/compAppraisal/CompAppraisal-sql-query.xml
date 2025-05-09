@@ -1,0 +1,626 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appCompetency.compAppraisal">
+<!-- 		리더십진단 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCompAppraisalList">
+
+				<![CDATA[
+					SELECT *
+					  FROM (
+							SELECT  T1.ENTER_CD AS ENTER_CD                                        /*-- 회사구분(TORG900)*/
+							      , T1.COMP_APPRAISAL_CD AS COMP_APPRAISAL_CD                      /*-- 역량진단ID*/
+							      , T1.SABUN AS SABUN                                              /*-- 사원번호*/
+							      , F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN) AS NAME
+							      , F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN, 'ALIAS') AS ALIAS
+							      , T1.W_ENTER_CD AS W_ENTER_CD
+							      , (SELECT ENTER_NM FROM TORG900 WHERE ENTER_CD = T1.W_ENTER_CD ) AS W_ENTER_NM
+							      , T3.ORG_NM AS SABUN_ORG_NM
+							      , T3.JIKCHAK_NM AS SABUN_JIKCHAK_NM
+							      , T3.JIKGUB_NM AS SABUN_JIKGUB_NM
+							      , T3.JIKWEE_NM AS SABUN_JIKWEE_NM
+							      , T1.APP_ENTER_CD AS APP_ENTER_CD
+							      , T1.APP_SABUN AS APP_SABUN                                      /*-- 진단자사번*/
+							      , F_COM_GET_NAMES(T1.APP_ENTER_CD, T1.APP_SABUN) AS APP_NAME
+							      , T1.APP_SEQ_CD AS APP_SEQ_CD                                    /*-- 차수*/
+							      , (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = T1.ENTER_CD AND CODE = T1.APP_SEQ_CD AND GRCODE_CD = 'P00004') AS APP_SEQ_NM /*-- 차수명 */
+							      , T1.ORG_CD AS ORG_CD                                            /*-- 조직코드(TORG101)*/
+							      , T1.ORG_NM AS ORG_NM                                            /*-- 조직명*/
+							      , T1.Q_ORG_CD AS Q_ORG_CD                                        /*-- 본부코드(TORG101)*/
+							      , T1.Q_ORG_NM AS Q_ORG_NM                                        /*-- 본부명*/
+							      , T1.JIKWEE_CD AS JIKWEE_CD                                      /*-- 직위(H20030)*/
+							      , T1.JIKWEE_NM AS JIKWEE_NM                                      /*-- 직위명*/
+							      , T1.JIKCHAK_CD AS JIKCHAK_CD                                    /*-- 직책(H20020)*/
+							      , T1.JIKCHAK_NM AS JIKCHAK_NM                                    /*-- 직책명*/
+							      , T1.JIKGUB_CD AS JIKGUB_CD                                      /*-- 직급(H20010)*/
+							      , T1.JIKGUB_NM AS JIKGUB_NM                                      /*-- 직급명*/
+							      , T1.A_COMMENT AS A_COMMENT                                      /*-- 장점의견*/
+							      , T1.C_COMMENT AS C_COMMENT                                      /*-- 개선점의견*/
+							      , T1.LDS_APP_STATUS_CD AS LDS_APP_STATUS_CD                      /*-- 진단상태코드:  03:완료, 01: 임시저장  NULL이면  00: 미진행*/
+							      , (SELECT COUNT(*) FROM  TPAP529
+							                        WHERE  ENTER_CD = T1.ENTER_CD                                     /*-- 회사구분(TORG900)*/
+							                          AND  COMP_APPRAISAL_CD = T1.COMP_APPRAISAL_CD                   /*-- 역량진단ID*/
+							                          AND  SABUN = T1.SABUN                                           /*-- 사원번호*/
+							                          AND  APP_SABUN = T1.APP_SABUN                                  /*-- 진단자사번*/
+							                          AND  W_ENTER_CD = T1.W_ENTER_CD                                  /*-- 진단자사번*/
+							                          AND  APP_ENTER_CD = T1.APP_ENTER_CD                                  /*-- 진단자사번*/
+							        ) AS JINDAN_CNT
+							      , (SELECT COUNT(*) FROM  TPAP529
+                                                    WHERE  ENTER_CD = T1.ENTER_CD                                     /*-- 회사구분(TORG900)*/
+                                                      AND  COMP_APPRAISAL_CD = T1.COMP_APPRAISAL_CD                   /*-- 역량진단ID*/
+                                                      AND  SABUN = T1.SABUN                                           /*-- 사원번호*/
+                                                      AND  APP_SABUN = T1.APP_SABUN                                  /*-- 진단자사번*/
+                                                      AND  W_ENTER_CD = T1.W_ENTER_CD                                  /*-- 진단자사번*/
+                                                      AND  APP_ENTER_CD = T1.APP_ENTER_CD                                  /*-- 진단자사번*/
+                                                      AND  APP_RESULT IS NULL
+                                    ) AS CHECKVAL  
+							       , '0' AS RESULT
+		
+							FROM   TPAP527 T1     /*-- 역량진단자관리(TPAP527)(TABLE)*/
+							     , TPAP525 T3     /*-- 역량진단대상자관리(TPAP525)(TABLE)*/
+		
+							WHERE  T1.ENTER_CD = #{ssnEnterCd}
+							  AND  T1.APP_ENTER_CD = #{ssnEnterCd}
+							  AND  T1.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}                 /*-- 역량진단ID*/
+							  AND  T1.W_ENTER_CD = T3.W_ENTER_CD
+							  AND  T1.ENTER_CD = T3.ENTER_CD
+							  AND  T1.COMP_APPRAISAL_CD = T3.COMP_APPRAISAL_CD
+							  AND  T1.SABUN = T3.SABUN
+				           )
+				     WHERE 1=1
+				               ]]>
+					<choose>
+					<when test='searchAdminYn != null and searchAdminYn.equals("N")'>
+					   AND  APP_SABUN = #{ssnSabun}                 				 /*-- 세션사번*/
+					</when>
+					<otherwise>
+					   AND APP_NAME LIKE '%'|| #{searchAppNm} ||'%'
+					   AND NAME LIKE '%'|| #{searchNm} ||'%'
+					   AND SABUN_ORG_NM LIKE '%'|| #{searchOrgNm} ||'%'
+					   <if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")' >
+					   		AND APP_SEQ_CD = #{searchAppSeqCd}
+					   </if>
+					   <if test='searchAppStatusCd  != null and !searchAppStatusCd.equals("") ' >
+					   		AND LDS_APP_STATUS_CD = #{searchAppStatusCd}
+					   </if>
+					</otherwise>
+					</choose>
+
+
+
+		</select>
+		
+		<!-- 		리더십진단  해더 조회(부서장) 한투 전용 -->
+		<select parameterType="map" resultType="cMap" id="getTeamHeaderList">
+
+				<![CDATA[
+						SELECT 
+						        SAVE_NAME
+						        ,SAVE_NAME1
+						        ,SAVE_NAME2
+						        ,SAVE_NAME3
+						        ,SAVE_NAME4
+						        ,SAVE_NAME_DISP
+						        ,SAVE_NAME_DISP2
+						FROM 
+						(
+						
+						                    SELECT 
+						                     --A.LDS_COMPETENCY_CD AS SAVE_NAME
+						                      A.MAIN_APP_TYPE AS SAVE_NAME
+						                     ,'AC'||A.MAIN_APP_TYPE AS SAVE_NAME1     
+						                     ,'AVGC_'||A.MAIN_APP_TYPE AS SAVE_NAME2        
+						                     ,'ac'||A.MAIN_APP_TYPE AS SAVE_NAME3     
+						                     ,'avgc'||A.MAIN_APP_TYPE AS SAVE_NAME4                 
+						                     --,A.LDS_COMPETENCY_NM AS SAVE_NAME_DISP
+						                     ,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00007', A.MAIN_APP_TYPE, '') AS SAVE_NAME_DISP
+						                     ,'AVG_'||F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00007', A.MAIN_APP_TYPE, '') AS SAVE_NAME_DISP2
+						                    FROM TPAP531  A                 
+						                    WHERE A.ENTER_CD = #{ssnEnterCd}
+						                      AND A.USE_YN = 'Y'
+						                      )
+						GROUP BY SAVE_NAME, SAVE_NAME1, SAVE_NAME2, SAVE_NAME3, SAVE_NAME4, SAVE_NAME_DISP, SAVE_NAME_DISP2
+						ORDER BY SAVE_NAME   
+				]]>
+
+
+		</select>
+		
+		<!-- 		리더십진단  리스트 조회(부서장) 한투 전용 -->
+		<select parameterType="map" resultType="cMap" id="getTeamList">
+
+				<![CDATA[
+                        SELECT
+                                SABUN
+                                ,APP_SABUN
+                                ,NAME
+                                ,APP_GROUP
+                                     ]]>
+                                <foreach item='rtitles' collection='titles'>
+                                 ,ROUND(AVG(MAX(${rtitles.saveName1})) OVER(PARTITION BY APP_GROUP),1) AS ${rtitles.saveName2}
+                                , MAX(${rtitles.saveName1}) AS  ${rtitles.saveName1}
+								</foreach>
+                                ,NVL(AVG1, 0) AS AVG1
+                                ,NVL(AVG2, 0) AS AVG2
+                        FROM
+                        (
+                         SELECT                
+                            SABUN
+                            ,APP_SABUN
+                            ,NAME
+                            ,APP_GROUP
+                            <foreach item='rtitles' collection='titles'>
+                            ,${rtitles.saveName1}
+                            </foreach>
+                            ,ROUND(AVG(SUM1)  OVER(PARTITION BY APP_GROUP), 1)  AS AVG1 -- 그룹 평균
+                            ,ROUND(AVG(SUM1)  OVER(PARTITION BY SABUN),1)     AS AVG2 -- 사원 별 평균
+                        FROM
+                        (                        
+                        SELECT
+                                SABUN
+                                ,APP_SABUN
+                                ,NAME
+                                ,APP_GROUP
+                                <foreach item='rtitles' collection='titles'>
+                                 ,CASE WHEN LDS_COMPETENCY_CD = #{rtitles.saveName} THEN SUM(APP_RESULT) ELSE 0 END AS ${rtitles.saveName1}
+                                </foreach>
+                                 ,SUM(APP_RESULT) AS SUM1
+                        FROM
+                        (
+                            SELECT 
+                                 T1.SABUN AS SABUN                                              /*-- 사원번호*/
+                                ,T1.APP_SABUN
+                                , F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN) AS NAME  
+                               -- , T1.LDS_APP_STATUS_CD AS LDS_APP_STATUS_CD                      /*-- 진단상태코드:  03:완료, 01: 임시저장  NULL이면  00: 미진행*/
+                               -- , T5.LDS_COMPETENCY_CD /*-- 역량명*/
+                               , T5.MAIN_APP_TYPE AS LDS_COMPETENCY_CD /* 역량코드*/
+                                , T1.APP_GROUP
+                                , T5.APP_RESULT  /*-- 결과*/
+                                --,ROUND(AVG(APP_RESULT) OVER(PARTITION BY APP_GROUP, LDS_COMPETENCY_CD),1) AS AVGVAL
+                                FROM   TPAP527 T1     /*-- 역량진단자관리(TPAP527)(TABLE)*/
+                                , TPAP525 T3     /*-- 역량진단대상자관리(TPAP525)(TABLE)*/
+                                , (
+                                       SELECT A.ENTER_CD
+                                         , A.LDS_COMPETENCY_CD
+                                         , F_COM_GET_COMPETENCY_NM( #{ssnEnterCd} ,A.LDS_COMPETENCY_CD,TO_CHAR( SYSDATE, 'YYYYMMDD')) AS LDS_COMPETENCY_NM
+                                         , A.SEQ 
+                                         , A.COMP_APPRAISAL_CD
+                                         , A.SABUN
+                                         , A.APP_ENTER_CD
+                                         , A.APP_SABUN
+                                         , A.W_ENTER_CD
+                                         , B.LDS_COMP_BENM
+                                         , A.APP_RESULT
+                                         , '0' AS LDS_COMMENT
+                                         , C.MAIN_APP_TYPE
+                                      FROM TPAP529 A
+                                        , TPAP533 B
+                                        , TPAP531 C
+                                      WHERE A.ENTER_CD = B.ENTER_CD
+                                        AND A.LDS_COMPETENCY_CD = B.LDS_COMPETENCY_CD
+                                        AND A.SEQ = B.SEQ 
+                                        AND B.ENTER_CD = C.ENTER_CD
+                                        AND B.LDS_COMPETENCY_CD = C.LDS_COMPETENCY_CD
+                               ) T5 /*-- 다면평가 상세  */
+                                WHERE  T1.ENTER_CD = #{ssnEnterCd}
+                                AND  T1.W_ENTER_CD = T3.W_ENTER_CD
+                                AND  T1.ENTER_CD = T3.ENTER_CD
+                                AND  T1.COMP_APPRAISAL_CD = T3.COMP_APPRAISAL_CD
+                                AND  T1.SABUN = T3.SABUN
+                                AND  T1.ENTER_CD = T5.ENTER_CD
+                                AND  T1.COMP_APPRAISAL_CD = T5.COMP_APPRAISAL_CD
+                                AND  T1.SABUN = T5.SABUN
+                                AND  T1.W_ENTER_CD = T5.W_ENTER_CD
+                                AND  T1.APP_ENTER_CD = T5.APP_ENTER_CD
+                                AND  T1.APP_SABUN = T5.APP_SABUN  
+                                                             AND T1.COMP_APPRAISAL_CD  = TRIM(#{searchCompAppraisalCd} )
+                                                            )
+                                GROUP BY SABUN, APP_SABUN, NAME, APP_GROUP, LDS_COMPETENCY_CD
+                                )
+                                )
+                                WHERE APP_SABUN IN (SELECT SABUN t
+                                       FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+                                     )
+                                AND NAME LIKE '%'|| #{searchNm} ||'%'
+                                 GROUP BY SABUN, APP_SABUN, NAME, APP_GROUP, AVG1 ,AVG2
+                                ORDER BY APP_GROUP, SABUN
+
+
+		</select>
+		
+		
+		<!-- 리더십진단 조회(부서장) -->
+		<select parameterType="map" resultType="cMap" id="getTeamCompAppraisalList">
+
+				<![CDATA[
+					SELECT *
+					  FROM (
+							SELECT  T1.ENTER_CD AS ENTER_CD                                        /*-- 회사구분(TORG900)*/
+							      , T1.COMP_APPRAISAL_CD AS COMP_APPRAISAL_CD                      /*-- 역량진단ID*/
+							      , T1.SABUN AS SABUN                                              /*-- 사원번호*/
+							      , F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN) AS NAME
+							      , F_COM_GET_NAMES(T1.W_ENTER_CD, T1.SABUN, 'ALIAS') AS ALIAS
+							      , T1.W_ENTER_CD AS W_ENTER_CD
+							      , (SELECT ENTER_NM FROM TORG900 WHERE ENTER_CD = T1.W_ENTER_CD ) AS W_ENTER_NM
+							      , T3.ORG_NM AS SABUN_ORG_NM
+							      , T3.JIKCHAK_NM AS SABUN_JIKCHAK_NM
+							      , T3.JIKGUB_NM AS SABUN_JIKGUB_NM
+							      , T3.JIKWEE_NM AS SABUN_JIKWEE_NM
+							      , T1.APP_ENTER_CD AS APP_ENTER_CD
+							      , T1.APP_SABUN AS APP_SABUN                                      /*-- 진단자사번*/
+							      , F_COM_GET_NAMES(T1.APP_ENTER_CD, T1.APP_SABUN) AS APP_NAME
+							      , T1.APP_SEQ_CD AS APP_SEQ_CD                                    /*-- 차수*/
+							      , (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = T1.ENTER_CD AND CODE = T1.APP_SEQ_CD AND GRCODE_CD = 'P00004') AS APP_SEQ_NM /*-- 차수명 */
+							      , T1.ORG_CD AS ORG_CD                                            /*-- 조직코드(TORG101)*/
+							      , T1.ORG_NM AS ORG_NM                                            /*-- 조직명*/
+							      , T1.Q_ORG_CD AS Q_ORG_CD                                        /*-- 본부코드(TORG101)*/
+							      , T1.Q_ORG_NM AS Q_ORG_NM                                        /*-- 본부명*/
+							      , T1.JIKWEE_CD AS JIKWEE_CD                                      /*-- 직위(H20030)*/
+							      , T1.JIKWEE_NM AS JIKWEE_NM                                      /*-- 직위명*/
+							      , T1.JIKCHAK_CD AS JIKCHAK_CD                                    /*-- 직책(H20020)*/
+							      , T1.JIKCHAK_NM AS JIKCHAK_NM                                    /*-- 직책명*/
+							      , T1.JIKGUB_CD AS JIKGUB_CD                                      /*-- 직급(H20010)*/
+							      , T1.JIKGUB_NM AS JIKGUB_NM                                      /*-- 직급명*/
+							      , T1.A_COMMENT AS A_COMMENT                                      /*-- 장점의견*/
+							      , T1.C_COMMENT AS C_COMMENT                                      /*-- 개선점의견*/
+							      , T1.LDS_APP_STATUS_CD AS LDS_APP_STATUS_CD                      /*-- 진단상태코드:  03:완료, 01: 임시저장  NULL이면  00: 미진행*/
+							      , (SELECT COUNT(*) FROM  TPAP529
+							                        WHERE  ENTER_CD = T1.ENTER_CD                                     /*-- 회사구분(TORG900)*/
+							                          AND  COMP_APPRAISAL_CD = T1.COMP_APPRAISAL_CD                   /*-- 역량진단ID*/
+							                          AND  SABUN = T1.SABUN                                           /*-- 사원번호*/
+							                          AND  APP_SABUN = T1.APP_SABUN                                  /*-- 진단자사번*/
+							                          AND  W_ENTER_CD = T1.W_ENTER_CD                                  /*-- 진단자사번*/
+							                          AND  APP_ENTER_CD = T1.APP_ENTER_CD                                  /*-- 진단자사번*/
+							        ) AS JINDAN_CNT
+							      , (SELECT COUNT(*) FROM  TPAP529
+                                                    WHERE  ENTER_CD = T1.ENTER_CD                                     /*-- 회사구분(TORG900)*/
+                                                      AND  COMP_APPRAISAL_CD = T1.COMP_APPRAISAL_CD                   /*-- 역량진단ID*/
+                                                      AND  SABUN = T1.SABUN                                           /*-- 사원번호*/
+                                                      AND  APP_SABUN = T1.APP_SABUN                                  /*-- 진단자사번*/
+                                                      AND  W_ENTER_CD = T1.W_ENTER_CD                                  /*-- 진단자사번*/
+                                                      AND  APP_ENTER_CD = T1.APP_ENTER_CD                                  /*-- 진단자사번*/
+                                                      AND  APP_RESULT IS NULL
+                                    ) AS CHECKVAL 
+							       , '0' AS RESULT
+		
+							FROM   TPAP527 T1     /*-- 역량진단자관리(TPAP527)(TABLE)*/
+							     , TPAP525 T3     /*-- 역량진단대상자관리(TPAP525)(TABLE)*/
+		
+							WHERE  T1.ENTER_CD = #{ssnEnterCd}
+							  AND  T1.APP_ENTER_CD = #{ssnEnterCd}
+							  AND  T1.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}                 /*-- 역량진단ID*/
+							  AND  T1.W_ENTER_CD = T3.W_ENTER_CD
+							  AND  T1.ENTER_CD = T3.ENTER_CD
+							  AND  T1.COMP_APPRAISAL_CD = T3.COMP_APPRAISAL_CD
+							  AND  T1.SABUN = T3.SABUN
+				           )
+				     WHERE 1=1
+                       AND APP_SABUN IN (SELECT SABUN t
+                                       FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+                                     )
+					   AND APP_NAME LIKE '%'|| #{searchAppNm} ||'%'
+					   AND NAME LIKE '%'|| #{searchNm} ||'%'
+					   AND SABUN_ORG_NM LIKE '%'|| #{searchOrgNm} ||'%'
+					           ]]>
+					   <if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")' >
+					   		AND APP_SEQ_CD = #{searchAppSeqCd}
+                       </if>
+					   <if test='searchAppStatusCd  != null and !searchAppStatusCd.equals("") ' >
+					   		AND LDS_APP_STATUS_CD = #{searchAppStatusCd}
+                       </if>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getCompAppraisalPopList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.LDS_COMPETENCY_CD
+						 , F_COM_GET_COMPETENCY_NM( #{ssnEnterCd} ,A.LDS_COMPETENCY_CD,TO_CHAR( SYSDATE, 'YYYYMMDD')) AS LDS_COMPETENCY_NM
+						 , A.SEQ
+						 , A.W_ENTER_CD
+						 , A.COMP_APPRAISAL_CD
+						 , A.SABUN
+						 , A.APP_ENTER_CD
+						 , A.APP_SABUN
+						 , B.LDS_COMP_BENM
+						 , A.APP_RESULT
+						 , C.MAIN_APP_TYPE
+						 , '0' AS LDS_COMMENT
+					FROM TPAP529 A
+						, TPAP533 B
+						, TPAP531 C
+					WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.LDS_COMPETENCY_CD = B.LDS_COMPETENCY_CD
+						AND A.SEQ = B.SEQ
+						AND B.ENTER_CD =  C.ENTER_CD
+                        AND B.LDS_COMPETENCY_CD = C.LDS_COMPETENCY_CD
+						AND A.ENTER_CD = #{ssnEnterCd}
+						AND A.W_ENTER_CD = #{searchWEnterCd}
+						AND A.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+						AND A.SABUN = #{searchEmpId}
+						AND A.APP_ENTER_CD = #{searchAppEnterCd}
+						AND A.APP_SABUN = #{searchAppEmpId}
+				   ORDER BY A.LDS_COMPETENCY_CD, B.ORDER_SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getCompAppraisalPopMap">
+
+				<![CDATA[
+					SELECT *
+					FROM TPAP527
+					WHERE W_ENTER_CD = #{searchWEnterCd}
+					    AND ENTER_CD = #{ssnEnterCd}
+						AND COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+						AND SABUN = #{searchEmpId}
+						AND APP_ENTER_CD = #{searchAppEnterCd}
+						AND APP_SABUN = #{searchAppEmpId}
+				]]>
+
+
+		</select>
+		
+		<!-- 하위 부서 다면평가 완료여부 체크 -->
+		<select parameterType="map" resultType="cMap" id="getCompAppraisalTeamChk">
+
+				<![CDATA[
+   					SELECT COUNT(*) AS CNT
+                                 
+                            FROM   TPAP527 T1     /*-- 역량진단자관리(TPAP527)(TABLE)*/
+                                 , TPAP525 T3     /*-- 역량진단대상자관리(TPAP525)(TABLE)*/
+                            WHERE  T1.ENTER_CD = #{ssnEnterCd}
+                              AND  T1.APP_ENTER_CD = #{ssnEnterCd}
+                              AND  T1.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}                /*-- 역량진단ID*/
+                              AND  T1.W_ENTER_CD = T3.W_ENTER_CD
+                              AND  T1.ENTER_CD = T3.ENTER_CD
+                              AND  T1.COMP_APPRAISAL_CD = T3.COMP_APPRAISAL_CD
+                              AND  T1.SABUN = T3.SABUN
+                              AND NVL(LDS_APP_STATUS_CD,'N') ='N'    
+                              AND  T1.APP_SABUN IN
+                              (
+                              SELECT SABUN t
+                                        FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+                                       )				
+				]]>
+
+
+		</select>
+		
+		
+<!-- 리더십진단 저장(완료여부 저장) -->
+		<update parameterType="map" id="saveCompAppraisal">
+
+				<![CDATA[
+                    MERGE INTO TPAP527 T
+                    USING    (
+                            SELECT      A.ENTER_CD
+                                    , A.COMP_APPRAISAL_CD
+                                    , A.W_ENTER_CD
+                                    , A.SABUN
+                                    , A.APP_ENTER_CD
+                                    , A.APP_SABUN
+                                    , A.LDS_APP_STATUS_CD
+                            FROM    (
+                                    SELECT      NULL        AS ENTER_CD
+                                            , NULL        AS COMP_APPRAISAL_CD
+                                            , NULL        AS W_ENTER_CD
+                                            , NULL        AS SABUN
+                                            , NULL        AS APP_ENTER_CD
+                                            , NULL        AS APP_SABUN
+                                            , NULL        AS LDS_APP_STATUS_CD
+                                      FROM    DUAL
+                                      ]]>
+<bind name='icnt' value='1' />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT
+                                              TRIM( #{ssnEnterCd} )    AS ENTER_CD
+                                            , TRIM(  #{rm.compAppraisalCd} )    AS COMP_APPRAISAL_CD
+                                            , TRIM(  #{rm.wEnterCd} )        AS W_ENTER_CD
+                                            , TRIM(  #{rm.sabun} )            AS SABUN
+                                            , TRIM(  #{rm.appEnterCd} )        AS APP_ENTER_CD
+                                            , TRIM(  #{rm.appSabun} )        AS APP_SABUN
+                                            , TRIM(  #{rm.ldsAppStatusCd} )        AS LDS_APP_STATUS_CD
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.ENTER_CD IS NOT NULL
+                                          AND A.COMP_APPRAISAL_CD IS NOT NULL
+                                          AND A.W_ENTER_CD IS NOT NULL
+                                          AND A.SABUN IS NOT NULL
+                                          AND A.APP_ENTER_CD IS NOT NULL
+                                          AND A.APP_SABUN IS NOT NULL
+                            ) S
+                    ON (     T.ENTER_CD             = S.ENTER_CD
+                        AND T.COMP_APPRAISAL_CD = S.COMP_APPRAISAL_CD
+                        AND T.W_ENTER_CD         = S.W_ENTER_CD
+                        AND T.SABUN             = S.SABUN
+                        AND T.APP_ENTER_CD         = S.APP_ENTER_CD
+                        AND T.APP_SABUN         = S.APP_SABUN
+                         )
+
+                    WHEN MATCHED THEN
+                        UPDATE SET      T.LDS_APP_STATUS_CD      = S.LDS_APP_STATUS_CD
+                                    , T.CHKDATE    = SYSDATE
+                                    , T.CHKID    = #{ssnSabun}
+        </update>
+		
+
+<!-- 		리더십진단 저장 -->
+		<update parameterType="map" id="saveCompAppraisalPop1">
+
+				<![CDATA[
+					MERGE INTO TPAP529 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.COMP_APPRAISAL_CD
+									, A.W_ENTER_CD
+									, A.SABUN
+									, A.APP_ENTER_CD
+									, A.APP_SABUN
+									, A.LDS_COMPETENCY_CD
+									, A.SEQ
+									, A.APP_RESULT
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS COMP_APPRAISAL_CD
+											, NULL		AS W_ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS APP_ENTER_CD
+											, NULL		AS APP_SABUN
+											, NULL		AS LDS_COMPETENCY_CD
+											, NULL		AS SEQ
+											, NULL		AS APP_RESULT
+									  FROM	DUAL
+									  ]]>
+<bind name='icnt' value='1' />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM(  #{rm.compAppraisalCd} )	AS COMP_APPRAISAL_CD
+											, TRIM(  #{rm.wEnterCd} )		AS W_ENTER_CD
+											, TRIM(  #{rm.sabun} )			AS SABUN
+											, TRIM(  #{rm.appEnterCd} )		AS APP_ENTER_CD
+											, TRIM(  #{rm.appSabun} )		AS APP_SABUN
+											, TRIM(  #{rm.ldsCompetencyCd} )	AS LDS_COMPETENCY_CD
+											, TRIM(  #{rm.seq} )				AS SEQ
+											, TRIM(  #{rm.appResult} )		AS APP_RESULT
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.COMP_APPRAISAL_CD IS NOT NULL
+										  AND A.W_ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.APP_ENTER_CD IS NOT NULL
+										  AND A.APP_SABUN IS NOT NULL
+										  AND A.LDS_COMPETENCY_CD IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+							) S
+					ON ( 	T.ENTER_CD 			= S.ENTER_CD
+						AND T.COMP_APPRAISAL_CD = S.COMP_APPRAISAL_CD
+						AND T.W_ENTER_CD 		= S.W_ENTER_CD
+						AND T.SABUN 			= S.SABUN
+						AND T.APP_ENTER_CD 		= S.APP_ENTER_CD
+						AND T.APP_SABUN 		= S.APP_SABUN
+						AND T.LDS_COMPETENCY_CD = S.LDS_COMPETENCY_CD
+						AND T.SEQ 				= S.SEQ )
+
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APP_RESULT  	= S.APP_RESULT
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+        </update>
+
+		<update parameterType="map" id="saveCompAppraisalPop2">
+
+				<![CDATA[
+					UPDATE TPAP527 SET
+						A_COMMENT = #{aComment}, C_COMMENT = #{cComment}, CHKDATE = SYSDATE, CHKID = #{ssnSabun}
+					WHERE ENTER_CD = #{ssnEnterCd}
+						AND W_ENTER_CD = #{searchWEnterCd}
+						AND COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+						AND SABUN = #{searchEmpId}
+						AND APP_ENTER_CD = #{searchAppEnterCd}
+						AND APP_SABUN = #{searchAppEmpId}
+				]]>
+
+
+        </update>
+
+		<update parameterType="map" id="saveCompAppraisalPop3">
+
+				<![CDATA[
+					UPDATE TPAP527 SET
+						LDS_APP_STATUS_CD = 'Y', CHKDATE = SYSDATE, CHKID = #{ssnSabun}
+					WHERE ENTER_CD = #{ssnEnterCd}
+					 	AND W_ENTER_CD = #{searchWEnterCd}
+						AND COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+						AND SABUN = #{searchEmpId}
+						AND APP_ENTER_CD = #{searchAppEnterCd}
+						AND APP_SABUN = #{searchAppEmpId}
+				]]>
+
+
+        </update>
+		
+		<select parameterType="map" resultType="cMap" id="getCompAppraisalCommentPopMap">
+
+				<![CDATA[
+					SELECT A.A_COMMENT
+					     , A.C_COMMENT
+					  FROM TPAP529 A
+						 , TPAP533 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.LDS_COMPETENCY_CD = B.LDS_COMPETENCY_CD
+					   AND A.SEQ = B.SEQ
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.W_ENTER_CD = #{searchWEnterCd}
+					   AND A.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+					   AND A.SABUN = #{searchSabun}
+					   AND A.APP_ENTER_CD = #{searchAppEnterCd}
+					   AND A.APP_SABUN = #{searchAppSabun}
+					   AND A.LDS_COMPETENCY_CD = #{searchLdsCompetencyCd}
+					   AND A.SEQ = #{searchSeq}
+				]]>
+
+
+		</select>
+		
+		<update parameterType="map" id="updateCompAppraisalCommentPop">
+
+				<![CDATA[
+					UPDATE TPAP529
+					   SET A_COMMENT = #{aComment}
+					     , C_COMMENT = #{cComment}
+					     , CHKDATE   = SYSDATE
+					     , CHKID     = #{ssnSabun}
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND W_ENTER_CD = #{searchWEnterCd}
+					   AND COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+					   AND SABUN = #{searchSabun}
+					   AND APP_ENTER_CD = #{searchAppEnterCd}
+					   AND APP_SABUN = #{searchAppSabun}
+					   AND LDS_COMPETENCY_CD = #{searchLdsCompetencyCd}
+					   AND SEQ = #{searchSeq}
+				]]>
+
+
+        </update>
+		
+		<select parameterType="map" resultType="cMap" id="getCompAppraisalCdMap">
+
+				<![CDATA[
+					SELECT A.COMP_APPRAISAL_NM
+					     , TO_CHAR(TO_DATE(A.APP_S_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS APP_S_YMD
+					     , TO_CHAR(TO_DATE(A.APP_E_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS APP_E_YMD
+					     , B.ENTER_NM
+					     , B.ENTER_ENG_NM
+					  FROM TPAP521 A
+					     , TORG900 B
+					 WHERE A.ENTER_CD 		   = B.ENTER_CD(+)
+					   AND A.ENTER_CD 		   = TRIM(#{ssnEnterCd})
+					   AND A.COMP_APPRAISAL_CD = TRIM(#{searchCompAppraisalCd})
+				]]>
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getCompAppraisalMailInfoMap">
+
+				<![CDATA[
+					SELECT SABUN
+					     , CONT_ADDRESS
+					  FROM THRM124
+					 WHERE ENTER_CD  = TRIM(#{ssnEnterCd})
+					   AND SABUN     = TRIM(#{appSabun})
+					   AND CONT_TYPE = 'IM'
+				]]>
+
+
+		</select>
+</mapper>

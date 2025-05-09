@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.capacity.orgCapaPlanApp">
+        
+        <select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppInfo">
+
+				<![CDATA[
+					SELECT ORG_CD, ORG_NM, MANAGE_NM, WORK_TYPE_NM, JIKWEE_NM, LOCATION_NM, COUNT(SABUN) AS CNT
+					FROM (
+					      SELECT ENTER_CD
+					           , MANAGE_CD
+					           , WORK_TYPE
+					           , JIKWEE_CD
+					           , MANAGE_NM
+					           , WORK_TYPE_NM
+					           , JIKWEE_NM
+					           , F_COM_GET_MAP_NM(A.ENTER_CD, '600', A.SABUN) AS LOCATION_NM
+					           , A.SABUN
+					           , A.ORG_CD
+                               , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+					      FROM THRM151 A
+					      WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					        AND STATUS_CD != 'RA' 
+					        AND ORG_CD IN (SELECT  TRIM(#{orgCd}) AS ORG_CD
+                                             FROM DUAL
+                                             UNION ALL
+                                             SELECT ORG_CD
+                                             FROM (
+                                               SELECT X.ORG_CD
+                                               FROM TORG105 X
+                                               WHERE X.ENTER_CD =  TRIM(#{ssnEnterCd})
+                                                 AND X.SDATE = (SELECT MAX(SDATE)
+                                                                 FROM TORG105
+                                                                 WHERE ENTER_CD = X.ENTER_CD
+                                                                   AND ORG_CD = X.ORG_CD
+                                                                   AND SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD'))
+                                               START WITH X.PRIOR_ORG_CD =  TRIM(#{orgCd})
+                                               CONNECT BY PRIOR X.ENTER_CD = X.ENTER_CD
+                                                AND PRIOR X.SDATE = X.SDATE
+                                                AND PRIOR X.ORG_CD = X.PRIOR_ORG_CD
+                                               ORDER SIBLINGS BY X.PRIOR_ORG_CD, X.SEQ
+                                             ))
+					)        
+					GROUP BY ENTER_CD, ORG_CD, ORG_NM, MANAGE_CD, WORK_TYPE, JIKWEE_CD, MANAGE_NM, WORK_TYPE_NM, JIKWEE_NM, LOCATION_NM  
+					ORDER BY ORG_CD
+					        ,F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H10030', MANAGE_CD)
+					        ,F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H10050', WORK_TYPE)
+					        ,F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20030', JIKWEE_CD)
+				]]>
+
+
+		</select>
+		
+		
+<!-- 인력충원요청 조회 -->
+	<!-- 인력충원요청 삭제 HR 4.0 이관 반영하면서 id값 수정(뒤에 _ 붙임) -->
+		<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppList_">
+
+				<![CDATA[
+					SELECT  A.ENTER_CD
+					      , '0' AS IBS_IMAGE
+			              , NVL(A.NOW_CNT1,0) + NVL(A.NOW_CNT2,0) AS TOT_NOW_CNT
+			              , NVL(A.REQ_CNT1,0) + NVL(A.REQ_CNT2,0) AS TOT_REQ_CNT
+			              , NVL(A.NOW_CNT1,0) + NVL(A.NOW_CNT2,0) + NVL(A.REQ_CNT1,0) + NVL(A.REQ_CNT2,0) AS TOT_AFT_CNT
+					   	  , B.APPL_YMD
+					   	  , B.APPL_STATUS_CD
+              			  , B.APPL_IN_SABUN
+					   	  , A.APPL_SEQ
+					   	  , A.PLAN_YM
+					   	  , NVL((
+				      		  SELECT B.ORG_JIK_CNT
+				            	FROM THRM313 B
+				           	   WHERE B.ENTER_CD = A.ENTER_CD
+				                 AND B.ORG_CD = A.ORG_CD 
+				             	 AND SUBSTR(B.SDATE,0,4) = SUBSTR(A.PLAN_YM,0,4)
+			       			),0) AS ORG_TO_CNT
+                		  , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, B.APPL_YMD) AS ORG_NM
+					  FROM THRM328 A
+						  ,THRI103 B		
+					WHERE A.ENTER_CD = B.ENTER_CD
+					  AND A.APPL_SEQ = B.APPL_SEQ
+					  AND A.ENTER_CD = #{ssnEnterCd}
+					  AND B.APPL_SABUN = TRIM( #{sabun} )
+					ORDER BY B.APPL_STATUS_CD,B.CHKDATE DESC 
+				]]>
+
+
+		</select>
+		
+<!-- 인력충원요청 삭제 -->
+		<delete parameterType="map" id="deleteOrgCapaPlanApp103">
+
+					DELETE FROM THRI103
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 인력충원요청 삭제 -->
+		<delete parameterType="map" id="deleteOrgCapaPlanApp328">
+
+					DELETE FROM THRM328
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+	<!-- 인력충원요청 삭제 HR 4.0 이관 START -->
+	<!-- 인력충원요청 조회 -->
+	<select parameterType="map" resultType="cMap" id="getOrgCapaPlanAppList">
+
+			<![CDATA[
+				SELECT A.REQ_GUBUN
+					 , A.REQ_CNT
+					 , B.APPL_SEQ
+					 , B.APPL_YMD
+					 , B.APPL_SABUN
+					 , B.APPL_IN_SABUN
+					 , B.APPL_STATUS_CD
+					 , DECODE(B.APPL_STATUS_CD, '11', '1', '0') AS SHTCOL_EDIT
+					 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+					 , (SELECT TITLE FROM THRM330 WHERE ENTER_CD = A.ENTER_CD AND APPL_SEQ = A.APPL_SEQ) AS TITLE
+					 , '0' AS DETAIL
+				FROM (SELECT ENTER_CD
+						   , APPL_SEQ
+						   , SABUN
+						   , REQ_GUBUN
+						   , SUM(REQ_CNT) AS REQ_CNT
+					  FROM THRM329 A
+					  GROUP BY ENTER_CD, APPL_SEQ, SABUN, REQ_GUBUN
+				) A
+				   , THRI103 B
+				WHERE A.ENTER_CD     = #{ssnEnterCd}
+				  AND A.ENTER_CD     = B.ENTER_CD
+				  AND A.APPL_SEQ     = B.APPL_SEQ
+				  AND A.SABUN        = TRIM( #{sabun} )
+				ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+			]]>
+
+
+		</select>
+
+	<delete parameterType="map" id="deleteOrgCapaPlanApp1">
+					DELETE FROM THRM329
+					 WHERE ENTER_CD  = #{ssnEnterCd}
+					   AND APPL_SEQ  IN  (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+									<if test='rm.applSeq != null and !rm.applSeq.equals("")'>
+										TRIM( #{rm.applSeq} )
+									</if>
+</foreach>
+										)
+	</delete>
+
+	<delete parameterType="map" id="deleteOrgCapaPlanApp2">
+					DELETE FROM THRM330
+					 WHERE ENTER_CD  = #{ssnEnterCd}
+					   AND APPL_SEQ  IN  (  NULL
+<foreach item="rm" collection="deleteRows" >
+						 ,
+						 <if test='rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{rm.applSeq} )
+						 </if>
+ </foreach>
+										)
+	</delete>
+	<!-- 인력충원요청 삭제 HR 4.0 이관 END -->
+
+</mapper>

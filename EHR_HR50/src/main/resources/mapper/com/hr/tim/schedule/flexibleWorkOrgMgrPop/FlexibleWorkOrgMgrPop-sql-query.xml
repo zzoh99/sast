@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.flexibleWorkOrgMgrPop">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrPopList1">
+
+				<![CDATA[
+					SELECT 	  AUTH_SCOPE_CD
+							, AUTH_SCOPE_NM
+							, SCOPE_TYPE
+							, PRG_URL
+							, SQL_SYNTAX
+							, TABLE_NM
+					FROM	TSYS315 C
+					WHERE	ENTER_CD = #{ssnEnterCd}
+					  AND	AUTH_SCOPE_CD IN ('W10')		-- 근무제 대상자 권한범위는 조직만 가능.
+					ORDER BY AUTH_SCOPE_NM
+				]]>
+
+
+		</select>
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrPopList2">
+
+				<![CDATA[
+					SELECT 	  B.SCOPE_VALUE
+							, B.SCOPE_VALUE_NM
+							, DECODE(A.ENTER_CD, '', '0', '1') AS CHK
+					FROM   TTIM223 A, ${query} B
+					WHERE  A.ENTER_CD(+) = #{ssnEnterCd}
+					   AND A.SCOPE_CD(+) = #{searchAuthScopeCd}
+					   AND A.USE_GUBUN(+) = #{searchUseGubun}
+					   AND A.ITEM_VALUE1(+) = #{searchItemValue1}
+					   AND A.ITEM_VALUE2(+) = #{searchItemValue2}
+					   AND A.ITEM_VALUE3(+) = #{searchItemValue3}
+					   AND A.SCOPE_VALUE(+) = B.SCOPE_VALUE
+					 ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrPopList3">
+
+				<![CDATA[
+					SELECT 	LEVEL AS "_level",
+					    		PRIOR_ORG_CD AS SCOPE_VALUE_TOP,
+					    		ORG_CD AS SCOPE_VALUE,
+					    		F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS SCOPE_VALUE_NM,
+					    	   	DECODE((SELECT COUNT(*) FROM TTIM223 WHERE ENTER_CD = A.ENTER_CD AND SCOPE_VALUE = A.ORG_CD AND USE_GUBUN = #{searchUseGubun} AND ITEM_VALUE1 = #{searchItemValue1} AND ITEM_VALUE2 = #{searchItemValue2} AND ITEM_VALUE3 = #{searchItemValue3} AND SCOPE_CD = #{searchAuthScopeCd} ), 0, 0, 1) AS CHK
+					    FROM TORG105 A
+					    WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					    AND A.SDATE = (
+					        SELECT MAX(SDATE)
+					        FROM TORG103
+					        WHERE ENTER_CD = A.ENTER_CD
+					          AND SDATE <= REPLACE(#{stdDate},'-','')
+					    )
+					    START WITH A.PRIOR_ORG_CD = '0'
+					    CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+						AND PRIOR A.SDATE = A.SDATE
+						AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+						ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrPopList4">
+
+				<![CDATA[
+				SELECT LVL AS "_level", ORG_CHART_NM, SDATE, PRIOR_ORG_CD, ORG_CD, ORG_NM, DIRECT_YN, SEQ,
+					ORG_CHIEF_SABUN, ORG_CHIEF_NAME, '0' AS EMP_CNT1, '0' AS EMP_CNT2
+				FROM (SELECT LEVEL AS LVL, A.ORG_CHART_NM, A.SDATE, A.PRIOR_ORG_CD, A.ORG_CD,
+						   F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, REPLACE(#{searchBaseDate}, '-', '')) AS ORG_NM,
+						   A.DIRECT_YN, A.SEQ,
+				       F_ORG_GET_CHIEF_SABUN(A.ENTER_CD, A.ORG_CD, REPLACE(#{searchBaseDate}, '-', '')) AS ORG_CHIEF_SABUN,
+				       F_ORG_GET_CHIEF_NAME(A.ENTER_CD, A.ORG_CD, REPLACE(#{searchBaseDate}, '-', '')) AS ORG_CHIEF_NAME
+				       --,F_ORG_GET_EMP_CNT2(A.ENTER_CD, A.ORG_CD, REPLACE(#{searchBaseDate}, '-', '')) AS EMP_CNT1
+				  FROM TORG105 A,
+				  (
+				    SELECT *
+				    FROM TORG103
+				    WHERE ENTER_CD = #{ssnEnterCd}
+				          AND REPLACE(#{searchSdate}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				    ) B
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SDATE = REPLACE(#{searchSdate}, '-', '')
+				--조직체계도------------------------------------------------------
+				   AND A.ENTER_CD = B.ENTER_CD
+				   --AND A.ORG_CHART_NM = B.ORG_CHART_NM
+				   AND A.SDATE = B.SDATE
+				------------------------------------------------------------------
+				--부서--------------------------
+				 START WITH A.PRIOR_ORG_CD = '0'
+				 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					AND PRIOR A.SDATE = A.SDATE
+					AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+				 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ )
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrPopList5">
+
+				<![CDATA[
+					SELECT A.NAME AS SCOPE_VALUE_NM, A.SABUN AS SCOPE_VALUE
+					      ,B.JIKWEE_NM
+					      ,B.JIKCHAK_NM
+					      ,B.JIKGUB_NM
+					      ,F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN, REPLACE(#{searchBaseDate}, '-', '')) AS ORG_NM
+					      , B.MANAGE_NM,
+					      CASE WHEN A.NAME = F_ORG_GET_CHIEF_NAME(B.ENTER_CD,B.ORG_CD,TO_CHAR(SYSDATE,'YYYYMMDD')) THEN 0 ELSE 1 END HEAD_YN,
+					        DECODE((
+					        SELECT COUNT(*)
+					        FROM TTIM223
+					        WHERE ENTER_CD = A.ENTER_CD
+					          AND SCOPE_VALUE = A.SABUN
+					          AND USE_GUBUN = #{searchUseGubun}
+					          AND ITEM_VALUE1 = #{searchItemValue1}
+					          AND ITEM_VALUE2 = #{searchItemValue2}
+					          AND ITEM_VALUE3 = #{searchItemValue3}
+					          AND SCOPE_CD = 'W20' ), 0, 0, 1) AS CHK
+					  FROM  THRM100 A,(SELECT *
+					                 FROM     THRM151
+					                WHERE     ENTER_CD = #{ssnEnterCd}
+					                AND REPLACE(#{searchBaseDate}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231'))  B,
+					         TSYS005 C
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND B.ORG_CD = TRIM(#{searchOrgCd})
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN =B.SABUN
+					   AND B.STATUS_CD NOT IN ('RA','RAA')
+					   AND B.ENTER_CD = C.ENTER_CD(+)
+					   AND B.MANAGE_CD = C.CODE(+)
+					   AND C.GRCODE_CD(+)='H10030'
+					   --AND NVL(C.NOTE1,'N') = 'Y'
+					   ORDER BY B.JIKCHAK_CD, F_COM_GET_GRCODE_SEQ(B.ENTER_CD, 'H20010',B.JIKGUB_CD), C.SEQ
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrPopList6">
+
+				<![CDATA[
+					SELECT A.NAME AS SCOPE_VALUE_NM, A.SABUN AS SCOPE_VALUE, B.JIKWEE_NM, B.JIKCHAK_NM, B.JIKGUB_NM, F_COM_GET_ORG_NM2(A.ENTER_CD,A.SABUN, REPLACE(#{searchBaseDate}, '-', '')) AS ORG_NM, B.MANAGE_NM, --A.PART_NM,
+					  DECODE((
+					        SELECT COUNT(*)
+					        FROM TTIM223
+					        WHERE ENTER_CD = A.ENTER_CD
+					          AND SCOPE_VALUE = A.SABUN
+					          AND USE_GUBUN = #{searchUseGubun}
+					          AND ITEM_VALUE1 = #{searchItemValue1}
+					          AND ITEM_VALUE2 = #{searchItemValue2}
+					          AND ITEM_VALUE3 = #{searchItemValue3}
+					          AND SCOPE_CD = 'W20' ), 0, 0, 1) AS CHK
+					  FROM  THRM100 A,(SELECT *
+					                 FROM   THRM151
+					                WHERE   ENTER_CD = #{ssnEnterCd}
+					                AND REPLACE(#{searchBaseDate}, '-','') BETWEEN SDATE AND NVL(EDATE, '99991231'))  B,
+							 TSYS005 C
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND B.ORG_CD IN (SELECT TRIM(#{searchOrgCd})
+										  FROM DUAL
+										 UNION
+										SELECT ORG_CD
+										  FROM TORG105
+										 WHERE ENTER_CD = #{ssnEnterCd}
+										   AND ORG_CHART_NM = #{searchOrgChartNm}
+										   AND SDATE = REPLACE(#{searchSdate}, '-', '')
+										 START WITH PRIOR_ORG_CD = TRIM(#{searchOrgCd})
+										 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+											 AND PRIOR ORG_CHART_NM = ORG_CHART_NM
+											 AND PRIOR SDATE = SDATE
+											 AND PRIOR ORG_CD = PRIOR_ORG_CD )
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN =B.SABUN
+					   AND B.STATUS_CD NOT IN ('RA','RAA')
+					   AND B.ENTER_CD = C.ENTER_CD(+)
+					   AND B.MANAGE_CD = C.CODE(+)
+					   AND C.GRCODE_CD(+)='H10030'
+					   ORDER BY B.JIKCHAK_CD, F_COM_GET_GRCODE_SEQ(B.ENTER_CD, 'H20010',B.JIKGUB_CD), C.SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getFlexibleWorkOrgMgrPopTempQueryMap">
+
+				<![CDATA[
+					 SELECT F_COM_GET_SQL_AUTH_SCOPE(#{ssnEnterCd},#{searchAuthScopeCd}) AS query FROM DUAL
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveFlexibleWorkOrgMgrPop">
+
+					MERGE INTO TTIM223 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.USE_GUBUN
+									, A.ITEM_VALUE1
+									, A.ITEM_VALUE2
+									, A.ITEM_VALUE3
+									, A.SCOPE_CD
+									, A.SCOPE_VALUE
+									, A.SCOPE_VALUE_NM
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS USE_GUBUN
+											, NULL		AS ITEM_VALUE1
+											, NULL		AS ITEM_VALUE2
+											, NULL		AS ITEM_VALUE3
+											, NULL		AS SCOPE_CD
+											, NULL		AS SCOPE_VALUE
+											, NULL		AS SCOPE_VALUE_NM
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}                 AS ENTER_CD
+											, #{searchUseGubun}	    	AS USE_GUBUN
+											, #{searchItemValue1}	    	AS ITEM_VALUE1
+											, #{searchItemValue2}	    	AS ITEM_VALUE2
+											, #{searchItemValue3}	        AS ITEM_VALUE3
+											, #{searchAuthScopeCd}	    AS SCOPE_CD
+											, TRIM( #{rm.scopeValue} )	AS SCOPE_VALUE
+											, TRIM(#{rm.scopeValueNm}) AS SCOPE_VALUE_NM
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON (    T.ENTER_CD   		= S.ENTER_CD
+					AND     T.USE_GUBUN        = S.USE_GUBUN
+					AND     T.ITEM_VALUE1      = S.ITEM_VALUE1
+					AND     T.ITEM_VALUE2      = S.ITEM_VALUE2
+					AND     T.ITEM_VALUE3      = S.ITEM_VALUE3
+					AND     T.SCOPE_CD         = S.SCOPE_CD
+					AND     T.SCOPE_VALUE      = S.SCOPE_VALUE
+					)
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.USE_GUBUN
+							, T.ITEM_VALUE1
+							, T.ITEM_VALUE2
+							, T.ITEM_VALUE3
+							, T.SCOPE_CD
+							, T.SCOPE_VALUE
+							, T.SCOPE_VALUE_NM
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.USE_GUBUN
+							, S.ITEM_VALUE1
+							, S.ITEM_VALUE2
+							, S.ITEM_VALUE3
+							, S.SCOPE_CD
+							, S.SCOPE_VALUE
+							, S.SCOPE_VALUE_NM
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteFlexibleWorkOrgMgrPop">
+
+					DELETE FROM TTIM223
+					WHERE 	(ENTER_CD,USE_GUBUN,ITEM_VALUE1,ITEM_VALUE2,ITEM_VALUE3,SCOPE_CD,SCOPE_VALUE) IN 	(  (NULL,NULL,NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										, #{searchUseGubun}
+										, #{searchItemValue1}
+										, #{searchItemValue2}
+										, #{searchItemValue3}
+										, #{searchAuthScopeCd}
+										<if test=' rm.scopeValue != null and !rm.scopeValue.equals("")'>
+										,	TRIM( #{rm.scopeValue} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+
+</mapper>

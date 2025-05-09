@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.commonApproval.comApr">
+	
+<!-- SEQ -->
+		<select parameterType="map" resultType="cMap" id="getComAprSeqList">
+
+				<![CDATA[
+				    SELECT A.CODE AS SEQ
+				         , B.COLUMN_TYPE_CD
+					     , B.SEARCH_ITEM_CD
+					     , B.POPUP_ITEM_CD
+				      FROM TSYS005 A, THRI804 B
+					 WHERE A.ENTER_CD  	= TRIM(#{ssnEnterCd})
+                       AND A.GRCODE_CD 	= 'Z80230'
+                       AND A.USE_YN     = 'Y' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.S_YMD AND A.E_YMD
+                       AND A.ENTER_CD = B.ENTER_CD(+)
+                       AND TRIM(#{searchApplCd}) = B.APPL_CD(+)
+                       AND A.CODE = B.LAYOUT_SEQ(+)
+                     ORDER BY TO_NUMBER(CODE)  
+				]]>
+
+
+		</select>
+	
+	
+	
+		<select parameterType="map" resultType="cMap" id="getComAprList">
+
+				<![CDATA[
+
+					   SELECT A.ENTER_CD
+							, A.APPL_SEQ
+							, A.SABUN
+							, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+							, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+
+							, A.TITLE
+							, A.NOTE
+							      ]]>
+<foreach item="tSeq" collection="seqList" >
+							, DATA${tSeq.seq}
+							, CASE WHEN #{tSeq.columnTypeCd} = 'Combo' THEN F_HRI_GET_SEARCH_CODE_NM( A.ENTER_CD, #{tSeq.searchItemCd}, DATA${tSeq.seq})
+							       WHEN #{tSeq.columnTypeCd} = 'Popup' AND #{tSeq.popupItemCd} = 'emp' THEN F_COM_GET_NAMES( A.ENTER_CD, DATA${tSeq.seq})
+							       WHEN #{tSeq.columnTypeCd} = 'Popup' AND #{tSeq.popupItemCd} = 'org' THEN F_COM_GET_ORG_NM( A.ENTER_CD, DATA${tSeq.seq}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+							       ELSE '' END AS DATA_NM${tSeq.seq}
+</foreach>
+							, B.APPL_CD
+							, B.APPL_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+							, B.APPL_STATUS_CD
+							, '0' AS DETAIL
+
+							, CASE WHEN B.APPL_STATUS_CD = '99' THEN '1' ELSE '0' END AS SHTCOL_EDIT
+
+					     FROM THRI811 A, THRI103 B
+					    WHERE A.ENTER_CD   = #{ssnEnterCd}
+					      AND A.ENTER_CD   = B.ENTER_CD
+					      AND A.APPL_SEQ   = B.APPL_SEQ
+					      AND B.APPL_STATUS_CD NOT IN ('11')
+
+<if test='searchFrom != null and !searchFrom.equals("") and searchTo != null and !searchTo.equals("")'>
+					      AND B.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchApplCd != null and !searchApplCd.equals("")'>
+					      AND B.APPL_CD = #{searchApplCd}
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					     AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC
+		</select>
+		
+<!-- 헤더 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAprTitleList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_CD
+					     , A.SEQ
+					     , A.COLUMN_NM
+					     , A.COLUMN_TYPE_CD
+					     , A.COLUMN_FORMAT
+					     , A.COLUMN_WIDTH
+                         , A.COLUMN_ALIGN
+					     , A.MAX_LENGTH
+					     , A.KEYFIELD_YN
+					     , A.DEF_GUBUN
+					     , A.DEF_VALUE
+					     , A.SEARCH_ITEM_CD
+					     , A.POPUP_ITEM_CD
+					     , A.LAYOUT_SEQ
+					  FROM THRI804 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPL_CD  = TRIM(#{searchApplCd})
+					           ]]>
+<if test='searchGubun != null and searchGubun.equals("APP")'>
+                       AND NVL(A.APP_VIEW_YN, 'N') = 'Y'
+</if>
+<if test='searchGubun != null and searchGubun.equals("APR")'>
+                       AND NVL(A.APR_VIEW_YN, 'N') = 'Y'
+</if>
+					 ORDER BY A.LAYOUT_SEQ
+
+
+		</select>
+		
+		<update parameterType="map" id="saveComApr">
+
+                    MERGE INTO THRI811 T
+					USING
+					(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+						    SELECT TRIM(#{ssnEnterCd})			AS	ENTER_CD
+						         , TRIM(#{rm.applSeq})			AS	APPL_SEQ
+						         , TRIM(#{rm.sabun})			AS	SABUN
+
+                                 , TRIM(#{rm.note})				AS	NOTE
+						      FROM DUAL
+</foreach>
+
+					) S
+					ON	(
+							T.ENTER_CD	=	S.ENTER_CD
+						AND	T.APPL_SEQ	=	S.APPL_SEQ
+						AND	T.SABUN   	=	S.SABUN
+					)
+
+					WHEN MATCHED THEN
+						UPDATE SET T.NOTE			=	S.NOTE
+							     , T.CHKDATE		=	sysdate
+							     , T.CHKID			=	#{ssnSabun}
+		</update>
+
+</mapper>

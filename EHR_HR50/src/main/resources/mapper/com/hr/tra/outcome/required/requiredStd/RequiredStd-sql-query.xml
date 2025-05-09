@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.required.requiredStd">
+
+		<select id="getRequiredStdList" parameterType="map" resultType="cMap">
+			
+				<![CDATA[
+				SELECT * FROM (
+					SELECT A.ENTER_CD
+					     , A.YEAR
+					     , A.SEQ
+					     , A.GUBUN_CD
+					     , A.ORDER_SEQ
+					     , A.JIKGUB_CD
+					     , A.JIKGUB_YEAR
+					     , A.JOB_CD
+					     , A.SEARCH_SEQ
+					     , A.YM
+					     , A.ST_MON
+					     , A.ED_MON
+					     , A.EDU_SEQ
+					     , A.EDU_LEVEL
+					     , A.NOTE
+						 , ( SELECT X.EDU_COURSE_NM
+						       FROM TTRA101 X
+						      WHERE X.ENTER_CD  = A.ENTER_CD
+						        AND X.EDU_SEQ   = A.EDU_SEQ
+						    ) AS EDU_COURSE_NM
+				     	 , ( SELECT X.JOB_NM
+					           FROM TORG201 X
+					          WHERE X.ENTER_CD = A.ENTER_CD
+					            AND X.JOB_CD   = A.JOB_CD
+					            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL( X.EDATE, '99991231' ) ) AS JOB_NM 
+						 , ( SELECT X.SEARCH_DESC
+						       FROM THRI201 X
+						      WHERE X.ENTER_CD   = A.ENTER_CD
+						        AND X.SEARCH_SEQ = A.SEARCH_SEQ
+						    ) AS SEARCH_DESC
+					  FROM TTRA160 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				       AND A.YEAR = TRIM( #{searchYear} )  ]]>
+<if test="searchGubunCd != null and searchGubunCd neq ''">
+						AND A.GUBUN_CD = TRIM( #{searchGubunCd} )
+</if>
+<if test="searchJikgubCd != null and searchJikgubCd neq ''">
+				       AND A.JIKGUB_CD = TRIM( #{searchJikgubCd} ) 
+</if>
+<if test="searchEduLevel != null and searchEduLevel neq ''">
+				       AND A.EDU_LEVEL = TRIM( #{searchEduLevel} ) 
+</if>
+					) A
+				WHERE 1=1
+						
+<if test="searchJobNm != null and searchJobNm neq ''">
+			       AND A.JOB_NM LIKE '%' || TRIM( #{searchJobNm} ) || '%'
+</if>
+<if test="searchEduCourseNm != null and searchEduCourseNm neq ''">
+				   AND A.EDU_COURSE_NM LIKE '%' || TRIM( #{searchEduCourseNm} ) || '%'
+</if>
+				ORDER BY F_COM_GET_GRCODE_SEQ( A.ENTER_CD, 'L16010', A.GUBUN_CD)
+				            , A.ORDER_SEQ
+		</select>
+		
+<!-- 저장 -->
+		<update parameterType="map" id="saveRequiredStd">
+					 MERGE INTO TTRA160 T 
+					 USING 
+					( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+					       SELECT TRIM(#{ssnEnterCd}) 	 	AS  ENTER_CD 
+					            , TRIM(#{searchYear})  		AS  YEAR
+					            , TRIM(#{rm.seq})  			AS  SEQ
+					            , TRIM(#{rm.gubunCd})  		AS  GUBUN_CD
+					            , TRIM(#{rm.orderSeq})  	AS  ORDER_SEQ
+					            , TRIM(#{rm.jikgubCd})  	AS  JIKGUB_CD
+					            , TRIM(#{rm.jikgubYear})  	AS  JIKGUB_YEAR
+					            , TRIM(#{rm.jobCd})  		AS  JOB_CD
+					            , TRIM(#{rm.searchSeq})  	AS  SEARCH_SEQ
+					            , TRIM(#{rm.ym})  			AS  YM
+					            , TRIM(#{rm.stMon})  		AS  ST_MON
+					            , TRIM(#{rm.edMon})  		AS  ED_MON
+					            , TRIM(#{rm.eduSeq})  		AS  EDU_SEQ
+					            , TRIM(#{rm.note})  		AS  NOTE
+					            , TRIM(#{rm.eduLevel})  	AS  EDU_LEVEL
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.YEAR 		= S.YEAR 
+					     AND  T.SEQ 		= S.SEQ 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun} 
+					            , T.GUBUN_CD 		= S.GUBUN_CD 
+					            , T.ORDER_SEQ 		= S.ORDER_SEQ 
+					            , T.JIKGUB_CD 		= S.JIKGUB_CD 
+					            , T.JIKGUB_YEAR 	= S.JIKGUB_YEAR 
+					            , T.JOB_CD 			= S.JOB_CD 
+					            , T.SEARCH_SEQ 		= S.SEARCH_SEQ 
+					            , T.YM 				= S.YM 
+					            , T.ST_MON 			= S.ST_MON 
+					            , T.ED_MON 			= S.ED_MON 
+					            , T.EDU_SEQ 		= S.EDU_SEQ 
+					            , T.NOTE 			= S.NOTE 
+					            , T.EDU_LEVEL 		= S.EDU_LEVEL 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.YEAR
+					            , T.SEQ
+					            , T.GUBUN_CD
+					            , T.ORDER_SEQ
+					            , T.JIKGUB_CD
+					            , T.JIKGUB_YEAR
+					            , T.JOB_CD
+					            , T.SEARCH_SEQ
+					            , T.YM
+					            , T.ST_MON
+					            , T.ED_MON
+					            , T.EDU_SEQ
+					            , T.NOTE
+					            , T.EDU_LEVEL
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.YEAR
+					            , S_TTRA160.NEXTVAL
+					            , S.GUBUN_CD
+					            , S.ORDER_SEQ
+					            , S.JIKGUB_CD
+					            , S.JIKGUB_YEAR
+					            , S.JOB_CD
+					            , S.SEARCH_SEQ
+					            , S.YM
+					            , S.ST_MON
+					            , S.ED_MON
+					            , S.EDU_SEQ
+					            , S.NOTE
+					            , S.EDU_LEVEL
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+		</update>
+
+<!-- 전년도 복사 저장 -->
+		<update parameterType="map" id="saveRequiredStdYear">
+					 MERGE INTO TTRA160 T 
+					 USING 
+					( 
+					       SELECT TRIM(#{ssnEnterCd}) AS  ENTER_CD 
+					            , TRIM(#{searchYear}) AS  YEAR
+					            , NULL  			AS  SEQ
+					            , GUBUN_CD 			AS  GUBUN_CD
+					            , ORDER_SEQ 		AS  ORDER_SEQ
+					            , JIKGUB_CD 		AS  JIKGUB_CD
+					            , JIKGUB_YEAR  		AS  JIKGUB_YEAR
+					            , JOB_CD  			AS  JOB_CD
+					            , SEARCH_SEQ  		AS  SEARCH_SEQ
+					            , YM  				AS  YM
+					            , ST_MON  			AS  ST_MON
+					            , ED_MON  			AS  ED_MON
+					            , EDU_SEQ 			AS  EDU_SEQ
+					            , NOTE  			AS  NOTE
+					            , EDU_LEVEL  		AS  EDU_LEVEL
+					        FROM TTRA160
+					       WHERE YEAR = TO_NUMBER( TRIM(#{searchYear}) ) - 1
+					         AND ENTER_CD = TRIM(#{ssnEnterCd})
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.YEAR 		= S.YEAR 
+					     AND  T.SEQ 		= S.SEQ 
+					) 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.YEAR
+					            , T.SEQ
+					            , T.GUBUN_CD
+					            , T.ORDER_SEQ
+					            , T.JIKGUB_CD
+					            , T.JIKGUB_YEAR
+					            , T.JOB_CD
+					            , T.SEARCH_SEQ
+					            , T.YM
+					            , T.ST_MON
+					            , T.ED_MON
+					            , T.EDU_SEQ
+					            , T.NOTE
+					            , T.EDU_LEVEL
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.YEAR
+					            , S_TTRA160.NEXTVAL
+					            , S.GUBUN_CD
+					            , S.ORDER_SEQ
+					            , S.JIKGUB_CD
+					            , S.JIKGUB_YEAR
+					            , S.JOB_CD
+					            , S.SEARCH_SEQ
+					            , S.YM
+					            , S.ST_MON
+					            , S.ED_MON
+					            , S.EDU_SEQ
+					            , S.NOTE
+					            , S.EDU_LEVEL
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+		</update>
+		
+<!-- 삭제 -->		
+		<delete parameterType="map" id="deleteRequiredStd">
+					DELETE FROM TTRA160
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+					   AND ( YEAR,SEQ ) IN ( ( NULL,NULL) 
+			<foreach item="rm" collection="deleteRows">
+			    <if test="rm.year != null and rm.year neq '' and rm.seq != null and rm.seq neq ''">
+					     , ( TRIM( #{rm.year} ),TRIM( #{rm.seq} ) ) 
+			    </if>
+			</foreach>
+					       )
+		</delete>
+		
+	<!-- 대상년도 기준 전체 삭제 -->		
+		<delete parameterType="map" id="deleteRequiredStdYear">
+				<![CDATA[
+					DELETE FROM TTRA160
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+					   AND YEAR     = TRIM(#{searchYear})
+					   AND EXISTS ( SELECT 1
+					                  FROM TTRA160 X
+					                 WHERE X.ENTER_CD = TRIM(#{ssnEnterCd}) 
+					                   AND X.YEAR     = TO_NUMBER( TRIM(#{searchYear}) ) - 1 ) 
+				]]>
+		</delete>
+		
+<!-- 회차생성 프로시저 -->	
+         <update id="prcRequiredStdEvt" parameterType="map" statementType="CALLABLE">
+         <![CDATA[
+			{CALL P_TRA_REQUIRED_EVT_CRE(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchYear,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+       </update>
+</mapper>

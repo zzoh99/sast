@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.scheduler">
+		
+	<select id="getSendDataList" resultType="cMap">
+	<![CDATA[
+		SELECT ENTER_CD
+		     , SEQ
+		     , RCV_NAME
+		     , TITLE
+		     , SEND_ADDR
+		     , CONTENTS
+		  FROM TSYS996
+		 WHERE NVL(SUCCESS_YN, 'N') = 'N'
+	]]>
+	</select>
+		
+	<update id="updateSMTP" parameterType="map">
+	<![CDATA[
+		UPDATE TSYS996
+		   SET SUCCESS_YN = #{result}
+		 WHERE ENTER_CD = #{enterCd}
+		   AND SEQ = #{seq}
+	]]>
+	</update>
+
+	<!-- 마지막 업데이트 기준시간 가져오기-->
+	<select id="getScheduleLastTime" parameterType="map" resultType="cMap">
+    <![CDATA[
+        SELECT MAX(ATIME) AS LAST_TIME1
+             , TO_CHAR(TO_DATE(MAX(ATIME), 'YYYYMMDDhh24miss')-5/24/60, 'YYYYMMDDhh24miss') AS LAST_TIME  -- 마지막 실행 시간에서 5분전
+          FROM T_SECOM_ALARM_LOG
+         WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+    ]]>
+	</select>
+        
+
+	<!-- 마지막 업데이트 기준시간 저장 -->
+	<update id="saveScheduleLastTime" parameterType="map">
+	<![CDATA[
+		 MERGE INTO T_SECOM_ALARM_LOG T 
+		 USING 
+		( 
+		       SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD 
+		            , TRIM(#{eTime})  	 AS  ATIME
+		        FROM DUAL
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.ATIME 		= S.ATIME 
+		) 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.ATIME
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.ATIME
+		            , sysdate
+		            , 'Schedule'
+		   ) 
+	]]>
+	</update>
+
+	<!-- 세콤 출퇴근 기록 저장 -->
+	<update id="saveScheduleSecom" parameterType="map">
+	<![CDATA[
+		 MERGE INTO T_SECOM_ALARM T 
+		 USING 
+		( 
+		       SELECT TRIM(#{ssnEnterCd}) 	AS  ENTER_CD 
+		            , TRIM(#{ATime})  		AS  ATIME
+		            , TRIM(#{EqCode})  		AS  EQCODE
+		            , TRIM(#{Master})  		AS  MASTER
+		            , TRIM(#{CardNo})  		AS  CARDNO
+		            , TRIM(#{Sabun})  		AS  SABUN
+		            , TRIM(#{ID})  			AS  ID
+		            , TRIM(#{Param})  		AS  PARAM
+		            , TRIM(#{Ack})  			AS  ACK
+		            , TRIM(#{AckUser})  		AS  ACKUSER
+		            , TRIM(#{AckTime})  		AS  ACKTIME
+		            , TRIM(#{AckContent})  	AS  ACKCONTENT
+		            , TRIM(#{Transfer})  		AS  TRANSFER
+		            , TRIM(#{AckMode})  		AS  ACKMODE
+		            , TRIM(#{Name})  			AS  NAME
+		            , TRIM(#{State})  		AS  STATE
+		            , TRIM(#{Flag1})  		AS  FLAG1
+		            , TRIM(#{Flag2})  		AS  FLAG2
+		            , TRIM(#{Flag3})  		AS  FLAG3
+		            , TRIM(#{Flag4})  		AS  FLAG4
+		            , TRIM(#{InsertTime})  	AS  INSERTTIME
+		            , TRIM(#{UpdateTime})  	AS  UPDATETIME
+		            , TRIM(#{Version})  	AS  VERSION
+		        FROM DUAL
+		       WHERE TRIM(#{Sabun})  IS NOT NULL 
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.ATIME 		= S.ATIME 
+		     AND  T.EQCODE 		= S.EQCODE 
+		     AND  T.MASTER 		= S.MASTER 
+		     AND  T.CARDNO 		= S.CARDNO 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.SABUN 		= S.SABUN 
+		            , T.ID 			= S.ID 
+		            , T.PARAM 		= S.PARAM 
+		            , T.ACK 		= S.ACK 
+		            , T.ACKUSER 	= S.ACKUSER 
+		            , T.ACKTIME 	= S.ACKTIME 
+		            , T.ACKCONTENT 	= S.ACKCONTENT 
+		            , T.TRANSFER 	= S.TRANSFER 
+		            , T.ACKMODE 	= S.ACKMODE 
+		            , T.NAME 		= S.NAME 
+		            , T.STATE 		= S.STATE 
+		            , T.FLAG1 		= S.FLAG1 
+		            , T.FLAG2 		= S.FLAG2 
+		            , T.FLAG3 		= S.FLAG3 
+		            , T.FLAG4 		= S.FLAG4 
+		            , T.INSERTTIME 	= S.INSERTTIME 
+		            , T.UPDATETIME 	= S.UPDATETIME 
+		            , T.VERSION 	= S.VERSION 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.ATIME
+		            , T.EQCODE
+		            , T.MASTER
+		            , T.CARDNO
+		            , T.SABUN
+		            , T.ID
+		            , T.PARAM
+		            , T.ACK
+		            , T.ACKUSER
+		            , T.ACKTIME
+		            , T.ACKCONTENT
+		            , T.TRANSFER
+		            , T.ACKMODE
+		            , T.NAME
+		            , T.STATE
+		            , T.FLAG1
+		            , T.FLAG2
+		            , T.FLAG3
+		            , T.FLAG4
+		            , T.INSERTTIME
+		            , T.UPDATETIME
+		            , T.VERSION
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.ATIME
+		            , S.EQCODE
+		            , S.MASTER
+		            , S.CARDNO
+		            , S.SABUN
+		            , S.ID
+		            , S.PARAM
+		            , S.ACK
+		            , S.ACKUSER
+		            , S.ACKTIME
+		            , S.ACKCONTENT
+		            , S.TRANSFER
+		            , S.ACKMODE
+		            , S.NAME
+		            , S.STATE
+		            , S.FLAG1
+		            , S.FLAG2
+		            , S.FLAG3
+		            , S.FLAG4
+		            , S.INSERTTIME
+		            , S.UPDATETIME
+		            , S.VERSION
+		   ) 
+	]]>
+	</update>
+
+	<update id="saveScheduleSecomWork" parameterType="map">
+	<![CDATA[
+		 MERGE INTO T_SECOM_WORKHISTORY T 
+		 USING 
+		( 
+		       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+		            , TRIM(#{WorkDate})  			AS  WORKDATE
+		            , TRIM(#{Sabun})  			AS  SABUN
+		            , TRIM(#{JuminNo})  			AS  JUMINNO
+		            , TRIM(#{Sabun})  			AS  NAME
+		            , TRIM(#{Company})  			AS  COMPANY
+		            , TRIM(#{Department})  		AS  DEPARTMENT
+		            , TRIM(#{Team}) 				AS  TEAM
+		            , TRIM(#{Part})  				AS  PART
+		            , TRIM(#{Grade})  			AS  GRADE
+		            , TRIM(#{WorkGroupCode})  	AS  WORKGROUPCODE
+		            , TRIM(#{WorkGroupName})  	AS  WORKGROUPNAME
+		            , TRIM(#{ScheduleID})  		AS  SCHEDULEID
+		            , TRIM(#{ScheduleName})  		AS  SCHEDULENAME
+		            , TRIM(#{ScheduleType})  		AS  SCHEDULETYPE
+		            , TRIM(#{WorkType})  			AS  WORKTYPE
+		            , TRIM(#{bWS})  				AS  BWS
+		            , TRIM(#{bWC})  				AS  BWC
+		            , TRIM(#{WSTime})  			AS  WSTIME
+		            , TRIM(#{WCTime})  			AS  WCTIME
+		            , TRIM(#{PWType})  			AS  PWTYPE
+		            , TRIM(#{PWTime})  			AS  PWTIME
+		            , TRIM(#{OWTime})  			AS  OWTIME
+		            , TRIM(#{NWTime})  			AS  NWTIME
+		            , TRIM(#{TotalWorkTime})  	AS  TOTALWORKTIME
+		            , TRIM(#{NormalWorkTime})  	AS  NORMALWORKTIME
+		            , TRIM(#{HWTime})  			AS  HWTIME
+		            , TRIM(#{bLate})  			AS  BLATE
+		            , TRIM(#{bPWC})  				AS  BPWC
+		            , TRIM(#{bAbsent})  			AS  BABSENT
+		            , TRIM(#{LateTime})  			AS  LATETIME
+		            , TRIM(#{ModifyUser})  		AS  MODIFYUSER
+		            , TRIM(#{ModifyTime})  		AS  MODIFYTIME
+		            , TRIM(#{InsertTime})  		AS  INSERTTIME
+		            , TRIM(#{UpdateTime})  		AS  UPDATETIME
+		            , TRIM(#{Version})  			AS  VERSION
+		        FROM DUAL
+			  WHERE TRIM(#{Sabun})  IS NOT NULL
+		) S 
+		ON ( 
+		          T.ENTER_CD = S.ENTER_CD 
+		     AND  T.WORKDATE = S.WORKDATE 
+		     AND  T.SABUN = S.SABUN 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE			= sysdate 
+		            , T.CHKID			= #{ssnSabun} 
+		            , T.NAME 			= S.NAME 
+		            , T.COMPANY 		= S.COMPANY 
+		            , T.DEPARTMENT 		= S.DEPARTMENT 
+		            , T.TEAM 			= S.TEAM 
+		            , T.PART 			= S.PART 
+		            , T.GRADE 			= S.GRADE 
+		            , T.WORKGROUPCODE 	= S.WORKGROUPCODE 
+		            , T.WORKGROUPNAME 	= S.WORKGROUPNAME 
+		            , T.SCHEDULEID 		= S.SCHEDULEID 
+		            , T.SCHEDULENAME 	= S.SCHEDULENAME 
+		            , T.SCHEDULETYPE 	= S.SCHEDULETYPE 
+		            , T.WORKTYPE 		= S.WORKTYPE 
+		            , T.BWS 			= S.BWS 
+		            , T.BWC 			= S.BWC 
+		            , T.WSTIME 			= S.WSTIME 
+		            , T.WCTIME 			= S.WCTIME 
+		            , T.PWTYPE 			= S.PWTYPE 
+		            , T.PWTIME 			= S.PWTIME 
+		            , T.OWTIME 			= S.OWTIME 
+		            , T.NWTIME 			= S.NWTIME 
+		            , T.TOTALWORKTIME 	= S.TOTALWORKTIME 
+		            , T.NORMALWORKTIME 	= S.NORMALWORKTIME 
+		            , T.HWTIME 			= S.HWTIME 
+		            , T.BLATE 			= S.BLATE 
+		            , T.BPWC 			= S.BPWC 
+		            , T.BABSENT 		= S.BABSENT 
+		            , T.LATETIME 		= S.LATETIME 
+		            , T.MODIFYUSER 		= S.MODIFYUSER 
+		            , T.MODIFYTIME 		= S.MODIFYTIME 
+		            , T.INSERTTIME 		= S.INSERTTIME 
+		            , T.UPDATETIME 		= S.UPDATETIME 
+		            , T.VERSION 		= S.VERSION 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.WORKDATE
+		            , T.SABUN
+		            , T.JUMINNO
+		            , T.NAME
+		            , T.COMPANY
+		            , T.DEPARTMENT
+		            , T.TEAM
+		            , T.PART
+		            , T.GRADE
+		            , T.WORKGROUPCODE
+		            , T.WORKGROUPNAME
+		            , T.SCHEDULEID
+		            , T.SCHEDULENAME
+		            , T.SCHEDULETYPE
+		            , T.WORKTYPE
+		            , T.BWS
+		            , T.BWC
+		            , T.WSTIME
+		            , T.WCTIME
+		            , T.PWTYPE
+		            , T.PWTIME
+		            , T.OWTIME
+		            , T.NWTIME
+		            , T.TOTALWORKTIME
+		            , T.NORMALWORKTIME
+		            , T.HWTIME
+		            , T.BLATE
+		            , T.BPWC
+		            , T.BABSENT
+		            , T.LATETIME
+		            , T.MODIFYUSER
+		            , T.MODIFYTIME
+		            , T.INSERTTIME
+		            , T.UPDATETIME
+		            , T.VERSION
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.WORKDATE
+		            , S.SABUN
+		            , S.JUMINNO
+		            , S.NAME
+		            , S.COMPANY
+		            , S.DEPARTMENT
+		            , S.TEAM
+		            , S.PART
+		            , S.GRADE
+		            , S.WORKGROUPCODE
+		            , S.WORKGROUPNAME
+		            , S.SCHEDULEID
+		            , S.SCHEDULENAME
+		            , S.SCHEDULETYPE
+		            , S.WORKTYPE
+		            , S.BWS
+		            , S.BWC
+		            , S.WSTIME
+		            , S.WCTIME
+		            , S.PWTYPE
+		            , S.PWTIME
+		            , S.OWTIME
+		            , S.NWTIME
+		            , S.TOTALWORKTIME
+		            , S.NORMALWORKTIME
+		            , S.HWTIME
+		            , S.BLATE
+		            , S.BPWC
+		            , S.BABSENT
+		            , S.LATETIME
+		            , S.MODIFYUSER
+		            , S.MODIFYTIME
+		            , S.INSERTTIME
+		            , S.UPDATETIME
+		            , S.VERSION
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>		
+	
+	<!-- 출퇴근 갱신-->
+	<update id="prcScheduleTimecardIns" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_TIM_TIMECARD_SECOM_INS(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchYmd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+	</update>
+		
+	<!-- 로그 프로시저 -->
+	<update id="procScheErrLog" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_COM_SET_LOG(
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{bizCd,mode=IN,jdbcType=VARCHAR},
+			#{objectNm,mode=IN,jdbcType=VARCHAR},
+			#{errLocation,mode=IN,jdbcType=VARCHAR},
+			#{errLog,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>	
+	</update>
+	
+</mapper>

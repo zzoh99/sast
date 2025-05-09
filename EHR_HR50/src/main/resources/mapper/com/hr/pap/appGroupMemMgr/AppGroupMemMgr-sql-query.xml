@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appGroupMemMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppGroupMemMgrList1">
+
+				<![CDATA[
+				    SELECT A.APPRAISAL_CD
+				         , A.APP_GROUP_CD
+				         , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00003', A.APP_SEQ_CD) AS APP_SEQ_NM
+				         , A.APP_GROUP_NM
+				         --, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P00002', A.ORG_GRADE_CD) AS ORG_GRADE_NM
+				         , (SELECT COUNT(SABUN) 
+				              FROM TPAP202 
+				             WHERE ENTER_CD = A.ENTER_CD
+				               AND APPRAISAL_CD = A.APPRAISAL_CD
+				               AND SABUN||APP_ORG_CD IN (SELECT SABUN||APP_ORG_CD
+				                                           FROM TPAP201 
+				                                          WHERE ENTER_CD     = #{ssnEnterCd}
+				                                            AND APPRAISAL_CD = #{searchAppraisalCd}
+				                                            AND APP_YN       = 'Y'
+				                                            AND APP_STEP_CD  = '5')  --최종평가일 경우에만
+				               AND APP_GROUP_CD   = A.APP_GROUP_CD
+				               AND APP_SEQ_CD   = A.APP_SEQ_CD
+				               AND APP_STEP_CD  = '5'
+				             ) AS INWON_CNT
+				      FROM TPAP133 A, TPAP201 B
+				     WHERE A.ENTER_CD = #{ssnEnterCd}
+				       AND A.APPRAISAL_CD = #{searchAppraisalCd}
+				       AND A.APP_SEQ_CD   = #{searchAppSeqCd}  -- 변수 : 1차, 2차(조회조건, 1이면 1차, 2이면 2차)
+				       AND B.ENTER_CD     = A.ENTER_CD
+				       AND B.APPRAISAL_CD = A.APPRAISAL_CD
+				       AND B.APP_YN       = 'Y'
+				       AND B.APP_STEP_CD = '5'  --최종평가일 경우에만
+				       ]]>
+<if test='searchOrgGradeCd != null and !searchOrgGradeCd.equals("")'>
+				       AND A.ORG_GRADE_CD = #{searchOrgGradeCd}  -- 변수, 상,중,하(조회조건, TSYS005.P00002)
+</if>
+<if test='searchAppGroupNm != null and !searchAppGroupNm.equals("")'>
+				       AND A.APP_GROUP_NM LIKE '%' || #{searchAppGroupNm} || '%'  -- 변수, (조회조건, TEXT)
+</if>
+				    GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_GROUP_CD, A.APP_GROUP_NM, /*A.ORG_GRADE_CD,*/ A.APP_SEQ_CD   
+				    ORDER BY A.APP_SEQ_CD ASC, A.APP_GROUP_NM ASC
+
+
+		</select>
+		
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppGroupMemMgrList2">
+
+				<![CDATA[
+			      SELECT B.APP_ORG_CD
+			      	   , B.APP_ORG_NM
+			      	   , B.SABUN
+			      	   , B.NAME
+			      	   , B.JIKWEE_NM
+			      	   , B.JIKCHAK_NM
+			      	   , C.APP_SABUN
+			      	   , F_COM_GET_NAMES(C.ENTER_CD, C.APP_SABUN) AS APP_NAME
+			      	   , F_COM_GET_JIKCHAK_NM(C.ENTER_CD, C.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231')) AS APP_JIKCHAK_NM
+			      FROM TPAP133 A, TPAP201 B, TPAP202 C, TPAP101 D
+			     WHERE A.ENTER_CD = #{ssnEnterCd}
+			       AND A.APPRAISAL_CD = #{searchAppraisalCd}
+			       AND B.ENTER_CD     = A.ENTER_CD
+			       AND B.APPRAISAL_CD = A.APPRAISAL_CD
+			       AND B.APP_YN       = 'Y'
+			       AND B.APP_STEP_CD = '5'  --최종평가일 경우에만 
+			       AND C.ENTER_CD     = A.ENTER_CD
+			       AND C.APPRAISAL_CD = A.APPRAISAL_CD
+			       AND C.SABUN        = B.SABUN
+			       AND C.APP_GROUP_CD = A.APP_GROUP_CD
+			       AND C.APP_ORG_CD   = B.APP_ORG_CD
+			       AND C.APP_STEP_CD  = B.APP_STEP_CD
+			       AND A.APP_GROUP_CD = #{searchAppGroupCd}  -- 변수, (평가그룹 적용인원으로 받는 변수)
+			       AND D.ENTER_CD     = A.ENTER_CD
+			       AND D.APPRAISAL_CD = A.APPRAISAL_CD
+			    ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD, C.SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231'))
+				]]>
+
+
+		</select>
+		
+		
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppGroupMemMgrList3">
+
+				<![CDATA[
+				     SELECT ENTER_CD
+				     	  , APP_ORG_CD
+				     	  , APPRAISAL_CD
+				     	  , APP_ORG_NM
+				     	  , NAME
+				     	  , SABUN
+				     	  , JIKWEE_NM
+				     	  , JIKCHAK_NM
+				     	  , APP_SABUN
+				     	  , APP_NAME
+						  , APP_JIKCHAK_NM
+				     FROM
+				          (
+				              SELECT A.ENTER_CD
+				              	   , A.APP_ORG_CD
+				              	   , A.APPRAISAL_CD
+				              	   , A.APP_ORG_NM
+				              	   , A.NAME
+				              	   , A.SABUN
+				              	   , A.JIKWEE_NM
+				              	   , A.JIKCHAK_NM
+				              	   , D.APP_SABUN
+				              	   , DECODE(D.APP_SABUN, NULL, NULL, NVL(F_COM_GET_NAMES(D.ENTER_CD, D.APP_SABUN), 'NONE')) AS APP_NAME
+				        		   , F_COM_GET_JIKCHAK_NM(D.ENTER_CD, D.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(A.ENTER_CD, A.APPRAISAL_CD, '5'), '99991231')) AS APP_JIKCHAK_NM
+				                FROM TPAP201 A, TPAP202 D
+				               WHERE A.ENTER_CD = #{ssnEnterCd}
+				                 AND A.APPRAISAL_CD = #{searchAppraisalCd}
+				                 AND A.APP_YN       = 'Y'
+				                 AND A.APP_STEP_CD  = '5' --최종평가일 경우에만  
+				                 AND D.ENTER_CD(+)     = A.ENTER_CD
+				                 AND D.APPRAISAL_CD(+) = A.APPRAISAL_CD
+				                 AND D.SABUN(+)        = A.SABUN
+				                 AND D.APP_ORG_CD(+)   = A.APP_ORG_CD
+				                 AND D.APP_SEQ_CD(+)   = #{searchAppSeqCd} -- 변수, 1차, 2차(조회조건, 1이면 1차, 2이면 2차)
+				                 AND D.APP_STEP_CD(+)  = A.APP_STEP_CD  
+				                 AND (
+				                       A.SABUN || '_' || A.APP_ORG_CD NOT IN (SELECT SABUN || '_' || APP_ORG_CD
+				                                             FROM TPAP202 B
+				                                            WHERE B.ENTER_CD     = A.ENTER_CD  
+				                                              AND B.APPRAISAL_CD = A.APPRAISAL_CD
+				                                              AND B.SABUN        = A.SABUN
+				                                              AND B.APP_ORG_CD   = A.APP_ORG_CD
+				                                              AND B.APP_SEQ_CD   = #{searchAppSeqCd} -- 변수, 1차, 2차(조회조건, 1이면 1차, 2이면 2차)
+				                                              AND B.APP_STEP_CD  = A.APP_STEP_CD
+				                                              AND B.APP_GROUP_CD IS NOT NULL
+				                                             )
+				                       OR
+				                       A.SABUN || '_' || A.APP_ORG_CD IN  (
+				                                       SELECT SABUN || '_' || APP_ORG_CD
+				                                         FROM TPAP202 C
+				                                        WHERE C.ENTER_CD     = A.ENTER_CD  
+				                                          AND C.APPRAISAL_CD = A.APPRAISAL_CD
+				                                          AND C.SABUN        = A.SABUN
+				                                          AND C.APP_ORG_CD   = A.APP_ORG_CD
+				                                          AND C.APP_SEQ_CD   = #{searchAppSeqCd} -- 변수, 1차, 2차(조회조건, 1이면 1차, 2이면 2차)
+				                                          AND C.APP_STEP_CD  = A.APP_STEP_CD  
+				                                          AND C.APP_GROUP_CD NOT IN (SELECT APP_GROUP_CD
+				                                                                   FROM TPAP133
+				                                                                  WHERE ENTER_CD     = C.ENTER_CD
+				                                                                    AND APPRAISAL_CD = C.APPRAISAL_CD
+				                                                                    AND APP_SEQ_CD   = C.APP_SEQ_CD)  
+				                                          )
+				                                     )
+				        )                     
+				    WHERE ENTER_CD = #{ssnEnterCd}
+				              ]]>
+				    <if test='searchSheet3Word != null and !searchSheet3Word.equals("")'>
+				    AND (
+				    	NAME LIKE '%' || #{searchSheet3Word} || '%' OR
+				    	APP_ORG_NM LIKE '%' || #{searchSheet3Word} || '%' OR
+				    	APP_NAME LIKE '%' || #{searchSheet3Word} || '%'
+				    	)
+					</if>
+				    ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, NVL(F_PAP_GET_BASE_YMD(ENTER_CD, APPRAISAL_CD, '5'), '99991231'))                                
+
+
+		</select>
+	
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppGroupMemMgr">
+
+				MERGE INTO TPAP202 T
+					USING	(
+							SELECT #{ssnEnterCd} AS ENTER_CD
+								 , #{searchAppraisalCd} AS APPRAISAL_CD
+								 , '5' AS APP_STEP_CD
+								 , A.SABUN
+								 , A.APP_ORG_CD
+								 , #{searchAppSeqCd} AS APP_SEQ_CD
+								 , A.APP_SABUN
+								 , F_COM_GET_ORG_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS ORG_CD
+								 , F_COM_GET_ORG_NM21(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS ORG_NM
+								 , F_COM_GET_JIKWEE_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKWEE_CD
+								 , F_COM_GET_JIKWEE_NM(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKWEE_NM
+								 , F_COM_GET_JIKCHAK_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKCHAK_CD
+								 , F_COM_GET_JIKCHAK_NM(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKCHAK_NM
+								 , F_COM_GET_JIKGUB_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKGUB_CD
+								 , F_COM_GET_JIKGUB_NM(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKGUB_NM
+							   FROM (
+									SELECT NULL			AS SABUN
+										 , NULL			AS APP_SABUN
+										 , NULL			AS APP_ORG_CD
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+							SELECT TRIM(#{rm.sabun})	AS SABUN
+								 , TRIM(#{rm.appSabun})	AS APP_SABUN
+								 , TRIM(#{rm.appOrgCd})	AS APP_ORG_CD
+							  FROM DUAL
+</foreach>
+									) A 
+							WHERE A.SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= S.ENTER_CD 
+						AND	T.APPRAISAL_CD	= S.APPRAISAL_CD
+						AND	T.APP_STEP_CD	= S.APP_STEP_CD
+						AND	T.SABUN			= S.SABUN
+						AND	T.APP_SEQ_CD	= S.APP_SEQ_CD
+						AND	T.APP_ORG_CD	= S.APP_ORG_CD
+						AND T.APP_SABUN		= S.APP_SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET APP_GROUP_CD	= #{searchAppGroupCd}
+								, T.ORG_CD 		= S.ORG_CD
+								, T.ORG_NM 		= S.ORG_NM
+								, T.JIKWEE_CD 	= S.JIKWEE_CD
+								, T.JIKWEE_NM 	= S.JIKWEE_NM
+								, T.JIKCHAK_CD	= S.JIKCHAK_CD
+								, T.JIKCHAK_NM	= S.JIKCHAK_NM
+								, T.JIKGUB_CD 	= S.JIKGUB_CD
+								, T.JIKGUB_NM	= S.JIKGUB_NM
+								, T.CHKDATE		= SYSDATE
+								, T.CHKID		= #{ssnSabun}
+					
+					WHEN NOT MATCHED THEN
+					INSERT (
+						T.ENTER_CD, 
+						T.APPRAISAL_CD, 
+						T.APP_STEP_CD, 
+						T.SABUN,
+						T.APP_ORG_CD, 
+						T.APP_SEQ_CD, 
+						T.APP_SABUN,
+						T.ORG_CD, 
+						T.ORG_NM, 
+						T.JIKWEE_CD, 
+						T.JIKWEE_NM,
+						T.JIKCHAK_CD, 
+						T.JIKCHAK_NM, 
+						T.JIKGUB_CD, 
+						T.JIKGUB_NM,
+						T.APP_GROUP_CD,
+						T.CHKDATE, 
+						T.CHKID
+					)
+					VALUES (
+						S.ENTER_CD, 
+						S.APPRAISAL_CD, 
+						S.APP_STEP_CD, 
+						S.SABUN,
+						S.APP_ORG_CD, 
+						S.APP_SEQ_CD, 
+						S.APP_SABUN,
+						S.ORG_CD, 
+						S.ORG_NM, 
+						S.JIKWEE_CD, 
+						S.JIKWEE_NM,
+						S.JIKCHAK_CD, 
+						S.JIKCHAK_NM, 
+						S.JIKGUB_CD, 
+						S.JIKGUB_NM,
+						#{searchAppGroupCd},
+						SYSDATE, 
+						#{ssnSabun}
+					)
+		</update>
+		
+<!-- 		평가그룹 초기화 -->
+		<update parameterType="map" id="updateInitializeAppGroupMem">
+
+				<![CDATA[
+					UPDATE TPAP202 
+					SET APP_GROUP_CD	= NULL,
+						CHKDATE			= SYSDATE,
+						CHKID			= #{ssnSabun}
+					WHERE ENTER_CD		= #{ssnEnterCd}
+					  AND APPRAISAL_CD	= #{searchAppraisalCd}
+					  AND APP_STEP_CD	= '5'
+					  AND APP_SEQ_CD	= #{searchAppSeqCd}
+				]]>
+
+
+		</update>
+
+</mapper>

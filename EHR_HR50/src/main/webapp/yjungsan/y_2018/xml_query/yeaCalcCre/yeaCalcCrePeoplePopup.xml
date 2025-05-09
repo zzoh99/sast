@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산 대상자
+ -->
+<root>
+
+	<!-- 연말정산 대상자 조회  -->
+	<query id="selectYeaCalcCrePopupList">
+		<![CDATA[
+			SELECT A.WORK_YY
+				 , A.ADJUST_TYPE
+				 , A.SABUN
+				 , A.BUSINESS_PLACE_CD
+				 , A.PAY_ACTION_CD
+				 , A.ZIP
+				 , A.ADDR1
+				 , A.ADDR2
+				 , A.ORG_CD
+				 , A.ORG_NM
+				 , A.INPUT_CLOSE_YN
+				 , A.APPRV_YN
+				 , A.FINAL_CLOSE_YN
+				 , DECODE(A.PAY_PEOPLE_STATUS,'P','1','J','2','0') PAY_PEOPLE_STATUS
+				 , B.NAME
+			     , A.HOUSE_OWNER_YN
+			     , NVL(A.FOREIGN_TAX_TYPE,'3') FOREIGN_TAX_TYPE
+			     , A.REDUCE_S_YMD
+			     , A.REDUCE_E_YMD
+			     , A.HOUSE_GET_YMD
+			     , A.HOUSE_AREA
+			     , A.OFFICIAL_PRICE
+			     , A.NATIONAL_CD
+			     , A.NATIONAL_NM
+			     , A.RESULT_CONFIRM_YN
+			     , A.HOUSE_CNT 
+			     , ( SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0,'Y','N') FINAL_CLOSE_YN
+					   FROM TCPN811
+					  WHERE ENTER_CD     = #ssnEnterCd#
+					    AND WORK_YY  	  = #searchWorkYy#
+					    AND ADJUST_TYPE  = #searchAdjustType#
+					    AND PAY_ACTION_CD= A.PAY_ACTION_CD 
+			       ) TOT_FINAL_CLOSE_YN
+			     , A.TAX_TYPE
+			     , C.ADJ_S_YMD
+			     , C.ADJ_E_YMD
+			     , C.SABUN AS ADJ_SABUN
+			  FROM TCPN811 A, THRM100 B, TCPN841 C
+			 WHERE A.ENTER_CD      		= #ssnEnterCd#
+			   AND A.WORK_YY			= #searchWorkYy#
+			   AND A.ADJUST_TYPE        = #searchAdjustType#
+			   AND A.PAY_ACTION_CD  	= #searchPayActionCd#
+			   AND A.ENTER_CD           = B.ENTER_CD
+			   AND A.SABUN				= B.SABUN
+			   AND A.ENTER_CD			= C.ENTER_CD(+)
+			   AND A.SABUN				= C.SABUN(+)
+			   AND A.WORK_YY			= C.WORK_YY(+)
+			   AND A.ADJUST_TYPE		= C.ADJUST_TYPE(+)
+			ORDER BY PAY_PEOPLE_STATUS desc, B.NAME
+		]]>
+	</query>
+
+	<!-- 연말정산 대상자 저장  -->
+	<query id="updateYeaCalcCrePopup">
+		<![CDATA[
+			UPDATE TCPN811
+			SET	BUSINESS_PLACE_CD  		= #business_place_cd#
+				, PAY_ACTION_CD			= #pay_action_cd#
+                , ZIP                	= #zip#
+                , ADDR1              	= #addr1#
+                , ADDR2              	= #addr2#
+                , ORG_CD            	= #org_cd#
+                , ORG_NM            	= #org_nm#
+                , INPUT_CLOSE_YN    	= #input_close_yn#
+                , APPRV_YN          	= #apprv_yn#
+                , PAY_PEOPLE_STATUS 	= DECODE(#pay_people_status#,'1',DECODE(#pay_people_status_view#,'1','P','W'),'2','J',DECODE(#pay_people_status_view#,'1','P','W'))
+                , FINAL_CLOSE_YN    	= #final_close_yn#
+                , FOREIGN_TAX_TYPE  	= #foreign_tax_type#
+                , HOUSE_OWNER_YN    	= #house_owner_yn#
+                , REDUCE_S_YMD      	= #reduce_s_ymd#
+                , REDUCE_E_YMD      	= #reduce_e_ymd#
+                , HOUSE_CNT         	= #house_cnt#
+                , HOUSE_GET_YMD     	= #house_get_ymd#
+                , HOUSE_AREA        	= #house_area#
+                , OFFICIAL_PRICE    	= #official_price#
+                , NATIONAL_CD       	= #national_cd#
+                , NATIONAL_NM       	= #national_nm#
+                , RESULT_CONFIRM_YN 	= #result_confirm_yn#
+				, CHKDATE	    	  	= SYSDATE
+				, CHKID    		  		= #ssnSabun#
+				, TAX_TYPE              = #tax_type#
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun# 
+		]]>
+	</query>
+	
+	<!-- 연말정산 대상자 저장-->
+	<query id="deleteFinalCloseTCPN981">
+		<![CDATA[
+			DELETE FROM TCPN981
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #pay_action_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산 대상자 저장 -->
+	<query id="insertFinalCloseTCPN981">
+		<![CDATA[
+			INSERT INTO TCPN981
+			(
+				ENTER_CD
+				, PAY_ACTION_CD
+				, CLOSE_YN
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #pay_action_cd#
+				, (	SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0,'Y','N') FINAL_CLOSE_YN
+			  		  FROM TCPN811
+			 		 WHERE ENTER_CD       = #ssnEnterCd#
+			   		   AND WORK_YY  	  = #work_yy#
+			   		   AND ADJUST_TYPE    = #adjust_type#
+			   		   AND PAY_ACTION_CD  = #pay_action_cd#
+			   	  )
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>	
+	
+	<!-- 연말정산 대상자 삭제  TCPN811 -->
+	<query id="deleteYeaCalcCrePopupTCPN811">
+		<![CDATA[
+			DELETE FROM TCPN811
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun#
+		]]>
+	</query>
+
+	<!-- 연말정산 대상자 삭제  TCPN823 -->
+	<query id="deleteYeaCalcCrePopupTCPN823">
+		<![CDATA[
+			DELETE FROM TCPN823
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun#
+		]]>
+	</query>
+
+	<!-- 연말정산 대상자 삭제  TCPN843 -->
+	<query id="deleteYeaCalcCrePopupTCPN843">
+		<![CDATA[
+			DELETE FROM TCPN843
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun#
+		]]>
+	</query>	
+	
+	<!-- 연말정산계산결과 수정 TCPN841 -->
+	<query id="updateYeaCalcCrePopupAdjYmd">
+		<![CDATA[
+			UPDATE TCPN841
+			SET	  ADJ_S_YMD				= #adj_s_ymd#
+				, ADJ_E_YMD				= #adj_e_ymd#
+				, CHKDATE	    	  	= SYSDATE
+				, CHKID    		  		= #ssnSabun#
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND SABUN = #sabun# 
+		]]>
+	</query>
+			
+</root>

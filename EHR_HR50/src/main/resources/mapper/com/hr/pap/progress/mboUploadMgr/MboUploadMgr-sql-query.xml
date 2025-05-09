@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.mboUploadMgr">
+<!-- 		성과항목관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMboUploadMgrList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+						 , APPRAISAL_CD
+						 , ELE_CD
+						 , ELE_NM
+						 , SEQ
+						 , BIGO
+					  FROM TPAP198
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPRAISAL_CD = #{searchAppraisalCd}
+					 ORDER BY SEQ, CHKDATE DESC
+				]]>
+
+
+		</select>
+		
+<!-- 		성과항목관리 저장 -->
+		<update parameterType="map" id="saveMboUploadMgr">
+
+					MERGE INTO TPAP198 T
+					USING (
+					    SELECT #{ssnEnterCd}			AS ENTER_CD
+					    	 , #{searchAppraisalCd}	AS APPRAISAL_CD
+					    	 , A.ELE_CD
+					    	 , A.ELE_NM
+					    	 , A.SEQ
+					    	 , A.BIGO
+					    	 , #{ssnSabun}			AS CHKID
+					    FROM (
+					    		SELECT NULL AS ELE_CD
+					    			 , NULL AS ELE_NM
+					    			 , NULL AS SEQ
+					    			 , NULL AS BIGO
+					    		FROM DUAL
+				    		<foreach item="rm" collection="mergeRows" >
+					    		UNION ALL
+					    		SELECT TRIM( #{rm.eleCd})	AS ELE_CD
+					    			 , TRIM( #{rm.eleNm})	AS ELE_NM
+					    			 , TRIM( #{rm.seq} )	AS SEQ
+					    			 , TRIM( #{rm.bigo})	AS BIGO
+					    		FROM DUAL
+							</foreach>
+					    	) A
+					    WHERE ELE_CD IS NOT NULL
+					    ) S
+					ON ( 
+					        T.ENTER_CD		= S.ENTER_CD
+					    AND T.APPRAISAL_CD	= S.APPRAISAL_CD
+					    AND T.ELE_CD		= S.ELE_CD
+					   )
+					WHEN MATCHED THEN
+				    UPDATE SET T.ELE_NM		= S.ELE_NM
+				             , T.SEQ		= S.SEQ
+				             , T.BIGO		= S.BIGO
+				             , T.CHKDATE	= SYSDATE
+				             , T.CHKID		= S.CHKID
+					WHEN NOT MATCHED THEN
+				    INSERT ( 
+				          T.ENTER_CD
+						, T.APPRAISAL_CD
+						, T.ELE_CD
+						, T.ELE_NM
+						, T.SEQ
+						, T.BIGO
+						, T.CHKDATE
+						, T.CHKID
+				    )
+				    VALUES (
+				          S.ENTER_CD
+						, S.APPRAISAL_CD
+						, S.ELE_CD
+						, S.ELE_NM
+						, S.SEQ
+						, S.BIGO
+				        , SYSDATE
+				        , S.CHKID
+				    )
+		</update>
+		
+<!-- 		성과항목관리 삭제 -->
+		<delete parameterType="map" id="deleteMboUploadMgr">
+
+					DELETE TPAP198 
+					WHERE (ENTER_CD, APPRAISAL_CD, ELE_CD) IN ( (NULL, NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+						, (#{ssnEnterCd}, #{searchAppraisalCd}, #{rm.eleCd})
+					</foreach>
+					)
+
+
+		</delete>
+		
+<!-- 		성과항목관리 전체삭제 -->
+		<delete parameterType="map" id="deleteMboUploadMgrAll">
+
+				<![CDATA[
+					DELETE TPAP198 WHERE ENTER_CD = #{ssnEnterCd} AND APPRAISAL_CD = #{searchAppraisalCd}
+				]]>
+
+
+		</delete>
+
+</mapper>

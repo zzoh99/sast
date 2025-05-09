@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.applyApproval.appMasterMgr">
+		<select parameterType="map" resultType="cMap" id="getAppMasterMgrList">
+
+				<![CDATA[
+					   SELECT '1' AS DETAIL
+					        , A.APPL_SEQ      
+					        , A.APPL_CD 
+					        , B.APPL_NM
+					        , TO_CHAR(TO_DATE(A.APPL_YMD),'YYYY-MM-DD') 						AS APPL_YMD      
+					        , A.APPL_SABUN    
+					        , F_COM_GET_NAMES(A.ENTER_CD,A.APPL_SABUN)  						AS APPL_NAME
+					        , A.APPL_IN_SABUN 
+					        , F_COM_GET_NAMES(A.ENTER_CD,A.APPL_IN_SABUN) 						AS APPL_IN_NAME
+					        , A.APPL_STATUS_CD
+					        , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'R10010' , A.APPL_STATUS_CD)	AS APPL_STATUS_CD_NM
+					        , A.AGREE_SABUN   
+					        , A.AGREE_YMD     
+					        , A.FINISH_YN      
+					     FROM THRI103 A, THRI101 B
+					    WHERE 1 = 1
+					      AND A.ENTER_CD	= #{ssnEnterCd}
+					      AND A.ENTER_CD	= B.ENTER_CD
+					      AND A.APPL_YMD BETWEEN REPLACE(TRIM( #{searchSdate} ),'-','') AND REPLACE(TRIM( #{searchEdate} ),'-','')
+					      AND A.APPL_CD = B.APPL_CD
+					      AND A.APPL_STATUS_CD NOT IN('11','23','33','99')
+				]]>
+<if test='searchApplCd != null and !searchApplCd.equals("")'>
+					      AND A.APPL_CD	= TRIM( #{searchApplCd} )
+</if>
+<if test='applCd != null and !applCd.equals("")'>
+					      AND A.APPL_CD	= TRIM( #{applCd} )
+</if>
+<if test='searchSabunNm != null and !searchSabunNm.equals("")'>
+					     AND ( 
+							     A.APPL_SABUN = TRIM( #{searchSabunNm} )
+						      OR  
+							     F_COM_GET_NAMES(A.ENTER_CD, A.APPL_SABUN) LIKE '%'|| TRIM( #{searchSabunNm} ) ||'%'
+						      )
+</if>
+					   ORDER BY A.APPL_YMD DESC
+
+
+<!-- 결재선 조회 -->			
+		</select>
+	<select parameterType="map" resultType="cMap" id="getAppMasterMgrDetailList">
+
+				<![CDATA[
+					   SELECT A.APPL_SEQ
+                            , A.AGREE_SEQ
+                            , A.AGREE_SABUN
+                            , F_COM_GET_NAMES(A.ENTER_CD, A.AGREE_SABUN, #{ssnLocaleCd} ) AS AGREE_NAME
+                            , A.PATH_SEQ
+                            , A.APPL_TYPE_CD
+                            , A.AGREE_STATUS_CD
+                            , TO_CHAR(A.AGREE_TIME,'YYYY-MM-DD HH24:mi')  AS AGREE_YMD
+                            , TO_CHAR(A.AGREE_TIME,'yyyymmddHH24miss')    AS AGREE_TIME      
+                            , A.GUBUN     
+                            , A.ORG_APP_YN
+                            , A.MEMO
+                            , A.ORG_NM	AS AGREE_ORG_NM
+							, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.AGREE_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS AGREE_JIKGUB_NM
+							, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.AGREE_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS AGREE_JIKWEE_NM
+                            , A.DEPUTY_YN
+                            , A.DEPUTY_SABUN
+                            , A.DEPUTY_ORG	
+                            , A.DEPUTY_JIKCHAK	
+                            , A.DEPUTY_JIKWEE	
+                            , A.DEPUTY_ADMIN_YN
+                            , DECODE( A.GUBUN, '0', 0, 1 ) AS SHTCOL_EDIT	
+                            , A.JIKCHAK_NM AS AGREE_JIKCHAK_NM
+					     FROM THRI107 A, THRI103 B
+					    WHERE 1 = 1
+					      AND A.ENTER_CD = #{ssnEnterCd}
+					      AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+					      AND A.ENTER_CD = B.ENTER_CD
+					      AND A.APPL_SEQ = B.APPL_SEQ
+					    ORDER BY A.AGREE_SEQ  
+				]]>
+
+
+		</select>
+<!-- 신청서 종류  -->		
+		<select parameterType="map" resultType="cMap" id="getAppMasterMgrApplCdList">
+
+				<![CDATA[
+					SELECT APPL_CD AS CODE
+						 , APPL_NM AS CODE_NM 
+					  FROM THRI101
+					 WHERE 1=1
+					   AND ENTER_CD = #{ssnEnterCd}
+					           ]]>
+<if test='useYn != null and useYn.equals("Y") '>
+					   AND USE_YN = 'Y'
+</if>
+					ORDER BY SEQ
+
+		</select>
+		
+<!-- 신청서 마스터 저장 -->
+		<update parameterType="map" id="saveAppMasterMgr">
+
+
+					MERGE INTO THRI103 T
+					USING	(
+
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+							SELECT
+									  #{ssnEnterCd}	            	AS ENTER_CD
+									, TRIM( #{rm.applSeq})			AS APPL_SEQ
+									, TRIM( #{rm.applStatusCd} )	AS APPL_STATUS_CD
+							FROM   DUAL
+
+</foreach>
+							) S
+					ON ( 		 T.ENTER_CD		= S.ENTER_CD
+							AND  T.APPL_SEQ		= S.APPL_SEQ
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APPL_STATUS_CD  = S.APPL_STATUS_CD
+									, T.CHKDATE		    = SYSDATE
+									, T.CHKID		    = #{ssnSabun}
+		</update>
+<!-- 결재선 저장 -->		
+		<update parameterType="map" id="saveAppMasterMgrDtl">
+
+   					MERGE INTO THRI107 T
+                  	USING (
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                           	SELECT   #{ssnEnterCd} 				AS ENTER_CD
+		                           	, TRIM( #{searchApplSeq} )	AS APPL_SEQ
+		                            , TRIM(#{rm.agreeSabun})  	AS AGREE_SABUN
+		                            , TRIM(#{rm.agreeSeq})		AS AGREE_SEQ
+		                           	, TRIM( #{searchPathSeq} )	AS PATH_SEQ
+		                            , TRIM(#{rm.applTypeCd}) 	AS APPL_TYPE_CD
+		                            , TRIM(#{rm.agreeStatusCd})	AS AGREE_STATUS_CD
+		                            , TO_DATE(TRIM(#{rm.agreeTime}),'yyyymmddHH24miss')  	AS AGREE_TIME
+		                            , TRIM(#{rm.gubun})  		AS GUBUN
+		                            , TRIM(#{rm.memo})  		AS MEMO
+		                            , TRIM(#{rm.orgAppYn})  	AS ORG_APP_YN
+		                            , TRIM(#{rm.agreeOrgNm})  	AS ORG_NM
+		                            , TRIM(#{rm.deputyYn})  	AS DEPUTY_YN
+		                            , TRIM(#{rm.deputySabun})  	AS DEPUTY_SABUN
+		                            , TRIM(#{rm.deputyOrg})  	AS DEPUTY_ORG
+		                            , TRIM(#{rm.deputyJikchak}) AS DEPUTY_JIKCHAK
+		                            , TRIM(#{rm.deputyJikwee})  AS DEPUTY_JIKWEE
+		                            , TRIM(#{rm.deputyAdminYn})  AS DEPUTY_ADMIN_YN
+		                            , TRIM(#{rm.agreeJikchakNm})  	AS JIKCHAK_NM
+                           	FROM   DUAL
+</foreach>
+                           ) S
+                        ON (
+                               	   T.ENTER_CD 		= S.ENTER_CD
+                               AND T.APPL_SEQ 		= S.APPL_SEQ
+                               AND T.AGREE_SABUN 	= S.AGREE_SABUN
+                               AND T.AGREE_SEQ		= S.AGREE_SEQ
+                           )
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD    
+               				, T.APPL_SEQ
+							, T.AGREE_SABUN
+							, T.AGREE_SEQ
+							, T.PATH_SEQ
+							, T.APPL_TYPE_CD
+							, T.AGREE_STATUS_CD
+                            , T.AGREE_TIME      
+                            , T.GUBUN       
+                            , T.MEMO        
+                            , T.ORG_APP_YN     
+                            , T.ORG_NM     
+                            , T.DEPUTY_YN
+                            , T.DEPUTY_SABUN
+                            , T.DEPUTY_ORG
+                            , T.DEPUTY_JIKCHAK
+                            , T.DEPUTY_JIKWEE
+                            , T.DEPUTY_ADMIN_YN
+							, T.CHKDATE     
+							, T.CHKID       
+							, T.JIKCHAK_NM       
+               			) 
+               			VALUES 
+               			(
+               				  S.ENTER_CD    
+							, S.APPL_SEQ
+							, S.AGREE_SABUN     
+							, S.AGREE_SEQ       
+							, S.PATH_SEQ      
+							, S.APPL_TYPE_CD    
+							, S.AGREE_STATUS_CD 
+                            , S.AGREE_TIME      
+                            , S.GUBUN       
+                            , S.MEMO        
+                            , S.ORG_APP_YN     
+                            , S.ORG_NM     
+                            , S.DEPUTY_YN
+                            , S.DEPUTY_SABUN
+                            , S.DEPUTY_ORG  
+                            , S.DEPUTY_JIKCHAK
+                            , S.DEPUTY_JIKWEE
+                            , S.DEPUTY_ADMIN_YN
+               				, SYSDATE
+               				, #{ssnSabun}
+               				, S.JIKCHAK_NM
+               			)
+		</update>
+		<delete parameterType="map" id="deleteAppMasterMgrDtl">
+
+				<![CDATA[
+   					DELETE FROM THRI107
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+
+		</delete>
+		<delete parameterType="map" id="deleteAppMasterMgr107">
+
+				<![CDATA[
+   					DELETE FROM THRI107
+					WHERE 1=1
+					AND ENTER_CD = #{ssnEnterCd}
+					AND APPL_SEQ = TO_NUMBER( TRIM( #{searchApplSeq} ) )
+					AND APPL_TYPE_CD <> '30'
+					AND AGREE_STATUS_CD <> '20'
+				]]>
+
+		</delete>
+</mapper>
+

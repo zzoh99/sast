@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.benefitBasis.accRatioMgr">
+		
+	<select id="getAccRatioMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT SDATE
+			 , EDATE
+			 , LOCATION_CD
+			 , RATE
+			 , ACCIDENT_RATE
+			 , BOND_MON
+			 , BIGO
+		  FROM TBEN006
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+	<if test="locationCd != null and locationCd neq''">
+		   AND LOCATION_CD = #{locationCd}
+	</if>
+		ORDER BY SDATE DESC
+	</select>
+		
+	<update id="saveAccRatioMgr" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN006 T
+		USING	(
+				SELECT A.SDATE
+					 , A.EDATE
+					 , A.LOCATION_CD
+					 , A.RATE
+					 , A.ACCIDENT_RATE
+					 , A.BOND_MON
+					 , A.BIGO
+				   FROM (
+						SELECT NULL		AS SDATE
+							 , NULL		AS EDATE
+							 , NULL		AS LOCATION_CD
+							 , NULL		AS RATE
+							 , NULL		AS ACCIDENT_RATE
+							 , NULL		AS BOND_MON
+							 , NULL		AS BIGO
+						  FROM DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+						  UNION ALL
+							SELECT TRIM(#{rm.sdate})		AS SDATE
+								 , TRIM(#{rm.edate})		AS EDATE
+								 , TRIM(#{rm.locationCd})	AS LOCATION_CD
+								 , TRIM(#{rm.rate})			AS RATE
+								 , TRIM(#{rm.accidentRate})	AS ACCIDENT_RATE
+								 , TRIM(#{rm.bondMon})		AS BOND_MON
+								 , TRIM(#{rm.bigo})			AS BIGO
+							  FROM DUAL
+		</foreach>				  
+						) A 
+				WHERE A.SDATE IS NOT NULL
+				  AND A.LOCATION_CD IS NOT NULL
+				) S
+		ON (	T.ENTER_CD		= #{ssnEnterCd} 
+			AND	T.SDATE			= S.SDATE
+			AND	T.LOCATION_CD	= S.LOCATION_CD
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.EDATE			= S.EDATE
+					 , T.RATE			= S.RATE
+					 , T.ACCIDENT_RATE	= S.ACCIDENT_RATE
+					 , T.BOND_MON		= S.BOND_MON
+					 , T.BIGO			= S.BIGO
+					 , T.CHKDATE		= SYSDATE
+					 , T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				T.ENTER_CD
+			  , T.SDATE
+			  , T.EDATE
+			  , T.LOCATION_CD
+			  , T.RATE
+			  , T.ACCIDENT_RATE
+			  , T.BOND_MON
+			  , T.BIGO
+			  , T.CHKDATE
+			  , T.CHKID
+			)
+			VALUES
+			(
+				#{ssnEnterCd}
+			  , S.SDATE
+			  , S.EDATE
+			  , S.LOCATION_CD
+			  , S.RATE
+			  , S.ACCIDENT_RATE
+			  , S.BOND_MON
+			  , S.BIGO
+			  , SYSDATE
+			  , #{ssnSabun}
+			)
+	</update>
+		
+	<delete id="deleteAccRatioMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN006
+		 WHERE ENTER_CD||'_'||SDATE||'_'||LOCATION_CD IN ( NULL ]]>
+		 <foreach item="rm" collection="deleteRows">
+		 	,
+		 	<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sdate != null and rm.sdate neq '' and rm.locationCd != null and rm.locationCd neq ''">
+		 		TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sdate})||'_'||TRIM(#{rm.locationCd})
+		 	</if>
+		 </foreach>
+		)
+	</delete>
+</mapper>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.system.sysUsingMgr">
+<!-- 		시스템사용기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSysUsingMgrList">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL, STD_CD, STD_NM, STD_CD_DESC, DATA_TYPE, STD_CD_VALUE, BIZ_CD
+					  FROM TSYS955
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND UPPER(NVL(STD_CD, '%')) LIKE '%'||UPPER(TRIM(#{searchStdCd}))||'%'
+					   AND UPPER(NVL(STD_NM, '%')) LIKE '%'||UPPER(TRIM(#{searchStdNm}))||'%'
+					   AND UPPER(NVL(BIZ_CD, '%')) LIKE '%'||UPPER(TRIM(#{searchBizCd}))||'%'
+					ORDER BY BIZ_CD, STD_NM  					 
+				]]>
+
+
+		</select>
+		
+<!-- 		시스템사용기준관리 저장 -->	
+		<update parameterType="map" id="saveSysUsingMgr">
+
+
+					MERGE INTO TSYS955 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.STD_CD
+									, A.STD_NM
+									, A.STD_CD_DESC
+									, A.DATA_TYPE
+									, A.STD_CD_VALUE
+									, A.BIZ_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS STD_CD
+											, NULL		AS STD_NM
+											, NULL		AS STD_CD_DESC
+											, NULL		AS DATA_TYPE
+											, NULL		AS STD_CD_VALUE
+											, NULL		AS BIZ_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.stdCd} )	AS STD_CD
+											, TRIM( #{rm.stdNm} )	AS STD_NM
+											, TRIM( #{rm.stdCdDesc} )	AS STD_CD_DESC
+											, TRIM( #{rm.dataType} )	AS DATA_TYPE
+											, TRIM( #{rm.stdCdValue} )	AS STD_CD_VALUE
+											, TRIM( #{rm.bizCd} )	AS BIZ_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.STD_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.STD_CD = S.STD_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.STD_NM	= S.STD_NM
+									, T.STD_CD_DESC	= S.STD_CD_DESC
+									, T.DATA_TYPE	= S.DATA_TYPE
+									, T.STD_CD_VALUE	= S.STD_CD_VALUE
+									, T.BIZ_CD	= S.BIZ_CD
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD
+							, T.STD_CD
+							, T.STD_NM
+							, T.STD_CD_DESC
+							, T.DATA_TYPE
+							, T.STD_CD_VALUE
+							, T.BIZ_CD
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  S.ENTER_CD
+							, S.STD_CD
+							, S.STD_NM
+							, S.STD_CD_DESC
+							, S.DATA_TYPE
+							, S.STD_CD_VALUE
+							, S.BIZ_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		시스템사용기준관리 삭제 -->
+		<delete parameterType="map" id="deleteSysUsingMgr">
+
+					DELETE FROM TSYS955 
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||STD_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.stdCd != null and !rm.stdCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.stdCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 시스템사용기준 기준코드값 단건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSystemUsingStdCdValueMap">
+
+				<![CDATA[
+                    SELECT F_COM_GET_STD_CD_VALUE(#{ssnEnterCd}, TRIM(#{stdCd})) AS STD_CD_VALUE
+                      FROM DUAL
+				]]>
+
+
+		</select>
+
+
+</mapper>

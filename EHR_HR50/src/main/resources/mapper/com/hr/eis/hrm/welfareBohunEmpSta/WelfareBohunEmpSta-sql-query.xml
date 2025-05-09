@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.hrm.welfareBohunEmpSta">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getWelfareBohunEmpStaList">
+			
+				<![CDATA[
+				  SELECT ENTER_CD
+				  		,SABUN
+				  		,NAME
+				  		,ORG_NM
+				  		,ORG_CD
+				  		,JIKWEE_NM
+				  		,JIKWEE_CD
+				  		,JIKCHAK_NM
+				  		,JIKCHAK_CD
+				  		,EMP_YMD
+				  		,RET_YMD
+				  		,WORK_TYPE
+				  		,STF_TYPE_NM
+				  		,BOHUN_NM
+                        ,FAM_NM
+                        ,BOHUN_NO
+                        ,NOTE
+				  FROM
+						(		
+						SELECT A.ENTER_CD,                                             --회사구분
+						       A.SABUN,                                                 -- 사번
+						       F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) NAME,                -- 성명(한글)          
+						       F_COM_GET_ORG_NM (B.ENTER_CD,
+						                         B.ORG_CD,
+						                         TO_CHAR (SYSDATE, 'YYYYMMDD')) AS ORG_NM,                                                     -- 소속
+						       B.ORG_CD,                                              -- 소속코드
+						       B.JIKWEE_NM,                                                   --직급
+						       B.JIKWEE_CD,                                           -- 직급코드
+						       B.JIKCHAK_NM,                                                 -- 직책
+						       B.JIKCHAK_CD,                                          -- 직책코드
+						       B.MANAGE_CD,                                           -- 사원구분코드
+						       A.EMP_YMD,                                             -- 입사일자
+						       A.RET_YMD,                                             -- 퇴사일자     
+						       B.WORK_TYPE,
+						       A.STF_TYPE_NM,										-- 입사구분       
+						       F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20310', C.BOHUN_CD) AS BOHUN_NM,
+                               F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20120', C.FAM_CD) AS FAM_NM,
+                               C.BOHUN_NO,
+                               C.NOTE,
+                               B.STATUS_CD
+						 FROM THRM100 A,                                                    -- 인사마스터
+						      THRM151 B,
+						       THRM122 C
+                         WHERE A.ENTER_CD = B.ENTER_CD
+                         AND A.ENTER_CD = C.ENTER_CD
+                         AND A.SABUN = C.SABUN
+                         AND A.SABUN = B.SABUN
+                         AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL (B.EDATE,'99999999')
+						)
+				  WHERE ENTER_CD = #{ssnEnterCd}
+					AND EMP_YMD BETWEEN NVL(REPLACE(#{searchYmdFrom}, '-'), '19000101') AND NVL(REPLACE(#{searchYmdTo}, '-'), '99991231') 
+					AND ORG_NM LIKE '%'|| #{searchOrgNm} ||'%'
+				    AND JIKWEE_CD LIKE '%'|| #{searchJikweeNm} ||'%'
+				    AND MANAGE_CD LIKE '%'|| #{searchManageCd} ||'%'
+					AND NAME LIKE '%'|| #{searchName} ||'%'
+					AND WORK_TYPE LIKE '%'|| #{searchWorkType} ||'%' ]]>
+				<choose>
+					<when test='statusCd != null and statusCd eq "Y"'>
+						AND STATUS_CD IN ('AA', 'CA', 'EA')
+					</when>
+					<otherwise>
+						AND STATUS_CD IN ('AA', 'CA', 'EA', 'RA')
+					</otherwise>
+				</choose>
+				 ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMD'))
+		</select>
+		
+<!-- 		현인원 조회용 -->
+		<select parameterType="map" resultType="cMap" id="getWelfareBohunEmpStaMap">
+			
+				<![CDATA[
+					SELECT NOW_CNT, LAW_PER, ROUND(NOW_CNT * ( LAW_PER / 100), 1) AS LAW_CNT, NOW_RCT_CNT, ROUND((NOW_RCT_CNT / NOW_CNT) * 100, 1) AS NOW_RCT_PER
+                    FROM (
+                                SELECT COUNT (*) AS NOW_CNT
+                                  FROM THRM100 A,THRM151 B
+                                 WHERE A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+                                     AND A.ENTER_CD = #{ssnEnterCd}
+                                       AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE
+                                                                             AND NVL (B.EDATE, '99999999')
+                                       AND B.STATUS_CD IN ('AA', 'CA', 'EA')
+                               ) A, 
+                               ( SELECT COUNT (*) NOW_RCT_CNT
+                                  FROM THRM100 A,THRM151 B, THRM122 C
+                                 WHERE A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+                                    AND A.ENTER_CD = C.ENTER_CD AND A.SABUN = C.SABUN
+                                     AND A.ENTER_CD = #{ssnEnterCd}
+                                    AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL (B.EDATE, '99999999')
+                                    AND B.STATUS_CD IN ('AA', 'CA', 'EA')
+                                ) B,   
+                                ( SELECT COUNT (*) ENTER_CNT
+                                    FROM THRM100 A,THRM151 B
+                                  WHERE A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+                                      AND A.ENTER_CD = #{ssnEnterCd}
+                                    AND A.EMP_YMD BETWEEN TO_CHAR(SYSDATE, 'YYYY') || '0101' AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+                                    AND B.STATUS_CD IN ('AA', 'CA', 'EA')
+                                ) C,
+                                (SELECT F_COM_GET_GRCODE_NAME(#{ssnEnterCd}, 'H90010', 'B') AS LAW_PER FROM DUAL ) D
+				]]>
+		</select>
+		
+</mapper>

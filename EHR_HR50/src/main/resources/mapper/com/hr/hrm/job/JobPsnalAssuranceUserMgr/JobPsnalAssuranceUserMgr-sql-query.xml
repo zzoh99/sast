@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.job.jobPsnalAssuranceUserMgr">
+
+<!-- 인사기본(보증) 보증인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobPsnalAssuranceUserMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , F_COM_GET_ORG_NM2 (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					     , F_COM_GET_JIKCHAK_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+					     , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+					     , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+					     , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+					     , A.TYPE
+					     , A.WARRANTY_S_YMD
+					     , A.WARRANTY_E_YMD
+					     , A.WARRANTY_NM
+					     , A.REL_NM
+					     , CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD) AS RES_NO
+					     , A.TEL_NO
+					     , A.ZIP
+					     , A.ADDR1
+					     , A.ADDR2
+					     , A.WARRANTY_MON
+					     , A.NOTE
+					     , A.FILE_SEQ
+					  FROM THRM119 A
+					  ]]>
+<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+-- 관리자 권한범위 체크
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = A.ENTER_CD
+  AND AUTH.SABUN = A.SABUN
+</if>
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+				<if test=' searchSabunNameAlias != null and !searchSabunNameAlias.equals("") '>
+					  AND ( A.SABUN LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%'
+					     OR F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') LIKE '%'||TRIM( #{searchSabunNameAlias} )||'%' )
+				</if>
+					   AND REPLACE(#{searchStdDate},'-','') BETWEEN WARRANTY_S_YMD AND NVL(WARRANTY_E_YMD,'99991231')
+					   AND A.TYPE = #{sType}
+					ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+
+		</select>
+
+<!-- 인사기본(보증) 보증인 저장 -->
+		<update parameterType="map" id="saveJobPsnalAssuranceUserMgr">
+
+
+					MERGE INTO THRM119 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.TYPE
+									, A.WARRANTY_S_YMD
+									, A.WARRANTY_E_YMD
+									, A.WARRANTY_NM
+									, A.REL_NM
+									, A.RES_NO
+									, A.TEL_NO
+									, A.ZIP
+									, A.ADDR1
+									, A.ADDR2
+									, A.WARRANTY_MON
+									, A.NOTE
+									, A.FILE_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS TYPE
+											, NULL		AS WARRANTY_S_YMD
+											, NULL		AS WARRANTY_E_YMD
+											, NULL		AS WARRANTY_NM
+											, NULL		AS REL_NM
+											, NULL		AS RES_NO
+											, NULL		AS TEL_NO
+											, NULL		AS ZIP
+											, NULL		AS ADDR1
+											, NULL		AS ADDR2
+											, NULL		AS WARRANTY_MON
+											, NULL      AS NOTE
+											, NULL      AS FILE_SEQ
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{sType} )				AS TYPE
+											, TRIM( #{rm.warrantySYmd} )	AS WARRANTY_S_YMD
+											, TRIM( #{rm.warrantyEYmd} )	AS WARRANTY_E_YMD
+											, TRIM( #{rm.warrantyNm} )		AS WARRANTY_NM
+											, TRIM( #{rm.relNm} )			AS REL_NM
+											, TRIM( #{rm.resNo} )			AS RES_NO
+											, TRIM( #{rm.telNo})			AS TEL_NO
+											, TRIM( #{rm.zip})				AS ZIP
+											, TRIM( #{rm.addr1})			AS ADDR1
+											, TRIM( #{rm.addr2})			AS ADDR2
+											, TRIM( #{rm.warrantyMon} )		AS WARRANTY_MON
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.fileSeq} )			AS FILE_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.TYPE  IS NOT NULL
+										  AND A.WARRANTY_S_YMD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.TYPE = S.TYPE AND T.WARRANTY_S_YMD = S.WARRANTY_S_YMD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.WARRANTY_E_YMD	= S.WARRANTY_E_YMD
+									, T.WARRANTY_NM   	= S.WARRANTY_NM
+									, T.REL_NM        	= S.REL_NM
+									, T.RES_NO          = CRYPTIT.ENCRYPT( S.RES_NO,S.ENTER_CD )
+									, T.TEL_NO          = S.TEL_NO
+									, T.ZIP             = S.ZIP
+									, T.ADDR1           = S.ADDR1
+									, T.ADDR2           = S.ADDR2
+									, T.WARRANTY_MON    = S.WARRANTY_MON
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+									, T.NOTE            = S.NOTE
+									, T.FILE_SEQ        = S.FILE_SEQ
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.TYPE
+							, T.WARRANTY_S_YMD
+							, T.WARRANTY_E_YMD
+							, T.WARRANTY_NM
+							, T.REL_NM
+							, T.RES_NO
+							, T.TEL_NO
+							, T.ZIP
+							, T.ADDR1
+							, T.ADDR2
+							, T.WARRANTY_MON
+							, T.CHKDATE
+							, T.CHKID
+							, T.NOTE
+							, T.FILE_SEQ
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.TYPE
+							, S.WARRANTY_S_YMD
+							, S.WARRANTY_E_YMD
+							, S.WARRANTY_NM
+							, S.REL_NM
+							, CRYPTIT.ENCRYPT( S.RES_NO,S.ENTER_CD )
+							, S.TEL_NO
+							, S.ZIP
+							, S.ADDR1
+							, S.ADDR2
+							, S.WARRANTY_MON
+							, SYSDATE
+							, #{ssnSabun}
+							, S.NOTE
+							, S.FILE_SEQ
+						)
+		</update>
+
+<!-- 인사기본(보증) 보증보험 삭제 -->
+		<delete parameterType="map" id="deleteJobPsnalAssuranceUserMgr">
+
+					DELETE FROM THRM119
+					WHERE  ENTER_CD||'_'||SABUN||'_'||TYPE||'_'||WARRANTY_S_YMD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sabun != null and !rm.sabun.equals("")
+											and rm.type != null and !rm.type.equals("")
+											and rm.warrantySYmd != null and !rm.warrantySYmd.equals("")
+											'>
+
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.type} )||'_'||TRIM( #{rm.warrantySYmd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

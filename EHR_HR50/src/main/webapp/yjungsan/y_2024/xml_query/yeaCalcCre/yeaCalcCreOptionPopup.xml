@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산 옵션
+ -->
+<root>
+
+	<!-- 연말정산 옵션 조회  -->
+	<query id="selectYeaCalcCreOptionPopupList">
+		<![CDATA[
+		    /* 20231201 TYEA955설정을 1순위로 보도록 로직 조정. (F_YEA_GET_STD_CD_VALUE 함수와 로직 동기화) */		
+		    SELECT NVL(B.STD_CD, A.STD_CD) AS STD_CD
+		         , NVL(B.STD_NM, A.STD_NM) AS STD_NM
+		         , NVL(B.STD_CD_VALUE, A.STD_CD_VALUE) AS STD_CD_VALUE
+		         , #searchStdWorkYy# AS WORK_YY
+			  FROM TSYS955 A
+		         , TYEA955 B
+			 WHERE A.ENTER_CD    = #ssnEnterCd#
+			   AND A.STD_CD     IN ('CPN_MONPAY_RETRY_YN', 'CPN_YEA_FAMILY' , 'CPN_YEA_RETRO_YN' , 'CPN_YEA_SIM_YN' , 'CPN_YEA_MON_SHOW_YN' , 'CPN_WORK_INCOME_PRINT_BUTTON','CPN_TAX_CUTVAL','CPN_YEA_FEEDBACK_YN','CPN_YEA_PDF_YN', 'CPN_YEA_DED_PRINT_YN', 'CPN_YEA_JINGSUJA_TYPE', 'CPN_YEA_DOJANG_TYPE','CPN_YEA_PAYTOT_YN','CPN_YEA_PAYTAX_YN','CPN_YEA_PAYTAX_INS_YN', 'CPN_YEA_PREWORK_YN', 'CPN_YEA_HOU_INFO_YN', 'CPN_YEA_ADD_FILE_YN', 'YEACALCLST_STAMP_YN', 'CPN_YEA_PAY_STD_TYPE','CPN_YEA_SIGN_YN', 'CPN_YEA_PDF_TYPE', 'CPN_TAX_SPC_YN')
+			   AND A.ENTER_CD    = B.ENTER_CD (+)
+			   AND A.STD_CD      = B.STD_CD (+)
+			   AND B.WORK_YY (+) = #searchStdWorkYy#			   
+		]]>
+	</query> 
+
+	<!-- 연말정산 과거 옵션 조회  -->
+	<query id="selectYeaCalcCreOptionPopupBfList">
+		<![CDATA[
+			SELECT STD_CD, STD_NM, STD_CD_VALUE
+			  /* 20231201
+			     [ 연말정산계산 ]
+					- 버그 : 연말정산옵션에서 기준년도별 조회 안됨 (기준년도 의미없음)
+					     => 조회시 현재년도(sysdate)와 기준년도를 비교하여 과거면 TYEA955, 현재면 TSYS955를 조회함
+					        문제는 TYEA955를 년도별 저장을 할때 그 시점에 그냥 TSYS955를 같이 업데이트 처리함
+					     => 기능을 살려보자 :: [ 연말정산 옵션 ](팝업)과 [ 전년대비 변경옵션 ] (레이어) 동기화 필요
+					      !! 주의) TYEA955는 년도별 운영자료
+					              TSYS955는 디폴트 운영자료
+					               → 참조불가 : 실시간으로 언제든 데이터가 조정될 수 있음
+					      !! 개선) 신규 테이블(TYEA956)에 연말정산 마감 버튼 클릭 시, 후처리로 해당년도의 옵션을 TYEA956에 갱신
+					               → [ 연말정산계산 ]화면에서 전년대비 자료 참조를 TYEA956에서 확인
+					      !! 개선사항시행) 2023년 귀속부터 기능 동작
+					               → 전년도 2022년 자료부터 저장
+					               → 단, 2022년도 자료는 2023-12-26일 1차 배포 시에 확정상태로 MIG 예정이므로
+					                    2022년도 연말정산 계산 당시의 옵션을 정확하게 기록하는데 한계가 있음
+		      FROM TYEA955 */
+	          FROM TYEA956
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #searchStdWorkYy#
+			   AND STD_CD IN ('CPN_MONPAY_RETRY_YN', 'CPN_YEA_FAMILY' , 'CPN_YEA_RETRO_YN' , 'CPN_YEA_SIM_YN' , 'CPN_YEA_MON_SHOW_YN' , 'CPN_WORK_INCOME_PRINT_BUTTON','CPN_TAX_CUTVAL','CPN_YEA_FEEDBACK_YN','CPN_YEA_PDF_YN', 'CPN_YEA_DED_PRINT_YN', 'CPN_YEA_JINGSUJA_TYPE', 'CPN_YEA_DOJANG_TYPE','CPN_YEA_PAYTOT_YN','CPN_YEA_PAYTAX_YN','CPN_YEA_PAYTAX_INS_YN', 'CPN_YEA_PREWORK_YN', 'CPN_YEA_HOU_INFO_YN', 'CPN_YEA_ADD_FILE_YN', 'YEACALCLST_STAMP_YN', 'CPN_YEA_PAY_STD_TYPE','CPN_YEA_SIGN_YN', 'CPN_YEA_PDF_TYPE', 'CPN_TAX_SPC_YN')
+		]]>
+	</query> 
+		
+
+	<!-- 연말정산 옵션 저장  -->
+	<query id="updateYeaCalcCreOptionPopup">
+		<![CDATA[
+			UPDATE TSYS955
+			SET STD_CD_VALUE  	= #std_cd_value#
+				, CHKDATE		= SYSDATE
+				, CHKID    		= #ssnSabun#
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND STD_CD = #std_cd#	
+		]]>
+	</query>
+
+	<!-- 연말정산 옵션 백업 저장  -->
+	<query id="updateYeaCalcCreOptionPopupBackup">
+		<![CDATA[
+			UPDATE TYEA955
+			SET STD_CD_VALUE  	= #std_cd_value#
+				, CHKDATE		= SYSDATE
+				, CHKID    		= #ssnSabun#
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND WORK_YY = #work_yy# 
+			  AND STD_CD = #std_cd#	
+		]]>
+	</query>
+	
+	<!-- 연말정산 옵션 백업 저장 -->
+	<query id="mergeYeaCalcCreOptionPopupBackup">
+		<![CDATA[
+			 MERGE INTO TYEA955 A
+			 USING ( SELECT ENTER_CD
+					 	  , STD_CD
+						  , STD_NM
+						  , STD_CD_DESC
+		             FROM TSYS955
+		             WHERE ENTER_CD = #ssnEnterCd#
+		               AND STD_CD       	  = #std_cd# ) B
+			    ON (       A.ENTER_CD         = B.ENTER_CD
+			           AND A.STD_CD           = B.STD_CD
+			           AND A.ENTER_CD         = #ssnEnterCd#
+			           AND A.WORK_YY          = #work_yy#
+			           AND A.STD_CD       	  = #std_cd#
+			       )
+			  WHEN MATCHED THEN
+			      UPDATE 
+			         SET   STD_CD_VALUE       = #std_cd_value#
+                		 , CHKDATE            = SYSDATE
+                		 , CHKID              = #ssnSabun#
+			  WHEN NOT MATCHED THEN
+			      INSERT
+	              (
+	                  ENTER_CD       
+	                , WORK_YY       
+	                , STD_CD   
+	                , STD_NM     
+	                , STD_CD_DESC          
+	                , STD_CD_VALUE      
+	                , CHKDATE
+	                , CHKID
+	              ) 
+	              VALUES
+	              (
+	                  B.ENTER_CD 
+	                , #work_yy#
+	                , B.STD_CD
+	                , B.STD_NM
+	                , B.STD_CD_DESC
+	                , #std_cd_value#
+	                , SYSDATE
+	                , #ssnSabun#
+	              )
+		]]>
+	</query>
+		
+</root>

@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	소득공제자료등록(주소사항)
+ -->
+<root>
+
+	<!-- 소득공제자료등록(주소사항) 조회 -->
+	<query id="selectYeaDataAddrList">
+		<![CDATA[
+			SELECT WORK_YY, ADJUST_TYPE, SABUN, BUSINESS_PLACE_CD, PAY_ACTION_CD, ZIP, ADDR1, ADDR2, ORG_CD, F_COM_GET_ORG_NM(ENTER_CD,ORG_CD,TO_CHAR(WORK_YY) || '1231') AS ORG_NM, INPUT_CLOSE_YN, APPRV_YN, FINAL_CLOSE_YN, PAY_PEOPLE_STATUS, HOUSE_OWNER_YN
+			      ,REDUCE_S_YMD,REDUCE_E_YMD
+			      ,HOUSE_GET_YMD,HOUSE_AREA,OFFICIAL_PRICE
+			      ,NATIONAL_CD, NATIONAL_NM, RESULT_CONFIRM_YN, HOUSE_CNT
+			      ,(SELECT F_COM_DECRYPT(RES_NO, ENTER_CD)
+			          FROM THRM100
+			         WHERE ENTER_CD = TCPN811.ENTER_CD
+			           AND SABUN    = TCPN811.SABUN) AS RES_NO
+			      ,NVL(FOREIGN_TAX_TYPE, '3') AS FOREIGN_TAX_TYPE
+			      ,RESIDENCY_CD
+			      ,RESIDENCY_TYPE
+			      ,CITIZEN_TYPE
+			      ,FOREIGN_EMP_TYPE
+			      ,TAX_RATE
+			      ,TAX_RATE AS TAX_RATE_OLD
+				  ,NVL(TAX_INS_YN, 'N') AS TAX_INS_YN
+				  ,TAX_INS_YN_MONTH
+				  ,NVL(INPUT_STATUS,'00') AS INPUT_STATUS
+			      ,CASE WHEN WED_TAX_DED_CHECK IS NOT NULL THEN 'Y' ELSE 'N' END AS WED_TAX_DED_CHECK
+			      ,CASE WHEN WED_TAX_DED_CHECK IS NOT NULL THEN ' 결혼세액공제 대상자임을 확인 (' || TO_CHAR(WED_TAX_DED_CHECK, 'YYYY.MM.DD HH24:MI:SS')||')' END AS WED_TAX_DED_CHECK_DATE
+			      ,WED_YMD
+			  FROM TCPN811
+			 WHERE ENTER_CD       = #ssnEnterCd#
+			   AND WORK_YY  	  = #searchWorkYy#
+			   AND ADJUST_TYPE    = #searchAdjustType#
+			   AND SABUN          = #searchSabun#
+		]]>
+	</query>
+
+	<!-- 소득공제자료등록(주소사항) 주소 조회 -->
+	<query id="selectYeaDataOrgAddr">
+		<![CDATA[
+			SELECT SABUN, ADD_TYPE, ZIP, ADDR1, ADDR2, HOUSING_TYPE
+			  FROM THRM123
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND SABUN = #searchSabun#
+			   AND ADD_TYPE IN ('3','2')
+			   AND ROWNUM = 1
+			   ORDER BY ADD_TYPE DESC
+		]]>
+	</query>
+
+	<!-- 소득공제자료등록(주소사항) 주소 저장 -->
+	<query id="updateYeaDataAddr">
+		<![CDATA[
+			UPDATE TCPN811
+			SET ZIP               	= #zip#
+				, ADDR1             = #addr1#
+				, ADDR2             = #addr2#
+				, HOUSE_OWNER_YN    = #house_owner_yn#
+				, REDUCE_S_YMD      = #reduce_s_ymd#
+				, REDUCE_E_YMD      = #reduce_e_ymd#
+				, HOUSE_CNT         = #house_cnt#
+				, HOUSE_GET_YMD     = #house_get_ymd#
+				, HOUSE_AREA        = #house_area#
+				, OFFICIAL_PRICE    = #official_price#
+				, FOREIGN_TAX_TYPE  = #foreign_tax_type#
+				, NATIONAL_CD       = #national_cd#
+				, NATIONAL_NM       = #national_nm#
+				, RESIDENCY_CD      = #residency_cd#
+				, RESIDENCY_TYPE    = NVL(#residency_type#, '1')
+				, CITIZEN_TYPE      = NVL(#citizen_type#, '1')
+				, FOREIGN_EMP_TYPE  = #foreign_emp_type#
+				, TAX_RATE          = #tax_rate#
+				, TAX_INS_YN        = #tax_ins_yn#
+				, WED_TAX_DED_CHECK = CASE WHEN #wed_tax_ded_check# = 'Y' 
+				                           THEN ( CASE WHEN WED_TAX_DED_CHECK IS NULL THEN SYSDATE ELSE WED_TAX_DED_CHECK END ) 
+				                           ELSE NULL END
+				, WED_YMD    		= #wed_ymd#
+				, CHKDATE	    	= SYSDATE
+				, CHKID    		  	= #ssnSabun#
+				, TAX_INS_YN_MONTH  = CASE WHEN #tax_ins_yn# = 'Y' THEN #tax_ins_yn_month# ELSE '1' END
+			WHERE WORK_YY	 		= #work_yy#
+			  AND ADJUST_TYPE 		= #adjust_type#
+			  AND SABUN 			= #sabun#
+			  AND ENTER_CD			= #ssnEnterCd#
+		]]>
+	</query>
+
+	<!-- 소득공제자료등록(주소사항) 주소 확정 -->
+    <query id="updateYeaDataAddrConfirm">
+        <![CDATA[
+            UPDATE TCPN811
+               SET INPUT_STATUS      = SUBSTR(INPUT_STATUS, 1, 1) || #input_status#
+             WHERE WORK_YY           = #work_yy#
+               AND ADJUST_TYPE       = #adjust_type#
+               AND SABUN             = #ssnSabun#
+               AND ENTER_CD          = #ssnEnterCd#
+        ]]>
+    </query>
+
+	<!-- 개인별원천징수세율 등록 확인 -->
+    <query id="selectITaxRateApp">
+        <![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TCPN114
+			 WHERE ENTER_CD	= #ssnEnterCd#
+			   AND SABUN    = #sabun#
+			   AND SUBSTR(SDATE, 1, 4) = #next_work_yy#
+        ]]>
+    </query>
+
+    <!-- 개인별원천징수세율 입력 -->
+	<query id="insertITaxRateApp">
+		<![CDATA[
+			INSERT INTO TCPN114
+			(
+				ENTER_CD
+				, SABUN
+				, SEQ
+				, APPL_YMD
+				, APPL_YM
+				, RATE
+				, SDATE
+				, EDATE
+				, APPL_STATUS
+				, APPR_YMD
+				, MEMO
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #sabun#
+				, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + 1)
+					          FROM TCPN114
+					         WHERE ENTER_CD = #ssnEnterCd#
+					           AND SABUN = TRIM(#sabun#)
+					      ) )
+				, TO_CHAR(SYSDATE,'YYYYMMDD')
+				, #appl_ym#
+				, #tax_rate#
+				, #sdate#
+				, '99991231'
+				, #appl_status#
+				, DECODE(#appr_ymd#, '', NULL, #appr_ymd#)
+				, #memo#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 우편번호 조회대상 가능 리스트 -->
+	<query id="selectTargetZipCodeList">
+		<![CDATA[
+			SELECT  COUNT(*) AS CNT
+				FROM TSYS955
+				WHERE STD_CD = 'CPN_YEA_ADDR_POP_YN'
+			    AND (STD_CD_VALUE = NULL OR STD_CD_VALUE = 'N')
+		]]>
+	</query>
+	<!-- 자료등록 필수기입사항 msg -->
+    <query id="selectYeaAlert">
+       <![CDATA[
+            SELECT F_YEA_ALERT(#ssnEnterCd#,#searchWorkYy#,#searchAdjustType#,'PSNL',#searchSabun#,#orgAuthPg#) AS MSG FROM DUAL
+       ]]>
+    </query>
+
+	<!-- 과거 결혼세액공제 적용 여부 -->
+	<query id="checkWedTaxDedPrevious">
+		<![CDATA[
+            SELECT COUNT(*) AS CNT
+			  FROM TCPN811
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY < #searchWorkYy#
+			   AND ADJUST_TYPE = #searchAdjustType#
+			   AND SABUN = #searchSabun#
+			   AND WED_TAX_DED_CHECK IS NOT NULL
+       ]]>
+	</query>
+</root>

@@ -1,0 +1,879 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.psnalPayUser">
+	<!-- 급여 총 지급액 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayUserBase">
+		<![CDATA[
+			SELECT RTRIM(TO_CHAR(SUM(C.PAYMENT_MON), 'FM999,999,999,999,999,999'), '.') AS TOT_PAYMENT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN303 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 퇴직금,연말정산 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN TCPN981 E
+			    ON E.ENTER_CD = A.ENTER_CD
+			   AND E.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND NVL(E.CLOSE_YN, 'N') = 'Y'
+			  LEFT OUTER JOIN TCPN991 F
+			    ON F.ENTER_CD = A.ENTER_CD
+			   AND F.PAY_CD = A.PAY_CD
+			   AND (
+			           CASE WHEN D.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+			                ELSE
+			                     CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD') THEN -1
+			                          WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD')
+			                          THEN
+			                               CASE WHEN F.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+			                          ELSE 0
+			                     END
+			           END
+			       ) < 0
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+		]]>
+		<if test='radioPeriod != null and radioPeriod neq ""'>
+			<choose>
+				<when test='"oneMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM = TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"threeMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -2), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"sixMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -5), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"nineMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -8), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"oneYear".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -11), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"period".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN REPLACE(#{searchSYm}, '-', '') AND NVL(REPLACE(#{searchEYm}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMM'))
+				</when>
+			</choose>
+		</if>
+	</select>
+
+	<!-- 급여 총 지급액 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayUserBaseList">
+		<![CDATA[
+			SELECT A.PAY_ACTION_CD, A.PAY_ACTION_NM, D.PAY_NM
+			     , RTRIM(TO_CHAR(SUM(C.PAYMENT_MON), 'FM999,999,999,999,999,999'), '.') AS PAYMENT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN303 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 00004: 퇴직금, Y0001: 연말정산, R0001: 퇴직급여, R0002: 퇴직상여, R0003: 퇴직연월차 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN TCPN981 E
+			    ON E.ENTER_CD = A.ENTER_CD
+			   AND E.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND NVL(E.CLOSE_YN, 'N') = 'Y'
+			  LEFT OUTER JOIN TCPN991 F
+			    ON F.ENTER_CD = A.ENTER_CD
+			   AND F.PAY_CD = A.PAY_CD
+			   AND (
+			           CASE WHEN D.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+			                ELSE
+			                     CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD') THEN -1
+			                          WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD')
+			                          THEN
+			                               CASE WHEN F.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+			                          ELSE 0
+			                     END
+			           END
+			       ) < 0
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+		]]>
+		<if test='radioPeriod != null and radioPeriod neq ""'>
+			<choose>
+				<when test='"oneMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM = TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"threeMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -2), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"sixMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -5), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"nineMonth".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -8), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"oneYear".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -11), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"period".equals(radioPeriod)'>
+			   AND A.PAY_YM BETWEEN REPLACE(#{searchSYm}, '-', '') AND NVL(REPLACE(#{searchEYm}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMM'))
+				</when>
+			</choose>
+		</if>
+		<![CDATA[
+			 GROUP BY A.ENTER_CD, A.PAY_ACTION_CD, A.PAY_ACTION_NM, A.PAY_YM, A.ORD_EYMD, B.SABUN, D.PAY_NM
+			 ORDER BY A.ENTER_CD, A.PAY_YM, A.ORD_EYMD
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 급여내역 상세리스트 조회 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayUserDetailList">
+		<![CDATA[
+			SELECT A.PAY_ACTION_CD, A.PAY_ACTION_NM
+			     , RTRIM(TO_CHAR(C.TOT_EARNING_MON, 'FM999,999,999,999,999,999'), '.') AS TOT_EARNING_MON
+			     , RTRIM(TO_CHAR(C.TOT_DED_MON, 'FM999,999,999,999,999,999'), '.') AS TOT_DED_MON
+			     , RTRIM(TO_CHAR(C.PAYMENT_MON, 'FM999,999,999,999,999,999'), '.') AS PAYMENT_MON
+			     , RTRIM(TO_CHAR(C.ITAX_MON, 'FM999,999,999,999,999,999'), '.') AS ITAX_MON
+			     , RTRIM(TO_CHAR(C.RTAX_MON, 'FM999,999,999,999,999,999'), '.') AS RTAX_MON
+			     , RTRIM(TO_CHAR(C.NP_EE_MON, 'FM999,999,999,999,999,999'), '.') AS NP_EE_MON
+			     , RTRIM(TO_CHAR(C.HI_EE_MON, 'FM999,999,999,999,999,999'), '.') AS HI_EE_MON
+			     , RTRIM(TO_CHAR(C.EI_EE_MON, 'FM999,999,999,999,999,999'), '.') AS EI_EE_MON
+			     , RTRIM(TO_CHAR(C.TAXIBLE_EARN_MON, 'FM999,999,999,999,999,999'), '.') AS TAXIBLE_EARN_MON
+			     , RTRIM(TO_CHAR(C.NOTAX_TOT_MON, 'FM999,999,999,999,999,999'), '.') AS NOTAX_TOT_MON
+			     , ROW_NUMBER() OVER(ORDER BY A.ENTER_CD, A.PAYMENT_YMD, A.PAY_ACTION_NM) AS SEQ
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN303 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 00004: 퇴직금, Y0001: 연말정산, R0001: 퇴직급여, R0002: 퇴직상여, R0003: 퇴직연월차 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN TCPN981 E
+			    ON E.ENTER_CD = A.ENTER_CD
+			   AND E.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND NVL(E.CLOSE_YN, 'N') = 'Y'
+			  LEFT OUTER JOIN TCPN991 F
+			    ON F.ENTER_CD = A.ENTER_CD
+			   AND F.PAY_CD = A.PAY_CD
+			   AND (
+			           CASE WHEN D.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+			                ELSE
+			                     CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD') THEN -1
+			                          WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD')
+			                          THEN
+			                               CASE WHEN F.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+			                          ELSE 0
+			                     END
+			           END
+			       ) < 0
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+		]]>
+		<if test='radioPeriod != null and radioPeriod neq ""'>
+			<choose>
+				<when test='"oneMonth".equals(radioPeriod)'>
+					AND A.PAY_YM = TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"threeMonth".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -2), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"sixMonth".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -5), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"nineMonth".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -8), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"oneYear".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -11), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"period".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN REPLACE(#{searchSYm}, '-', '') AND NVL(REPLACE(#{searchEYm}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMM'))
+				</when>
+			</choose>
+		</if>
+	</select>
+
+	<!-- 개인별급여내역 급여내역 상세리스트 Summary 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayUserDetailListSum">
+		<![CDATA[
+			SELECT RTRIM(TO_CHAR(SUM(C.TOT_EARNING_MON), 'FM999,999,999,999,999,999'), '.') AS TOT_EARNING_MON
+			     , RTRIM(TO_CHAR(SUM(C.TOT_DED_MON), 'FM999,999,999,999,999,999'), '.') AS TOT_DED_MON
+			     , RTRIM(TO_CHAR(SUM(C.PAYMENT_MON), 'FM999,999,999,999,999,999'), '.') AS PAYMENT_MON
+			     , RTRIM(TO_CHAR(SUM(C.ITAX_MON), 'FM999,999,999,999,999,999'), '.') AS ITAX_MON
+			     , RTRIM(TO_CHAR(SUM(C.RTAX_MON), 'FM999,999,999,999,999,999'), '.') AS RTAX_MON
+			     , RTRIM(TO_CHAR(SUM(C.NP_EE_MON), 'FM999,999,999,999,999,999'), '.') AS NP_EE_MON
+			     , RTRIM(TO_CHAR(SUM(C.HI_EE_MON), 'FM999,999,999,999,999,999'), '.') AS HI_EE_MON
+			     , RTRIM(TO_CHAR(SUM(C.EI_EE_MON), 'FM999,999,999,999,999,999'), '.') AS EI_EE_MON
+			     , RTRIM(TO_CHAR(SUM(C.TAXIBLE_EARN_MON), 'FM999,999,999,999,999,999'), '.') AS TAXIBLE_EARN_MON
+			     , RTRIM(TO_CHAR(SUM(C.NOTAX_TOT_MON), 'FM999,999,999,999,999,999'), '.') AS NOTAX_TOT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN303 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 00004: 퇴직금, Y0001: 연말정산, R0001: 퇴직급여, R0002: 퇴직상여, R0003: 퇴직연월차 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN TCPN981 E
+			    ON E.ENTER_CD = A.ENTER_CD
+			   AND E.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND NVL(E.CLOSE_YN, 'N') = 'Y'
+			  LEFT OUTER JOIN TCPN991 F
+			    ON F.ENTER_CD = A.ENTER_CD
+			   AND F.PAY_CD = A.PAY_CD
+			   AND (
+			           CASE WHEN D.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+			                ELSE
+			                     CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD') THEN -1
+			                          WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD')
+			                          THEN
+			                               CASE WHEN F.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+			                          ELSE 0
+			                     END
+			           END
+			       ) < 0
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+		]]>
+		<if test='radioPeriod != null and radioPeriod neq ""'>
+			<choose>
+				<when test='"oneMonth".equals(radioPeriod)'>
+					AND A.PAY_YM = TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"threeMonth".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -2), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"sixMonth".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -5), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"nineMonth".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -8), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"oneYear".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE, -11), 'YYYYMM') AND TO_CHAR(SYSDATE, 'YYYYMM')
+				</when>
+				<when test='"period".equals(radioPeriod)'>
+					AND A.PAY_YM BETWEEN REPLACE(#{searchSYm}, '-', '') AND NVL(REPLACE(#{searchEYm}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMM'))
+				</when>
+			</choose>
+		</if>
+	</select>
+
+	<!-- 개인별급여내역 급여상세레이어 급여 리스트 Summary 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayDetailUserPayActionList">
+		<![CDATA[
+			SELECT A.PAY_ACTION_CD AS CODE
+			     , A.PAY_ACTION_NM AS CODE_NM
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN303 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 00004: 퇴직금, Y0001: 연말정산, R0001: 퇴직급여, R0002: 퇴직상여, R0003: 퇴직연월차 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN TCPN981 E
+			    ON E.ENTER_CD = A.ENTER_CD
+			   AND E.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND NVL(E.CLOSE_YN, 'N') = 'Y'
+			  LEFT OUTER JOIN TCPN991 F
+			    ON F.ENTER_CD = A.ENTER_CD
+			   AND F.PAY_CD = A.PAY_CD
+			   AND (
+			           CASE WHEN D.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+			                ELSE
+			                     CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD') THEN -1
+			                          WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD')
+			                          THEN
+			                               CASE WHEN F.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+			                          ELSE 0
+			                     END
+			           END
+			       ) < 0
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 급여 총 지급액 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayUserIsOpen">
+		<![CDATA[
+			SELECT DECODE(COUNT(1), 0, 'N', 'Y') AS OPEN_YN
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN303 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 퇴직금,연말정산 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN TCPN981 E
+			    ON E.ENTER_CD = A.ENTER_CD
+			   AND E.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND NVL(E.CLOSE_YN, 'N') = 'Y'
+			 INNER JOIN TCPN991 F
+			    ON F.ENTER_CD = A.ENTER_CD
+			   AND F.PAY_CD = A.PAY_CD
+			   AND (
+			           CASE WHEN D.RUN_TYPE IN ('R0001','R0002','R0003') THEN -1
+			                ELSE
+			                     CASE WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') > TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD') THEN -1
+			                          WHEN  TO_CHAR(SYSDATE,'YYYYMMDD') = TO_CHAR((TO_DATE(A.PAYMENT_YMD,'YYYYMMDD') + TO_NUMBER(NVL(F.OPEN_DD,0))),'YYYYMMDD')
+			                          THEN
+			                               CASE WHEN F.OPEN_HM <= TO_CHAR(SYSDATE,'HH24MI') THEN -1 ELSE 0 END
+			                          ELSE 0
+			                     END
+			           END
+			       ) < 0
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+			   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 급여상세 Summary 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayDetailUserSummary">
+		<![CDATA[
+			WITH
+			TCPN201_W AS
+			(
+			    SELECT ENTER_CD, PAY_ACTION_CD, PAY_ACTION_NM, ORD_EYMD
+			      FROM TCPN201
+			     WHERE ENTER_CD = #{ssnEnterCd}
+			       AND PAY_ACTION_CD = #{searchPayActionCd}
+			)
+			SELECT A.PAY_ACTION_NM
+			     , RTRIM(TO_CHAR(C.PAYMENT_MON, 'FM999,999,999,999,999,999'), '.') AS PAYMENT_MON -- 실수령액
+				 , RTRIM(TO_CHAR(C.TOT_EARNING_MON, 'FM999,999,999,999,999,999'), '.') AS TOT_EARNING_MON -- 지급총액
+			     , RTRIM(TO_CHAR(C.NOTAX_TOT_MON, 'FM999,999,999,999,999,999'), '.') AS NOTAX_TOT_MON -- 비과세총액
+			     , RTRIM(TO_CHAR(C.TAXIBLE_EARN_MON, 'FM999,999,999,999,999,999'), '.') AS TAXIBLE_EARN_MON -- 과세대상금액
+				 , RTRIM(TO_CHAR(C.TOT_DED_MON, 'FM999,999,999,999,999,999'), '.') AS TOT_DED_MON -- 공제총액
+			     , RTRIM(TO_CHAR(C.ITAX_MON, 'FM999,999,999,999,999,999'), '.') AS ITAX_MON -- 소득세
+			     , RTRIM(TO_CHAR(C.RTAX_MON, 'FM999,999,999,999,999,999'), '.') AS RTAX_MON -- 주민세
+			     , RTRIM(TO_CHAR(C.TOT_DED_MON - C.ITAX_MON - C.RTAX_MON, 'FM999,999,999,999,999,999'), '.') AS ETC_DED_MON -- 기타공제
+				 , RTRIM(TO_CHAR(DECODE(NVL(G.SPOUSE_YN, 0), 'Y', 1, 0) + NVL(G.FAMILY_CNT_1, 0) + NVL(G.FAMILY_CNT_2, 0) + 1, 'FM999,990'), '.') AS FAMILY_CNT -- 부양가족수
+				 , DECODE(RTRIM(TO_CHAR(NVL(G.ADD_CHILD_CNT, 0), '999,999,999,990'), '.'), '0', NULL, RTRIM(TO_CHAR(NVL(G.ADD_CHILD_CNT, 0), 'FM999,990'), '.')) AS ADD_CHILD_CNT -- 다자녀수
+			  FROM TCPN201_W A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN303 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			  LEFT OUTER JOIN
+			       (
+			           SELECT T.ENTER_CD, T.SABUN
+			                , T.SPOUSE_YN, T.FAMILY_CNT_1, T.FAMILY_CNT_2, T.ADD_CHILD_CNT
+			             FROM TCPN101 T
+			            WHERE T.SDATE =
+			                  (
+			                      SELECT MAX(SDATE)
+			                        FROM TCPN101
+			                       WHERE ENTER_CD = T.ENTER_CD
+			                         AND SABUN = T.SABUN
+			                         AND ( SELECT ORD_EYMD FROM TCPN201_W ) BETWEEN SDATE AND NVL(EDATE, '99991231')
+							  )
+			       ) G
+			    ON G.ENTER_CD = B.ENTER_CD
+			   AND G.SABUN = B.SABUN
+			 WHERE B.SABUN = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 급여상세 지급내역 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayDetailUserPay">
+		<![CDATA[
+			SELECT 'PAY_TOT' AS TYPE, '지급총액' AS REPORT_NM
+			     , RTRIM(TO_CHAR(NVL(SUM(C.RESULT_MON), 0), 'FM999,999,999,999,999,999'), '.') AS RESULT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN205 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN
+			       (
+			           SELECT G1.ENTER_CD, G1.ELEMENT_CD, G1.SDATE, G1.EDATE
+			                , NVL2(G1.LANGUAGE_CD2, F_COM_GET_LANGUAGE_MAPPING(G1.ENTER_CD, 'tsys011', G1.LANGUAGE_CD2, #{ssnLocaleCd}), G1.REPORT_NM) AS REPORT_NM
+			             FROM TCPN011 G1
+			            WHERE G1.ELEMENT_TYPE  = 'A' -- 지급
+			              AND (G1.DEDUCTION_TYPE IS NULL OR G1.DEDUCTION_TYPE <> 'ER_CAG')
+						  AND NOT EXISTS
+						      (
+						          SELECT 1
+						            FROM TSYS001 T1
+						               , TSYS005 T2
+						           WHERE T1.GRCODE_CD = T2.GRCODE_CD
+						             AND T2.GRCODE_CD = 'C00011'
+						             AND NVL(T2.NOTE1, '0') = '1'
+						             AND T2.ENTER_CD = G1.ENTER_CD
+						             AND T2.CODE = G1.ATTRIBUTE_3
+							)
+			       ) G
+			    ON G.ENTER_CD = C.ENTER_CD
+			   AND G.ELEMENT_CD = C.ELEMENT_CD
+			   AND A.ORD_EYMD BETWEEN G.SDATE AND NVL(G.EDATE, '99991231')
+			   AND NOT EXISTS
+			       (
+			           SELECT 1
+			             FROM TCPN071 T1
+			                , TCPN072 T2
+			            WHERE T1.ENTER_CD = T2.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = T2.ELEMENT_SET_CD
+			              AND T1.ENTER_CD = A.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = '30'
+			              AND T2.ELEMENT_CD = C.ELEMENT_CD
+			              AND A.ORD_EYMD BETWEEN T2.SDATE AND NVL(T2.EDATE, '99991231')
+			       )
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+			   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+
+			UNION ALL
+
+			SELECT 'PAY' AS TYPE, G.REPORT_NM
+			     , RTRIM(TO_CHAR(NVL(SUM(C.RESULT_MON), 0), 'FM999,999,999,999,999,999'), '.') AS RESULT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN205 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN
+			       (
+			           SELECT G1.ENTER_CD, G1.ELEMENT_CD, G1.SDATE, G1.EDATE
+			                , NVL2(G1.LANGUAGE_CD2, F_COM_GET_LANGUAGE_MAPPING(G1.ENTER_CD, 'tsys011', G1.LANGUAGE_CD2, #{ssnLocaleCd}), G1.REPORT_NM) AS REPORT_NM
+			             FROM TCPN011 G1
+			            WHERE G1.ELEMENT_TYPE  = 'A' -- 지급
+			              AND (G1.DEDUCTION_TYPE IS NULL OR G1.DEDUCTION_TYPE <> 'ER_CAG')
+						  AND NOT EXISTS
+						      (
+						          SELECT 1
+						            FROM TSYS001 T1
+						               , TSYS005 T2
+						           WHERE T1.GRCODE_CD = T2.GRCODE_CD
+						             AND T2.GRCODE_CD = 'C00011'
+						             AND NVL(T2.NOTE1, '0') = '1'
+						             AND T2.ENTER_CD = G1.ENTER_CD
+						             AND T2.CODE = G1.ATTRIBUTE_3
+							)
+			       ) G
+			    ON G.ENTER_CD = C.ENTER_CD
+			   AND G.ELEMENT_CD = C.ELEMENT_CD
+			   AND A.ORD_EYMD BETWEEN G.SDATE AND NVL(G.EDATE, '99991231')
+			   AND NOT EXISTS
+			       (
+			           SELECT 1
+			             FROM TCPN071 T1
+			                , TCPN072 T2
+			            WHERE T1.ENTER_CD = T2.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = T2.ELEMENT_SET_CD
+			              AND T1.ENTER_CD = A.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = '30'
+			              AND T2.ELEMENT_CD = C.ELEMENT_CD
+			              AND A.ORD_EYMD BETWEEN T2.SDATE AND NVL(T2.EDATE, '99991231')
+			       )
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			  AND B.SABUN = #{ssnSabun}
+			  AND A.PAY_ACTION_CD = #{searchPayActionCd}
+			GROUP BY G.REPORT_NM
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 급여상세 공제내역 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayDetailUserDeduct">
+		<![CDATA[
+			SELECT 'DEDUCT_TOT' AS TYPE, '공제총액' AS REPORT_NM
+			     , RTRIM(TO_CHAR(NVL(SUM(C.RESULT_MON), 0), 'FM999,999,999,999,999,999'), '.') AS RESULT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN205 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN
+			       (
+			           SELECT G1.ENTER_CD, G1.ELEMENT_CD, G1.SDATE, G1.EDATE
+			                , NVL2(G1.LANGUAGE_CD2, F_COM_GET_LANGUAGE_MAPPING(G1.ENTER_CD, 'tsys011', G1.LANGUAGE_CD2, #{ssnLocaleCd}), G1.REPORT_NM) AS REPORT_NM
+			             FROM TCPN011 G1
+			            WHERE G1.ELEMENT_TYPE  = 'D' -- 공제
+			              AND (G1.DEDUCTION_TYPE IS NULL OR G1.DEDUCTION_TYPE <> 'ER_CAG')
+			              AND NOT EXISTS
+			                  (
+			                      SELECT 1
+			                        FROM TSYS001 T1
+			                           , TSYS005 T2
+			                       WHERE T1.GRCODE_CD = T2.GRCODE_CD
+			                         AND T2.GRCODE_CD = 'C00011'
+			                         AND NVL(T2.NOTE1, '0') = '1'
+			                         AND T2.ENTER_CD = G1.ENTER_CD
+			                         AND T2.CODE = G1.ATTRIBUTE_3
+			                  )
+			       ) G
+			    ON G.ENTER_CD = C.ENTER_CD
+			   AND G.ELEMENT_CD = C.ELEMENT_CD
+			   AND A.ORD_EYMD BETWEEN G.SDATE AND NVL(G.EDATE, '99991231')
+			   AND NOT EXISTS
+			       (
+			           SELECT 1
+			             FROM TCPN071 T1
+			                , TCPN072 T2
+			            WHERE T1.ENTER_CD = T2.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = T2.ELEMENT_SET_CD
+			              AND T1.ENTER_CD = A.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = '30'
+			              AND T2.ELEMENT_CD = C.ELEMENT_CD
+			              AND A.ORD_EYMD BETWEEN T2.SDATE AND NVL(T2.EDATE, '99991231')
+			       )
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+			   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+
+			UNION ALL
+
+			SELECT 'DEDUCT' AS TYPE, G.REPORT_NM
+			     , RTRIM(TO_CHAR(NVL(SUM(C.RESULT_MON), 0), 'FM999,999,999,999,999,999'), '.') AS RESULT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN205 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN
+			       (
+			           SELECT G1.ENTER_CD, G1.ELEMENT_CD, G1.SDATE, G1.EDATE
+			                , NVL2(G1.LANGUAGE_CD2, F_COM_GET_LANGUAGE_MAPPING(G1.ENTER_CD, 'tsys011', G1.LANGUAGE_CD2, #{ssnLocaleCd}), G1.REPORT_NM) AS REPORT_NM
+			             FROM TCPN011 G1
+			            WHERE G1.ELEMENT_TYPE  = 'D' -- 공제
+			              AND (G1.DEDUCTION_TYPE IS NULL OR G1.DEDUCTION_TYPE <> 'ER_CAG')
+			              AND NOT EXISTS
+			                  (
+			                      SELECT 1
+			                        FROM TSYS001 T1
+			                           , TSYS005 T2
+			                       WHERE T1.GRCODE_CD = T2.GRCODE_CD
+			                         AND T2.GRCODE_CD = 'C00011'
+			                         AND NVL(T2.NOTE1, '0') = '1'
+			                         AND T2.ENTER_CD = G1.ENTER_CD
+			                         AND T2.CODE = G1.ATTRIBUTE_3
+			                  )
+			       ) G
+			    ON G.ENTER_CD = C.ENTER_CD
+			   AND G.ELEMENT_CD = C.ELEMENT_CD
+			   AND A.ORD_EYMD BETWEEN G.SDATE AND NVL(G.EDATE, '99991231')
+			   AND NOT EXISTS
+			       (
+			           SELECT 1
+			             FROM TCPN071 T1
+			                , TCPN072 T2
+			            WHERE T1.ENTER_CD = T2.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = T2.ELEMENT_SET_CD
+			              AND T1.ENTER_CD = A.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = '30'
+			              AND T2.ELEMENT_CD = C.ELEMENT_CD
+			              AND A.ORD_EYMD BETWEEN T2.SDATE AND NVL(T2.EDATE, '99991231')
+			       )
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+			   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+			 GROUP BY G.REPORT_NM
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 급여상세 급여기초 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayDetailUserBasic">
+		<![CDATA[
+			SELECT 'BASIC_TOT' AS TYPE, '급여기초총액' AS REPORT_NM
+			     , RTRIM(TO_CHAR(NVL(SUM(C.RESULT_MON), 0), 'FM999,999,999,999,999,999'), '.') AS RESULT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN294 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 00004: 퇴직금, Y0001: 연말정산, R0001: 퇴직급여, R0002: 퇴직상여, R0003: 퇴직연월차 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN
+			       (
+			           SELECT G1.ENTER_CD, G1.ELEMENT_CD, G1.SDATE, G1.EDATE
+			                , NVL2(G1.LANGUAGE_CD2, F_COM_GET_LANGUAGE_MAPPING(G1.ENTER_CD, 'tsys011', G1.LANGUAGE_CD2, #{ssnLocaleCd}), G1.REPORT_NM) AS REPORT_NM
+			             FROM TCPN011 G1
+			       ) G
+			    ON G.ENTER_CD = C.ENTER_CD
+			   AND G.ELEMENT_CD = C.ELEMENT_CD
+			   AND A.ORD_EYMD BETWEEN G.SDATE AND NVL(G.EDATE, '99991231')
+			   AND EXISTS
+			       (
+			           SELECT 1
+			             FROM TCPN071 T1
+			                , TCPN072 T2
+			            WHERE T1.ENTER_CD = T2.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = T2.ELEMENT_SET_CD
+			              AND T1.ENTER_CD = A.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = D.ELEMENT_SET_CD
+			              AND T2.ELEMENT_CD = C.ELEMENT_CD
+			              AND NVL(T2.BASE_SHOW_YN, 'N') = 'Y'
+			              AND A.ORD_EYMD BETWEEN T2.SDATE AND NVL(T2.EDATE, '99991231')
+			       )
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+			   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+
+			UNION ALL
+
+			SELECT 'BASIC' AS TYPE, G.REPORT_NM
+			     , RTRIM(TO_CHAR(NVL(SUM(C.RESULT_MON), 0), 'FM999,999,999,999,999,999'), '.') AS RESULT_MON
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN294 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN051 D
+			    ON D.ENTER_CD = A.ENTER_CD
+			   AND D.PAY_CD = A.PAY_CD
+			   -- 00004: 퇴직금, Y0001: 연말정산, R0001: 퇴직급여, R0002: 퇴직상여, R0003: 퇴직연월차 제외
+			   AND D.RUN_TYPE NOT IN ('00004','Y0001','R0001','R0002','R0003')
+			 INNER JOIN
+			       (
+			           SELECT G1.ENTER_CD, G1.ELEMENT_CD, G1.SDATE, G1.EDATE
+			                , NVL2(G1.LANGUAGE_CD2, F_COM_GET_LANGUAGE_MAPPING(G1.ENTER_CD, 'tsys011', G1.LANGUAGE_CD2, #{ssnLocaleCd}), G1.REPORT_NM) AS REPORT_NM
+			             FROM TCPN011 G1
+			       ) G
+			    ON G.ENTER_CD = C.ENTER_CD
+			   AND G.ELEMENT_CD = C.ELEMENT_CD
+			   AND A.ORD_EYMD BETWEEN G.SDATE AND NVL(G.EDATE, '99991231')
+			   AND EXISTS
+			       (
+			           SELECT 1
+			             FROM TCPN071 T1
+			                , TCPN072 T2
+			            WHERE T1.ENTER_CD = T2.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = T2.ELEMENT_SET_CD
+			              AND T1.ENTER_CD = A.ENTER_CD
+			              AND T1.ELEMENT_SET_CD = D.ELEMENT_SET_CD
+			              AND T2.ELEMENT_CD = C.ELEMENT_CD
+			              AND NVL(T2.BASE_SHOW_YN, 'N') = 'Y'
+			              AND A.ORD_EYMD BETWEEN T2.SDATE AND NVL(T2.EDATE, '99991231')
+			       )
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND B.SABUN = #{ssnSabun}
+			   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+			 GROUP BY G.REPORT_NM
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 급여상세 급여기초 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayDetailUserEtcList">
+		<![CDATA[
+			SELECT TRIM(BIZ_NM)			AS BIZ_NM
+				 , TRIM(ELEMENT_NM)		AS ELEMENT_NM
+				 , ELE_VALUE
+				 , UNIT
+				 , TRIM(BIZ_NM2)		AS BIZ_NM2
+				 , TRIM(ELEMENT_NM2)	AS ELEMENT_NM2
+				 , ELE_VALUE2
+				 , UNIT2
+			  FROM (
+			           SELECT RANK() OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS RK
+			                , F_COM_GET_GRCODE_NAME(ENTER_CD, 'C00400', BIZ_CD, #{ssnLocaleCd}) AS BIZ_NM
+			                , ELEMENT_NM
+			                , ELE_VALUE
+			                , UNIT
+			                , LEAD(F_COM_GET_GRCODE_NAME(ENTER_CD, 'C00400', BIZ_CD, #{ssnLocaleCd})) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS BIZ_NM2
+			                , LEAD(ELEMENT_NM) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS ELEMENT_NM2
+			                , LEAD(ELE_VALUE) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS ELE_VALUE2
+			                , LEAD(UNIT) OVER(ORDER BY BIZ_CD, ELEMENT_CD) AS UNIT2
+			             FROM (
+			                      SELECT ENTER_CD
+			                           , BIZ_CD
+			                           , ELEMENT_CD
+			                           , ELEMENT_NM
+			                           , ELE_VALUE
+			                           , UNIT
+			                        FROM TCPN295 X
+			                       WHERE ENTER_CD		= #{ssnEnterCd}
+			                         AND PAY_ACTION_CD	= #{payActionCd}
+			                         AND SABUN			= #{ssnSabun}
+			                      UNION
+			                      SELECT ENTER_CD
+			                           , BIZ_CD
+			                           , ELEMENT_CD
+			                           , ELEMENT_NM
+			                           , ELE_VALUE
+			                           , UNIT
+			                        FROM TCPN296 X
+			                       WHERE ENTER_CD		= #{ssnEnterCd}
+			                         AND PAY_ACTION_CD	= #{searchPayActionCd}
+			                         AND SABUN			= #{ssnSabun}
+			                  )
+			       )
+			 WHERE MOD(RK, 2) = 1
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 항목별 세부내역 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayItemDetailUser">
+		<![CDATA[
+			SELECT CASE WHEN D.LANGUAGE_CD IS NULL THEN D.ELEMENT_NM
+			            ELSE NVL(F_COM_GET_LANGUAGE_MAPPING(D.ENTER_CD, 'tcpn011', D.LANGUAGE_CD, #{ssnLocaleCd}), D.ELEMENT_NM) END AS ELEMENT_NM
+			     , CASE WHEN D.LANGUAGE_CD2 IS NULL THEN D.REPORT_NM
+			            ELSE NVL(F_COM_GET_LANGUAGE_MAPPING(D.ENTER_CD, 'tcpn011', D.LANGUAGE_CD2, #{ssnLocaleCd}), D.REPORT_NM) END AS REPORT_NM
+			     , RTRIM(TO_CHAR(NVL(C.BASIC_MON, 0), 'FM999,999,999,999,999,999'), '.') AS BASIC_MON
+			     , RTRIM(TO_CHAR(NVL(C.RESULT_MON, 0), 'FM999,999,999,999,999,999'), '.') AS RESULT_MON
+			     , E.NOTE
+			  FROM TCPN201 A
+			 INNER JOIN TCPN203 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.PAY_ACTION_CD = A.PAY_ACTION_CD
+			 INNER JOIN TCPN205 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.PAY_ACTION_CD = A.PAY_ACTION_CD
+			   AND C.SABUN = B.SABUN
+			 INNER JOIN TCPN011 D
+			    ON D.ENTER_CD = C.ENTER_CD
+			   AND D.ELEMENT_CD = C.ELEMENT_CD
+			   AND D.SDATE =
+			       (
+			           SELECT MAX(SDATE)
+			             FROM TCPN011
+			            WHERE ENTER_CD = D.ENTER_CD
+			              AND ELEMENT_CD = D.ELEMENT_CD
+			              AND A.ORD_EYMD BETWEEN SDATE AND NVL(EDATE, '99991231')
+				   )
+			   LEFT OUTER JOIN TCPN110 E
+			     ON E.ENTER_CD = A.ENTER_CD
+			    AND E.PAY_ACTION_CD = A.PAY_ACTION_CD
+			    AND E.SABUN = B.SABUN
+			    AND E.ELEMENT_CD = C.ELEMENT_CD
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.PAY_ACTION_CD = #{searchPayActionCd}
+			   AND B.SABUN = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 개인별급여내역 항목별 계산방법 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPsnalPayFormulaUser">
+		<![CDATA[
+			SELECT DISTINCT
+			       B.ELEMENT_CD
+			     , C.ELEMENT_NM
+			     , C.REPORT_NM
+			     , NVL(D.FORMULA,NVL(B.FORMULA_CHG,F_CPN_GET_CAL_VALUE_NM (B.ENTER_CD,B.ELEMENT_CD,B.SEARCH_SEQ,B.S_YM))) AS FORMULA
+			     , A.RESULT_MON
+			     , CASE WHEN NVL(A.RESULT_MON,0) = 0 THEN ''
+			            ELSE RTRIM(TO_CHAR(NVL(A.RESULT_MON, 0), 'FM999,999,999,990'), '.') END RESULT_MON_FOR
+			  FROM (
+			           SELECT X.ENTER_CD
+			                , X.ELEMENT_CD
+			                , X.SABUN
+			                , X.PAY_ACTION_CD
+			                , X.RESULT_MON
+			             FROM TCPN205 X
+			            WHERE X.ENTER_CD 		= #{ssnEnterCd}
+			              AND X.PAY_ACTION_CD 	= #{searchPayActionCd}
+			              AND X.SABUN 			= #{ssnSabun}
+			           UNION
+			           SELECT Y.ENTER_CD
+			                , Y.ELEMENT_CD
+			                , Y.SABUN
+			                , Y.PAY_ACTION_CD
+			                , Y.RESULT_MON
+			             FROM TCPN294 Y
+			            WHERE 1=1
+			              AND Y.ENTER_CD 		= #{ssnEnterCd}
+			              AND Y.PAY_ACTION_CD 	= #{searchPayActionCd}
+			              AND Y.SABUN 			= #{ssnSabun}
+			       ) A
+			     , TCPN230 B
+			     , TCPN011 C
+			     , (
+			           SELECT X.ENTER_CD
+			                , X.ELEMENT_CD
+			                , X.SABUN
+			                , X.S_YM
+			                , X.E_YM
+			                , X.FORMULA
+			             FROM TCPN235 X
+			                , TCPN201 Y
+			            WHERE X.ENTER_CD = Y.ENTER_CD
+			              AND X.ENTER_CD = #{ssnEnterCd}
+			              AND X.SABUN 	 = #{ssnSabun}
+			              AND Y.PAY_ACTION_CD 	= #{searchPayActionCd}
+			              AND NVL(X.APPLY_YN,'N') = 'Y'
+			              AND Y.PAY_YM BETWEEN X.S_YM AND NVL(X.E_YM, '999912')
+			       ) D
+			     , TCPN201 E
+			 WHERE A.ENTER_CD 		= B.ENTER_CD
+			   AND A.ELEMENT_CD 		= B.ELEMENT_CD
+			   AND A.ELEMENT_CD		= C.ELEMENT_CD
+			   AND A.ENTER_CD		= C.ENTER_CD
+			   AND A.ENTER_CD 		= D.ENTER_CD(+)
+			   AND A.SABUN    		= D.SABUN(+)
+			   AND A.ELEMENT_CD 		= D.ELEMENT_CD(+)
+			   AND A.ENTER_CD 		= E.ENTER_CD
+			   AND A.PAY_ACTION_CD 	= E.PAY_ACTION_CD
+			   AND A.ENTER_CD 		= #{ssnEnterCd}
+			   AND A.PAY_ACTION_CD 	= #{searchPayActionCd}
+			   AND A.SABUN 			= #{ssnSabun}
+			   AND C.ELEMENT_TYPE	= #{searchElementType}
+			   AND NVL(B.DISPLAY_YN,'N') = 'Y'
+			   AND (
+			           B.SEARCH_SEQ IS NULL
+			           OR B.SEARCH_SEQ IN
+			              ( NVL( ( SELECT F.SEARCH_SEQ
+			                         FROM TCPN206 F
+			                        WHERE F.ENTER_CD 		= E.ENTER_CD
+			                          AND F.PAY_ACTION_CD = E.PAY_ACTION_CD
+			                          AND F.SABUN  		= A.SABUN
+			                          AND F.ELEMENT_CD 	= A.ELEMENT_CD), B.SEARCH_SEQ) )
+			       )
+			   AND E.PAY_YM BETWEEN B.S_YM AND NVL(B.E_YM, '999912')
+			   AND B.S_YM BETWEEN SUBSTR(C.SDATE,0,6) AND SUBSTR(NVL(C.EDATE, '999912'),0,6)
+			 ORDER BY B.ELEMENT_CD
+		]]>
+	</select>
+</mapper>

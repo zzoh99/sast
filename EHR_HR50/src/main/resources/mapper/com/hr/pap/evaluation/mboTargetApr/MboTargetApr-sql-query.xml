@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.evaluation.mboTargetApr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getMboTargetAprList">
+
+				<![CDATA[
+					SELECT  A.ENTER_CD
+						   ,A.APPRAISAL_CD
+						   ,A.SABUN
+						   ,A.NAME
+						   ,F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+						   ,A.APP_ORG_CD
+						   ,A.APP_ORG_NM
+						   ,A.JIKWEE_CD
+						   ,A.JIKWEE_NM
+						   ,A.JOB_CD
+						   ,A.JOB_NM
+						   ,A.WORK_TYPE
+						   ,A.WORK_TYPE_NM
+						   ,A.JIKCHAK_CD
+						   ,A.JIKCHAK_NM
+						   ,A.JIKGUB_CD
+						   ,A.JIKGUB_NM
+						   ,A.APP_YN
+						   ,A.NOTE
+						   ,D.EMP_YMD
+						   ,(CASE WHEN A.APP_STEP_CD = '1' THEN NVL(C.TARGET_STATUS_CD, '11' )
+							     WHEN A.APP_STEP_CD = '3' THEN NVL(C.MIDDLE_STATUS_CD, '11' )
+							 END) AS STATUS_CD
+						   ,(CASE WHEN A.APP_STEP_CD = '1' THEN NVL2(C.TARGET_STATUS_CD, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10018', C.TARGET_STATUS_CD), '작성중')
+							     WHEN A.APP_STEP_CD = '3' THEN NVL2(C.MIDDLE_STATUS_CD, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'P10018', TRIM(C.MIDDLE_STATUS_CD)), '작성중')
+							 END) AS STATUS_NM
+						   ,F_PAPN_EDITABLE_YN(B.ENTER_CD, B.APPRAISAL_CD, B.APP_STEP_CD, B.SABUN, B.APP_ORG_CD, B.APP_SEQ_CD) AS EDITABLE
+						   ,'0' AS DETAIL
+						   ,DECODE(APP_SELF_MEMO,NULL,'N','Y') AS MIDDLE_MEMO_YN
+						   ,C.MIDDLE_APP_CLASS_CD
+						   ,C.MIDDLE_APP_MEMO
+						   , (
+						      SELECT NVL(MAX(T.APP_SEQ_CD), '-1')
+						        FROM TPAP202 T
+						       WHERE T.ENTER_CD = B.ENTER_CD
+						         AND T.APPRAISAL_CD = B.APPRAISAL_CD
+						         AND T.APP_STEP_CD = B.APP_STEP_CD
+						         AND T.SABUN = B.SABUN
+						         AND T.APP_ORG_CD = B.APP_ORG_CD
+						     ) AS LAST_APP_SEQ_CD
+                          , NVL(A.MBO_TARGET_YN, 'N') AS MBO_TARGET_YN
+                          , NVL(A.COMP_TARGET_YN, 'N') AS COMP_TARGET_YN
+					  FROM TPAP201 A, TPAP202 B, TPAP350 C, THRM100 D, TPAP160 E
+					 WHERE A.ENTER_CD     = B.ENTER_CD
+					   AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					   AND A.APP_ORG_CD   = B.APP_ORG_CD
+					   AND A.SABUN        = B.SABUN
+					   AND A.APP_STEP_CD  = B.APP_STEP_CD
+
+					   --평가조직
+					   AND A.ENTER_CD     = E.ENTER_CD
+					   AND A.APPRAISAL_CD = E.APPRAISAL_CD
+					   AND A.APP_STEP_CD  = E.APP_STEP_CD
+					   AND A.APP_ORG_CD   = E.APP_ORG_CD
+
+					   AND A.ENTER_CD     = C.ENTER_CD(+)
+					   AND A.APPRAISAL_CD = C.APPRAISAL_CD(+)
+					   AND A.SABUN        = C.SABUN(+)
+					   AND A.APP_ORG_CD   = C.APP_ORG_CD(+)
+
+					   AND A.ENTER_CD     = D.ENTER_CD
+					   AND A.SABUN        = D.SABUN
+
+					   AND A.APP_YN       = 'Y'
+					   AND A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.APP_STEP_CD  = TRIM(#{searchAppStepCd})
+					   AND B.APP_SEQ_CD   = TRIM(#{searchAppSeqCd})
+]]>
+					<if test='searchAppSabun != null and !searchAppSabun.equals("")'>
+					   AND B.APP_SABUN = TRIM(#{searchAppSabun})
+					</if>
+					<if test='searchAppOrgCd != null and !searchAppOrgCd.equals("")'>
+					   AND A.APP_ORG_CD = TRIM(#{searchAppOrgCd})
+					</if>
+
+					ORDER BY TO_NUMBER(E.ORG_SEQ), F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20020',A.JIKCHAK_CD), F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20010',A.JIKGUB_CD), F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20030',A.JIKWEE_CD), D.EMP_YMD
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getMboTargetAprMap">
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+		</select>
+</mapper>

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.timeCdMgr">
+
+<!-- 근태코드관리 조회  -->
+		<select parameterType="map" resultType="cMap" id="getTimeCdMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GNT_CD
+					     , A.GNT_NM
+					     , A.GNT_GUBUN_CD
+					     , A.REQUEST_USE_TYPE
+					     , A.SEQ
+					     , A.HOL_INCL_YN
+					     , A.MAX_CNT
+					     , A.BASE_CNT
+					     , A.MAX_UNIT
+					     , A.NOTE1
+					     , A.NOTE2
+					     , A.NOTE3
+					     , A.LANGUAGE_CD
+						 , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'ttim014', LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM
+						 , A.STD_APPLY_HOUR
+						 , A.WORK_CD
+						 , A.VACATION_YN -- 발셍휴가사용여부
+						 , A.APPL_YN     -- 근태신청여부
+						 , A.SEARCH_SEQ  -- 신청대상자
+						 , ( SELECT SUBSTR( B.SEARCH_DESC , LENGTH('[근태신청]')+1 ) 
+						       FROM THRI201 B
+						      WHERE B.ENTER_CD   = A.ENTER_CD
+						        AND B.SEARCH_SEQ = A.SEARCH_SEQ
+						        AND ROWNUM = 1
+						    ) AS SEARCH_DESC
+						 , DECODE(A.SEARCH_SEQ, NULL, 0, 1 ) AS SEARCH_DTL
+						 , A.USE_STD_DATE_CD
+						 , A.USE_SDATE_CD
+						 , A.USE_EDATE_CD 
+						 , A.APPL_LIMIT_DAY
+						 , A.OCC_DIV_CNT
+					  FROM TTIM014 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+<if test='searchGntNm != null and !searchGntNm.equals("")'>
+					   AND LOWER(A.GNT_NM) LIKE '%'||LOWER(TRIM( #{searchGntNm} ))||'%'
+</if>
+<if test='searchPayYn != null and !searchPayYn.equals("")'>
+					   AND A.PAY_YN = TRIM( #{searchPayYn} )
+</if>
+<if test='searchGntGubunCd != null and !searchGntGubunCd.equals("")'>
+					   AND A.GNT_GUBUN_CD = TRIM( #{searchGntGubunCd} )
+</if>
+<if test='searchApplYn != null and !searchApplYn.equals("")'>
+					   AND A.APPL_YN = TRIM( #{searchApplYn} )
+</if>
+					 ORDER BY A.SEQ
+
+		</select>
+
+<!-- 근태코드관리 저장 -->
+		<update parameterType="map" id="saveTimeCdMgr">
+
+					MERGE INTO TTIM014 T
+					USING	(          
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.gntCd} )			AS  GNT_CD
+										 , TRIM( #{rm.gntNm})			AS  GNT_NM
+										 , TRIM( #{rm.gntGubunCd})		AS  GNT_GUBUN_CD
+										 , TRIM( #{rm.requestUseType})	AS  REQUEST_USE_TYPE
+										 , TRIM( #{rm.maxCnt})			AS  MAX_CNT
+										 , TRIM( #{rm.baseCnt})		AS  BASE_CNT
+										 , TRIM( #{rm.maxUnit})		AS  MAX_UNIT
+										 , TRIM( #{rm.vacationYn})		AS  VACATION_YN
+										 , TRIM( #{rm.applYn})			AS  APPL_YN
+										 , TRIM( #{rm.holInclYn})		AS  HOL_INCL_YN
+										 , TRIM( #{rm.stdApplyHour})	AS  STD_APPLY_HOUR
+										 , TRIM( #{rm.workCd})			AS  WORK_CD
+										 , TRIM( #{rm.note1})			AS  NOTE1
+										 , TRIM( #{rm.note2})			AS  NOTE2
+										 , TRIM( #{rm.note3})			AS  NOTE3
+										 , TRIM( #{rm.seq} )			AS  SEQ
+										 , TRIM( #{rm.languageCd})		AS  LANGUAGE_CD
+										 , TRIM( #{rm.searchSeq})		AS  SEARCH_SEQ
+										 , TRIM( #{rm.useStdDateCd})	AS	USE_STD_DATE_CD
+										 , TRIM( #{rm.useSdateCd})		AS  USE_SDATE_CD
+										 , TRIM( #{rm.useEdateCd})		AS  USE_EDATE_CD
+										 , TRIM( #{rm.applLimitDay})	AS  APPL_LIMIT_DAY
+										 , TRIM( #{rm.occDivCnt})		AS  OCC_DIV_CNT
+									  FROM DUAL
+</foreach>
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GNT_CD = S.GNT_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.GNT_NM          	= S.GNT_NM
+									, T.GNT_GUBUN_CD    	= S.GNT_GUBUN_CD
+									, T.REQUEST_USE_TYPE    = S.REQUEST_USE_TYPE
+									, T.MAX_CNT				= S.MAX_CNT
+									, T.BASE_CNT			= S.BASE_CNT
+									, T.MAX_UNIT			= S.MAX_UNIT
+									, T.VACATION_YN			= S.VACATION_YN
+									, T.APPL_YN				= S.APPL_YN
+									, T.HOL_INCL_YN         = S.HOL_INCL_YN
+									, T.STD_APPLY_HOUR      = S.STD_APPLY_HOUR
+									, T.WORK_CD				= S.WORK_CD
+									, T.NOTE1               = S.NOTE1
+									, T.NOTE2               = S.NOTE2
+									, T.NOTE3               = S.NOTE3
+									, T.SEQ                 = S.SEQ
+									, T.LANGUAGE_CD			= S.LANGUAGE_CD
+									, T.SEARCH_SEQ			= S.SEARCH_SEQ
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+									, T.USE_STD_DATE_CD		= S.USE_STD_DATE_CD
+									, T.USE_SDATE_CD		= S.USE_SDATE_CD
+									, T.USE_EDATE_CD		= S.USE_EDATE_CD
+									, T.APPL_LIMIT_DAY		= S.APPL_LIMIT_DAY
+									, T.OCC_DIV_CNT			= S.OCC_DIV_CNT
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.GNT_CD
+							, T.GNT_NM
+							, T.GNT_GUBUN_CD
+							, T.REQUEST_USE_TYPE
+							, T.MAX_CNT
+							, T.BASE_CNT
+							, T.MAX_UNIT
+							, T.VACATION_YN
+							, T.APPL_YN
+							, T.HOL_INCL_YN
+							, T.STD_APPLY_HOUR
+							, T.WORK_CD
+							, T.NOTE1
+							, T.NOTE2
+							, T.NOTE3
+							, T.SEQ
+							, T.LANGUAGE_CD
+							, T.SEARCH_SEQ
+							, T.CHKDATE
+							, T.CHKID
+							, T.USE_STD_DATE_CD
+							, T.USE_SDATE_CD
+							, T.USE_EDATE_CD
+							, T.APPL_LIMIT_DAY
+							, T.OCC_DIV_CNT
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.GNT_CD
+							, S.GNT_NM
+							, S.GNT_GUBUN_CD
+							, S.REQUEST_USE_TYPE
+							, S.MAX_CNT
+							, S.BASE_CNT
+							, S.MAX_UNIT
+							, S.VACATION_YN
+							, S.APPL_YN
+							, S.HOL_INCL_YN
+							, S.STD_APPLY_HOUR
+							, S.WORK_CD
+							, S.NOTE1
+							, S.NOTE2
+							, S.NOTE3
+							, S.SEQ
+							, S.LANGUAGE_CD
+							, S.SEARCH_SEQ
+							, sysdate
+							, #{ssnSabun}
+							, S.USE_STD_DATE_CD
+							, S.USE_SDATE_CD
+							, S.USE_EDATE_CD
+							, S.APPL_LIMIT_DAY
+							, S.OCC_DIV_CNT
+						)
+		</update>
+<!-- 근태코드관리 삭제 -->
+		<delete parameterType="map" id="deleteTimeCdMgr">
+
+					DELETE FROM TTIM014
+					 WHERE ENTER_CD||'_'||GNT_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.gntCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

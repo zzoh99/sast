@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.empPap.empPapHistMgr">
+
+		<!-- 고과현황(년도별) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpPapHistMgrList">
+			WITH DATA AS (
+		        SELECT A.ENTER_CD
+		             , A.APPRAISAL_YY
+		             , A.SABUN
+		             , A.APPRAISAL_NM
+		             , A.MBO_POINT
+		             , A.COMP_POINT
+		             , A.FINAL_CLASS_CD
+		          FROM TPAP555 A
+		         WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		 	<if test='searchYear != null and !searchYear.equals("")'>
+		           AND A.APPRAISAL_YY BETWEEN TRIM(TO_NUMBER(#{searchYear})-4) AND TRIM(#{searchYear})
+			</if>
+		         ) 
+		    SELECT A.ENTER_CD
+		         , A.SABUN
+				 , B.WORK_TYPE_NM
+		         , F_COM_GET_HQ_ORG_NM(A.ENTER_CD, B.ORG_CD, B.EDATE	) AS PRIOR_ORG_NM
+                 , F_COM_GET_ORG_NM(A.ENTER_CD,	B.ORG_CD, B.EDATE	)	AS	ORG_NM
+                 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.SDATE, '')	AS	JIKGUB_NM
+                 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, '') AS NAME
+		         , MAX((CASE WHEN A.APPRAISAL_YY = #{searchYear} THEN A.MBO_POINT END)) AS MBO_POINT1
+		         , MAX((CASE WHEN A.APPRAISAL_YY = #{searchYear} THEN A.COMP_POINT END)) AS COMP_POINT1
+		         , MAX((CASE WHEN A.APPRAISAL_YY = #{searchYear} THEN A.FINAL_CLASS_CD END)) AS FINAL_CLASS_CD1
+		         
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-1) THEN A.MBO_POINT END)) AS MBO_POINT2
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-1) THEN A.COMP_POINT END)) AS COMP_POINT2
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-1) THEN A.FINAL_CLASS_CD END)) AS FINAL_CLASS_CD2
+		         
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-2) THEN A.MBO_POINT END)) AS MBO_POINT3
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-2) THEN A.COMP_POINT END)) AS COMP_POINT3
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-2) THEN A.FINAL_CLASS_CD END)) AS FINAL_CLASS_CD3
+		         
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-3) THEN A.MBO_POINT END)) AS MBO_POINT4
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-3) THEN A.COMP_POINT END)) AS COMP_POINT4
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-3) THEN A.FINAL_CLASS_CD END)) AS FINAL_CLASS_CD4
+		         
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-4) THEN A.MBO_POINT END)) AS MBO_POINT5
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-4) THEN A.COMP_POINT END)) AS COMP_POINT5
+		         , MAX((CASE WHEN A.APPRAISAL_YY = (TO_NUMBER(#{searchYear})-4) THEN A.FINAL_CLASS_CD END)) AS FINAL_CLASS_CD5
+		         
+		        FROM DATA A
+		        JOIN THRM151 B
+		          ON A.ENTER_CD = B.ENTER_CD
+		         AND A.SABUN = B.SABUN
+		       WHERE 1=1
+				AND #{searchYear}||'1231' BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+		    <if test='searchWorkType != null and !searchWorkType.equals("")'>
+		        AND B.WORK_TYPE = #{searchWorkType}
+		    </if>
+		    <if test='searchSaNm != null and !searchSaNm.equals("")'>
+		        AND (A.SABUN LIKE TRIM(#{searchSaNm}) || '%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, '') LIKE TRIM(#{searchSaNm}) || '%')
+			</if>
+			GROUP BY A.ENTER_CD, A.SABUN, B.ORG_CD, B.SDATE, B.EDATE, B.WORK_TYPE_NM
+		    ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, B.SDATE)
+		</select>
+		
+
+</mapper>

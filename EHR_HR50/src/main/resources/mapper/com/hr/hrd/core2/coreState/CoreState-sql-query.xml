@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.core2.coreState">
+
+<!-- 핵심인재현황 총 인원 -->
+		<select parameterType="map" resultType="cMap" id="getCoreStateCnt">
+			<![CDATA[
+				SELECT G1.CORE_CNT
+					 , NVL(G1.HR_CNT, 0) AS HR_CNT
+					 , NVL(ROUND(G1.CORE_CNT / G1.HR_CNT * 100, 1), 0) AS CORE_PER
+				  FROM (
+						SELECT COUNT(1) AS CORE_CNT
+					         , MAX((SELECT COUNT(1)
+					                  FROM THRM100 T1
+					                     , THRM151 T2
+					                 WHERE T1.ENTER_CD = T2.ENTER_CD
+					                   AND T1.SABUN = T2.SABUN
+					                   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN T2.SDATE AND T2.EDATE
+					                   AND T1.ENTER_CD = A.ENTER_CD
+					                   AND T2.STATUS_CD NOT IN ('RA', 'RAA')
+					               )) AS HR_CNT
+					          FROM TCDP992 A
+					         WHERE A.ENTER_CD = #{ssnEnterCd}
+			]]>
+<if test="searchStdYmd != null and searchStdYmd neq ''">
+					           AND REPLACE(TRIM(#{searchStdYmd}), '-', '') BETWEEN A.POOL_IN_YMD AND NVL(A.POOL_OUT_YMD, '99991231')
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")' >
+		<![CDATA[
+					           AND (
+					                     INSTR(A.SABUN, #{searchSabunName}) > 0
+					                  OR INSTR(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}), #{searchSabunName}) > 0
+					               )
+		]]>
+</if>
+<if test="searchBizPlaceCd != null and searchBizPlaceCd neq ''" >
+					           AND F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) = #{searchBizPlaceCd}
+	<if test="searchOrgCd != null and searchOrgCd neq ''">
+		<choose>
+			<when test="searchOrgType != null and searchOrgType eq 'Y'" >
+				<![CDATA[
+					           /*하위조직포함일때 Y , 아닐때 N */
+					           AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) IN (
+					                   SELECT #{searchOrgCd} AS ORG_CD
+					                     FROM DUAL
+					                    UNION
+					                   SELECT ORG_CD
+					                     FROM (
+					                           SELECT O.ENTER_CD, O.ORG_CD, O.PRIOR_ORG_CD, O.SDATE
+					                             FROM TORG105 O
+					                            WHERE O.ENTER_CD = TRIM(#{ssnEnterCd})
+					                              AND O.SDATE = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = O.ENTER_CD AND ORG_CD = O.ORG_CD AND SDATE <= NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+					                          )
+					                    START WITH PRIOR_ORG_CD = #{searchOrgCd}
+					                  CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					                      AND PRIOR SDATE = SDATE
+					                      AND PRIOR ORG_CD = PRIOR_ORG_CD
+					               )
+				]]>
+			</when>
+			<otherwise>
+					           AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) = #{searchOrgCd}
+			</otherwise>
+		</choose>
+	</if>
+</if>
+					       ) G1
+
+		</select>
+		
+<!-- 핵심인재현황 row list -->
+		<select parameterType="map" resultType="cMap" id="getCoreStateOrgList">
+			<![CDATA[
+				SELECT A.ORG_CD
+					 , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS ORG_NM
+					 , COUNT(1) AS CNT
+				  FROM TCDP992 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+			]]>
+<if test="searchStdYmd != null and searchStdYmd neq ''" >
+				   AND REPLACE(TRIM(#{searchStdYmd}), '-', '') BETWEEN A.POOL_IN_YMD AND NVL(A.POOL_OUT_YMD, '99991231')
+</if>
+<if test="searchSabunName != null and searchSabunName neq ''" >
+			<![CDATA[
+					   AND (
+					             INSTR(A.SABUN, #{searchSabunName}) > 0
+					          OR INSTR(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}), #{searchSabunName}) > 0
+					       )
+			]]>
+</if>
+<if test="searchBizPlaceCd != null and searchBizPlaceCd neq ''" >
+					   AND F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) = #{searchBizPlaceCd}
+	<if test="searchOrgCd != null and searchOrgCd neq ''" >
+		<choose>
+			<when test="searchOrgType != null and searchOrgType eq 'Y'" >
+					   /*하위조직포함일때 Y , 아닐때 N */
+					   <![CDATA[
+					   AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) IN (
+					           SELECT #{searchOrgCd} AS ORG_CD
+					             FROM DUAL
+					            UNION
+					           SELECT ORG_CD
+					             FROM (
+					                   SELECT O.ENTER_CD, O.ORG_CD, O.PRIOR_ORG_CD, O.SDATE
+					                     FROM TORG105 O
+					                    WHERE O.ENTER_CD = TRIM(#{ssnEnterCd})
+					                      AND O.SDATE = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = O.ENTER_CD AND ORG_CD = O.ORG_CD AND SDATE <= NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+					                  )
+					            START WITH PRIOR_ORG_CD = #{searchOrgCd}
+					          CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					              AND PRIOR SDATE = SDATE
+					              AND PRIOR ORG_CD = PRIOR_ORG_CD
+					       )
+					          ]]>
+			</when>
+			<otherwise>
+					   AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) = #{searchOrgCd}
+			</otherwise>
+		</choose>
+	</if>
+</if>
+					 GROUP BY A.ENTER_CD, A.ORG_CD
+					 ORDER BY ORG_NM
+		</select>
+
+		<!-- 핵심인재현황 col list -->
+		<select parameterType="map" resultType="cMap" id="getCoreStatsOrgMemberList">
+			<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.ORG_CD
+					     , A.POOL_IN_YMD
+					     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS ORG_NM
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS JIKGUB_NM
+					     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS JIKCHAK_NM
+					  FROM TCDP992 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+			]]>
+<if test="searchStdYmd != null and searchStdYmd neq ''" >
+					   AND REPLACE(TRIM(#{searchStdYmd}), '-', '') BETWEEN A.POOL_IN_YMD AND NVL(A.POOL_OUT_YMD, '99991231')
+</if>
+<if test="searchSabunName != null and searchSabunName neq ''" >
+			<![CDATA[
+				   	   AND (
+					             INSTR(A.SABUN, #{searchSabunName}) > 0
+					          OR INSTR(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}), #{searchSabunName}) > 0
+					       )
+			]]>
+</if>
+<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")' >
+					   AND F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) = #{searchBizPlaceCd}
+	<if test='searchOrgCd != null and !searchOrgCd.equals("")' >
+		<choose>
+			<when test='searchOrgType != null and searchOrgType.equals("Y") ' >
+					   /*하위조직포함일때 Y , 아닐때 N */
+					   <![CDATA[
+					   AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) IN (
+					           SELECT #{searchOrgCd} AS ORG_CD
+					             FROM DUAL
+					            UNION
+					           SELECT ORG_CD
+					             FROM (
+					                   SELECT O.ENTER_CD, O.ORG_CD, O.PRIOR_ORG_CD, O.SDATE
+					                     FROM TORG105 O
+					                    WHERE O.ENTER_CD = TRIM(#{ssnEnterCd})
+					                      AND O.SDATE = (SELECT MAX(SDATE) FROM TORG105 WHERE ENTER_CD = O.ENTER_CD AND ORG_CD = O.ORG_CD AND SDATE <= NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+					                  )
+					            START WITH PRIOR_ORG_CD = #{searchOrgCd}
+					          CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					              AND PRIOR SDATE = SDATE
+					              AND PRIOR ORG_CD = PRIOR_ORG_CD
+					       )
+					              ]]>
+			</when>
+			<otherwise>
+					   AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD'))) = #{searchOrgCd}
+			</otherwise>
+		</choose>
+	</if>
+</if>
+					 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, NVL(REPLACE(TRIM(#{searchStdYmd}), '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+		</select>
+</mapper>

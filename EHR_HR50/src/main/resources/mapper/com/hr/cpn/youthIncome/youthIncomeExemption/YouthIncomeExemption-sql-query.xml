@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="cpn.youthIncome.youthIncomeExemption">
+<!--         조회 -->
+        <select parameterType="map" resultType="cMap" id="getYouthIncomeExemptionList">
+            <![CDATA[
+             SELECT             A.ENTER_CD                --회사구분코드(TORG900)
+                            ,A.SABUN                   --사번(PK)
+                            ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+                            ,A.NAME                    --성명
+                            ,CRYPTIT.DECRYPT (A.RES_NO,A.ENTER_CD) AS RES_NO                --주민번호
+                            ,A.WORK_TYPE               --취업자유형(C70002)(청년, 고령자, 장애인)
+                            ,A.ENT_YMD                 --입사일자
+                            ,A.BIRTH_YMD               --생년월일
+                            ,A.ARMY_IN_YMD             --입대일자
+                            ,A.ARMY_OUT_YMD            --전역일자
+                            ,A.ARMY_WORK_CNT           --군경력일수
+                            ,A.AGE_TYMD                --취업_년월일_텍스트
+                            ,A.ARMY_TYMD               --병역_년월일_텍스트
+                            ,A.CAL_TYMD                --차감_년월일_텍스트
+                            ,A.CAL_AGE                 --나이
+                            ,A.EXT_DAY_CNT             --제외일수
+                            ,A.STA_YMD                 --감면 시작일자(입사일자)
+                            ,A.END_YMD                 --감면 종료일자 (입사일자로 부터 3년)
+                            ,A.TAX_RATE                --적용세율(100%, 50%)
+                            ,A.PAY_YN                  --급여반영여부
+                            ,A.PAY_CAL_YN              --급여계산여부
+                      FROM TCPN112 A
+                         , THRM100 B
+                         , THRM151 C
+                     WHERE 1=1
+                       AND A.ENTER_CD    = #{ssnEnterCd}
+                       AND A.ENTER_CD = B.ENTER_CD
+                       AND A.SABUN    = B.SABUN
+                       AND A.ENTER_CD = C.ENTER_CD
+                       AND A.SABUN    = C.SABUN
+                       AND C.SDATE    = (SELECT MAX(SDATE) FROM THRM151 WHERE ENTER_CD = C.ENTER_CD AND SABUN = C.SABUN )
+            ]]>
+                    <if test="searchDate != null and searchDate neq ''">
+			           AND NVL(REPLACE(#{searchDate}, '-', ''), A.STA_YMD) BETWEEN A.STA_YMD AND NVL(A.END_YMD, '99991231')
+                    </if>
+                    <if test="searchEmpFromDate != null and searchEmpFromDate neq ''">
+                       AND A.ENT_YMD >= NVL(REPLACE(#{searchEmpFromDate}, '-', ''), B.EMP_YMD)
+                    </if>
+                    <if test="searchEmpToDate != null and searchEmpToDate neq ''">
+                        AND NVL(REPLACE(#{searchEmpToDate}, '-', ''), B.EMP_YMD) >= A.ENT_YMD
+                    </if>
+                    <if test="searchPayType != null and searchPayType neq ''">
+                       AND C.PAY_TYPE    = NVL(#{searchPayType}, C.PAY_TYPE)
+                    </if>
+			 ORDER BY B.EMP_YMD DESC, A.CHKDATE DESC
+        </select>
+
+<!--         저장 -->    
+        <update parameterType="map" id="saveYouthIncomeExemption">
+
+
+                    MERGE INTO TCPN112 T
+                    USING    (
+                            SELECT     A.ENTER_CD     
+                                    ,  A.SABUN        
+                                    ,  A.NAME         
+                                    ,  A.RES_NO       
+                                    ,  A.WORK_TYPE    
+                                    ,  A.ENT_YMD      
+                                    ,  A.BIRTH_YMD    
+                                    ,  A.ARMY_IN_YMD  
+                                    ,  A.ARMY_OUT_YMD 
+                                    ,  A.AGE_TYMD     
+                                    ,  A.ARMY_TYMD    
+                                    ,  A.CAL_TYMD     
+                                    ,  A.STA_YMD      
+                                    ,  A.END_YMD      
+                                    ,  A.TAX_RATE     
+                                    ,  A.PAY_YN       
+                                    ,  A.PAY_CAL_YN   
+
+                            FROM    (
+                                    SELECT       NULL AS ENTER_CD     
+                                            ,  NULL AS SABUN        
+                                            ,  NULL AS NAME         
+                                            ,  NULL AS RES_NO       
+                                            ,  NULL AS WORK_TYPE    
+                                            ,  NULL AS ENT_YMD      
+                                            ,  NULL AS BIRTH_YMD    
+                                            ,  NULL AS ARMY_IN_YMD  
+                                            ,  NULL AS ARMY_OUT_YMD 
+                                            ,  NULL AS AGE_TYMD     
+                                            ,  NULL AS ARMY_TYMD    
+                                            ,  NULL AS CAL_TYMD     
+                                            ,  NULL AS STA_YMD      
+                                            ,  NULL AS END_YMD      
+                                            ,  NULL AS TAX_RATE     
+                                            ,  NULL AS PAY_YN       
+                                            ,  NULL AS PAY_CAL_YN   
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT    TRIM( #{ssnEnterCd} )         AS ENTER_CD
+                                            , TRIM(#{rm.sabun})          AS SABUN
+                                            , TRIM(#{rm.name})            AS NAME           
+                                            , CRYPTIT.ENCRYPT(TRIM(#{rm.resNo}) , #{ssnEnterCd})          AS RES_NO
+                                            , TRIM(#{rm.workType})         AS WORK_TYPE
+                                            , TRIM(#{rm.entYmd})         AS ENT_YMD        
+                                            , TRIM(#{rm.birthYmd})         AS BIRTH_YMD      
+                                            , TRIM(#{rm.armyInYmd})        AS ARMY_IN_YMD    
+                                            , TRIM(#{rm.armyOutYmd})    AS ARMY_OUT_YMD   
+                                            , TRIM(#{rm.ageTymd})         AS AGE_TYMD       
+                                            , TRIM(#{rm.armyTymd})         AS ARMY_TYMD      
+                                            , TRIM(#{rm.calTymd})         AS CAL_TYMD       
+                                            , TRIM(#{rm.staYmd})         AS STA_YMD        
+                                            , TRIM(#{rm.endYmd})         AS END_YMD        
+                                            , TRIM(#{rm.taxRate})         AS TAX_RATE       
+                                            , TRIM(#{rm.payYn})         AS PAY_YN         
+                                            , TRIM(#{rm.payCalYn})         AS PAY_CAL_YN     
+                                    FROM   DUAL
+</foreach>
+                                    ) A WHERE A.SABUN IS NOT NULL
+                            ) S
+                    ON (        T.ENTER_CD  = S.ENTER_CD 
+                            AND T.SABUN     = S.SABUN
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET     T.NAME                  = S.NAME          
+                                    ,T.RES_NO                = S.RES_NO        
+                                    ,T.WORK_TYPE             = S.WORK_TYPE     
+                                    ,T.ENT_YMD               = S.ENT_YMD       
+                                    ,T.BIRTH_YMD             = S.BIRTH_YMD     
+                                    ,T.ARMY_IN_YMD           = S.ARMY_IN_YMD   
+                                    ,T.ARMY_OUT_YMD          = S.ARMY_OUT_YMD  
+                                    ,T.AGE_TYMD              = S.AGE_TYMD      
+                                    ,T.ARMY_TYMD             = S.ARMY_TYMD     
+                                    ,T.CAL_TYMD              = S.CAL_TYMD      
+                                    ,T.STA_YMD               = S.STA_YMD       
+                                    ,T.END_YMD               = S.END_YMD       
+                                    ,T.TAX_RATE              = S.TAX_RATE      
+                                    ,T.PAY_YN                = S.PAY_YN        
+                                    ,T.PAY_CAL_YN            = S.PAY_CAL_YN    
+                                    ,T.CHKDATE               = SYSDATE
+                                    ,T.CHKID                 = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                              T.ENTER_CD
+                            , T.SABUN
+                            , T.NAME         
+                            , T.RES_NO       
+                            , T.WORK_TYPE    
+                            , T.ENT_YMD      
+                            , T.BIRTH_YMD    
+                            , T.ARMY_IN_YMD  
+                            , T.ARMY_OUT_YMD 
+                            , T.AGE_TYMD     
+                            , T.ARMY_TYMD    
+                            , T.CAL_TYMD     
+                            , T.STA_YMD      
+                            , T.END_YMD      
+                            , T.TAX_RATE     
+                            , T.PAY_YN       
+                            , T.PAY_CAL_YN   
+                            , T.CHKDATE
+                            , T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd}
+                            , S.SABUN        
+                            , S.NAME         
+                            , S.RES_NO       
+                            , S.WORK_TYPE    
+                            , S.ENT_YMD      
+                            , S.BIRTH_YMD    
+                            , S.ARMY_IN_YMD  
+                            , S.ARMY_OUT_YMD 
+                            , S.AGE_TYMD     
+                            , S.ARMY_TYMD    
+                            , S.CAL_TYMD     
+                            , S.STA_YMD      
+                            , S.END_YMD      
+                            , S.TAX_RATE     
+                            , S.PAY_YN       
+                            , S.PAY_CAL_YN   
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+<!--         삭제 -->
+        <delete parameterType="map" id="deleteYouthIncomeExemption">
+
+
+                    DELETE FROM TCPN112
+                    WHERE (ENTER_CD, SABUN)  IN     (  (NULL, NULL)  
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.sabun != null and !rm.sabun.equals("")'>
+                                            (#{ssnEnterCd} , #{rm.sabun})
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+
+
+
+        </delete>
+    </mapper>

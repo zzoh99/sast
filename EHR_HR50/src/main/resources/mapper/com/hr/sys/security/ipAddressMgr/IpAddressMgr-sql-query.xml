@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.security.ipAddressMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getIpAddressMgrList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.IP_ADDRESS
+						     , A.SDATE
+						     , A.IP_ADDRESS_END
+						     , A.EDATE
+						     , A.IP_CNT
+						     , A.MEMO
+						  FROM TORG905 A 
+					  	 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					       AND REPLACE( #{searchDate} ,'-','') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+		      		    ORDER BY A.IP_ADDRESS
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveIpAddressMgr">
+
+					 MERGE INTO TORG905 T 
+					 USING 
+					(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD
+					            , TRIM(#{rm.ipAddress})  	AS  IP_ADDRESS
+					            , TRIM(#{rm.sdate})  		AS  SDATE
+					            , TRIM(#{rm.ipAddressEnd})  AS  IP_ADDRESS_END
+					            , TRIM(#{rm.edate})  		AS  EDATE
+					            , TRIM(#{rm.ipCnt})  		AS  IP_CNT
+					            , TRIM(#{rm.memo})  		AS  MEMO
+					        FROM DUAL
+</foreach>
+					) S
+					ON (
+					          T.ENTER_CD 		= S.ENTER_CD
+					     AND  T.IP_ADDRESS 		= S.IP_ADDRESS
+					     AND  T.SDATE 			= S.SDATE
+					)
+					WHEN MATCHED THEN
+					   UPDATE SET T.CHKDATE			= sysdate
+					            , T.CHKID			= #{ssnSabun}
+					            , T.IP_ADDRESS_END 	= S.IP_ADDRESS_END
+					            , T.EDATE 			= S.EDATE
+					            , T.IP_CNT 			= S.IP_CNT
+					            , T.MEMO 			= S.MEMO
+					WHEN NOT MATCHED THEN
+					   INSERT
+					   (
+					              T.ENTER_CD
+					            , T.IP_ADDRESS
+					            , T.SDATE
+					            , T.IP_ADDRESS_END
+					            , T.EDATE
+					            , T.IP_CNT
+					            , T.MEMO
+					            , T.CHKDATE
+					            , T.CHKID
+					   )
+					   VALUES
+					   (
+					              S.ENTER_CD
+					            , S.IP_ADDRESS
+					            , S.SDATE
+					            , S.IP_ADDRESS_END
+					            , S.EDATE
+					            , S.IP_CNT
+					            , S.MEMO
+					            , sysdate
+					            , #{ssnSabun}
+					   )
+
+
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteIpAddressMgr">
+
+					DELETE FROM TORG905
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND ( IP_ADDRESS,SDATE ) IN ( ( NULL,NULL)  
+<foreach item="rm" collection="deleteRows" >
+    <if test="rm.ipAddress != null and !rm.ipAddress.equals('') and rm.sdate != null and !rm.sdate.equals('') ">
+		     				, ( TRIM( #{rm.ipAddress} ),TRIM( #{rm.sdate} ) )
+	</if>
+</foreach>
+		       			)
+
+
+		</delete>
+
+
+</mapper>

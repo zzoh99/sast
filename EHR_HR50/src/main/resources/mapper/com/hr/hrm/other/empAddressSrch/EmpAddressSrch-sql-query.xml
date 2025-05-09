@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.other.empAddressSrch">
+<!-- 임직원 거주지 조회 > 임직원 주소 다건 조회   -->
+    <select parameterType="map" resultType="cMap" id="getEmpAddressSrchAddressList">
+        <![CDATA[
+            SELECT A.ENTER_CD,
+                   A.SABUN,
+                   A.NAME,
+                   B.ORG_CD,
+                   F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, B.SDATE, #{ssnLocaleCd}) AS ORG_NM,
+                   C.ZIP,
+                   C.ADDR1
+            FROM THRM100 A,
+                 THRM151 B,
+                 THRM123 C
+            WHERE A.ENTER_CD = #{ssnEnterCd}
+              AND A.ENTER_CD = B.ENTER_CD
+              AND A.ENTER_CD = C.ENTER_CD
+              AND A.SABUN = B.SABUN
+              AND A.SABUN = C.SABUN
+              AND B.STATUS_CD <> 'RA'
+              AND B.SDATE = ( SELECT MAX(SDATE)
+                              FROM THRM151
+                              WHERE ENTER_CD = B.ENTER_CD
+                                AND SABUN = B.SABUN
+                                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+            )
+              AND C.ADD_TYPE = CASE WHEN ((SELECT COUNT(X.ADDR1)
+                                           FROM THRM123 X
+                                           WHERE X.ENTER_CD = #{ssnEnterCd}
+                                             AND X.SABUN = #{searchSabun}
+                                             AND ADD_TYPE = '3') > 0) THEN '3'
+                                    ELSE '2'
+                               END
+        ]]>
+        <if test='searchName != null and !searchName.equals("")'>
+            AND (A.SABUN LIKE ('%' || TRIM(#{searchName}) || '%') OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})
+            LIKE '%' || TRIM(#{searchName}) || '%')
+        </if>
+        <if test='searchOrgCd != null and !searchOrgCd.equals("0")'>
+            AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, #{searchYmd}) IN (
+                SELECT ORG_CD
+                FROM (
+                    SELECT ENTER_CD, SDATE, PRIOR_ORG_CD, ORG_CD, SEQ
+                    FROM TORG105 X
+                    WHERE ENTER_CD = #{ssnEnterCd}
+                    AND SDATE = (SELECT MAX(S.SDATE)
+                                FROM TORG103 S
+                                WHERE S.ENTER_CD = X.ENTER_CD
+                                AND #{searchYmd} BETWEEN S.SDATE AND NVL(S.EDATE,'99991231')
+                                )
+                )
+                START WITH ORG_CD = TRIM(#{searchOrgCd})
+                CONNECT BY PRIOR ENTER_CD = ENTER_CD
+                AND PRIOR SDATE = SDATE
+                AND PRIOR ORG_CD = PRIOR_ORG_CD
+            )
+        </if>
+
+    </select>
+
+</mapper>

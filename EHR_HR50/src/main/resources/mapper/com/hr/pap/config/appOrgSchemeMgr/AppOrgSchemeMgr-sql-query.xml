@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appOrgSchemeMgr">
+
+<!-- 평가조직관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppOrgSchemeMgrList">
+
+				<![CDATA[
+					SELECT LEVEL AS "_level"
+						 , A.APPRAISAL_CD
+						 , A.APP_STEP_CD
+						 , A.APP_ORG_CD
+						 , A.APP_ORG_NM
+						 , A.OBJECT_TYPE
+						 , A.ORG_TYPE
+						 , A.SABUN
+						 , B.NAME
+						 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_NM
+						 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKCHAK_NM
+					     , A.PRIOR_ORG_CD
+					     , A.SEQ
+                         , ROWNUM AS ORG_SEQ
+                         , CASE WHEN NVL(ORG_SEQ,-1) <> ROWNUM THEN 'U'
+                                ELSE '' END AS S_STATUS
+					  FROM TPAP160 A, THRM100 B
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.APP_STEP_CD = TRIM(#{searchAppStepCd})
+					   AND A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.SABUN = B.SABUN(+)
+					 START WITH A.PRIOR_ORG_CD = '0'
+					CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					    AND PRIOR A.APPRAISAL_CD = A.APPRAISAL_CD
+					    AND PRIOR A.APP_STEP_CD = A.APP_STEP_CD
+					    AND PRIOR A.APP_ORG_CD = A.PRIOR_ORG_CD
+					ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+				]]>
+
+
+		</select>
+
+<!-- 평가조직관리 저장 -->
+		<update parameterType="map" id="saveAppOrgSchemeMgr">
+
+				<![CDATA[
+					MERGE INTO TPAP160 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.APP_STEP_CD
+									, A.APP_ORG_CD
+									, A.APP_ORG_NM
+									, A.OBJECT_TYPE
+									, A.ORG_TYPE
+									, A.SABUN
+									, A.PRIOR_ORG_CD
+									, A.SEQ
+									, A.ORG_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS APPRAISAL_CD
+											, NULL		AS APP_STEP_CD
+											, NULL		AS APP_ORG_CD
+											, NULL		AS APP_ORG_NM
+											, NULL		AS OBJECT_TYPE
+											, NULL		AS ORG_TYPE
+											, NULL		AS SABUN
+											, NULL		AS PRIOR_ORG_CD
+											, NULL		AS SEQ
+											, NULL		AS ORG_SEQ
+									FROM	DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT   #{ssnEnterCd}				AS ENTER_CD
+											, TRIM(#{rm.appraisalCd})	AS APPRAISAL_CD
+											, TRIM(#{rm.appStepCd})		AS APP_STEP_CD
+											, TRIM(#{rm.appOrgCd}) 		AS APP_ORG_CD
+											, TRIM(#{rm.appOrgNm})		AS APP_ORG_NM
+											, TRIM(#{rm.objectType})	AS OBJECT_TYPE
+											, TRIM(#{rm.orgType})		AS ORG_TYPE
+											, TRIM(#{rm.sabun})			AS SABUN
+											, TRIM(#{rm.priorOrgCd})	AS PRIOR_ORG_CD
+											, TRIM(#{rm.seq})			AS SEQ
+											, TRIM(#{rm.orgSeq})		AS ORG_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD
+					AND T.APPRAISAL_CD = S.APPRAISAL_CD
+					AND T.APP_STEP_CD = S.APP_STEP_CD
+					AND T.APP_ORG_CD = S.APP_ORG_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SABUN	= S.SABUN
+									, T.SEQ	    = S.SEQ
+									, T.ORG_SEQ	= S.ORG_SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.APP_STEP_CD
+							, T.APP_ORG_CD
+							, T.APP_ORG_NM
+							, T.OBJECT_TYPE
+							, T.ORG_TYPE
+							, T.SABUN
+							, T.PRIOR_ORG_CD
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.APP_STEP_CD
+							, S.APP_ORG_CD
+							, S.APP_ORG_NM
+							, S.OBJECT_TYPE
+							, S.ORG_TYPE
+							, S.SABUN
+							, S.PRIOR_ORG_CD
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 평가조직관리 삭제 -->
+		<delete parameterType="map" id="deleteAppOrgSchemeMgr">
+
+					DELETE FROM TPAP160
+					WHERE 	ENTER_CD||'_'||APPRAISAL_CD||'_'||APP_STEP_CD||'_'||APP_ORG_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.appOrgCd != null and !rm.appOrgCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.appraisalCd})||'_'||TRIM(#{rm.appStepCd})||'_'||TRIM(#{rm.appOrgCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 평가조직관리 복사 -->
+		<update parameterType="map" id="prcAppOrgSchemeCopy" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APP_ORG_CREATE(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppStepCd,mode=IN,jdbcType=VARCHAR},
+				#{searchSdate,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

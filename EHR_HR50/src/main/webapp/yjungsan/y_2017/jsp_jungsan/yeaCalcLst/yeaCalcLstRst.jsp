@@ -1,0 +1,210 @@
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ page import="yjungsan.util.*"%>
+<%@ page import="yjungsan.exception.*"%>
+<%@ page import="java.sql.Connection"%>
+<%@ page import="java.util.List"%>
+<%@ page import="java.util.ArrayList"%>
+<%@ page import="java.util.Map"%>
+<%@ page import="java.util.HashMap"%>
+<%@ page import="java.net.URLDecoder"%>
+ 
+<%@ page import="org.json.JSONObject" %>
+<%@ page import="com.hr.common.logger.Log" %>
+<%@ include file="../common/include/session.jsp"%>
+
+<%!
+//연말정산계산내역 조회
+public List selectResList(Map paramMap, String locPath) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+	List listData = null;
+	
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectResList",pm);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+	
+	return listData;
+}
+
+//연말정산계산내역 조회
+public List selectResList841(Map paramMap, String locPath) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+	List listData = null;
+	
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectResList841",pm);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+	
+	return listData;
+}
+
+//연말정산계산내역 조회
+public List selectResList843(Map paramMap, String locPath) throws Exception {
+
+	//파라메터 복사.
+	Map pm =  StringUtil.getParamMapData(paramMap);
+	Map queryMap = XmlQueryParser.getQueryMap(locPath);
+	List listData = null;
+	
+	try{
+		//쿼리 실행및 결과 받기.
+		listData  = (queryMap == null) ? null : DBConn.executeQueryList(queryMap,"selectResList843",pm);
+	} catch (Exception e) {
+		Log.Error("[Exception] " + e);
+		throw new Exception("조회에 실패하였습니다.");
+	} finally {
+		queryMap = null;
+	}
+	
+	return listData;
+}
+
+%>
+
+<%
+	//쿼리 맵 셋팅
+	String locPath = xmlPath+"/yeaCalcLst/yeaCalcLst.xml";
+
+	String ssnEnterCd = (String)session.getAttribute("ssnEnterCd");
+	String ssnSabun = (String)session.getAttribute("ssnSabun");
+	String cmd = (String)request.getParameter("cmd");
+
+	if("selectResList".equals(cmd)) {
+		//연말정산계산내역 조회
+		
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+
+		try {
+			listData = selectResList(mp, locPath);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+		
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+		
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("Data", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+		
+	} else if("selectResList841".equals(cmd)) {
+		//연말정산계산내역 조회
+		
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+
+		try {
+			listData = selectResList841(mp, locPath);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+		
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+		
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("Data", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+		
+	} else if("selectResList843".equals(cmd)) {
+		//연말정산계산내역 조회
+		
+		Map mp = StringUtil.getRequestMap(request);
+		mp.put("ssnEnterCd", ssnEnterCd);
+		mp.put("ssnSabun", ssnSabun);
+		
+		List listData  = new ArrayList();
+		String message = "";
+		String code = "1";
+
+		try {
+			listData = selectResList843(mp, locPath);
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+		
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+		
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		rstMap.put("Data", listData == null ? null : (List)listData);
+		out.print((new org.json.JSONObject(rstMap)).toString());
+		
+	} else if("prcYeaResultConfirm".equals(cmd)) {
+		//이상없음 확인
+
+		Map paramMap = StringUtil.getRequestMap(request);
+		Map mp =  StringUtil.getParamMapData(paramMap);
+		String payActionCd = (String)mp.get("searchPayActionCd");
+		String workYy = (String)mp.get("searchWorkYy");
+		String adjustType = (String)mp.get("searchAdjustType");
+		String sabun = (String)mp.get("searchSabun");
+		
+		String[] type =  new String[]{"OUT","OUT","STR","STR","STR","STR","STR","STR"};
+		String[] param = new String[]{"","",ssnEnterCd,payActionCd,workYy,adjustType,sabun,ssnSabun};
+		
+		String message = "";
+		String code = "1";
+		
+		try {
+			
+			String[] rstStr = DBConn.executeProcedure("P_CPN_YEA_RESULT_CONFIRM",type,param);
+			
+			if( "".equals(rstStr[0]) ) {
+				message = "처리되었습니다.";
+			} else {
+				code = "-1";
+				message = "프로시저 실행에 실패하였습니다.\n"+rstStr[1];
+			}
+		} catch(Exception e) {
+			code = "-1";
+			message = e.getMessage();
+		}
+		
+		Map mapCode = new HashMap();
+		mapCode.put("Code", code);
+		mapCode.put("Message", message);
+		
+		Map rstMap = new HashMap();
+		rstMap.put("Result", mapCode);
+		
+		out.print((new org.json.JSONObject(rstMap)).toString());
+	}
+%>

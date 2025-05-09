@@ -1,0 +1,448 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sys.layout.layoutMgr">
+	<select parameterType="map" resultType="cMap" id="getLayoutMgrCount">
+		SELECT A.ENTER_CD, A.GRP_CD, A.GRP_NM, COUNT(B.GRP_CD) AS CNT
+		  FROM TSYS307 A
+		  LEFT JOIN TSYS365 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.GRP_CD = B.GRP_CD
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		 GROUP BY A.ENTER_CD, A.GRP_CD, A.GRP_NM, A.SEQ
+		 ORDER BY A.SEQ
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getLayoutMgrList">
+		SELECT A.ENTER_CD, A.MAIN_MENU_CD, A.MAIN_MENU_NM
+			 , B.LAYOUT_CD
+			 , DECODE(LAYOUT_CD, NULL, 'N', 'Y') AS SETTING_YN
+             , ('/LayoutThumbnail.do' || chr(63) || 'enterCd=' || A.ENTER_CD || chr(38) || 'layoutCd=' || B.LAYOUT_CD ) AS IMAGE_URL
+			 , TO_CHAR(B.CHKDATE, 'YYYY-MM-DD') AS CHKDATE
+		  FROM (
+				SELECT ENTER_CD, MAIN_MENU_CD, MAIN_MENU_NM, SEQ
+				  FROM TSYS309
+				 WHERE USE_YN = '1'
+				 UNION ALL
+				 SELECT #{ssnEnterCd} AS ENTER_CD, 'MAIN', '메인', 0 AS SEQ
+				  FROM DUAL
+			   ) A
+		  LEFT JOIN TSYS365 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.MAIN_MENU_CD = B.MAIN_MENU_CD
+		   AND B.GRP_CD = #{grpCd}
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		 ORDER BY A.SEQ
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getLayoutMgrConfig">
+		SELECT A.TEMPLATE_CD
+			 , A.LAYOUT_CD
+			 , A.LAYOUT_NM
+			 , A.CONFIG_INFO
+			 , A.FILE_SEQ
+		  FROM TSYS361 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		<if test='mainMenuCd != null and mainMenuCd neq "" and grpCd != null and grpCd neq ""'>
+		   AND A.LAYOUT_CD = (SELECT LAYOUT_CD FROM TSYS365 WHERE ENTER_CD = A.ENTER_CD AND MAIN_MENU_CD = #{mainMenuCd} AND GRP_CD = #{grpCd})
+		</if>
+		<if test='layoutCd != null and layoutCd neq ""'>
+		   AND A.LAYOUT_CD = #{layoutCd}
+		</if>
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getAuthList">
+		SELECT A.ENTER_CD
+		     , A.GRP_CD
+		     , A.GRP_NM
+		  FROM TSYS307 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getMainMenuList">
+		SELECT ENTER_CD, MAIN_MENU_CD, MAIN_MENU_NM, SEQ
+		  FROM TSYS309
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND USE_YN = '1'
+		 UNION ALL
+		 SELECT #{ssnEnterCd} AS ENTER_CD, 'MAIN', '메인', 0 AS SEQ
+		  FROM DUAL
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getLayoutList">
+		SELECT ENTER_CD, TEMPLATE_CD, LAYOUT_CD, LAYOUT_NM, CONFIG_INFO, FILE_SEQ
+			 , ('/LayoutThumbnail.do' || chr(63) || 'enterCd=' || ENTER_CD || chr(38) || 'layoutCd=' || LAYOUT_CD ) AS IMAGE_URL
+		  FROM TSYS361
+		 WHERE ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getLayoutMgrImageList">
+		SELECT A.FILE_SEQ
+			 , B.SEQ_NO
+			 , B.S_FILE_NM
+			 , B.R_FILE_NM
+			 , ('/LayoutPhotoOut.do' || chr(63) || 'enterCd=' || A.ENTER_CD || chr(38) || 'fileSeq=' || B.FILE_SEQ || chr(38) || 'seqNo=' || B.SEQ_NO) AS IMAGE_URL
+		  FROM TSYS361 A
+		  JOIN TSYS201 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.FILE_SEQ = B.FILE_SEQ
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		<if test='mainMenuCd != null and mainMenuCd neq "" and grpCd != null and grpCd neq ""'>
+		   AND A.LAYOUT_CD = (SELECT LAYOUT_CD FROM TSYS365 WHERE ENTER_CD = A.ENTER_CD AND MAIN_MENU_CD = #{mainMenuCd} AND GRP_CD = #{grpCd})
+		</if>
+		<if test='layoutCd != null and layoutCd neq ""'>
+		   AND A.LAYOUT_CD = #{layoutCd}
+		</if>
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getLayoutMgrImageList2">
+		SELECT A.ENTER_CD
+			 , A.FILE_SEQ
+			 , B.SEQ_NO
+			 , B.S_FILE_NM
+			 , B.R_FILE_NM
+			 , ('/LayoutPhotoOut.do' || chr(63) || 'enterCd=' || A.ENTER_CD || chr(38) || 'fileSeq=' || A.FILE_SEQ || chr(38) || 'seqNo=' || B.SEQ_NO) AS IMAGE_URL
+		  FROM TSYS200 A
+		  JOIN TSYS201 B
+			ON A.ENTER_CD = B.ENTER_CD
+		   AND A.FILE_SEQ = B.FILE_SEQ
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.FILE_SEQ = #{fileSeq}
+	</select>
+
+
+	<update parameterType="map" id="saveLayoutMgrConfig">
+		MERGE INTO TSYS361 T
+		USING (
+			SELECT
+				TRIM(#{ssnEnterCd}) AS ENTER_CD,
+				TRIM(#{layoutCd}) AS LAYOUT_CD,
+				TRIM(#{layoutNm}) AS LAYOUT_NM,
+				TRIM(#{templateCd}) AS TEMPLATE_CD,
+				#{configInfo, jdbcType=CLOB} AS CONFIG_INFO,
+				TRIM(#{fileSeq}) AS FILE_SEQ
+			FROM DUAL
+		) S
+		ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.LAYOUT_CD = S.LAYOUT_CD
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+			    T.LAYOUT_NM = S.LAYOUT_NM,
+			    T.TEMPLATE_CD = S.TEMPLATE_CD,
+				T.CONFIG_INFO = S.CONFIG_INFO,
+				T.FILE_SEQ = S.FILE_SEQ,
+				CHKDATE = SYSDATE,
+				CHKID = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT (
+				T.ENTER_CD,
+				T.LAYOUT_CD,
+				T.LAYOUT_NM,
+				T.TEMPLATE_CD,
+				T.CONFIG_INFO,
+				T.FILE_SEQ,
+				CHKDATE,
+				CHKID
+			)
+			VALUES (
+				S.ENTER_CD,
+				S.LAYOUT_CD,
+				S.LAYOUT_NM,
+				S.TEMPLATE_CD,
+				S.CONFIG_INFO,
+				S.FILE_SEQ,
+				SYSDATE,
+				#{ssnSabun}
+			)
+	</update>
+
+	<delete parameterType="map" id="deleteLayoutMgrConfig">
+		DELETE TSYS365
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND MAIN_MENU_CD = TRIM(#{mainMenuCd})
+		   AND GRP_CD = TRIM(#{grpCd})
+	</delete>
+
+	<update parameterType="map" id="applyLayoutMgr">
+		MERGE INTO TSYS365 T
+		USING (
+			SELECT
+				TRIM(#{ssnEnterCd}) AS ENTER_CD,
+				TRIM(#{mainMenuCd}) AS MAIN_MENU_CD,
+				TRIM(#{grpCd}) AS GRP_CD,
+				TRIM(#{layoutCd}) AS LAYOUT_CD,
+				TRIM(#{fileSeq}) AS FILE_SEQ
+			FROM DUAL
+		) S
+		ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.MAIN_MENU_CD = S.MAIN_MENU_CD
+			AND T.GRP_CD = S.GRP_CD
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+				T.LAYOUT_CD = S.LAYOUT_CD,
+				CHKDATE = SYSDATE,
+				CHKID = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT (
+				T.ENTER_CD,
+				T.MAIN_MENU_CD,
+				T.GRP_CD,
+				T.LAYOUT_CD,
+				CHKDATE,
+				CHKID
+			)
+			VALUES (
+				S.ENTER_CD,
+				S.MAIN_MENU_CD,
+				S.GRP_CD,
+				S.LAYOUT_CD,
+				SYSDATE,
+				#{ssnSabun}
+			)
+	</update>
+
+	<select parameterType="map" resultType="cMap" id="getLayoutMgrWidgetList">
+		SELECT A.WIDGET_CD
+			 , A.WIDGET_NM
+		  FROM TSYS362 A
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+	</select>
+
+	<select id="execWidgetQuery" parameterType="map" resultType="cMap">
+	<![CDATA[
+		${query}
+	]]>
+	</select>
+
+	<select id="getWidgetInfo" parameterType="map" resultType="cMap">
+		SELECT A.WIDGET_CD
+			 , A.WIDGET_NM
+			 , A.ICON
+		  FROM TSYS362 A
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.WIDGET_CD = TRIM(#{widgetCd})
+	</select>
+
+	<select id="getSubWidgetList" parameterType="map" resultType="cMap">
+		SELECT A.SUB_WIDGET_CD
+			 , A.SUB_WIDGET_NM
+			 , A.TYPE
+			 , A.ICON
+			 , A.SQL_BODY
+			 , A.SUMMARY_SQL_BODY
+			 , A.CONFIG_INFO
+		  FROM TSYS363 A
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.WIDGET_CD = TRIM(#{widgetCd})
+		<if test="subWidgetCd != null and subWidgetCd neq ''">
+		   AND A.SUB_WIDGET_CD = TRIM(#{subWidgetCd})
+		</if>
+	</select>
+
+	<select id="getFilterList" parameterType="map" resultType="cMap">
+		SELECT A.SUB_WIDGET_CD
+		     , A.FILTER_KEY
+			 , A.TYPE
+			 , A.OPTIONS
+		  FROM TSYS364 A
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.WIDGET_CD = TRIM(#{widgetCd})
+	</select>
+
+	<update parameterType="map" id="saveWidgetInfo">
+		MERGE INTO TSYS362 T
+		USING (
+			SELECT
+				TRIM(#{ssnEnterCd}) AS ENTER_CD,
+				TRIM(#{widgetCd}) AS WIDGET_CD,
+				TRIM(#{widgetNm}) AS WIDGET_NM,
+				TRIM(#{icon}) AS ICON
+			FROM DUAL
+		) S
+		ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.WIDGET_CD = S.WIDGET_CD
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+			    T.WIDGET_NM = S.WIDGET_NM,
+			    T.ICON = S.ICON,
+				CHKDATE = SYSDATE,
+				CHKID = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT (
+				T.ENTER_CD,
+				T.WIDGET_CD,
+				T.WIDGET_NM,
+				T.ICON,
+				CHKDATE,
+				CHKID
+			)
+			VALUES (
+				S.ENTER_CD,
+				S.WIDGET_CD,
+				S.WIDGET_NM,
+				S.ICON,
+				SYSDATE,
+				#{ssnSabun}
+			)
+	</update>
+
+	<update parameterType="map" id="saveFilterConfig">
+		MERGE INTO TSYS364 T
+		USING (
+			SELECT
+				TRIM(#{ssnEnterCd}) AS ENTER_CD,
+				TRIM(#{widgetCd}) AS WIDGET_CD,
+				TRIM(#{subWidgetCd}) AS SUB_WIDGET_CD,
+				TRIM(#{filterKey}) AS FILTER_KEY,
+				TRIM(#{type}) AS TYPE,
+				#{options, jdbcType=CLOB} AS OPTIONS
+			FROM DUAL
+		) S
+		ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.WIDGET_CD = S.WIDGET_CD
+			AND T.SUB_WIDGET_CD = S.SUB_WIDGET_CD
+			AND T.FILTER_KEY = S.FILTER_KEY
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+			    T.TYPE = S.TYPE,
+			    T.OPTIONS = S.OPTIONS,
+				CHKDATE = SYSDATE,
+				CHKID = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT (
+				T.ENTER_CD,
+				T.WIDGET_CD,
+				T.SUB_WIDGET_CD,
+				T.FILTER_KEY,
+				T.TYPE,
+				T.OPTIONS,
+				CHKDATE,
+				CHKID
+			)
+			VALUES (
+				S.ENTER_CD,
+				S.WIDGET_CD,
+				S.SUB_WIDGET_CD,
+				S.FILTER_KEY,
+				S.TYPE,
+				S.OPTIONS,
+				SYSDATE,
+				#{ssnSabun}
+			)
+	</update>
+
+	<update parameterType="map" id="saveSubWidgetConfig">
+		MERGE INTO TSYS363 T
+		USING (
+			SELECT
+				TRIM(#{ssnEnterCd}) AS ENTER_CD,
+				TRIM(#{widgetCd}) AS WIDGET_CD,
+				TRIM(#{subWidgetCd}) AS SUB_WIDGET_CD,
+				TRIM(#{label}) AS SUB_WIDGET_NM,
+				TRIM(#{type}) AS TYPE,
+				TRIM(#{icon}) AS ICON,
+				#{sqlBody, jdbcType=CLOB} AS SQL_BODY,
+				#{summarySqlBody, jdbcType=CLOB} AS SUMMARY_SQL_BODY,
+				#{config, jdbcType=CLOB} AS CONFIG_INFO
+			FROM DUAL
+		) S
+		ON (
+			T.ENTER_CD = S.ENTER_CD
+			AND T.WIDGET_CD = S.WIDGET_CD
+			AND T.SUB_WIDGET_CD = S.SUB_WIDGET_CD
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+			    T.SUB_WIDGET_NM = S.SUB_WIDGET_NM,
+			    T.TYPE = S.TYPE,
+			    T.ICON = S.ICON,
+			    T.CONFIG_INFO = S.CONFIG_INFO,
+			    T.SQL_BODY = S.SQL_BODY,
+			    T.SUMMARY_SQL_BODY = S.SUMMARY_SQL_BODY,
+				CHKDATE = SYSDATE,
+				CHKID = #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT (
+				T.ENTER_CD,
+				T.WIDGET_CD,
+				T.SUB_WIDGET_CD,
+				T.SUB_WIDGET_NM,
+				T.TYPE,
+				T.ICON,
+				T.CONFIG_INFO,
+				T.SQL_BODY,
+				T.SUMMARY_SQL_BODY,
+				CHKDATE,
+				CHKID
+			)
+			VALUES (
+				S.ENTER_CD,
+				S.WIDGET_CD,
+				S.SUB_WIDGET_CD,
+				S.SUB_WIDGET_NM,
+				S.TYPE,
+				S.ICON,
+				S.CONFIG_INFO,
+				S.SQL_BODY,
+				S.SUMMARY_SQL_BODY,
+				SYSDATE,
+				#{ssnSabun}
+			)
+	</update>
+
+	<select id="getMenuSurl" parameterType="map" resultType="cMap">
+		<![CDATA[
+		SELECT REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+				"mainMenuCd":"'||MAIN_MENU_CD||'"
+				,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+				,"menuCd":"'||MENU_CD||'"
+				,"prgCd":"'||PRG_CD||'"
+				,"menuSeq":"'||MENU_SEQ||'"
+				,"searchUseYn":"'||SEARCH_USE_YN||'"
+				,"applCd":"'||APPL_CD||'"
+				}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'') AS SURL
+		  FROM (
+				SELECT A.MAIN_MENU_CD
+					 , A.PRIOR_MENU_CD
+					 , A.MENU_CD
+					 , A.MENU_SEQ
+					 , REPLACE(C.PRG_CD,'&','||') AS PRG_CD
+					 , A.GRP_CD
+					 , A.SEARCH_USE_YN
+					 , C.APPL_CD
+				  FROM TSYS311 A
+				  JOIN TSYS303 C
+					ON A.ENTER_CD   	= C.ENTER_CD
+				   AND A.MENU_SEQ 		= C.MENU_SEQ
+				   AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+				   AND A.MENU_CD 		= C.MENU_CD
+				   AND A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+				 WHERE A.USE_YN 		= '1'
+				   AND A.TYPE <> 'T'
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND C.PRG_CD = REPLACE(#{actionLink}, '||', '&')
+				   AND A.GRP_CD = #{ssnGrpCd}
+				 UNION ALL
+				SELECT MAIN_MENU_CD
+					 , PRIOR_MENU_CD
+					 , MENU_CD
+					 , TO_NUMBER(MENU_CD) AS MENU_SEQ
+					 , REPLACE(#{actionLink}, '&' ,'||') AS PRG_CD, TRIM(#{ssnGrpCd}) AS GRP_CD, '0' AS SEARCH_USE_YN
+					 , NULL AS APPL_CD
+				  FROM TSYS700
+				 WHERE ENTER_CD = #{ssnEnterCd}
+				   AND BBS_CD = SUBSTR(#{actionLink}, INSTR(#{actionLink}, 'bbsCd=')+6)
+			   ) DM
+		]]>
+	</select>
+
+</mapper>

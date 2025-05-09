@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	국세청신고파일작업(지급조서)
+ -->
+<root>
+
+	<!-- 마감체크  -->
+	<query id="getBizLoc">
+		<![CDATA[
+		   SELECT COUNT(*) AS CNT 
+			 FROM TYEA811
+			    WHERE enter_cd = #ssnEnterCd#
+			    $query$
+			    AND FINAL_CLOSE_YN = 'Y'
+	   ]]> 
+	</query>
+
+	<!-- 국세청신고파일작업(지급조서) 파일명 조회  -->
+	<query id="selectYeaNtsTaxHFileName">
+		<![CDATA[
+			SELECT /*+ index_desc(A) */ REGINO
+			  FROM TCPN121 A
+			 WHERE A.ENTER_CD = #ssnEnterCd#
+			   AND A.BUSINESS_PLACE_CD LIKE DECODE(#tmpBizLoc#, NULL, '%',  #tmpBizLoc#)
+			   AND ROWNUM = 1
+	   ]]> 
+	</query>
+	
+	<!-- 국세청신고파일작업(지급조서) 데이터 조회  -->
+	<query id="selectYeaNtsTaxCRecodeAContent">
+		<![CDATA[
+			SELECT CONTENT
+			  FROM TCPN_DISKA
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #tgtYear#
+			   AND TAX_FILE_TYPE = #declClass#
+			   AND SEND_YMD = #declYmd#
+	   ]]> 
+	</query>
+	
+	<!-- 국세청신고파일작업(지급조서) 데이터 조회  -->
+	<query id="selectYeaNtsTaxCRecodeBContent">
+		<![CDATA[
+			SELECT CONTENT, REGINO
+			  FROM TCPN_DISKB
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #tgtYear#
+			   AND TAX_FILE_TYPE = #declClass#
+			   AND SEND_YMD = #declYmd#
+			   AND REGINO LIKE '%'|| (
+			   					SELECT REPLACE(REGINO,'-','')
+								  FROM TCPN121 X
+								 WHERE X.ENTER_CD = #ssnEnterCd#
+								   AND X.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+								                   WHERE Y.ENTER_CD = X.ENTER_CD
+								                     AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+								                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+					               AND X.BUSINESS_PLACE_CD = #bizLoc#
+			   				 )
+	   ]]> 
+	</query>
+	
+	<!-- 국세청신고파일작업(지급조서) 데이터 조회  -->
+	<query id="selectYeaNtsTaxCRecodeCContent">
+		<![CDATA[
+			SELECT CONTENT, SABUN, SERIAL_NO, ADJUST_TYPE
+			  FROM TCPN_DISKC
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #tgtYear#
+			   AND TAX_FILE_TYPE = #declClass#
+			   AND SEND_YMD = #declYmd#
+			   AND REGINO = #regiNo#
+			 ORDER BY SERIAL_NO
+	   ]]> 
+	</query>	
+	
+			
+				
+	
+	<!-- 국세청신고파일작업(지급조서) 기부금액,공제금액 조회  -->
+	<query id="selectYeaNtsTaxCResult1">
+		<![CDATA[
+			SELECT SUM(PAY_TOT_MON) AS PAY_TOT_MON, SUM(ITAX_TOT_MON) AS ITAX_TOT_MON, COUNT(*) AS DISKB_TOTSUM
+			  FROM TCPN_DISKB
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #tgtYear#
+			   AND TAX_FILE_TYPE = #declClass#
+			   AND SEND_YMD = #declYmd#
+			   AND REGINO LIKE '%'|| (
+			   					SELECT REPLACE(REGINO,'-','')
+								  FROM TCPN121 X
+								 WHERE X.ENTER_CD = #ssnEnterCd#
+								   AND X.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+								                   WHERE Y.ENTER_CD = X.ENTER_CD
+								                     AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+								                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+					               AND X.BUSINESS_PLACE_CD = #bizLoc#
+			   				 )
+	   ]]> 
+	</query>
+
+	<!-- 국세청신고파일작업(지급조서) 기부금액,공제금액 조회  -->
+	<query id="selectYeaNtsTaxCResult2">
+		<![CDATA[
+			SELECT NVL(SUM(NTAX_TOT_MON),0) AS EXT_TAX_AMOUNT, COUNT(*) AS DISKC_TOTSUM
+			  FROM TCPN_DISKC
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #tgtYear#
+			   AND TAX_FILE_TYPE = #declClass#
+			   AND SEND_YMD = #declYmd#
+			   AND REGINO LIKE '%'|| (
+			   					SELECT REPLACE(REGINO,'-','')
+								  FROM TCPN121 X
+								 WHERE X.ENTER_CD = #ssnEnterCd#
+								   AND X.SDATE = (SELECT MAX(Y.SDATE) FROM TCPN121 Y
+								                   WHERE Y.ENTER_CD = X.ENTER_CD
+								                     AND Y.BUSINESS_PLACE_CD = X.BUSINESS_PLACE_CD
+								                     AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231'))
+					               AND X.BUSINESS_PLACE_CD = #bizLoc#
+			   				 )
+	   ]]> 
+	</query>
+</root>

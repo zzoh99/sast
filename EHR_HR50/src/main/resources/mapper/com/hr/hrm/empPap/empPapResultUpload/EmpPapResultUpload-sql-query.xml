@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.empPap.empPapResultUpload">
+
+		<!-- 필요지식 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpPapResultUploadList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.APPRAISAL_YY
+						     , A.SABUN
+						     , A.APPRAISAL_NM
+						     , A.MBO_POINT
+						     , A.COMP_POINT
+						     , A.FINAL_CLASS_CD
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+						  FROM TPAP555 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						           ]]>
+					 <if test='searchYear != null and !searchYear.equals("")'>
+					       AND A.APPRAISAL_YY = TRIM(#{searchYear})
+					 </if>
+					 <if test='searchSaNm != null and !searchSaNm.equals("")'>
+					   AND (A.SABUN LIKE #{searchSaNm} || '%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd} ) LIKE #{searchSaNm} || '%')
+					 </if>
+					 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, SYSDATE)
+		</select>
+		
+		<!-- 필요지식 저장 -->
+		<update parameterType="map" id="saveEmpPapResultUpload">
+
+						 MERGE INTO TPAP555 T 	
+						 USING 	
+			                (
+								<bind name="icnt" value="1" />
+								<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+			                   SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD
+						            , TRIM(#{rm.appraisalYy})  AS  APPRAISAL_YY
+						            , TRIM(#{rm.sabun})  AS  SABUN
+						            , TRIM(#{rm.mboPoint})  AS  MBO_POINT
+						            , TRIM(#{rm.compPoint})  AS  COMP_POINT
+						            , TRIM(#{rm.finalClassCd})  AS  FINAL_CLASS_CD
+						        FROM DUAL	
+								</foreach>
+						) S 	
+						ON ( 	
+						          T.ENTER_CD = S.ENTER_CD 	
+						     AND  T.APPRAISAL_YY = S.APPRAISAL_YY 	
+						     AND  T.SABUN = S.SABUN 	
+						) 	
+						WHEN MATCHED THEN 	
+						   UPDATE SET T.CHKDATE	= sysdate
+						            , T.CHKID	= #{ssnSabun}
+						            , T.MBO_POINT = S.MBO_POINT 	
+						            , T.COMP_POINT = S.COMP_POINT 	
+						            , T.FINAL_CLASS_CD = S.FINAL_CLASS_CD 	
+						WHEN NOT MATCHED THEN 	
+						   INSERT 	
+						   ( 	
+						              T.ENTER_CD	
+						            , T.APPRAISAL_YY	
+						            , T.SABUN	
+						            , T.MBO_POINT	
+						            , T.COMP_POINT	
+						            , T.FINAL_CLASS_CD	
+						            , T.CHKDATE	
+						            , T.CHKID	
+						   ) 	
+						   VALUES 	
+						   ( 	
+						              S.ENTER_CD	
+						            , S.APPRAISAL_YY	
+						            , S.SABUN	
+						            , S.MBO_POINT	
+						            , S.COMP_POINT	
+						            , S.FINAL_CLASS_CD	
+						            , sysdate	
+						            , #{ssnSabun}
+						   ) 	
+		</update>
+		
+		<!-- 필요지식 삭제 -->
+		<delete parameterType="map" id="deleteEmpPapResultUpload">
+
+					  		DELETE 
+					  		  FROM TPAP555
+							 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+							   AND ( APPRAISAL_YY,SABUN ) IN ( ( NULL,NULL) 
+					<foreach item="rm" collection="deleteRows" >
+					    <if test='  rm.appraisalYy != null and !rm.appraisalYy.equals("") and rm.sabun != null and !rm.sabun.equals("") '>
+							     , ( TRIM( #{rm.appraisalYy} ),TRIM( #{rm.sabun} ) )
+						</if>
+					</foreach>
+							       )
+		</delete>
+		
+
+</mapper>

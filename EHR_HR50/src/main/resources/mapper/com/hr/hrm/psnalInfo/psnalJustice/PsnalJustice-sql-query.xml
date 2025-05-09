@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalJustice">
+
+<!-- 인사기본(상벌) 포상 조회 -->
+		<select id="getPsnalJusticePrizeList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.SEQ
+					     , A.PRIZE_GRD_CD
+					     , A.PRIZE_YMD
+					     , A.IN_OUT_CD
+					     , A.PRIZE_CD
+					     , A.PRIZE_OFFICE_NM
+					     , A.PRIZE_NO
+					     , A.PRIZE_MON
+					     , A.PAYMENT_YM
+					     , A.S_POINT
+					     , A.SG_POINT
+					     , A.S_FROM_YMD
+					     , A.S_TO_YMD
+					     , A.MEMO2
+					     , A.NOTE
+					     , A.FILE_SEQ
+					     , F_COM_GET_ORG_NM2( A.ENTER_CD, A.SABUN, A.PRIZE_YMD ) AS ORG_NM
+					     , F_COM_GET_JIKGUB_NM ( A.ENTER_CD, A.SABUN, A.PRIZE_YMD ) AS JIKGUB_NM
+					     , F_COM_GET_JIKCHAK_NM ( A.ENTER_CD, A.SABUN, A.PRIZE_YMD ) AS JIKCHAK_NM
+					     , F_COM_GET_MANAGE_NM ( A.ENTER_CD, A.SABUN, A.PRIZE_YMD ) AS MANAGE_NM
+					  FROM THRM128 A
+					 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					   AND A.SABUN = #{sabun}
+					 ORDER BY A.PRIZE_YMD DESC
+				]]>
+
+
+		</select>
+
+<!-- 인사기본(상벌) 징계 조회 -->
+		<select id="getPsnalJusticePunishList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.SEQ
+					     , A.PUNISH_YMD
+					     , A.PUNISH_CD
+					     , A.PUNISH_MEMO
+					     , A.SDATE
+					     , A.EDATE
+					     , A.PUNISH_NO
+					     , A.PAY_S_YMD
+					     , A.PAY_E_YMD
+					     , A.S_POINT
+					     , A.SG_POINT
+					     , A.S_FROM_YMD
+					     , A.S_TO_YMD
+					     , A.FILE_SEQ
+					     , F_COM_GET_ORG_NM2( A.ENTER_CD, A.SABUN, A.PUNISH_YMD ) AS ORG_NM
+					     , F_COM_GET_JIKGUB_NM ( A.ENTER_CD, A.SABUN, A.PUNISH_YMD ) AS JIKGUB_NM
+					     , F_COM_GET_JIKCHAK_NM ( A.ENTER_CD, A.SABUN, A.PUNISH_YMD ) AS JIKCHAK_NM
+					     , F_COM_GET_MANAGE_NM ( A.ENTER_CD, A.SABUN, A.PUNISH_YMD ) AS MANAGE_NM
+					     , A.PUNISH_OFFICE
+					     , A.AUDIT_OFFICE
+					     , A.EMP_YN
+					     , A.PROFILE_YN
+					  FROM THRM129 A
+					 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					   AND A.SABUN = #{sabun}
+					 ORDER BY A.PUNISH_YMD DESC
+				]]>
+
+
+		</select>
+
+<!-- 인사기본(상벌) 포상 저장 -->
+		<update id="savePsnalJusticePrize" parameterType="map">
+
+					MERGE INTO THRM128 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SEQ
+									, A.PRIZE_GRD_CD
+									, A.PRIZE_YMD
+									, A.IN_OUT_CD
+									, A.PRIZE_CD
+									, A.PRIZE_OFFICE_NM
+									, A.PRIZE_NO
+									, A.PRIZE_MON
+									, A.PAYMENT_YM
+									, A.S_POINT
+									, A.SG_POINT
+									, A.S_FROM_YMD
+									, A.S_TO_YMD
+									, A.MEMO2
+									, A.NOTE
+									, A.FILE_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS SEQ
+											, NULL		AS PRIZE_GRD_CD
+											, NULL		AS PRIZE_YMD
+											, NULL		AS IN_OUT_CD
+											, NULL		AS PRIZE_CD
+											, NULL		AS PRIZE_OFFICE_NM
+											, NULL		AS PRIZE_NO
+											, NULL		AS PRIZE_MON
+											, NULL		AS PAYMENT_YM
+											, NULL		AS S_POINT
+											, NULL      AS SG_POINT
+											, NULL		AS S_FROM_YMD
+											, NULL		AS S_TO_YMD
+											, NULL		AS MEMO2
+											, NULL		AS NOTE
+											, NULL		AS FILE_SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+									     <choose>
+											<when test='rm.seq != null and !rm.seq.equals("")' >
+											, TRIM(#{rm.seq}) 			AS SEQ
+											</when>
+											<otherwise>
+											, TO_CHAR( (
+															SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+															  FROM THRM128
+															 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+															   AND SABUN = TRIM( #{rm.sabun} )
+														) )	AS SEQ
+												<bind name="icnt" value="icnt+1"/>
+											</otherwise>
+										</choose>
+											, TRIM( #{rm.prizeGrdCd} )		AS PRIZE_GRD_CD
+											, TRIM( #{rm.prizeYmd} )		AS PRIZE_YMD
+											, TRIM( #{rm.inOutCd} )			AS IN_OUT_CD
+											, TRIM( #{rm.prizeCd} )			AS PRIZE_CD
+											, TRIM( #{rm.prizeOfficeNm} )	AS PRIZE_OFFICE_NM
+											, TRIM( #{rm.prizeNo} )			AS PRIZE_NO
+											, TRIM( #{rm.prizeMon} )		AS PRIZE_MON
+											, TRIM( #{rm.paymentYm} )		AS PAYMENT_YM
+											, TRIM( #{rm.sPoint} )		AS S_POINT
+											, TRIM( #{rm.sgPoint} )		AS SG_POINT
+											, TRIM( #{rm.sFromYmd} )		AS S_FROM_YMD
+											, TRIM( #{rm.sToYmd} )		AS S_TO_YMD
+											, TRIM( #{rm.memo2} )			AS MEMO2
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.fileSeq} )			AS FILE_SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PRIZE_GRD_CD	= S.PRIZE_GRD_CD
+									, T.PRIZE_YMD		= S.PRIZE_YMD
+									, T.IN_OUT_CD		= S.IN_OUT_CD
+									, T.PRIZE_CD		= S.PRIZE_CD
+									, T.PRIZE_OFFICE_NM	= S.PRIZE_OFFICE_NM
+									, T.PRIZE_NO		= S.PRIZE_NO
+									, T.PRIZE_MON		= S.PRIZE_MON
+									, T.PAYMENT_YM		= S.PAYMENT_YM
+									, T.S_POINT			= S.S_POINT
+									, T.SG_POINT        = S.SG_POINT
+									, T.S_FROM_YMD		= S.S_FROM_YMD
+									, T.S_TO_YMD		= S.S_TO_YMD
+									, T.MEMO2			= S.MEMO2
+									, T.NOTE			= S.NOTE
+									, T.FILE_SEQ		= S.FILE_SEQ
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SEQ
+							, T.PRIZE_GRD_CD
+							, T.PRIZE_YMD
+							, T.IN_OUT_CD
+							, T.PRIZE_CD
+							, T.PRIZE_OFFICE_NM
+							, T.PRIZE_NO
+							, T.PRIZE_MON
+							, T.PAYMENT_YM
+							, T.S_POINT
+							, T.SG_POINT
+							, T.S_FROM_YMD
+							, T.S_TO_YMD
+							, T.MEMO2
+							, T.NOTE
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SEQ
+							, S.PRIZE_GRD_CD
+							, S.PRIZE_YMD
+							, S.IN_OUT_CD
+							, S.PRIZE_CD
+							, S.PRIZE_OFFICE_NM
+							, S.PRIZE_NO
+							, S.PRIZE_MON
+							, S.PAYMENT_YM
+							, S.S_POINT
+							, S.SG_POINT
+							, S.S_FROM_YMD
+							, S.S_TO_YMD
+							, S.MEMO2
+							, S.NOTE
+							, S.FILE_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+<!-- 인사기본(상벌) 징계 저장 -->
+		<update id="savePsnalJusticePunish" parameterType="map">
+
+					MERGE INTO THRM129 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SEQ
+									, A.PUNISH_YMD
+									, A.PUNISH_CD
+									, A.PUNISH_MEMO
+									, A.SDATE
+									, A.EDATE
+									, A.PUNISH_NO
+									, A.PAY_S_YMD
+									, A.PAY_E_YMD
+									, A.S_POINT
+									, A.SG_POINT
+									, A.S_FROM_YMD
+									, A.S_TO_YMD
+									, A.FILE_SEQ
+									, A.PUNISH_OFFICE
+									, A.AUDIT_OFFICE
+									, A.EMP_YN
+									, A.PROFILE_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS SEQ
+											, NULL		AS PUNISH_YMD
+											, NULL		AS PUNISH_CD
+											, NULL		AS PUNISH_MEMO
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS PUNISH_NO
+											, NULL		AS PAY_S_YMD
+											, NULL		AS PAY_E_YMD
+											, NULL		AS S_POINT
+											, NULL		AS SG_POINT
+											, NULL		AS S_FROM_YMD
+											, NULL		AS S_TO_YMD
+											, NULL		AS FILE_SEQ
+											, NULL		AS PUNISH_OFFICE
+											, NULL		AS AUDIT_OFFICE
+											, NULL		AS EMP_YN
+											, NULL		AS PROFILE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach collection="mergeRows" item="rm" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.sabun} )		AS SABUN
+									     <choose>
+											<when test='rm.seq != null and !rm.seq.equals("")' >
+											, TRIM(#{rm.seq}) 			AS SEQ
+											</when>
+											<otherwise>
+											, TO_CHAR( (
+															SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+															  FROM THRM129
+															 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+															   AND SABUN = TRIM( #{rm.sabun} )
+														) )	AS SEQ
+												<bind name="icnt" value="icnt+1"/>
+											</otherwise>
+										</choose>
+											, TRIM( #{rm.punishYmd} )		AS PUNISH_YMD
+											, TRIM( #{rm.punishCd} )		AS PUNISH_CD
+											, TRIM( #{rm.punishMemo} )		AS PUNISH_MEMO
+											, TRIM( #{rm.sdate} )			AS SDATE
+											, TRIM( #{rm.edate} )			AS EDATE
+											, TRIM( #{rm.punishNo} )		AS PUNISH_NO
+											, TRIM( #{rm.paySYmd} )			AS PAY_S_YMD
+											, TRIM( #{rm.payEYmd} )			AS PAY_E_YMD
+											, TRIM( #{rm.sPoint} )			AS S_POINT
+											, TRIM( #{rm.sgPoint} )			AS SG_POINT
+											, TRIM( #{rm.sFromYmd} )		AS S_FROM_YMD
+											, TRIM( #{rm.sToYmd} )			AS S_TO_YMD
+											, TRIM( #{rm.fileSeq} )			AS FILE_SEQ
+											, TRIM( #{rm.punishOffice} )	AS PUNISH_OFFICE
+											, TRIM( #{rm.auditOffice} )		AS AUDIT_OFFICE
+											, TRIM( #{rm.empYn} )			AS EMP_YN
+											, TRIM( #{rm.profileYn} )		AS PROFILE_YN
+										 FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PUNISH_YMD	= S.PUNISH_YMD
+									, T.PUNISH_CD	= S.PUNISH_CD
+									, T.PUNISH_MEMO	= S.PUNISH_MEMO
+									, T.SDATE		= S.SDATE
+									, T.EDATE		= S.EDATE
+									, T.PUNISH_NO	= S.PUNISH_NO
+									, T.PAY_S_YMD	= S.PAY_S_YMD
+									, T.PAY_E_YMD	= S.PAY_E_YMD
+									, T.S_POINT		= S.S_POINT
+									, T.SG_POINT	= S.SG_POINT
+									, T.S_FROM_YMD	= S.S_FROM_YMD
+									, T.S_TO_YMD	= S.S_TO_YMD
+									, T.FILE_SEQ	= S.FILE_SEQ
+									, T.PUNISH_OFFICE	= S.PUNISH_OFFICE
+									, T.AUDIT_OFFICE 	= S.AUDIT_OFFICE
+									, T.EMP_YN     	= S.EMP_YN
+									, T.PROFILE_YN 	= S.PROFILE_YN
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SEQ
+							, T.PUNISH_YMD
+							, T.PUNISH_CD
+							, T.PUNISH_MEMO
+							, T.SDATE
+							, T.EDATE
+							, T.PUNISH_NO
+							, T.PAY_S_YMD
+							, T.PAY_E_YMD
+							, T.S_POINT
+							, T.SG_POINT
+							, T.S_FROM_YMD
+							, T.S_TO_YMD
+							, T.FILE_SEQ
+							, T.PUNISH_OFFICE
+							, T.AUDIT_OFFICE
+							, T.EMP_YN
+							, T.PROFILE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SEQ
+							, S.PUNISH_YMD
+							, S.PUNISH_CD
+							, S.PUNISH_MEMO
+							, S.SDATE
+							, S.EDATE
+							, S.PUNISH_NO
+							, S.PAY_S_YMD
+							, S.PAY_E_YMD
+							, S.S_POINT
+							, S.SG_POINT
+							, S.S_FROM_YMD
+							, S.S_TO_YMD
+							, S.FILE_SEQ
+							, S.PUNISH_OFFICE
+							, S.AUDIT_OFFICE
+							, S.EMP_YN
+							, S.PROFILE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+<!-- 인사기본(상벌) 포상 삭제 -->
+		<delete id="deletePsnalJusticePrize" parameterType="map">
+
+					DELETE FROM THRM128
+					WHERE  ENTER_CD||'_'||SABUN||'_'||SEQ IN 	(  NULL
+<foreach collection="deleteRows" item="rm" >
+
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sabun != null and !rm.sabun.equals("")
+											and rm.seq != null and !rm.seq.equals("")' >
+
+										, TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+<!-- 인사기본(상벌) 징계 삭제 -->
+		<delete id="deletePsnalJusticePunish" parameterType="map">
+
+					DELETE FROM THRM129
+					WHERE  ENTER_CD||'_'||SABUN||'_'||SEQ IN 	(  NULL
+<foreach collection="deleteRows" item="rm" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.sabun != null and !rm.sabun.equals("")
+											and rm.seq != null and !rm.seq.equals("")' >
+
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+
+	</mapper>

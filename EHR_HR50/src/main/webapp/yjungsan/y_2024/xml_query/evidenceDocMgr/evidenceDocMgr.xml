@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	증빙자료관리
+ -->
+<root>
+
+	<!-- 증빙자료 목록 조회  -->
+	<query id="selectEvidenceDocMgrList">
+		<![CDATA[
+			SELECT A.ENTER_CD     	/* 회사구분 */
+			     , B.NAME         	/* 이름 */
+			     , B.SABUN        	/* 사번 */
+			     , A.NM_TXT
+			     , A.STATUS_CD
+			     , A.FEEDBACK
+			     , F_COM_GET_ORG_NM21(B.ENTER_CD,B.SABUN,TO_CHAR(A.UPLOAD_DATE,'YYYYMMDD')) AS ORG_NM 	/* 조직명 */
+			     , F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN) AS BIZ_PLACE_CD 			/* 사업장 */
+			     , A.WORK_YY      	/* 귀속년도 */
+			     , A.ADJUST_TYPE  	/* 정산구분 */
+			     , A.FILE_TYPE    	/* 파일구분 */
+			     , A.UPLOAD_DATE  	/* 업로드일자 */
+			     , A.FILE_SEQ     	/* 파일순번 */
+			     , A.FILE_PATH    	/* 파일경로정보 */
+			     , A.FILE_NAME    	/* 파일명 */
+			     , A.ATTR1			/* ATTR1 */
+			     , A.ATTR2    		/* ATTR2 */
+			     , A.ATTR3    		/* ATTR3 */
+			     , A.ATTR4    		/* ATTR4 */
+			FROM TYEA105 A /* 연말정산_증빙자료관리 */
+			   , THRM100 B /* 인사마스타 */
+			WHERE A.ENTER_CD = B.ENTER_CD
+			  AND A.SABUN = B.SABUN
+			  AND A.ENTER_CD = #ssnEnterCd#
+			  AND A.WORK_YY = #searchWorkYy#
+			  AND REGEXP_LIKE(A.ADJUST_TYPE, '^[139]') -- 시뮬레이션 자료 등은 조회되지 않도록
+        	  AND ( #searchAdjustType# IS NULL OR A.ADJUST_TYPE = #searchAdjustType# ) -- 조회조건 : 작업구분
+			  $query$
+			  AND DECODE('',#searchNmTxt#,'A',A.NM_TXT) LIKE '%'||DECODE('',#searchNmTxt#,'A',#searchNmTxt#)||'%'
+			  AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+			  AND DECODE('',#searchFileType#,'A',A.FILE_TYPE) = DECODE('',#searchFileType#,'A',#searchFileType#)
+			  AND DECODE('',#searchStatusCd#,'A',A.STATUS_CD) = DECODE('',#searchStatusCd#,'A',#searchStatusCd#)
+			  AND A.FILE_TYPE IN (SELECT B.CODE
+								    FROM TSYS005 B
+								   WHERE B.ENTER_CD = #ssnEnterCd# 
+								     AND B.GRCODE_CD = 'YEA001'
+								     AND B.USE_YN = 'Y'
+								     AND #searchWorkYy#||'1231' BETWEEN B.S_YMD AND B.E_YMD)	
+		ORDER BY A.ADJUST_TYPE, A.SABUN		  
+	   ]]> 
+	</query>
+	
+	<!-- 증빙자료 삭제 -->
+	<query id="deleteEvidenceDocData">
+		<![CDATA[
+			DELETE FROM TYEA105
+			WHERE ENTER_CD				= #ssnEnterCd#
+			  AND SABUN   				= #sabun#
+			  AND WORK_YY  	    		= #workYy#
+			  AND ADJUST_TYPE   		= #adjustType#
+			  AND FILE_TYPE   			= #fileType#
+			  AND FILE_SEQ   			= #fileSeq#
+		]]> 
+	</query>
+    <!-- 증빙자료관리 수정 -->
+    <query id="updateYeaDataFileList2">
+        <![CDATA[
+            UPDATE TYEA105
+            SET NM_TXT    = #nm_txt#
+              , STATUS_CD = #status_cd#
+              , FEEDBACK  = #feedback#
+              , CHKDATE   = SYSDATE
+              , CHKID     = #ssnSabun#
+            WHERE ENTER_CD              = #ssnEnterCd#
+              AND SABUN                 = #sabun#
+              AND WORK_YY               = #work_yy#
+              AND ADJUST_TYPE           = #adjust_type#
+              AND FILE_TYPE             = #fileType#
+              AND FILE_SEQ              = #fileSeq#
+        ]]>
+    </query>
+    <!-- 일괄결재 -->
+    <query id="updateStatusCd">
+        <![CDATA[
+            UPDATE TYEA105
+            SET STATUS_CD = #status_cd#
+              , CHKDATE   = SYSDATE
+              , CHKID     = #ssnSabun#
+            WHERE ENTER_CD              = #ssnEnterCd#
+              AND SABUN                 = #sabun#
+              AND WORK_YY               = #work_yy#
+              AND ADJUST_TYPE           = #adjust_type#
+              AND FILE_TYPE             = #fileType#
+              AND FILE_SEQ              = #fileSeq#
+        ]]>
+    </query>    
+</root>

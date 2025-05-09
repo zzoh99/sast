@@ -1,0 +1,603 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.workflow">
+
+<!-- 워크플로우 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkflowList">
+
+
+					SELECT PRO_CD
+					    , PRO_NM
+					    , BIZ_CD
+					    , MEMO
+					    , SORT_SEQ
+					    , '0' AS DETAIL1
+					    , '0' AS DETAIL2
+					FROM TSYS451
+					WHERE ENTER_CD = #{ssnEnterCd}
+				<if test='searchProNm != null and !searchProNm.equals("")'>
+					AND PRO_NM LIKE '%'|| #{searchProNm} ||'%'
+				</if>
+					ORDER BY SORT_SEQ
+
+
+
+		</select>
+
+<!-- 워크플로우 화면단 프로그램 리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkflowViewPrgList">
+
+				<![CDATA[
+					SELECT B.SUB_PRO_CD
+					    , B.SUB_PRO_NM
+					    , B.SORT_SEQ AS SUB_SORT_SEQ
+					    , B.MEMO AS SUB_PRO_MEMO
+					    , C.PRG_CD
+					    , (SELECT PRG_NM FROM TSYS301 WHERE PRG_CD = C.PRG_CD) AS PRG_NM
+					    , C.SORT_SEQ AS PRG_SORT_SEQ
+					    , C.MEMO AS PRG_MEMO
+					FROM TSYS451 A
+					    , TSYS455 B
+					    , TSYS457 C
+					WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.PRO_CD = B.PRO_CD
+					AND B.ENTER_CD = C.ENTER_CD
+					AND B.PRO_CD = C.PRO_CD
+					AND B.SUB_PRO_CD = C.SUB_PRO_CD
+					AND A.ENTER_CD = #{ssnEnterCd}
+					AND A.PRO_CD = #{searchProCd}
+					ORDER BY B.SORT_SEQ,C.SORT_SEQ
+				]]>
+
+
+		</select>
+
+<!-- 워크플로우 프로세스 단건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkflowMap">
+
+				<![CDATA[
+					SELECT PRO_CD
+					    , PRO_NM
+					    , BIZ_CD
+					    , SORT_SEQ
+					    , MEMO
+					    , CONTENTS
+					FROM TSYS451
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND PRO_CD = #{searchProCd}
+				]]>
+
+
+		</select>
+
+<!-- 워크플로우 프로그램 메뉴 단건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkflowOpenPrgMap">
+
+				<![CDATA[
+
+					SELECT  DM.*
+							, REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{
+							"url": "'||PRG_CD||'"
+							,"dataPrgType":"'||DATA_PRG_TYPE||'"
+							,"dataRwType":"'||DATA_RW_TYPE||'"
+							,"cnt":"'||CNT||'"
+							,"mainMenuCd":"'||MAIN_MENU_CD||'"
+							,"priorMenuCd":"'||PRIOR_MENU_CD||'"
+							,"type":"'||TYPE||'"
+							,"menuCd":"'||MENU_CD||'"
+							,"menuSeq":"'||MENU_SEQ||'"
+							,"grpCd":"'||GRP_CD||'"
+							,"prgCd":"'||PRG_CD||'"
+							,"popupUseYn":"'||POPUP_USE_YN||'"
+							,"helpUseYn":"'||HELP_USE_YN||'"
+							,"myMenu":"'||MY_MENU||'"
+							}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'')AS SURL
+							,MAIN_MENU_CD || PRIOR_MENU_CD || MENU_CD || MENU_SEQ || GRP_CD  AS MENU_ID
+						FROM
+						(
+					SELECT LEVEL AS LVL
+						 , A.MAIN_MENU_CD
+						 , A.PRIOR_MENU_CD
+						 , A.MENU_CD
+						 , A.MENU_SEQ
+						 , A.GRP_CD
+						 , A.TYPE
+						 , A.MENU_NM
+						 , SUBSTR(SYS_CONNECT_BY_PATH(A.MENU_NM, '>'),2) AS MENU_NM_PATH
+						 , A.PRG_CD
+						 , NVL(A.SEARCH_SEQ, '') AS SRCH_SEQ
+						 , A.DATA_RW_TYPE
+						 , A.DATA_PRG_TYPE
+						 , A.SEQ
+						 , A.CNT
+						 , '' PRG_PATH
+						 , A.USE_YN
+						 , A.INQ_S_YMD
+						 , A.INQ_E_YMD
+						 , ''  AS DATE_TRACK_YN
+						 , (SELECT MAIN_MENU_NM
+						      FROM TSYS309
+						     WHERE MAIN_MENU_CD = A.MAIN_MENU_CD
+						     AND ENTER_CD = #{ssnEnterCd}
+						     AND USE_YN = '1'
+						   ) AS MAIN_MENU_NM
+						 , POPUP_USE_YN
+						 , LAST_SESSION_USE_YN
+						 , SEARCH_USE_YN
+						 , NVL('1','0') HELP_USE_YN
+						, DECODE( (	SELECT 'Y'
+									FROM TSYS331 D
+									WHERE D.ENTER_CD	= A.ENTER_CD
+									AND D.MENU_SEQ		= A.MENU_SEQ
+									AND D.PRIOR_MENU_CD	= A.PRIOR_MENU_CD
+									AND D.MENU_CD		= A.MENU_CD
+									AND D.MAIN_MENU_CD	= A.MAIN_MENU_CD
+									AND D.GRP_CD		= A.GRP_CD
+									AND D.SABUN			= #{ssnSabun}
+									AND D.GRP_CD        = #{ssnGrpCd}
+									AND ROWNUM =1 ),NULL, 'N','Y') AS MY_MENU
+					FROM TSYS311 A,  TSYS303 C
+					WHERE 1 = 1
+					AND A.ENTER_CD   	= C.ENTER_CD
+					AND A.MENU_SEQ 		= C.MENU_SEQ
+					AND A.PRIOR_MENU_CD = C.PRIOR_MENU_CD
+					AND A.MENU_CD 		= C.MENU_CD
+					AND A.MAIN_MENU_CD 	= C.MAIN_MENU_CD
+					AND A.TYPE <> 'T'
+					AND A.USE_YN = '1'
+					AND A.ENTER_CD  	=  #{ssnEnterCd}
+					AND A.PRG_CD 		= #{prgCd}
+					AND ROWNUM = 1
+					START WITH A.PRIOR_MENU_CD 	= '0'
+					AND A.ENTER_CD      	=  #{ssnEnterCd}
+					AND A.MAIN_MENU_CD     	=  (SELECT MAIN_MENU_CD FROM TSYS303 WHERE ENTER_CD = #{ssnEnterCd} AND PRG_CD = #{prgCd} AND ROWNUM=1)
+					AND A.GRP_CD        	=  #{ssnGrpCd}
+					CONNECT BY PRIOR A.ENTER_CD     = A.ENTER_CD
+					AND PRIOR A.MAIN_MENU_CD     = A.MAIN_MENU_CD
+					AND PRIOR A.GRP_CD           = A.GRP_CD
+					AND PRIOR A.MENU_CD          = A.PRIOR_MENU_CD
+					AND PRIOR A.USE_YN			= A.USE_YN
+					ORDER SIBLINGS BY A.PRIOR_MENU_CD, A.SEQ) DM
+				]]>
+
+
+		</select>
+
+<!-- 워크플로우 권한그룹 팝업 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkflowAuthGrpPopList">
+
+				<![CDATA[
+					SELECT #{searchProCd} AS PRO_CD
+					    , B.GRP_CD
+					    , B.GRP_NM
+					    , DECODE(A.GRP_CD, NULL, 'N', 'Y') AS CHK
+					FROM TSYS453 A
+					    , TSYS307 B
+					WHERE A.ENTER_CD(+) = B.ENTER_CD
+					AND A.GRP_CD(+) = B.GRP_CD
+					AND A.PRO_CD(+) = #{searchProCd}
+					AND B.ENTER_CD = #{ssnEnterCd}
+					ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+<!-- 워크플로우 하위프로세스 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkflowSubList">
+
+				<![CDATA[
+					SELECT A.PRO_CD
+						, A.SUB_PRO_CD
+						, A.SUB_PRO_NM
+						, A.SORT_SEQ
+						, A.MEMO
+					FROM TSYS455 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.PRO_CD = #{searchProCd}
+					ORDER BY A.SORT_SEQ
+				]]>
+
+
+		</select>
+
+<!-- 워크플로우 프로그램 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkflowPrgList">
+
+				<![CDATA[
+					SELECT A.PRO_CD
+						, A.SUB_PRO_CD
+						, A.PRG_CD
+						, A.SORT_SEQ
+					    , (SELECT PRG_NM FROM TSYS301 WHERE PRG_CD = A.PRG_CD) AS PRG_NM
+					    , A.MEMO
+					FROM TSYS457 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.PRO_CD = #{searchProCd}
+					AND A.SUB_PRO_CD = #{searchSubProCd}
+					ORDER BY A.SORT_SEQ
+				]]>
+
+
+		</select>
+
+<!-- 워크플로우 저장 -->
+		<update parameterType="map" id="saveWorkflowList">
+
+
+					MERGE INTO TSYS451 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.PRO_CD
+									, A.PRO_NM
+									, A.BIZ_CD
+									, A.SORT_SEQ
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS PRO_CD
+											, NULL		AS PRO_NM
+											, NULL		AS BIZ_CD
+											, NULL		AS SORT_SEQ
+											, NULL		AS MEMO
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.proCd} )		AS PRO_CD
+											, TRIM( #{rm.proNm} )		AS PRO_NM
+											, TRIM( #{rm.bizCd} )		AS BIZ_CD
+											, TRIM( #{rm.sortSeq} )		AS SORT_SEQ
+											, TRIM( #{rm.memo} )		AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										AND A.PRO_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PRO_CD = S.PRO_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PRO_NM		= S.PRO_NM
+									, T.BIZ_CD    	= S.BIZ_CD
+									, T.SORT_SEQ    = S.SORT_SEQ
+									, T.MEMO      	= S.MEMO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PRO_CD
+							, T.PRO_NM
+							, T.BIZ_CD
+							, T.SORT_SEQ
+							, T.MEMO
+							, T.CONTENTS
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.PRO_CD
+							, S.PRO_NM
+							, S.BIZ_CD
+							, S.SORT_SEQ
+							, S.MEMO
+							, EMPTY_CLOB()
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 워크플로우 권한그룹 단건 입력 -->
+		<insert parameterType="map" id="insertWorkflowAuthGrpPop">
+
+				<![CDATA[
+					INSERT INTO TSYS453
+					(
+						  ENTER_CD
+						, PRO_CD
+						, GRP_CD
+						, CHKDATE
+						, CHKID
+					)
+					VALUES
+					(
+						  #{ssnEnterCd}
+						, #{proCd}
+						, #{grpCd}
+						, SYSDATE
+						, #{ssnSabun}
+					)
+				]]>
+
+
+		</insert>
+
+<!-- 워크플로우 하우프로세스 저장 -->
+		<update parameterType="map" id="saveWorkflowSubList">
+
+
+					MERGE INTO TSYS455 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.PRO_CD
+									, A.SUB_PRO_CD
+									, A.SUB_PRO_NM
+									, A.SORT_SEQ
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS PRO_CD
+											, NULL		AS SUB_PRO_CD
+											, NULL		AS SUB_PRO_NM
+											, NULL		AS SORT_SEQ
+											, NULL		AS MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.proCd} )		AS PRO_CD
+
+										 <choose><when test='rm.subProCd != null and !rm.subProCd.equals("")'>
+											, TRIM( #{rm.subProCd} )	AS SUB_PRO_CD
+										 </when><otherwise>
+											,(
+												SELECT TO_CHAR(NVL(MAX(TO_NUMBER(SUB_PRO_CD)), 0)+${icnt},'FM009')
+												FROM TSYS455
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND PRO_CD = TRIM( #{rm.proCd} )
+											 ) 							AS	SUB_PRO_CD
+											 <bind name="icnt" value="icnt + 1" />
+										 </otherwise>
+										 </choose>
+
+											, TRIM( #{rm.subProNm} )	AS SUB_PRO_NM
+											, TRIM( #{rm.sortSeq} )		AS SORT_SEQ
+											, TRIM( #{rm.memo} )		AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										AND A.PRO_CD IS NOT NULL
+										AND A.SUB_PRO_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PRO_CD = S.PRO_CD AND T.SUB_PRO_CD = S.SUB_PRO_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SUB_PRO_NM	= S.SUB_PRO_NM
+									, T.SORT_SEQ	= S.SORT_SEQ
+									, T.MEMO		= S.MEMO
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PRO_CD
+							, T.SUB_PRO_CD
+							, T.SUB_PRO_NM
+							, T.SORT_SEQ
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.PRO_CD
+							, S.SUB_PRO_CD
+							, S.SUB_PRO_NM
+							, S.SORT_SEQ
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 워크플로우 프로그램 저장 -->
+		<update parameterType="map" id="saveWorkflowPrgList">
+
+
+					MERGE INTO TSYS457 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.PRO_CD
+									, A.SUB_PRO_CD
+									, A.PRG_CD
+									, A.SORT_SEQ
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS PRO_CD
+											, NULL		AS SUB_PRO_CD
+											, NULL		AS PRG_CD
+											, NULL		AS SORT_SEQ
+											, NULL		AS MEMO
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.proCd} )		AS PRO_CD
+											, TRIM( #{rm.subProCd} )	AS SUB_PRO_CD
+											, TRIM( #{rm.prgCd} )		AS PRG_CD
+											, TRIM( #{rm.sortSeq} )		AS SORT_SEQ
+											, TRIM( #{rm.memo} )		AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										AND A.PRO_CD IS NOT NULL
+										AND A.SUB_PRO_CD IS NOT NULL
+										AND A.PRG_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PRO_CD = S.PRO_CD AND T.SUB_PRO_CD = S.SUB_PRO_CD AND T.PRG_CD = S.PRG_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SORT_SEQ	= S.SORT_SEQ
+									, T.MEMO		= S.MEMO
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PRO_CD
+							, T.SUB_PRO_CD
+							, T.PRG_CD
+							, T.SORT_SEQ
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.PRO_CD
+							, S.SUB_PRO_CD
+							, S.PRG_CD
+							, S.SORT_SEQ
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 워크플로우 컨텐츠 단건 저장 -->
+		<update parameterType="map" id="saveWorkflowContentsEmpty">
+
+
+					UPDATE TSYS451
+					SET CONTENTS = EMPTY_CLOB()
+						, CHKDATE = SYSDATE
+						, CHKID = #{ssnSabun}
+   					WHERE ENTER_CD = #{ssnEnterCd}
+   					AND PRO_CD = #{searchProCd}
+
+		</update>
+
+		<update parameterType="map" id="saveWorkflowContents">
+
+			<![CDATA[
+			UPDATE TSYS451
+			SET CONTENTS = #{content}
+			WHERE ENTER_CD = #{ssnEnterCd}
+			  AND PRO_CD = #{searchProCd}
+			]]>
+		</update>
+
+<!-- 워크플로우 삭제 -->
+		<delete parameterType="map" id="deleteWorkflowList">
+
+
+					DELETE FROM TSYS451
+					WHERE 	ENTER_CD||PRO_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.proCd != null and !rm.proCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||TRIM( #{rm.proCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 워크플로우 권한그룹 단건 삭제 -->
+		<delete parameterType="map" id="deleteWorkflowAuthGrpPop">
+
+				<![CDATA[
+					DELETE FROM TSYS453
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND PRO_CD = #{proCd}
+					AND GRP_CD = #{grpCd}
+				]]>
+
+
+		</delete>
+
+<!-- 워크플로우 하위프로세스 삭제 -->
+		<delete parameterType="map" id="deleteWorkflowSubAll">
+
+
+					DELETE FROM TSYS455
+					WHERE 	ENTER_CD||PRO_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.proCd != null and !rm.proCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||TRIM( #{rm.proCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 워크플로우 하위프로세스 삭제 -->
+		<delete parameterType="map" id="deleteWorkflowSubList">
+
+
+					DELETE FROM TSYS455
+					WHERE 	ENTER_CD||PRO_CD||SUB_PRO_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.proCd != null and !rm.proCd.equals("")
+												and rm.subProCd != null and !rm.subProCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||TRIM( #{rm.proCd} )||TRIM( #{rm.subProCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 워크플로우 프로그램 삭제 -->
+		<delete parameterType="map" id="deleteWorkflowPrgAll1">
+
+
+					DELETE FROM TSYS457
+					WHERE 	ENTER_CD||PRO_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.proCd != null and !rm.proCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||TRIM( #{rm.proCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 워크플로우 프로그램 삭제 -->
+		<delete parameterType="map" id="deleteWorkflowPrgAll2">
+
+
+					DELETE FROM TSYS457
+					WHERE 	ENTER_CD||PRO_CD||SUB_PRO_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.proCd != null and !rm.proCd.equals("")
+												and rm.subProCd != null and !rm.subProCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||TRIM( #{rm.proCd} )||TRIM( #{rm.subProCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+<!-- 워크플로우 프로그램 삭제 -->
+		<delete parameterType="map" id="deleteWorkflowPrgList">
+
+
+					DELETE FROM TSYS457
+					WHERE 	ENTER_CD||PRO_CD||SUB_PRO_CD||PRG_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.proCd != null and !rm.proCd.equals("")
+												and rm.subProCd != null and !rm.subProCd.equals("")
+												and rm.prgCd != null and !rm.prgCd.equals("")'>
+											TRIM( #{ssnEnterCd} )||TRIM( #{rm.proCd} )||TRIM( #{rm.subProCd} )||TRIM( #{rm.prgCd} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

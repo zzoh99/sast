@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualHolinq">
+
+<!-- 근태코드 콤보 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualHolInqGntCd">
+
+				<![CDATA[
+				SELECT CODE, CODE_NM, COM_TYPE
+				  FROM (
+					 SELECT B.GNT_CD AS CODE
+					      , B.GNT_NM||'('||F_COM_GET_GRCODE_NAME(#{ssnEnterCd},'T10023',A.COM_TYPE)||')' AS CODE_NM
+					      , A.COM_TYPE
+					      , B.SEQ
+					   FROM TTIM010 A, TTIM014 B
+					  WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND A.ENTER_CD = B.ENTER_CD
+					    AND A.GNT_CD   = B.GNT_CD
+					    AND EXISTS ( SELECT 1
+					                   FROM TSYS005 X
+					                  WHERE X.ENTER_CD       = A.ENTER_CD
+					                    AND X.GRCODE_CD      = 'T10023'
+					                    AND X.CODE           = A.COM_TYPE
+					                    AND NVL(X.NOTE1,'N') = 'Y' )
+                       )
+                 GROUP BY CODE, CODE_NM, COM_TYPE, SEQ      					                    
+				 ORDER BY SEQ 				
+				]]>
+
+
+		</select>
+		
+		
+<!-- 기준년월 콤보 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualHolInqYear">
+
+				<![CDATA[
+					 SELECT YM AS CODE
+					      , CASE WHEN LENGTH(YM) = 6 THEN TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYY-MM')
+					             WHEN LENGTH(YM) = 8 THEN TO_CHAR(TO_DATE(YM, 'YYYYMMDD'), 'YYYY-MM-DD')
+					             ELSE YM END AS CODE_NM
+					   FROM TTIM521
+					  WHERE ENTER_CD     = #{ssnEnterCd}
+					    AND GNT_CD       = TRIM(#{searchGntCd})
+					    AND GNT_CRE_TYPE = TRIM(#{searchComType})
+					   GROUP BY YM
+					   ORDER BY YM DESC  
+				]]>
+
+
+		</select>
+		
+<!-- 연차확정 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualHolInqList">
+
+				<![CDATA[
+					SELECT A.*
+					     , DECODE(NVL(A.END_YN,'N'), 'Y', '2', '1') AS END_IMG 
+					     
+					     , B.NAME
+					     , C.JIKWEE_NM
+					     , C.JIKGUB_NM
+					     , C.ORG_CD
+					     , F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					     , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10030', C.MANAGE_CD) AS MANAGE_NM
+					     , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10050', C.WORK_TYPE) AS WORK_TYPE_NM
+					     
+					     , B.YEAR_YMD
+					     , CASE WHEN F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'HRM_WKP_TYPE') = 'A' THEN NVL(B.EMP_YMD, B.GEMP_YMD)
+	                           ELSE NVL(B.GEMP_YMD, B.EMP_YMD) END AS EMP_YMD
+	                           
+	                   FROM TTIM521 A, THRM100 B, THRM151 C
+					  WHERE A.ENTER_CD  = #{ssnEnterCd}
+				 	    AND A.YM        = REPLACE(TRIM(#{searchDate}) ,'-','')
+				 	    AND A.GNT_CD    = TRIM(#{searchGntCd})
+				 	    AND A.END_YN LIKE DECODE(TRIM(#{searchType}), 'A', '%', #{searchType})
+				 	    AND A.ENTER_CD  = B.ENTER_CD
+				 	    AND A.SABUN     = B.SABUN
+				 	    AND A.ENTER_CD  = C.ENTER_CD
+				 	    AND A.SABUN     = C.SABUN
+				 	    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+			]]>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					    AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					    AND F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+			          ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+		</select>
+
+<!-- 연차확정 저장 -->
+		<update parameterType="map" id="saveAnnualHolInq">
+
+					MERGE INTO TTIM521 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.YM
+								 , A.SABUN
+								 , A.GNT_CD
+								 , A.GNT_CNT
+							     , A.BAS_CNT
+							     , A.CHG_CNT
+							     , A.WKP_CNT
+							     , A.WKP_YEA_CNT
+							     , A.CRE_YEA_CNT
+							     , A.WKP_STD_CNT
+							     , A.WKP_RATE
+							     , A.USE_CNT
+							     , A.GNT_S_YMD
+							     , A.GNT_E_YMD
+							     , A.END_YN
+							     , A.YEAR_CNT
+							     , A.MOD_CNT
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS YM
+										 , NULL AS SABUN
+										 , NULL AS GNT_CD
+										 , NULL AS GNT_CNT
+										 , NULL AS BAS_CNT
+										 , NULL AS CHG_CNT
+										 , NULL AS WKP_CNT
+										 , NULL AS WKP_YEA_CNT
+									     , NULL AS CRE_YEA_CNT
+									     , NULL AS WKP_STD_CNT
+									     , NULL AS WKP_RATE
+									     , NULL AS USE_CNT
+									     , NULL AS GNT_S_YMD
+									     , NULL AS GNT_E_YMD
+									     , NULL AS END_YN
+									     , NULL AS YEAR_CNT
+									     , NULL AS MOD_CNT
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.ym} )				AS  YM
+										 , TRIM( #{rm.sabun} )			AS  SABUN
+										 , TRIM( #{rm.gntCd} )			AS  GNT_CD
+										 , TRIM( #{rm.gntCnt} )			AS  GNT_CNT
+										 , TRIM( #{rm.basCnt} )			AS  BAS_CNT
+										 , TRIM( #{rm.chgCnt})			AS  CHG_CNT
+										 , TRIM( #{rm.wkpCnt})			AS  WKP_CNT
+										 , TRIM( #{rm.wkpYeaCnt})		AS  WKP_YEA_CNT
+										 , TRIM( #{rm.creYeaCnt})		AS  CRE_YEA_CNT
+										 , TRIM( #{rm.wkpStdCnt})		AS  WKP_STD_CNT
+										 , TRIM( #{rm.wkpRate})		AS  WKP_RATE
+										 , TRIM( #{rm.useCnt})			AS  USE_CNT
+										 , TRIM( #{rm.gntSYmd})		AS  GNT_S_YMD
+										 , TRIM( #{rm.gntEYmd})		AS  GNT_E_YMD
+										 , TRIM( #{rm.endYn})			AS  END_YN
+										 , TRIM( #{rm.yearCnt})		AS  YEAR_CNT
+										 , TRIM( #{rm.modCnt})			AS  MOD_CNT
+
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GNT_CD = S.GNT_CD AND T.SABUN = S.SABUN AND T.YM = S.YM)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.GNT_CNT    		= S.GNT_CNT
+									, T.BAS_CNT    		= S.BAS_CNT
+									, T.CHG_CNT         = S.CHG_CNT
+									, T.WKP_CNT         = S.WKP_CNT
+									, T.WKP_YEA_CNT     = S.WKP_YEA_CNT
+									, T.CRE_YEA_CNT     = S.CRE_YEA_CNT
+									, T.WKP_STD_CNT     = S.WKP_STD_CNT
+									, T.WKP_RATE   		= S.WKP_RATE
+									, T.USE_CNT    		= S.USE_CNT
+									, T.GNT_S_YMD  		= S.GNT_S_YMD
+									, T.GNT_E_YMD       = S.GNT_E_YMD
+									, T.END_YN          = S.END_YN
+									, T.YEAR_CNT        = S.YEAR_CNT
+									, T.MOD_CNT         = S.MOD_CNT
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YM
+							, T.SABUN
+							, T.GNT_CD
+							, T.GNT_CNT
+							, T.BAS_CNT
+							, T.CHG_CNT
+							, T.WKP_CNT
+							, T.WKP_YEA_CNT
+							, T.CRE_YEA_CNT
+							, T.WKP_STD_CNT
+							, T.WKP_RATE
+							, T.USE_CNT
+							, T.GNT_S_YMD
+							, T.GNT_E_YMD
+							, T.END_YN
+							, T.YEAR_CNT
+							, T.MOD_CNT
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YM
+							, S.SABUN
+							, S.GNT_CD
+							, S.GNT_CNT
+							, S.BAS_CNT
+							, S.CHG_CNT
+							, S.WKP_CNT
+							, S.WKP_YEA_CNT
+							, S.CRE_YEA_CNT
+							, S.WKP_STD_CNT
+							, S.WKP_RATE
+							, S.USE_CNT
+							, S.GNT_S_YMD
+							, S.GNT_E_YMD
+							, S.END_YN
+							, S.YEAR_CNT
+							, S.MOD_CNT
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 휴가생성내역 삭제 -->
+		<delete parameterType="map" id="deleteAnnualHolInq">
+
+					DELETE FROM TTIM521
+					 WHERE (ENTER_CD, YM, SABUN, GNT_CD) IN ( (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+							,	(TRIM(#{ssnEnterCd}), TRIM(#{rm.ym}), TRIM(#{rm.sabun}), TRIM(#{rm.gntCd}))
+</foreach>
+							)
+		</delete>
+
+<!-- 연차확정 삭제 -->  
+		<delete parameterType="map" id="deleteAnnualHolInqAll">
+
+				<![CDATA[
+			  DELETE FROM TTIM521 
+                       WHERE YM IN (SELECT A.YM
+                                      FROM TTIM521 A, THRM100 B, THRM151 C
+                                      WHERE A.ENTER_CD  = #{ssnEnterCd}
+                                        AND A.YM        = REPLACE(TRIM(#{searchDate}) ,'-','')
+                                        AND A.GNT_CD    = TRIM(#{searchGntCd})
+                                        AND A.END_YN LIKE DECODE(TRIM(#{searchType}), 'A', '%', #{searchType})
+                                        AND A.ENTER_CD  = B.ENTER_CD
+                                        AND A.SABUN     = B.SABUN
+                                        AND A.ENTER_CD  = C.ENTER_CD
+                                        AND A.SABUN     = C.SABUN
+                                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')                         
+                                    ) 
+                       AND SABUN IN  (SELECT A.SABUN
+                                      FROM TTIM521 A, THRM100 B, THRM151 C
+                                      WHERE A.ENTER_CD  = #{ssnEnterCd}
+                                        AND A.YM        = REPLACE(TRIM(#{searchDate}) ,'-','')
+                                        AND A.GNT_CD    = TRIM(#{searchGntCd})
+                                        AND A.END_YN LIKE DECODE(TRIM(#{searchType}), 'A', '%', #{searchType})
+                                        AND A.ENTER_CD  = B.ENTER_CD
+                                        AND A.SABUN     = B.SABUN
+                                        AND A.ENTER_CD  = C.ENTER_CD
+                                        AND A.SABUN     = C.SABUN
+                                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')                      
+                                    ) 
+                       AND ENTER_CD IN  (SELECT A.ENTER_CD
+                                      FROM TTIM521 A, THRM100 B, THRM151 C
+                                      WHERE A.ENTER_CD  = #{ssnEnterCd}
+                                        AND A.YM        = REPLACE(TRIM(#{searchDate}) ,'-','')
+                                        AND A.GNT_CD    = TRIM(#{searchGntCd})
+                                        AND A.END_YN LIKE DECODE(TRIM(#{searchType}), 'A', '%', #{searchType})
+                                        AND A.ENTER_CD  = B.ENTER_CD
+                                        AND A.SABUN     = B.SABUN
+                                        AND A.ENTER_CD  = C.ENTER_CD
+                                        AND A.SABUN     = C.SABUN
+                                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')                      
+                                    ) 
+                       AND GNT_CD IN  (SELECT A.GNT_CD
+                                      FROM TTIM521 A, THRM100 B, THRM151 C
+                                     WHERE A.ENTER_CD  = #{ssnEnterCd}
+                                        AND A.YM        = REPLACE(TRIM(#{searchDate}) ,'-','')
+                                        AND A.GNT_CD    = TRIM(#{searchGntCd})
+                                        AND A.END_YN LIKE DECODE(TRIM(#{searchType}), 'A', '%', #{searchType})
+                                        AND A.ENTER_CD  = B.ENTER_CD
+                                        AND A.SABUN     = B.SABUN
+                                        AND A.ENTER_CD  = C.ENTER_CD
+                                        AND A.SABUN     = C.SABUN
+                                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')                        
+                                    ) 
+				]]>
+
+		</delete>
+
+</mapper>

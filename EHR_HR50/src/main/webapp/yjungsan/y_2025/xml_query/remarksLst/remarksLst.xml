@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	특이사항등록현황
+ -->
+<root>
+
+	<!-- 특이사항등록현황 조회  -->
+	<query id="selectRemarksLstList">
+		<![CDATA[
+			SELECT *
+			  FROM
+			  (
+				SELECT X.ENTER_CD
+				     , X.SABUN
+				     , F_COM_GET_NAMES(X.ENTER_CD, X.SABUN) AS NAME
+				     , X.WORK_YY
+                     , X.ADJUST_TYPE
+				     , NVL(Y.CLEAR_YN,'N') AS CLEAR_YN
+				     , Y.TIP_TEXT
+				  FROM TCPN811 X
+				      ,TCPN847 Y
+				 WHERE X.ENTER_CD    = Y.ENTER_CD(+)
+				   AND X.WORK_YY     = Y.WORK_YY(+)
+				   AND X.ADJUST_TYPE = Y.ADJUST_TYPE(+)
+				   AND X.SABUN       = Y.SABUN(+)
+				   AND X.ENTER_CD    = #ssnEnterCd#
+				   AND X.WORK_YY     = #searchWorkYy#
+				   AND X.ADJUST_TYPE LIKE '%'|| #searchAdjustType# ||'%'
+				   AND X.ADJUST_TYPE    IN (SELECT CODE
+						                     FROM TSYS005
+						                    WHERE ENTER_CD = #ssnEnterCd#
+						                      AND GRCODE_CD = 'C00303'
+						                      AND USE_YN = 'Y'
+						                      AND #searchWorkYy#||'1231' BETWEEN S_YMD AND E_YMD)
+				   AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(X.ENTER_CD,X.WORK_YY,X.ADJUST_TYPE,X.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+				   
+			  )
+			 WHERE (SABUN LIKE '%'||#searchSbNm#||'%' OR NAME LIKE '%'||#searchSbNm#||'%')
+			 $query$
+		     ORDER BY CLEAR_YN DESC
+	   ]]> 
+	</query>
+
+	<!-- 특이사항 입력 -->
+	<query id="mergeRemarks">
+		<![CDATA[
+			   MERGE INTO TCPN847 T
+					USING	(
+							SELECT A.ENTER_CD
+                                 , A.WORK_YY          
+                                 , A.ADJUST_TYPE      
+                                 , A.SABUN            
+                                 , A.TIP_TEXT
+                                 , A.CLEAR_YN
+							  FROM (
+									SELECT   #ssnEnterCd#   AS ENTER_CD
+                                           , #work_yy#      AS WORK_YY
+                                           , #adjust_type#  AS ADJUST_TYPE            
+                                           , #sabun#        AS SABUN
+                                           , #tip_text#     AS TIP_TEXT
+                                           , #clear_yn#     AS CLEAR_YN
+									  FROM DUAL
+									) A
+							 WHERE A.ENTER_CD    IS NOT NULL
+							   AND A.WORK_YY     IS NOT NULL
+							   AND A.ADJUST_TYPE IS NOT NULL
+							   AND A.SABUN	     IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= S.ENTER_CD
+						AND	T.WORK_YY	    = S.WORK_YY
+						AND	T.ADJUST_TYPE	= S.ADJUST_TYPE
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET    T.TIP_TEXT = S.TIP_TEXT
+                                    , T.CLEAR_YN = S.CLEAR_YN    
+                                    , T.CHKDATE  = SYSDATE
+                                    , T.CHKID    = #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+				            , T.WORK_YY          
+				            , T.ADJUST_TYPE      
+				            , T.SABUN            
+        		            , T.TIP_TEXT
+        		            , T.CLEAR_YN          
+        		            , T.CHKDATE
+        		            , T.CHKID
+						)
+						VALUES
+						(
+                              S.ENTER_CD
+				            , S.WORK_YY          
+				            , S.ADJUST_TYPE      
+				            , S.SABUN            
+        		            , S.TIP_TEXT
+        		            , S.CLEAR_YN
+                            , SYSDATE
+                            , #ssnSabun#
+						)
+		]]> 
+	</query>
+	
+</root>

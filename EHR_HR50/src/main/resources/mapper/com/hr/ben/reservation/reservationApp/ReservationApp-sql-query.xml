@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--  자원장 예약관리  -->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.reservation.reservationApp">
+	
+	<!-- 예약 리스트  -->	
+	<select id="getReservationAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		  SELECT A.ENTER_CD
+ 			   , A.APPL_SEQ
+ 			   , B.RES_NM
+ 			   , NVL(DAY_YN,'N') AS DAY_YN
+			     -- 전달과 이어지는 날짜를 캘린더가 표시 못해서 전달꺼는 표시 안함.
+	           , CASE WHEN A.S_YMD < TRIM(#{searchYm}) ||'01' THEN SUBSTR(TRIM(#{searchYm}),1,4)||'-'||SUBSTR(TRIM(#{searchYm}),5,6) ||'-01' ELSE TO_CHAR(TO_DATE(A.S_YMD,'YYYYMMDD'),'YYYY-MM-DD') END AS YMD 
+	           , CASE WHEN A.E_YMD > TO_CHAR(ADD_MONTHS(TO_DATE(TRIM(#{searchYm})||'01', 'YYYYMMDD'), 1)-1, 'YYYYMMDD') 
+	                   THEN TO_CHAR(ADD_MONTHS(TO_DATE(TRIM(#{searchYm})||'01', 'YYYYMMDD'), 1)-1, 'YYYY-MM-DD') 
+	                   ELSE TO_CHAR(TO_DATE(A.E_YMD,'YYYYMMDD'),'YYYY-MM-DD') END AS E_YMD 
+	           , CASE WHEN A.S_YMD <> A.E_YMD THEN  ' ( '||TO_CHAR(TO_DATE(A.S_YMD,'YYYYMMDD'),'MM.DD')||' ~ '|| TO_CHAR(TO_DATE(A.E_YMD,'YYYYMMDD'),'MM.DD')||' )' 
+			          ELSE '' END AS TITLE
+			   , NVL2( A.S_TIME, LPAD(SUBSTR(A.S_TIME, 1,2), 2, '0') || NVL2( SUBSTR(A.S_TIME, 3,2), ':' || LPAD(SUBSTR(A.S_TIME, 3,2), 2, '0'), ':00' ) , '' )  AS S_TIME
+			   , NVL2( A.E_TIME, LPAD(SUBSTR(A.E_TIME, 1,2), 2, '0') || NVL2( SUBSTR(A.E_TIME, 3,2), ':' || LPAD(SUBSTR(A.E_TIME, 3,2), 2, '0'), ':00' ) , '' )  AS E_TIME
+			   , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.APPL_YMD) AS ORG_NM
+			   , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+               , ROW_NUMBER() OVER (ORDER BY A.S_YMD, B.SEQ, A.S_TIME) AS SEQ     
+			FROM TBEN521 A, TBEN520 B
+		   WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})	
+		     AND A.ENTER_CD = B.ENTER_CD
+		     AND A.RES_SEQ = B.RES_SEQ 
+		     AND B.RES_TYPE_CD  		= TRIM(#{searchResTypeCd})			
+		     AND B.RES_LOCATION_CD  	= TRIM(#{searchResLocationCd}) ]]>
+		<if test="searchResSeq != null and searchResSeq neq ''">					 
+		     AND A.RES_SEQ  = TRIM(#{searchResSeq})
+		</if>
+			 AND ( SUBSTR(A.S_YMD,1,6) = TRIM(#{searchYm}) OR SUBSTR(A.E_YMD,1,6) = TRIM(#{searchYm}) )
+		  ORDER BY A.S_YMD, B.SEQ, A.S_TIME
+	</select>
+		
+	<!-- 자원종류 콤보 리스트 -->
+	<select id="getReservationAppResCdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.RES_SEQ AS CODE
+		     , A.RES_NM AS CODE_NM
+		     , A.NOTE
+		     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B52010' , A.RES_TYPE_CD) 		AS RES_TYPE_NM
+		     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'B52020' , A.RES_LOCATION_CD)  AS RES_LOCATION_NM
+		  FROM TBEN520 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')	 
+		   AND A.RES_TYPE_CD      = TRIM(#{searchResTypeCd})					 
+		   AND A.RES_LOCATION_CD  = TRIM(#{searchResLocationCd})
+	     ORDER BY A.SEQ
+	]]>
+	</select>
+		
+	<!-- 예약 상세 정보 조회 -->
+	<select id="getReservationAppMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN	 	AS REQ_SABUN
+		     , A.APPL_YMD
+		     , A.APPL_SABUN
+		     , A.RES_SEQ
+		     , A.S_YMD
+		     , A.E_YMD
+		     , A.S_TIME
+		     , A.E_TIME
+		     , A.DAY_YN 
+		     , A.TITLE
+		     , A.CONTENTS
+		     , A.PHONE_NO
+		     , A.MAIL_ID
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) || ' / ' || F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.S_YMD) AS REQ_USER
+		     , DECODE( TRIM( #{ssnSabun} ), A.SABUN, 'Y', A.APPL_SABUN, 'Y', 'N' ) AS EDIT_YN
+		  FROM TBEN521 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND A.APPL_SEQ = TRIM(#{searchApplSeq})
+	]]>
+	</select>
+
+	<!-- 세션 사용자 연락처 정보 -->
+	<select id="getReservationAppUserMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_CONT_ADDRESS(#{ssnEnterCd}, TRIM(#{ssnSabun}), 'HP') AS PHONE_NO 
+			  ,F_COM_GET_CONT_ADDRESS(#{ssnEnterCd}, TRIM(#{ssnSabun}), 'IM') AS MAIL_ID -- 메일주소 
+		FROM DUAL
+	]]>
+	</select>
+		
+	<!-- 예약 중복 체크 -->		
+	<select id="getReservationAppUserDupCheck" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT (SELECT COUNT(1) AS CNT
+				  FROM TBEN521 A 
+				 WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd})
+				   AND A.RES_SEQ   = TRIM(#{resSeq})
+				   AND (    REPLACE(TRIM(#{sYmd}), '-', '') BETWEEN S_YMD AND E_YMD 
+				         OR REPLACE(TRIM(#{eYmd}), '-', '') BETWEEN S_YMD AND E_YMD 
+				         OR ( S_YMD > REPLACE(TRIM(#{sYmd}), '-', '') AND E_YMD < REPLACE(TRIM(#{eYmd}), '-', '') )  
+				       )
+				   AND (    A.DAY_YN = 'Y' 
+				         OR ( REPLACE(TRIM(#{sTime}), ':', '') >= S_TIME AND REPLACE(TRIM(#{sTime}), ':', '') < E_TIME  )
+				         OR ( REPLACE(TRIM(#{eTime}), ':', '') > S_TIME AND REPLACE(TRIM(#{eTime}), ':', '') <= E_TIME  )
+				         OR ( S_TIME > REPLACE(TRIM(#{sTime}), ':', '') AND E_TIME < REPLACE(TRIM(#{eTime}), ':', '') )  
+				       )
+			   ) AS DUP_CNT
+		  FROM DUAL		    
+	]]>
+	</select>
+		
+	<!-- 자원장 예약저장 -->
+	<update id="saveReservationApp" parameterType="map">
+	<![CDATA[		 
+		 MERGE INTO TBEN521 T 
+		 USING ( ]]>
+		 	<bind name="idx" value="1" />
+			<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+		       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+		    <choose>
+		    	<when test="rm.seq != null and rm.seq neq ''">
+		    		, TRIM(#{rm.applSeq})  		AS  APPL_SEQ
+		    	</when>
+		    	<otherwise>
+		    		, TO_CHAR( (SELECT (NVL(MAX(APPL_SEQ),0) + (#{idx} + 1)) FROM TBEN521 WHERE ENTER_CD = #{ssnEnterCd} ))  AS APPL_SEQ
+		    		<bind name="idx" value="idx + 1" />
+		    	</otherwise>
+		    </choose>
+		            , TRIM(#{rm.reqSabun})  		AS  SABUN
+		            , TRIM( #{ssnSabun} )  		AS  APPL_SABUN
+		            , TRIM(#{rm.resSeq})  		AS  RES_SEQ
+		            , REPLACE(TRIM(#{rm.sYmd}),'-','')  	AS  S_YMD
+		            , REPLACE(TRIM(#{rm.eYmd}),'-','')  	AS  E_YMD
+		            , REPLACE(TRIM(#{rm.sTime}),':','')  	AS  S_TIME
+		            , REPLACE(TRIM(#{rm.eTime}),':','')  	AS  E_TIME
+		            , TRIM(#{rm.dayYn})  		AS  DAY_YN
+		            , TRIM(#{rm.title})  		AS  TITLE
+		            , TRIM(#{rm.contents})  	AS  CONTENTS
+		            , TRIM(#{rm.phoneNo})  		AS  PHONE_NO
+		            , TRIM(#{rm.mailId})  		AS  MAIL_ID
+		        FROM DUAL
+			</foreach>
+	<![CDATA[
+			) S 
+			ON ( 
+			          T.ENTER_CD = S.ENTER_CD 
+			     AND  T.APPL_SEQ = S.APPL_SEQ 
+			) 
+			WHEN NOT MATCHED THEN 
+			   INSERT 
+			   ( 
+			              T.ENTER_CD
+			            , T.APPL_SEQ
+			            , T.SABUN
+			            , T.APPL_YMD
+			            , T.APPL_SABUN
+			            , T.RES_SEQ
+			            , T.S_YMD
+			            , T.E_YMD
+			            , T.S_TIME
+			            , T.E_TIME
+			            , T.DAY_YN
+			            , T.TITLE
+			            , T.CONTENTS
+			            , T.PHONE_NO
+			            , T.MAIL_ID
+			            , T.CHKDATE
+			            , T.CHKID
+			   ) VALUES ( 
+			              S.ENTER_CD
+			            , S.APPL_SEQ
+			            , S.SABUN
+			            , TO_CHAR(SYSDATE, 'YYYYMMDD')
+			            , S.APPL_SABUN
+			            , S.RES_SEQ
+			            , S.S_YMD
+			            , S.E_YMD
+			            , S.S_TIME
+			            , S.E_TIME
+			            , S.DAY_YN
+			            , S.TITLE
+			            , S.CONTENTS
+			            , S.PHONE_NO
+			            , S.MAIL_ID
+			            , sysdate
+			            , #{ssnSabun}
+			   ) 
+	]]>
+	</update>
+
+	<!-- 자원장 예약 삭제 -->		
+	<delete id="deleteReservationApp">
+	<![CDATA[
+		DELETE FROM TBEN521
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( APPL_SEQ ) IN ( ( NULL) ]]> 
+		<foreach item="rm" collection="deleteRows"> 
+ 			<if test="rm.applSeq != null and rm.applSeq neq ''">
+		     , ( TRIM( #{rm.applSeq} ) ) 
+ 			</if>
+		</foreach>
+		       )
+	</delete>
+</mapper>

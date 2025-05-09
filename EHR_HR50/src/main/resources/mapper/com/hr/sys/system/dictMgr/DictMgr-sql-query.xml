@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="sys.system.dictMgr">
+
+
+		<!-- 다국어 KEY 코드 & 테이블  코드 -->
+		<select parameterType="map" resultType="cMap" id="getKeyLevelList">
+
+				<![CDATA[
+					SELECT CODE
+					     , CODE_NM
+					  FROM (SELECT 1 AS DM
+					             , CODE
+					             , CODE_NM
+					             , SEQ
+					          FROM TSYS005
+					         WHERE GRCODE_CD = 'L00120'
+					           AND ENTER_CD  = #{ssnEnterCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+					         UNION ALL
+
+					        SELECT DISTINCT 2 AS DM
+					             , A.KEY_LEVEL AS CODE
+					             , LOWER(A.KEY_LEVEL) AS CODE_NM
+					             , RANK() OVER ( ORDER BY A.KEY_LEVEL DESC ) AS SEQ
+					          FROM TLAN_VIEW A
+					         WHERE A.ENTER_CD = #{ssnEnterCd}
+					           AND A.KEY_LEVEL NOT IN (SELECT CODE
+					                                     FROM TSYS005
+					                                    WHERE GRCODE_CD = 'L00120'
+					                                      AND ENTER_CD  = A.ENTER_CD AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD)
+					     )
+					 ORDER BY DM
+					        , SEQ
+				]]>
+
+
+		</select>
+
+
+        <!-- 사전관리 저장 -->
+        <update parameterType="map" id="tlan150Save001">
+
+
+                    MERGE INTO TLAN150 T
+                    USING   (
+                            SELECT    A.KEY_LEVEL
+                                    , A.KEY_ID
+                                    , A.KEY_TEXT
+                                    , A.KEY_NOTE
+                                    , A.KEY_READ
+                            FROM    (
+                                    SELECT    NULL AS KEY_LEVEL
+                                            , NULL AS KEY_ID
+                                            , NULL AS KEY_TEXT
+                                            , NULL AS KEY_NOTE
+                                            , NULL AS KEY_READ
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT    TRIM( #{rm.keyLevel} )  AS KEY_LEVEL
+                                            , TRIM( #{rm.keyId} )  AS KEY_ID
+                                            , TRIM( #{rm.keyText} ) AS KEY_TEXT
+                                            , TRIM( #{rm.keyNote} )    AS KEY_NOTE
+                                            , TRIM( #{rm.keyRead} )    AS KEY_READ
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.KEY_ID IS NOT NULL
+                            ) S
+                    ON (  T.KEY_LEVEL = S.KEY_LEVEL AND T.KEY_ID = S.KEY_ID)
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.KEY_TEXT = S.KEY_TEXT
+                                    , T.KEY_NOTE = S.KEY_NOTE
+                                    , T.KEY_READ = S.KEY_READ
+                                    , T.CHKDATE  = SYSDATE
+                                    , T.CHKID    = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.KEY_LEVEL
+                            , T.KEY_ID
+                            , T.KEY_TEXT
+                            , T.KEY_NOTE
+                            , T.KEY_READ
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.KEY_LEVEL
+                            , S.KEY_ID
+                            , S.KEY_TEXT
+                            , S.KEY_NOTE
+                            , S.KEY_READ
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+		</update>
+
+        <!-- 회사사전관리 조회 -->
+        <select parameterType="map" resultType="cMap" id="getCompDictMgrList">
+
+                <![CDATA[
+                    SELECT A.ENTER_CD
+                         , A.KEY_LEVEL
+                         , A.KEY_ID
+                         , A.LANG_CD
+                         , A.COUNTRY_CD
+                         , A.KEY_TEXT
+                         , A.KEY_READ
+                      FROM TLAN151 A
+                ]]>
+
+
+        </select>
+
+        <!-- 회사사전관리 저장 -->
+        <update parameterType="map" id="tlan151Save001">
+
+
+                    MERGE INTO TLAN151 T
+                    USING   (
+                            SELECT A.ENTER_CD
+                                 , A.KEY_LEVEL
+                                 , A.KEY_ID
+                                 , A.LANG_CD
+                                 , A.COUNTRY_CD
+                                 , A.KEY_TEXT
+                                 , A.KEY_READ
+                              FROM (
+                                    SELECT NULL      AS ENTER_CD
+                                         , NULL      AS KEY_LEVEL
+                                         , NULL      AS KEY_ID
+                                         , NULL      AS LANG_CD
+                                         , NULL      AS COUNTRY_CD
+                                         , NULL      AS KEY_TEXT
+                                         , NULL      AS KEY_READ
+                                      FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                                    UNION ALL
+                                    SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+                                         , TRIM( #{rm.keyLevel} )  AS KEY_LEVEL
+                                         , TRIM( #{rm.keyId} )  AS KEY_ID
+                                         , TRIM( #{rm.langCd} )  AS LANG_CD
+                                         , TRIM( #{rm.countryCd} )  AS COUNTRY_CD
+                                         , TRIM( #{rm.keyText} ) AS KEY_TEXT
+                                         , TRIM( #{rm.keyRead} )    AS KEY_READ
+                                      FROM DUAL
+</foreach>
+                                   ) A WHERE A.KEY_ID IS NOT NULL
+                            ) S
+                    ON (     T.ENTER_CD    = S.ENTER_CD
+                        AND  T.KEY_LEVEL   = S.KEY_LEVEL
+                        AND  T.KEY_ID      = S.KEY_ID
+                        AND  T.LANG_CD     = S.LANG_CD
+                        AND  T.COUNTRY_CD  = S.COUNTRY_CD
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.KEY_TEXT = S.KEY_TEXT
+                                    , T.KEY_READ = S.KEY_READ
+                                    , T.CHKDATE  = SYSDATE
+                                    , T.CHKID    = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (     T.ENTER_CD
+                            , T.KEY_LEVEL
+                            , T.KEY_ID
+                            , T.LANG_CD
+                            , T.COUNTRY_CD
+                            , T.KEY_TEXT
+                            , T.KEY_READ
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (     S.ENTER_CD
+                            , S.KEY_LEVEL
+                            , S.KEY_ID
+                            , S.LANG_CD
+                            , S.COUNTRY_CD
+                            , S.KEY_TEXT
+                            , S.KEY_READ
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+        </update>
+
+
+		<!-- 사전관리 삭제 -->
+		<delete parameterType="map" id="tlan150Delete001">
+
+
+					DELETE FROM TLAN150
+					 WHERE 1 = 1
+					   AND (0, KEY_LEVEL, KEY_ID) IN ( (0, NULL, NULL)
+				<foreach item="rm" collection="deleteRows" >
+				                                     , ((SELECT COUNT(1) FROM TLAN151 WHERE KEY_LEVEL = TRIM(#{rm.keyLevel}) AND KEY_ID=TRIM(#{rm.keyId})), TRIM(#{rm.keyLevel}),TRIM(#{rm.keyId}) )
+                </foreach>
+					)
+
+        </delete>
+
+
+
+		<!-- 사전관리 삭제시 하위 회사사전관리 삭제 -->
+		<delete parameterType="map" id="tlan151Delete001">
+
+
+					DELETE FROM TLAN151
+					 WHERE 1 = 1
+					   AND ( ENTER_CD, KEY_LEVEL, KEY_ID) IN (  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+                                                           , ( TRIM(#{ssnEnterCd}),TRIM(#{rm.keyLevel}),TRIM(#{rm.keyId})  )
+</foreach>
+					)
+
+
+
+        </delete>
+
+
+
+		<select parameterType="map" resultType="cMap" id="getDictMgrListSheet1">
+
+
+					SELECT A.*
+					  FROM TLAN150 A
+					 WHERE 1=1
+				<if test='searchkeyLevel != null and !searchkeyLevel.equals("")'>
+					AND A.KEY_LEVEL = #{searchkeyLevel}
+				</if>
+				<if test='searchkeyText != null and !searchkeyText.equals("")'>
+					AND A.KEY_TEXT LIKE '%' || #{searchkeyText} || '%'
+				</if>
+				<if test='searchkeyId != null and !searchkeyId.equals("")'>
+					AND A.KEY_ID LIKE '%' || #{searchkeyId} || '%'
+				</if>
+				<if test='searchkeyTextLen != null and !searchkeyTextLen.equals("")'>
+					AND LENGTH(A.KEY_TEXT) = #{searchkeyTextLen}
+				</if>
+					ORDER BY A.KEY_LEVEL
+					       , A.KEY_ID
+
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getDictMgrListSheet2">
+
+				<![CDATA[
+					WITH AA AS (
+					    SELECT A.LANG_CD
+					         , B.COUNTRY_CD
+					         , A.LANG_CD || '_' || B.COUNTRY_CD AS LOCALE_CD
+					         , A.SEQ
+					      FROM TLAN101 A
+					         , TLAN100 B
+					         , TORG900 C
+					     WHERE A.LANG_CD  = B.LANG_CD
+					       AND A.ENTER_CD = C.ENTER_CD
+					       AND A.ENTER_CD = #{ssnEnterCd}
+					       AND C.LANG_USE_YN = '1'
+					       AND A.USE_YN = '1'
+					       AND C.USE_YN = 'Y' )
+					SELECT CASE WHEN KEY_TEXT IS NULL THEN 'I'
+					            ELSE 'R' END AS S_STATUS
+					     , NVL(D.KEY_LEVEL, #{keyLevel}) AS KEY_LEVEL
+					     , NVL(D.KEY_ID, #{keyId}) AS KEY_ID
+					     , E.LANG_CD
+					     , E.COUNTRY_CD
+					     , E.LANG_CD || '_' || E.COUNTRY_CD AS LOCALE_CD
+					     --,D.KEY_TEXT
+					     , NVL(D.KEY_TEXT, E.LANG_CD || '_' || E.COUNTRY_CD  || #{keyText}) AS KEY_TEXT
+					     , D.KEY_READ
+					  FROM AA E
+					  LEFT OUTER JOIN TLAN151 D
+					                       ON D.LANG_CD = E.LANG_CD
+					                      AND D.KEY_LEVEL = #{keyLevel}
+					                      AND D.KEY_ID = #{keyId}
+					 WHERE 1 = CASE WHEN #{keyLevel} IS NULL THEN 2
+					                ELSE 1 END
+					   AND 1 = CASE WHEN #{keyId} IS NULL THEN 2
+					                ELSE 1 END
+					 ORDER BY E.SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getDictMgrListSheet3">
+
+				<![CDATA[
+					SELECT A.*
+					  FROM TLAN152 A
+					       INNER JOIN TORG900 B
+					                       ON B.ENTER_CD = A.ENTER_CD
+					 WHERE A.KEY_LEVEL = #{keyLevel}
+					   AND A.KEY_ID = #{keyId}
+					 ORDER BY B.SEQ
+					     , A.LANG_CD
+					     , A.COUNTRY_CD
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getLocaleCdList">
+
+				<![CDATA[
+					SELECT A.LANG_CD || '_' || B.COUNTRY_CD AS CODE
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20295', B.COUNTRY_CD, NULL) ||' ('|| F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'L00100', A.LANG_CD, 1)||')' AS CODE_NM
+					  FROM TLAN101 A
+					     , TLAN100 B
+					     , TORG900 C
+					 WHERE A.LANG_CD  = B.LANG_CD
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND C.LANG_USE_YN = '1'
+					   AND A.USE_YN = '1'
+					   AND C.USE_YN = 'Y'
+					 ORDER BY NVL(A.DEFAULT_YN, 'N') DESC
+					        , A.SEQ
+				]]>
+
+
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getEnterList">
+
+				<![CDATA[
+					SELECT ENTER_CD AS CODE
+					     , ENTER_NM AS CODE_NM
+					  FROM TORG900
+					 ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+        <update parameterType="map" id="getDictMgrSaveSheet1">
+
+
+                    MERGE INTO TLAN150 T
+                    USING   (
+                            SELECT    A.KEY_LEVEL
+                                    , A.KEY_ID
+                                    , A.KEY_TEXT
+                                    , A.KEY_NOTE
+                                    , A.KEY_READ
+                            FROM    (
+                                    SELECT    NULL AS KEY_LEVEL
+                                            , NULL AS KEY_ID
+                                            , NULL AS KEY_TEXT
+                                            , NULL AS KEY_NOTE
+                                            , NULL AS KEY_READ
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT    TRIM( #{rm.keyLevel} )  AS KEY_LEVEL
+                                            , TRIM( #{rm.keyId} )  AS KEY_ID
+                                            , TRIM( #{rm.keyText} ) AS KEY_TEXT
+                                            , TRIM( #{rm.keyNote} )    AS KEY_NOTE
+                                            , TRIM( #{rm.keyRead} )    AS KEY_READ
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.KEY_ID IS NOT NULL
+                            ) S
+                    ON (  T.KEY_LEVEL = S.KEY_LEVEL AND T.KEY_ID = S.KEY_ID)
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.KEY_TEXT = S.KEY_TEXT
+                                    , T.KEY_NOTE = S.KEY_NOTE
+                                    , T.KEY_READ = S.KEY_READ
+                                    , T.CHKDATE  = SYSDATE
+                                    , T.CHKID    = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.KEY_LEVEL
+                            , T.KEY_ID
+                            , T.KEY_TEXT
+                            , T.KEY_NOTE
+                            , T.KEY_READ
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.KEY_LEVEL
+                            , S.KEY_ID
+                            , S.KEY_TEXT
+                            , S.KEY_NOTE
+                            , S.KEY_READ
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+
+        <update parameterType="map" id="getDictMgrSaveSheet2">
+
+
+                    MERGE INTO TLAN151 T
+                    USING   (
+                            SELECT A.KEY_LEVEL
+                                 , A.KEY_ID
+                                 , A.LANG_CD
+                                 , A.COUNTRY_CD
+                                 , A.KEY_TEXT
+                                 , A.KEY_READ
+                              FROM (
+                                    SELECT NULL      AS KEY_LEVEL
+                                         , NULL      AS KEY_ID
+                                         , NULL      AS LANG_CD
+                                         , NULL      AS COUNTRY_CD
+                                         , NULL      AS KEY_TEXT
+                                         , NULL      AS KEY_READ
+                                      FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                                    UNION ALL
+                                    SELECT TRIM( #{rm.keyLevel} )  AS KEY_LEVEL
+                                         , TRIM( #{rm.keyId} )  AS KEY_ID
+                                         , TRIM( #{rm.langCd} )  AS LANG_CD
+                                         , TRIM( #{rm.countryCd} )  AS COUNTRY_CD
+                                         , TRIM( #{rm.keyText} ) AS KEY_TEXT
+                                         , TRIM( #{rm.keyRead} )    AS KEY_READ
+                                      FROM DUAL
+</foreach>
+                                   ) A WHERE A.KEY_ID IS NOT NULL
+                            ) S
+                    ON (     T.KEY_LEVEL   = S.KEY_LEVEL
+                        AND  T.KEY_ID      = S.KEY_ID
+                        AND  T.LANG_CD     = S.LANG_CD
+                        AND  T.COUNTRY_CD  = S.COUNTRY_CD
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.KEY_TEXT = S.KEY_TEXT
+                                    , T.KEY_READ = S.KEY_READ
+                                    , T.CHKDATE  = SYSDATE
+                                    , T.CHKID    = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (     T.KEY_LEVEL
+                            , T.KEY_ID
+                            , T.LANG_CD
+                            , T.COUNTRY_CD
+                            , T.KEY_TEXT
+                            , T.KEY_READ
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (     S.KEY_LEVEL
+                            , S.KEY_ID
+                            , S.LANG_CD
+                            , S.COUNTRY_CD
+                            , S.KEY_TEXT
+                            , S.KEY_READ
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+
+        <update parameterType="map" id="getDictMgrSaveSheet3">
+
+
+                    MERGE INTO TLAN152 T
+                    USING   (
+                            SELECT A.ENTER_CD
+                                 , A.KEY_LEVEL
+                                 , A.KEY_ID
+                                 , A.LANG_CD
+                                 , A.COUNTRY_CD
+                                 , A.KEY_TEXT
+                                 , A.KEY_READ
+                              FROM (
+                                    SELECT NULL      AS ENTER_CD
+                                         , NULL      AS KEY_LEVEL
+                                         , NULL      AS KEY_ID
+                                         , NULL      AS LANG_CD
+                                         , NULL      AS COUNTRY_CD
+                                         , NULL      AS KEY_TEXT
+                                         , NULL      AS KEY_READ
+                                      FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                                    UNION ALL
+                                    SELECT TRIM( #{rm.enterCd} ) AS ENTER_CD
+                                         , TRIM( #{rm.keyLevel} )  AS KEY_LEVEL
+                                         , TRIM( #{rm.keyId} )  AS KEY_ID
+                                         , TRIM( #{rm.langCd} )  AS LANG_CD
+                                         , TRIM( #{rm.countryCd} )  AS COUNTRY_CD
+                                         , TRIM( #{rm.keyText} ) AS KEY_TEXT
+                                         , TRIM( #{rm.keyRead} )    AS KEY_READ
+                                      FROM DUAL
+</foreach>
+                                   ) A WHERE A.KEY_ID IS NOT NULL
+                            ) S
+                    ON (     T.ENTER_CD    = S.ENTER_CD
+                        AND  T.KEY_LEVEL   = S.KEY_LEVEL
+                        AND  T.KEY_ID      = S.KEY_ID
+                        AND  T.LANG_CD     = S.LANG_CD
+                        AND  T.COUNTRY_CD  = S.COUNTRY_CD
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.KEY_TEXT = S.KEY_TEXT
+                                    , T.KEY_READ = S.KEY_READ
+                                    , T.CHKDATE  = SYSDATE
+                                    , T.CHKID    = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (     T.ENTER_CD
+                            , T.KEY_LEVEL
+                            , T.KEY_ID
+                            , T.LANG_CD
+                            , T.COUNTRY_CD
+                            , T.KEY_TEXT
+                            , T.KEY_READ
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (     S.ENTER_CD
+                            , S.KEY_LEVEL
+                            , S.KEY_ID
+                            , S.LANG_CD
+                            , S.COUNTRY_CD
+                            , S.KEY_TEXT
+                            , S.KEY_READ
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+
+		<delete parameterType="map"  id="getDictMgrDel1Sheet1">
+
+
+					DELETE FROM TLAN152
+					 WHERE 1 = 1
+					   AND (KEY_LEVEL, KEY_ID) IN (  (NULL,NULL)
+				<foreach item="rm" collection="deleteRows" >
+                                               , (TRIM(#{rm.keyLevel}),TRIM(#{rm.keyId})  )
+                </foreach>
+					)
+
+
+
+		</delete>
+
+		<delete parameterType="map" id="getDictMgrDel2Sheet1">
+
+
+					DELETE FROM TLAN151
+					 WHERE 1 = 1
+					   AND (KEY_LEVEL, KEY_ID) IN (  (NULL,NULL)
+				<foreach item="rm" collection="deleteRows" >
+                                               , (TRIM(#{rm.keyLevel}),TRIM(#{rm.keyId})  )
+                </foreach>
+					)
+
+
+
+
+		</delete>
+
+		<delete parameterType="map" id="getDictMgrDel3Sheet1">
+
+
+					DELETE FROM TLAN150
+					 WHERE 1 = 1
+					   AND (KEY_LEVEL, KEY_ID) IN (  (NULL,NULL)
+				<foreach item="rm" collection="deleteRows" >
+                                               , (TRIM(#{rm.keyLevel}),TRIM(#{rm.keyId})  )
+                </foreach>
+					)
+
+
+
+		</delete>
+
+		<delete parameterType="map" id="getDictMgrDelSheet2">
+
+
+					DELETE FROM TLAN151
+					 WHERE 1 = 1
+					   AND (KEY_LEVEL, KEY_ID, LANG_CD, COUNTRY_CD) IN (  (NULL,NULL, NULL, NULL)
+				<foreach item="rm" collection="deleteRows" >
+                                               , (TRIM(#{rm.keyLevel}),TRIM(#{rm.keyId}),TRIM(#{rm.langCd}),TRIM(#{rm.countryCd})  )
+                </foreach>
+					)
+
+
+
+		</delete>
+
+		<delete parameterType="map" id="getDictMgrDelSheet3">
+
+
+					DELETE FROM TLAN152
+					 WHERE 1 = 1
+					   AND (KEY_LEVEL, KEY_ID, ENTER_CD, LANG_CD, COUNTRY_CD) IN (  (NULL,NULL, NULL, NULL, NULL)
+				<foreach item="rm" collection="deleteRows" >
+                                               , (TRIM(#{rm.keyLevel}),TRIM(#{rm.keyId}),TRIM(#{rm.enterCd}),TRIM(#{rm.langCd}),TRIM(#{rm.countryCd})  )
+                </foreach>
+					)
+
+
+
+		</delete>
+
+
+</mapper>

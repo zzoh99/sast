@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalBasic">
+
+	<!-- 인사기본(기본탭) 조회 -->
+	<select id="getPsnalBasicList" parameterType="map" resultType="cMap">
+			<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.SABUN
+						 , A.NAME
+						 , A.NAME_CN
+						 , A.NAME_US
+					     , A.CNAME
+					     , A.ENAME1
+					     , A.GEMP_YMD
+					     , A.EMP_YMD
+						 , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN,'Y','YY',NULL, NULL, #{ssnLocaleCd}) AS ALL_CAREER_YY_CNT
+					     , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN,'Y','MM',NULL, NULL, #{ssnLocaleCd}) AS ALL_CAREER_MM_CNT
+					     , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN,'W', 'YY', NULL, NULL, 'ko_KR') AS WORK_YYMM_CNT
+					     , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN,'N', 'YYMM', '1', NULL, #{ssnLocaleCd}) AS TOT_AGREE_YYMM_CNT
+					     , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN,'Y', 'YYMM', '1', NULL, #{ssnLocaleCd}) AS ALL_CAREER_YYMM_CNT
+					     , A.STF_TYPE
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'F10001' , A.STF_TYPE, #{ssnLocaleCd}) AS STF_TYPE_NM
+					     , A.EMP_TYPE
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'F10003' , A.EMP_TYPE, #{ssnLocaleCd}) AS EMP_TYPE_NM
+					     , A.TRA_YMD
+					     , A.RET_YMD
+					     , A.RESIGN_REASON_CD
+					     , A.RESIGN_REASON_NM
+					     ,CASE
+							  WHEN #{authPg} = 'A' THEN CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD)
+							  ELSE SUBSTR(CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD), 1, 7) ||
+								   RPAD('*', LENGTH(CRYPTIT.DECRYPT (A.RES_NO, A.ENTER_CD)) - 7, '*')
+						  END AS RES_NO
+					     , A.SEX_TYPE
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H00010', A.SEX_TYPE, #{ssnLocaleCd}) AS SEX_TYPE_NM
+					     , A.BIR_YMD
+					     , A.LUN_TYPE
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H00030', A.LUN_TYPE, #{ssnLocaleCd}) AS LUN_TYPE_NM
+					     , A.BLOOD_CD
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20460', A.BLOOD_CD, #{ssnLocaleCd}) AS BLOOD_CD_NM
+						 , A.WED_YN
+						 , CASE WHEN A.WED_YN = 'Y' THEN NVL(F_COM_GET_LANGUAGE_MAPPING (A.ENTER_CD, 'tit', '112809', #{ssnLocaleCd}), '기혼')
+						        WHEN A.WED_YN = 'N' THEN NVL(F_COM_GET_LANGUAGE_MAPPING (A.ENTER_CD, 'tit', '112466', #{ssnLocaleCd}), '미혼')
+						        ELSE '' END AS WED_YN_NM
+					     , A.WED_YMD
+			     		 , A.FOREIGN_YN
+					     , A.NATIONAL_CD
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20290', A.NATIONAL_CD, #{ssnLocaleCd}) AS NATIONAL_NM
+						 , A.REL_CD
+					     , NVL(A.REL_NM,F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20350', A.REL_CD,  #{ssnLocaleCd})) as REL_NM
+					     , A.HOBBY
+					     , F_COM_FINAL_SCH(A.ENTER_CD, A.SABUN, '3', A.EMP_YMD)  AS EMP_ACA_CD  -- 입사시 학력
+					     , F_COM_FINAL_SCH(A.ENTER_CD, A.SABUN, '3') AS FINAL_ACA_CD  -- 최종학력
+					     , F_COM_FINAL_SCH(A.ENTER_CD, A.SABUN, '2') AS FINAL_ACAMAJ_NM  -- 최종전공명
+					     , F_COM_FINAL_SCH(A.ENTER_CD, A.SABUN, '1') AS FINAL_SCH_NM  -- 최종학교명
+					     , F_HRM_GET_EMP_INFO(A.ENTER_CD, '5', A.SABUN) AS GUN_YN  -- 군필여부
+					     , B.LOCATION_CD
+					     , F_COM_GET_MAP_NM(A.ENTER_CD, '600', A.SABUN, NULL, #{ssnLocaleCd}) AS LOCATION_NM
+					     , FIR_YMD          -- 최초입사일 (사용안함)
+					     , ORG_MOVE_YMD   	-- 부서배치일 (사용안함)
+					     , F_CPN_GET_RMID_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS RMID_YMD  -- 퇴직금기산일
+					     , (SELECT MIN(RMID_YMD) FROM TCPN769 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN) AS FIR_RMID_YMD  -- 최초퇴직금기산일
+					     , F_COM_GET_CURR_JOB_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JOB_YMD          --(조회성) 직무담당일
+					     , F_COM_GET_CURR_JIKCHAK_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS POSITION_YMD     --(조회성) 보직임명일
+					     , B.CONTRACT_SYMD AS CON_R_YMD
+                         , B.CONTRACT_EYMD AS CON_E_YMD
+					     , BLOOD_CD         --혈액형(SELECTBOX)
+					     , HT               --신장
+					     , WT               --체중
+					     , HOBBY            --취미
+					     , SPECIALITY_NOTE  --특기
+					     , REL_NM           --종교
+					     , EYE_L            --시력 좌
+					     , EYE_R            --시력 우
+					     , A.BASE1_CD		-- 입사인정경력(직급코드)
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010', A.BASE1_CD, #{ssnLocaleCd}) AS BASE1_CD_NM -- 입사인정경력(직급명)
+					     , A.BASE1_NM		-- 입사인정경력(년수)
+					     , CASE WHEN F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'H10030', B.MANAGE_CD, 1) = 'Y' THEN
+                                    CASE WHEN A.EMP_YMD = F_COM_GET_CURR_MANAGE_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) THEN ''
+                                         ELSE F_COM_GET_CURR_MANAGE_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) END
+                                END AS FT_WORK_YMD-- 정규직전환일
+					     , F_COM_GET_CURR_ORG_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_YMD	 -- 현 부서배치일
+                         , F_COM_GET_CURR_JIKGUB_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_YMD	 -- 현 직급승격일
+					     , YEAR_YMD         -- 연차기산일
+					     , CASE WHEN F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'H10030', B.MANAGE_CD, 2) = 'Y' THEN  F_COM_GET_CURR_MANAGE_YMD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) END AS EXECUTIVE_YMD-- 임원선임일
+					     , NVL((SELECT MAX('Y') FROM TCPN129 A WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')), 'N') AS PEAK_YN-- 임금피크제 여부
+					     , (SELECT MIN(A.SDATE) FROM TCPN129 A WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN ) AS PEAK_YMD -- 임금피크제 적용일
+					     , F_HRM_GET_EMP_INFO(A.ENTER_CD, '3', A.SABUN) AS BOHUN_YN  -- 보훈여부
+					     , F_HRM_GET_EMP_INFO(A.ENTER_CD, '4', A.SABUN) AS JANG_YN -- 장애인여부
+						 , F_HRM_UNION_MEMBER_YN(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS UNION_YN         --노조가입여부
+						 , F_HRM_EMP_ACC_MEMBER_YN(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS EMP_ACC_YN         --사우회가입여부
+					     , F_HRM_CLUB_MEMBER_YN(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS CLUB_YN          --동호회가입여부
+					     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'GP1') AS GP_ADDR  -- 비상연락망(관계)
+					     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'NM1') AS NM_ADDR  -- 비상연락망(성명)
+					     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'SC1') AS SC_ADDR  -- 비상연락망(연락처)
+					     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'OT') AS OT_ADDR -- 사무실전화
+					     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') AS IM_ADDR -- 사내이메일
+					     , F_COM_GET_AGE(A.ENTER_CD, A.BIR_YMD, A.RES_NO, REPLACE(TO_CHAR(SYSDATE,'YYYYMMDD'), '-', '')) AS AGE	-- 나이
+					     , B.ORG_CD
+					     , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					     , B.JIKWEE_CD
+					     , B.JIKWEE_NM
+					     , B.JIKCHAK_CD
+					     , B.JIKCHAK_NM
+					     , B.JIKGUB_CD
+					     , B.JIKGUB_NM
+					  FROM THRM100 A
+					     , (
+					        SELECT SUB1.*, SUB2.RESIGN_REASON_CD, SUB2.RESIGN_REASON_NM
+                              FROM THRM151 SUB1, THRM191 SUB2
+                             WHERE SUB1.ENTER_CD = SUB2.ENTER_CD
+                               AND SUB1.SABUN = SUB2.SABUN
+                               AND SUB1.SDATE = SUB2.ORD_YMD
+                               AND SUB2.APPLY_SEQ = (SELECT MAX(X.APPLY_SEQ) FROM THRM191 X WHERE X.ENTER_CD = #{ssnEnterCd} AND X.ORD_YMD = SUB1.SDATE AND X.SABUN = SUB1.SABUN)
+                               AND SUB1.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					           AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					       ) B
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.SABUN    = B.SABUN(+)
+					   AND A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					   AND A.SABUN    = #{sabun}
+				]]>
+	</select>
+
+	<select id="getPsnalBasicCopyPopList" parameterType="map" resultType="cMap">
+		<![CDATA[
+				SELECT SABUN, EMP_YMD, RET_YMD
+				 FROM THRM100
+				 WHERE  CryptIT.decrypt(RES_NO, ENTER_CD) = #{searchResNo}
+					 AND ENTER_CD = #{ssnEnterCd}
+					 AND RET_YMD IS NOT NULL
+			]]>
+	</select>
+
+	<!-- 인사기본(기본탭) 수정 -->
+	<update id="updatePsnalBasic" parameterType="map">
+			<![CDATA[
+					UPDATE THRM100
+					SET RES_NO					= CRYPTIT.ENCRYPT(TRIM( #{resNo} ), #{ssnEnterCd} )
+						, SEX_TYPE				= TRIM( #{sexType} )
+						, NAME					= TRIM( #{name} )
+						, NAME_CN				= TRIM( #{nameCn} )
+						, NAME_US				= TRIM( #{nameUs} )
+						, BIR_YMD				= TRIM( #{birYmd} )
+						, EMP_YMD				= TRIM( #{empYmd} )
+						, GEMP_YMD				= TRIM( #{gempYmd} )
+						, LUN_TYPE				= TRIM( #{lunType} )
+						, RET_YMD				= TRIM( #{retYmd} )
+						, TRA_YMD				= TRIM( #{traYmd} )
+						, NATIONAL_CD			= TRIM( #{nationalCd} )
+						, NATIONAL_NM           = TRIM( #{nationalNm}     )
+						, STF_TYPE              = TRIM( #{stfType} )
+						, STF_TYPE_NM           = TRIM( #{stfTypeNm}      )
+						, EMP_TYPE              = TRIM( #{empType} )
+						, EMP_TYPE_NM           = TRIM( #{empTypeNm}      )
+						, WED_YN                = TRIM( #{wedYn}          )
+						, WED_YMD               = TRIM( #{wedYmd}         )
+						, FOREIGN_YN            = TRIM( #{foreignYn}      )
+						, DALTONISM_CD          = TRIM( #{daltonismCd} )
+						, BASE1_YN          	= TRIM( #{base1Yn} )
+						, BASE2_YN          	= TRIM( #{base2Yn} )
+						, BASE3_YN          	= TRIM( #{base3Yn} )
+						, BASE1_CD          	= TRIM( #{base1Cd} )
+						, BASE2_CD          	= TRIM( #{base2Cd} )
+						, BASE3_CD          	= TRIM( #{base3Cd} )
+						, BASE1_NM          	= TRIM( #{base1Nm} )
+						, BASE2_NM          	= TRIM( #{base2Nm} )
+						, BASE3_NM          	= TRIM( #{base3Nm} )
+
+					/* 추가됨 START */
+					     , FIR_YMD          = TRIM( #{firYmd}         ) -- 최초입사일
+					     , JIKGUB_YMD       = TRIM( #{jikgubYmd}      ) -- 직급승진일(직급기산일)
+					     , ORG_MOVE_YMD     = TRIM( #{orgMoveYmd}     ) -- 부서배치일
+					     , YEAR_YMD         = TRIM( #{yearYmd}        ) -- 연차기산일
+					     , RMID_YMD         = TRIM( #{rmidYmd}        ) -- 퇴직금기산일
+					     , FIR_RMID_YMD     = TRIM( #{firRmidYmd}     ) --최초퇴직금기산일
+					     , EXECUTIVE_YMD    = TRIM( #{executiveYmd}   ) --임원선임일
+					     , CON_R_YMD        = TRIM( #{conRYmd}        ) --계약시작일
+					     , CON_E_YMD        = TRIM( #{conEYmd}        ) --계약만료일
+					     , BLOOD_CD         = TRIM( #{bloodCd}       ) --혈액형(SELECTBOX)
+					     , HT               = TRIM( #{ht}             ) --신장
+					     , WT               = TRIM( #{wt}             ) --체중
+					     , HOBBY            = TRIM( #{hobby}          ) --취미
+					     , SPECIALITY_NOTE  = TRIM( #{specialityNote} ) --특기
+					     , REL_CD           = TRIM( #{relCd}          )
+					     , REL_NM           = TRIM( #{relNm}          ) --종교
+					     , EYE_L            = TRIM( #{eyeL}           ) --시력 좌
+					     , EYE_R            = TRIM( #{eyeR}           ) --시력 우
+						 , RESIGN_REASON_CD = TRIM( #{resignReasonCd}           ) --퇴직사유
+                         , RESIGN_REASON_NM = TRIM( #{resignReasonNm}           ) --퇴직사유명
+					/* 추가됨 END */
+
+						, CHKDATE				= SYSDATE
+						, CHKID					= #{ssnSabun}
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND SABUN = #{sabun}
+				]]>
+	</update>
+
+	<select id="prcPsnalBasicCopy" statementType="CALLABLE" parameterType="map">
+		{
+			CALL  P_HRM_DATA_COPY(
+				#{sqlcodem, mode=OUT, jdbcType=VARCHAR},
+				#{sqlerrm, mode=OUT, jdbcType=VARCHAR},
+				#{ssnEnterCd, mode=IN, jdbcType=VARCHAR},
+				#{searchSabun, mode=IN, jdbcType=VARCHAR},
+				#{searchNewSabun, mode=IN, jdbcType=VARCHAR}
+		}
+	</select>
+
+	<select id="getPsnalBasic" parameterType="map" resultType="cMap">
+			<![CDATA[
+		SELECT A.ENTER_CD
+			 , A.SABUN
+			 , A.NAME
+			 , B.STATUS_NM
+			 , NVL (
+				F_COM_GET_HQ_ORG_NM (
+						A.ENTER_CD,
+						B.ORG_CD,
+						NVL (REPLACE ('', '-', ''),
+							 TO_CHAR (SYSDATE, 'YYYYMMDD')),
+						'B0400'),
+				F_COM_GET_HQ_ORG_NM (
+						A.ENTER_CD,
+						B.ORG_CD,
+						NVL (REPLACE ('', '-', ''),
+							 TO_CHAR (SYSDATE, 'YYYYMMDD')),
+						'B0300')) AS HQ_ORG_NM
+			 , B.ORG_CD
+			 , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+			 , B.JIKWEE_NM
+			 , B.JIKCHAK_NM
+			 , TO_CHAR (TO_DATE (A.BIR_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS BIR_YMD
+			 , F_COM_GET_AGE(A.ENTER_CD, A.BIR_YMD, A.RES_NO, REPLACE(TO_CHAR(SYSDATE,'YYYYMMDD'), '-', '')) AS AGE	-- 나이
+			 , B.JOB_CD
+			 , F_COM_GET_JOB_NM (A.ENTER_CD, A.SABUN, TO_CHAR(sysdate, 'YYYYMMDD')) AS JOB_NM
+			 , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'HP') AS HP_ADDR
+			 , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'SC1') AS SC_ADDR  -- 비상연락망(연락처)
+			 , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM') AS IM_ADDR -- 사내이메일
+			 , (SELECT A.ADDR1 || ' ' || A.ADDR2 ||
+					   CASE
+						   WHEN A.ZIP IS NOT NULL THEN ' (우)' || A.ZIP
+						   ELSE ''
+						   END AS ADDR
+				FROM THRM123 A
+				WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+				  AND A.SABUN = #{ssnSabun}
+				  AND A.ADD_TYPE = '2') AS ADDR
+		FROM THRM100 A
+		   , (
+			SELECT SUB1.*, SUB2.RESIGN_REASON_CD, SUB2.RESIGN_REASON_NM
+			FROM THRM151 SUB1, THRM191 SUB2
+			WHERE SUB1.ENTER_CD = SUB2.ENTER_CD
+			  AND SUB1.SABUN = SUB2.SABUN
+			  AND SUB1.SDATE = SUB2.ORD_YMD
+			  AND SUB2.APPLY_SEQ = (SELECT MAX(X.APPLY_SEQ) FROM THRM191 X WHERE X.ENTER_CD = #{ssnEnterCd} AND X.ORD_YMD = SUB1.SDATE AND X.SABUN = SUB1.SABUN)
+			  AND SUB1.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+		) B
+		WHERE A.ENTER_CD = B.ENTER_CD(+)
+		  AND A.SABUN    = B.SABUN(+)
+		  AND A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+		  AND A.SABUN    = NVL(#{sabun}, #{ssnSabun})
+		]]>
+	</select>
+
+	<select id="getPsnalTimeLineList" parameterType="map" resultType="cMap">
+		<![CDATA[
+		SELECT X.*, TO_CHAR(
+				TO_DATE(
+						CASE
+							WHEN LENGTH(X.YMD) = 6 THEN X.YMD || '01' -- YYYYMM 인 경우
+							ELSE X.YMD -- YYYYMMDD 인 경우
+							END,
+						'YYYYMMDD'
+					),
+				'YYYY'
+			) AS YYYY,
+			   TO_CHAR(
+					   TO_DATE(
+							   CASE
+								   WHEN LENGTH(X.YMD) = 6 THEN X.YMD || '01' -- YYYYMM 인 경우
+								   ELSE X.YMD -- YYYYMMDD 인 경우
+								   END,
+							   'YYYYMMDD'
+						   ),
+					   'MM.DD'
+				   ) AS MMDD
+		FROM	(SELECT A.ENTER_CD
+				, A.SABUN
+		      	, '' AS COLOR
+				, '발령' AS KEY
+				, 'apartment' AS ICON
+				, NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tsys011', A.ORD_TYPE_CD, #{ssnLocaleCd}), F_COM_GET_ORD_TYPE_NM(A.ENTER_CD, A.ORD_TYPE_CD)) || ' - ' ||
+			NVL(TRIM(F_COM_GET_ORG_NM(A.ENTER_CD,A.ORG_CD,A.ORD_YMD, #{ssnLocaleCd})),A.ORG_NM) || ' ' ||
+			F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',A.JIKGUB_CD, #{ssnLocaleCd}) AS HISTORY_NM
+				, A.ORD_YMD AS YMD
+			FROM THRM191 A
+			WHERE ENTER_CD = #{ssnEnterCd}
+			AND SABUN    = #{ssnSabun}
+			UNION ALL
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, 'blue' AS COLOR
+				, '교육' AS KEY
+			    , 'school' AS ICON
+				, D.EDU_COURSE_NM AS HISTORY_NM
+				, E.EDU_E_YMD AS YMD
+			FROM TTRA301 A ,
+			TTRA101 D,
+			TTRA121 E
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN = #{ssnSabun}
+			AND A.ENTER_CD = D.ENTER_CD
+			AND A.EDU_SEQ = D.EDU_SEQ
+			AND A.ENTER_CD = E.ENTER_CD
+			AND A.EDU_SEQ = E.EDU_SEQ
+			AND A.EDU_EVENT_SEQ = E.EDU_EVENT_SEQ
+			UNION ALL
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, 'yellow' AS COLOR
+				, '자격' AS KEY
+			    , 'badge' AS ICON
+				, A.LICENSE_NM || ' 취득' AS HISTORY_NM
+				, A.LIC_S_YMD AS YMD
+			FROM THRM113 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN = #{ssnSabun}
+			UNION ALL
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, 'yellow' AS COLOR
+				, '경력' AS KEY
+				, 'work' AS ICON
+				, A.TF_ORG_NM || ' 시작' AS HISTORY_NM
+				, A.SDATE AS YMD
+			FROM THRM116 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN = #{ssnSabun}
+			UNION ALL
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, 'yellow' AS COLOR
+				, '경력' AS KEY
+			    , 'work' AS ICON
+			 	, A.TF_ORG_NM || ' 종료' AS HISTORY_NM
+				, A.EDATE AS YMD
+			FROM THRM116 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN = #{ssnSabun}
+			UNION ALL
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, 'yellow' AS COLOR
+				, '상벌' AS KEY
+			  	, 'stars' AS ICON
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20250',A.PRIZE_CD) AS HISTORY_NM
+				, A.PRIZE_YMD AS YMD
+			FROM THRM128 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN = #{ssnSabun}
+			UNION ALL
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, 'yellow' AS COLOR
+				, '상벌' AS KEY
+			    , 'warning' AS ICON
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20270',A.PUNISH_CD) || ' - ' ||  A.PUNISH_MEMO AS HISTORY_NM
+				, A.PUNISH_YMD AS YMD
+			FROM THRM129 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN = #{ssnSabun}
+			UNION ALL
+			SELECT	A.ENTER_CD
+				, A.SABUN
+				, 'yellow' AS COLOR
+				, '자격' AS KEY
+			    , 'badge' AS ICON
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20307', A.F_TEST_CD) || ' 취득' AS HISTORY_NM
+				, A.APPLY_YMD
+			FROM THRM125 A
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN    = #{ssnSabun}
+			UNION ALL
+			SELECT	A.ENTER_CD
+				,	A.SABUN
+				, '' AS COLOR
+				, '해외연수' AS KEY
+			    , 'flight' AS ICON
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20290',A.NATION_CD) || ' 해외연수 시작' AS HISTORY_NM
+				,	A.SDATE	AS YMD
+			FROM	THRM131	A
+			WHERE	A.ENTER_CD	= #{ssnEnterCd}
+			AND		A.SABUN		= #{ssnSabun}
+			UNION ALL
+			SELECT	A.ENTER_CD
+				,	A.SABUN
+				, '' AS COLOR
+				, '해외연수' AS KEY
+				, 'flight' AS ICON
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20290',A.NATION_CD) || ' 해외연수 종료' AS HISTORY_NM
+				,	A.EDATE	AS YMD
+			FROM	THRM131	A
+			WHERE	A.ENTER_CD	= #{ssnEnterCd}
+			AND		A.SABUN		= #{ssnSabun}
+			UNION ALL
+			 SELECT A.ENTER_CD
+					 , A.SABUN
+			         , 'yellow' AS COLOR
+					 , '학력' AS KEY
+			         , 'school' AS ICON
+					 , A.ACA_SCH_NM || ' 입학' AS HISTORY_NM
+					 , A.ACA_S_YM AS YMD
+			 FROM THRM115 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.SABUN = #{ssnSabun}
+			 UNION ALL
+			 SELECT A.ENTER_CD
+					 , A.SABUN
+			         , 'yellow' AS COLOR
+					 , '학력' AS KEY
+					 , 'school' AS ICON
+					 , A.ACA_SCH_NM || ' ' || F_COM_GET_GRCODE_NAME(A.ENTER_CD,'F20140',A.ACA_YN) AS HISTORY_NM
+					 , A.ACA_S_YM AS YMD
+			 FROM THRM115 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.SABUN = #{ssnSabun}
+			UNION ALL
+				 SELECT A.ENTER_CD
+						 , A.SABUN
+				   		 , 'yellow' AS COLOR
+						 , '보증' AS KEY
+				   		, 'verified_user' AS ICON
+						 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20380',A.WARRANTY_CD) || ' 시작' AS HISTORY_NM
+						 , A.WARRANTY_S_YMD AS YMD
+				 FROM THRM119 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = #{ssnSabun}
+				   AND A.TYPE = '1'
+				 UNION ALL
+				 SELECT A.ENTER_CD
+						 , A.SABUN
+						 , 'yellow' AS COLOR
+						 , '보증' AS KEY
+						 , 'verified_user' AS ICON
+						 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20380',A.WARRANTY_CD) || ' 종료' AS HISTORY_NM
+						 , A.WARRANTY_E_YMD AS YMD
+				 FROM THRM119 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = #{ssnSabun}
+				   AND A.TYPE = '1') X
+		ORDER BY X.YMD DESC
+		]]>
+	</select>
+</mapper>

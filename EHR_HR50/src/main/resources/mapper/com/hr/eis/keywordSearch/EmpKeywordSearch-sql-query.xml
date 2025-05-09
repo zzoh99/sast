@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.keywordSearch">
+	
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpKeywordSearchList">
+			
+				<![CDATA[
+					SELECT '0' AS SELECT_IMG 
+						, A.SABUN
+						, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+						, F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+						, B.JIKWEE_NM
+						, B.JIKCHAK_NM
+						, B.STATUS_NM
+						, A.NOTE
+							||' '|| (SELECT NOTE FROM TSYS002 WHERE ENTER_CD = A.ENTER_CD AND CHKID = A.CHKID AND SABUN = A.SABUN AND KEYWORD = TRIM(#{searchKeyword2}) AND ROWNUM = 1) AS NOTE
+					FROM TSYS002 A, THRM151 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.SABUN = B.SABUN
+						AND B.SDATE = (SELECT MAX(SDATE) FROM THRM151 WHERE ENTER_CD = B.ENTER_CD AND SABUN = B.SABUN AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+						AND B.STATUS_CD <> 'RAA' ]]>
+					<if test="searchStatusCd != null and searchStatusCd neq ''"> <![CDATA[
+						AND B.STATUS_CD <> TRIM(#{searchStatusCd})
+					]]></if>
+						
+						AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						AND A.CHKID = TRIM(#{ssnSabun})
+						AND KEYWORD = TRIM(#{searchKeyword1})
+					
+					<if test="searchKeyword2 != null and searchKeyword2 neq ''">
+						AND EXISTS(SELECT 1 FROM TSYS002 WHERE ENTER_CD = A.ENTER_CD AND CHKID = A.CHKID AND SABUN = A.SABUN AND KEYWORD = TRIM(#{searchKeyword2}))
+					</if>
+					
+					ORDER BY 1
+		</select>
+		
+		<!-- 프로시저 -->
+		<update id="prcEmpKeywordSearch" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRI_KEYWORD_EMP_INS(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR},
+				#{searchKeyword1,mode=IN,jdbcType=VARCHAR},
+				#{searchKeyword2,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+</mapper>

@@ -1,0 +1,148 @@
+<?xml	version="1.0"	encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.progress.appEtcResultMgr">
+
+<!-- 대상자 조회	-->
+		<select parameterType="map" resultType="cMap" id="getAppEtcResultList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPRAISAL_CD
+					     , A.SABUN
+					     , A.NAME
+					     , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+					     , A.APP_ORG_CD
+					     , A.APP_ORG_NM
+					     , B.ETC_GUBUN_CD
+					     , A.JIKGUB_NM
+					     , A.JIKWEE_NM
+					     , B.ETC_POINT
+					  FROM TPAP201 A, TPAP550 B, TPAP101 C
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					   AND A.SABUN = B.SABUN
+					   AND A.APP_ORG_CD = B.APP_ORG_CD
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.APP_STEP_CD = '5'
+					   AND C.ENTER_CD = A.ENTER_CD
+					   AND C.APPRAISAL_CD = A.APPRAISAL_CD
+					           ]]>
+						<if test='searchAppOrgNm != null and !searchAppOrgNm.equals("")'>
+						AND		A.APP_ORG_NM LIKE '%' || #{searchAppOrgNm} || '%'
+						</if>
+						<if test='searchNm != null and !searchNm.equals("")'>
+						AND		(
+										A.NAME LIKE '%' || #{searchNm} || '%'
+									OR	A.SABUN	=	#{searchNm}
+								)
+						</if>
+						<if test='searchEtcGubunCd != null and !searchEtcGubunCd.equals("")'>
+						AND		B.ETC_GUBUN_CD	=	#{searchEtcGubunCd}
+						</if>
+			ORDER BY APP_ORG_NM ASC, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, APP_S_YMD) ASC
+
+
+		</select>
+
+<!-- 반영비율 저장 -->
+		<update parameterType="map" id="saveAppEtcResultMgr">
+
+				<![CDATA[
+					MERGE INTO TPAP550 T
+					USING (
+							SELECT A.ENTER_CD
+								, A.APPRAISAL_CD
+								, A.SABUN
+								, A.APP_ORG_CD
+								, A.ETC_GUBUN_CD
+								, A.ETC_POINT
+							FROM (
+									SELECT NULL	AS	ENTER_CD
+										, NULL	AS	APPRAISAL_CD
+										, NULL	AS	SABUN
+										, NULL	AS	APP_ORG_CD
+										, NULL	AS	ETC_GUBUN_CD
+										, NULL	AS	ETC_POINT
+									FROM DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+										SELECT #{ssnEnterCd}				AS	ENTER_CD
+											, TRIM(	#{rm.appraisalCd} )	AS	APPRAISAL_CD
+											, TRIM(	#{rm.sabun} )		AS	SABUN
+											, TRIM(	#{rm.appOrgCd} )	AS	APP_ORG_CD
+											, TRIM(	#{rm.etcGubunCd})	AS	ETC_GUBUN_CD
+											, TRIM(	#{rm.etcPoint})	AS	ETC_POINT
+										FROM DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		=	S.ENTER_CD
+					AND		T.APPRAISAL_CD	=	S.APPRAISAL_CD
+					AND		T.SABUN			=	S.SABUN
+					AND		T.APP_ORG_CD	=	S.APP_ORG_CD
+					AND		T.ETC_GUBUN_CD	=	S.ETC_GUBUN_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE
+						SET	T.ETC_POINT 	=	S.ETC_POINT
+							, T.CHKDATE		=	SYSDATE
+							, T.CHKID		=	#{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.SABUN
+							, T.APP_ORG_CD
+							, T.ETC_GUBUN_CD
+							, T.ETC_POINT
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.SABUN
+							, S.APP_ORG_CD
+							, S.ETC_GUBUN_CD
+							, S.ETC_POINT
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppEtcResultMgr">
+
+					DELETE FROM TPAP550
+					WHERE 	(ENTER_CD,APPRAISAL_CD,SABUN,APP_ORG_CD,ETC_GUBUN_CD) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											, TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											, TRIM( #{rm.sabun} )
+										</if>
+										<if test='rm.appOrgCd != null and !rm.appOrgCd.equals("")'>
+											, TRIM( #{rm.appOrgCd} )
+										</if>
+										<if test='rm.etcGubunCd != null and !rm.etcGubunCd.equals("")'>
+											, TRIM( #{rm.etcGubunCd})
+										</if>
+										)
+</foreach>
+										)
+
+
+		</delete>
+
+
+</mapper>

@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.config.wtmLeaveCreMgr">
+
+    <!-- 휴가생성기준 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreMgrList">
+        <![CDATA[
+        SELECT A.ENTER_CD
+             , '/EmpPhotoOut.do' || chr(63) || 'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO
+             , A.SABUN
+             , B.NAME
+             , B.ORG_NM
+             , B.JIKWEE_NM
+             , B.EMP_YMD
+             , B.GEMP_YMD
+             /* 생성기준 */
+             , C.GNT_S_YMD /* 생성기준시작일 */
+             , C.GNT_E_YMD /* 생성기준종료일 */
+             , C.EMP_YMD AS CRE_EMP_YMD /* 생성기준입사일 */
+             , C.WORK_YEAR_CNT /* 근속년차 */
+             , RTRIM(TO_CHAR(C.WORK_CNT, 'FM90.999'), '.') AS WORK_CNT /* 근속년수 */
+             , RTRIM(TO_CHAR(
+                    ( CASE WHEN C.TOT_WORK_DAYS IS NULL OR C.TOT_WORK_DAYS = 0 THEN NULL
+                           ELSE ROUND(C.REAL_WORK_DAYS / C.TOT_WORK_DAYS, 2)
+                      END ), 'FM90.999'), '.') AS WORK_RATE /* 근속비율 */
+             , RTRIM(TO_CHAR(NVL(C.CRE_ANNUAL_CNT, 0) + NVL(C.ANNUAL_U1Y_CNT, 0), 'FM90.999'), '.') AS CRE_ANNUAL_CNT /* 1년미만대상자의 1년차 발생 연차 포함 */
+             , RTRIM(TO_CHAR(C.ADD_ANNUAL_CNT, 'FM90.999'), '.') AS ADD_ANNUAL_CNT
+             , RTRIM(TO_CHAR(C.MONTHLY_CNT, 'FM90.999'), '.') AS MONTHLY_CNT
+             , RTRIM(TO_CHAR(C.MONTHLY_U1Y_CNT, 'FM90.999'), '.') AS MONTHLY_U1Y_CNT
+             , RTRIM(TO_CHAR(C.CARRY_OVER_CNT, 'FM90.999'), '.') AS CARRY_OVER_CNT
+             , C.NOTE AS CRE_NOTE
+             /* 사용기준 */
+             , A.LEAVE_ID
+             , A.GNT_CD
+             , A.USE_S_YMD
+             , A.USE_E_YMD
+             , A.CRE_CNT
+             , A.USE_CNT
+             , A.USED_CNT
+             , A.REST_CNT
+             , A.FRD_CNT
+             , A.COM_CNT
+             , A.UNDER_1Y_YN
+             , A.NOTE
+             , A.INSDATE
+             , A.INSID
+             , A.CHKDATE
+             , A.CHKID
+          FROM TWTM511 A
+         INNER JOIN (
+             SELECT B1.ENTER_CD, B1.SABUN, F_COM_GET_NAMES(B1.ENTER_CD, B1.SABUN, #{ssnLocaleCd}) AS NAME
+                  , (SELECT F_COM_GET_ORG_NM(B2.ENTER_CD, B2.ORG_CD, LEAST(TO_CHAR(SYSDATE, 'YYYYMMDD'), #{searchYear}||'1231'), #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+                  , (SELECT F_COM_GET_GRCODE_NAME(B2.ENTER_CD, 'H20030', B2.JIKWEE_CD, #{ssnLocaleCd}) FROM DUAL) AS JIKWEE_NM
+                  , B1.EMP_YMD, B1.GEMP_YMD, B2.STATUS_CD
+               FROM THRM100 B1
+                  , THRM151 B2
+              WHERE B1.ENTER_CD = B2.ENTER_CD
+                AND B1.SABUN = B2.SABUN
+                AND B1.ENTER_CD = #{ssnEnterCd} ]]>
+            <if test="searchSabun != null and searchSabun neq ''">
+                AND B1.SABUN = #{searchSabun}
+            </if>
+            <if test="searchOrgNm != null and searchOrgNm neq ''">
+                AND (SELECT F_COM_GET_ORG_NM(B2.ENTER_CD, B2.ORG_CD, LEAST(TO_CHAR(SYSDATE, 'YYYYMMDD'), #{searchYear}||'1231'), #{ssnLocaleCd}) FROM DUAL) LIKE '%' || #{searchOrgNm} || '%'
+            </if>
+                AND LEAST(TO_CHAR(SYSDATE, 'YYYYMMDD'), #{searchYear}||'1231') BETWEEN B2.SDATE AND NVL(B2.EDATE, '99991231')
+        <![CDATA[
+             ) B
+            ON B.ENTER_CD = A.ENTER_CD
+           AND B.SABUN = A.SABUN
+          LEFT OUTER JOIN (
+              SELECT C1.ANNUAL_CRE_JOIN_TYPE
+                   , C2.*
+                FROM TWTM011 C1
+                   , TWTM509 C2
+               WHERE C1.ENTER_CD = C2.ENTER_CD
+                 AND C1.GNT_CD = C2.GNT_CD
+                 AND C1.SEARCH_SEQ = C2.SEARCH_SEQ
+             ) C
+            ON C.ENTER_CD = A.ENTER_CD
+           AND C.LEAVE_ID = A.LEAVE_ID
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.USE_E_YMD >= #{searchYear}||'0101'
+           AND A.USE_S_YMD <= #{searchYear}||'1231' ]]>
+        <if test="searchGntCd != null and searchGntCd neq ''">
+            AND A.GNT_CD = #{searchGntCd}
+        </if>
+        <if test='searchUnder1yYn != null and "Y".equals(searchUnder1yYn)'>
+            AND A.UNDER_1Y_YN = 'Y'
+        </if>
+        <if test="searchSabunName != null and searchSabunName neq ''">
+            AND (UPPER(A.SABUN) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%' OR UPPER(B.NAME) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%' )
+        </if>
+        <if test="searchStatusCd != null and searchStatusCd neq ''">
+            AND B.STATUS_CD = #{searchStatusCd}
+        </if>
+        <if test="searchEnableUse != null and searchEnableUse eq 'Y'">
+            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.USE_S_YMD BETWEEN A.USE_E_YMD
+        </if>
+         ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, LEAST(TO_CHAR(SYSDATE, 'YYYYMMDD'), #{searchYear}||'1231')), A.GNT_CD
+    </select>
+
+    <update parameterType="map" id="saveWtmLeaveCreMgr">
+        MERGE INTO TWTM511 T
+        USING (
+            <foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+                SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                     , TRIM(#{rm.leaveId}) AS LEAVE_ID
+                     , TRIM(#{rm.sabun}) AS SABUN
+                     , TRIM(#{rm.gntCd}) AS GNT_CD
+                     , TRIM(#{rm.useSYmd}) AS USE_S_YMD
+                     , TRIM(#{rm.useEYmd}) AS USE_E_YMD
+                     , TRIM(#{rm.creCnt}) AS CRE_CNT
+                     , TRIM(#{rm.frdCnt}) AS FRD_CNT
+                     , TRIM(#{rm.useCnt}) AS USE_CNT
+                     , TRIM(#{rm.usedCnt}) AS USED_CNT
+                     , TRIM(#{rm.restCnt}) AS REST_CNT
+                     , TRIM(#{rm.comCnt}) AS COM_CNT
+                     , TRIM(#{rm.under1yYn}) AS UNDER_1Y_YN
+                     , TRIM(#{rm.note}) AS NOTE
+                   FROM DUAL
+            </foreach>
+        ) S
+        on (
+                T.ENTER_CD = S.ENTER_CD
+            AND T.LEAVE_ID = S.LEAVE_ID
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.USE_S_YMD = S.USE_S_YMD
+                     , T.USE_E_YMD = S.USE_E_YMD
+                     , T.CRE_CNT = S.CRE_CNT
+                     , T.FRD_CNT = S.FRD_CNT
+                     , T.USE_CNT = S.USE_CNT
+                     , T.USED_CNT = S.USED_CNT
+                     , T.REST_CNT = S.REST_CNT
+                     , T.COM_CNT = S.COM_CNT
+                     , T.UNDER_1Y_YN = S.UNDER_1Y_YN
+                     , T.NOTE = S.NOTE
+                     , T.CHKDATE = SYSDATE
+                     , T.CHKID = #{ssnSabun}
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                  T.ENTER_CD
+                , T.LEAVE_ID
+                , T.SABUN
+                , T.GNT_CD
+                , T.USE_S_YMD
+                , T.USE_E_YMD
+                , T.CRE_CNT
+                , T.FRD_CNT
+                , T.USE_CNT
+                , T.USED_CNT
+                , T.REST_CNT
+                , T.COM_CNT
+                , T.UNDER_1Y_YN
+                , T.NOTE
+                , T.INSDATE
+                , T.INSID
+                , T.CHKDATE
+                , T.CHKID
+            )
+            VALUES
+            (
+                  S.ENTER_CD
+                , S.LEAVE_ID
+                , S.SABUN
+                , S.GNT_CD
+                , S.USE_S_YMD
+                , S.USE_E_YMD
+                , S.CRE_CNT
+                , S.FRD_CNT
+                , S.USE_CNT
+                , S.USED_CNT
+                , S.REST_CNT
+                , S.COM_CNT
+                , S.UNDER_1Y_YN
+                , S.NOTE
+                , SYSDATE
+                , #{ssnSabun}
+                , SYSDATE
+                , #{ssnSabun}
+            )
+    </update>
+
+    <delete parameterType="map" id="deleteWtmLeaveCreMgr509">
+        DELETE FROM TWTM509
+         WHERE (ENTER_CD, LEAVE_ID) IN
+               (
+                <foreach item="rm" collection="deleteRows" separator=" UNION ALL ">
+                    SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                         , TRIM(#{rm.leaveId}) AS LEAVE_ID
+                      FROM DUAL
+                </foreach>
+               )
+    </delete>
+
+    <delete parameterType="map" id="deleteWtmLeaveCreMgr510">
+        DELETE FROM TWTM510
+         WHERE (ENTER_CD, LEAVE_ID) IN
+               (
+                <foreach item="rm" collection="deleteRows" separator=" UNION ALL ">
+                    SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                         , TRIM(#{rm.leaveId}) AS LEAVE_ID
+                      FROM DUAL
+                </foreach>
+               )
+    </delete>
+
+    <delete parameterType="map" id="deleteWtmLeaveCreMgr">
+        DELETE FROM TWTM511
+         WHERE (ENTER_CD, LEAVE_ID) IN
+               (
+                <foreach item="rm" collection="deleteRows" separator=" UNION ALL ">
+                   SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                        , TRIM(#{rm.leaveId}) AS LEAVE_ID
+                     FROM DUAL
+                </foreach>
+               )
+    </delete>
+
+    <select id="getWtmLeaveCreEmpYmd" parameterType="map" resultType="cMap">
+        SELECT A.ENTER_CD, A.SABUN, A.EMP_YMD, A.GEMP_YMD
+             , ( SELECT T.LEAVE_ID
+                   FROM TWTM511 T
+                  WHERE T.ENTER_CD = A.ENTER_CD
+                    AND T.SABUN = A.SABUN
+                    AND T.GNT_CD = '2'
+                    AND T.USE_S_YMD =
+                        ( SELECT MIN(USE_S_YMD)
+                            FROM TWTM511
+                           WHERE ENTER_CD = T.ENTER_CD
+                             AND SABUN = T.SABUN
+                             AND GNT_CD = T.GNT_CD
+                             AND T.UNDER_1Y_YN = 'Y' )
+                    AND ROWNUM = 1 )
+          FROM THRM100 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.SABUN IN
+        <foreach item="item" collection="empRows" separator=", " open="(" close=")" index="index">
+            #{item.sabun}
+        </foreach>
+    </select>
+
+    <select id="getWtmLeaveCreMgrSearchSeqList" parameterType="map" resultType="cMap">
+        SELECT A.SEARCH_SEQ AS CODE
+             , B.SEARCH_DESC AS CODE_NM
+          FROM TWTM011 A
+             , THRI201 B
+         WHERE A.ENTER_CD = B.ENTER_CD
+           AND A.SEARCH_SEQ = B.SEARCH_SEQ
+           AND A.ENTER_CD = #{ssnEnterCd}
+           AND A.GNT_CD = #{searchGntCd}
+    </select>
+
+    <select id="getWtmLeaveCreMgrFrdCnt" parameterType="map" resultType="cMap">
+        SELECT NVL(MAX(REST_CNT) KEEP ( DENSE_RANK FIRST ORDER BY USE_S_YMD DESC ), 0) AS FRD_CNT
+          FROM TWTM511
+         WHERE ENTER_CD = #{dto.enterCd}
+           AND SABUN = #{dto.sabun}
+           AND GNT_CD = #{dto.gntCd}
+           AND USE_E_YMD = TO_CHAR(TO_DATE(#{dto.useSYmd}, 'YYYYMMDD')-1, 'YYYYMMDD')
+           AND (
+                   1 = 0
+        <if test="rewardYn != null and rewardYn = 'Y'">
+                   OR UNDER_1Y_YN = 'N'
+        </if>
+        <if test="rewardU1yYn != null and rewardU1yYn = 'Y'">
+                   OR UNDER_1Y_YN = 'Y'
+        </if>
+               )
+    </select>
+
+    <delete id="deleteWtmLeavesCreateLogicDet" parameterType="map">
+        DELETE FROM TWTM510 T
+         WHERE T.ENTER_CD = #{ssnEnterCd}
+           AND EXISTS
+               (
+                   SELECT 1
+                     FROM TWTM509
+                    WHERE ENTER_CD = T.ENTER_CD
+                      AND LEAVE_ID = T.LEAVE_ID
+                      AND SABUN IN
+                      <foreach item="rm" collection="deleteEmps" open="(" close=")" separator=" UNION " index="index">
+                          SELECT #{rm.sabun} FROM DUAL
+                      </foreach>
+                      AND GNT_CD = #{gntCd}
+                      AND YM LIKE #{searchYear} || '%'
+               )
+    </delete>
+
+    <delete id="deleteWtmLeavesCreate" parameterType="map">
+        DELETE FROM TWTM511 T
+         WHERE T.ENTER_CD = #{ssnEnterCd}
+           AND EXISTS
+               (
+                   SELECT 1
+                     FROM TWTM509
+                    WHERE ENTER_CD = T.ENTER_CD
+                      AND LEAVE_ID = T.LEAVE_ID
+                      AND SABUN IN
+                      <foreach item="rm" collection="deleteEmps" open="(" close=")" separator=" UNION " index="index">
+                          SELECT #{rm.sabun} FROM DUAL
+                      </foreach>
+                      AND GNT_CD = #{gntCd}
+                      AND YM LIKE #{searchYear} || '%'
+               )
+    </delete>
+
+    <delete id="deleteWtmLeavesCreateLogic" parameterType="map">
+        DELETE FROM TWTM509 T
+         WHERE T.ENTER_CD = #{ssnEnterCd}
+           AND T.SABUN IN
+               <foreach item="rm" collection="deleteEmps" open="(" close=")" separator=" UNION " index="index">
+                   SELECT #{rm.sabun} FROM DUAL
+               </foreach>
+           AND T.GNT_CD = #{gntCd}
+           AND T.YM LIKE #{searchYear} || '%'
+    </delete>
+
+    <insert id="saveWtmLeavesCreateLogic" parameterType="map">
+        INSERT INTO TWTM509
+        <foreach item="rm" collection="insertRows" separator=" UNION ALL " index="index">
+            SELECT #{ssnEnterCd} AS ENTER_CD
+                 , #{rm.leaveId} AS LEAVE_ID
+                 , #{rm.ym} AS YM
+                 , #{rm.sabun} AS SABUN
+                 , #{rm.gntCd} AS GNT_CD
+                 , #{rm.searchSeq} AS SEARCH_SEQ
+                 , #{rm.gntSYmd} AS GNT_S_YMD
+                 , #{rm.gntEYmd} AS GNT_E_YMD
+                 , #{rm.empYmd} AS EMP_YMD
+                 , #{rm.workYearCnt, jdbcType=DOUBLE} AS WORK_YEAR_CNT -- 근속년차
+                 , #{rm.workCnt, jdbcType=DOUBLE} AS WORK_CNT -- 근속년수
+                 , #{rm.realWorkDays, jdbcType=INTEGER} AS REAL_WORK_DAYS -- 생성기준기간내실질소정근로일수
+                 , #{rm.totWorkDays, jdbcType=INTEGER} AS TOT_WORK_DAYS -- 생성기준기간내총소정근로일수
+                 , #{rm.creAnnualCnt, jdbcType=DOUBLE} AS CRE_ANNUAL_CNT -- 발생기준연차
+                 , #{rm.addAnnualCnt, jdbcType=DOUBLE} AS ADD_ANNUAL_CNT -- 근속에따른가산연차
+                 , #{rm.monthlyCnt, jdbcType=DOUBLE} AS MONTHLY_CNT -- 월차(근무율80%미만)
+                 , #{rm.monthlyU1yCnt, jdbcType=DOUBLE} AS MONTHLY_U1Y_CNT -- 1년미만대상자월차
+                 , #{rm.annualU1yCnt, jdbcType=DOUBLE} AS ANNUAL_U1Y_CNT -- 1년미만대상자2년차연차
+                 , #{rm.useSYmd, jdbcType=VARCHAR} AS USE_S_YMD -- 사용기준시작일(YYYYMMDD)
+                 , #{rm.useEYmd, jdbcType=VARCHAR} AS USE_E_YMD -- 사용기준종료일(YYYYMMDD)
+                 , #{rm.carryOverCnt, jdbcType=DOUBLE} AS CARRY_OVER_CNT -- 이월일수
+                 , #{rm.applYn, jdbcType=VARCHAR} AS APPL_YN -- 반영여부
+                 , #{rm.note, jdbcType=VARCHAR} AS NOTE
+                 , SYSDATE AS INSDATE
+                 , #{ssnSabun} AS INSID
+                 , SYSDATE AS CHKDATE
+                 , #{ssnSabun} AS CHKID
+              FROM DUAL
+        </foreach>
+    </insert>
+
+    <insert id="saveWtmLeavesCreate" parameterType="map">
+        INSERT INTO TWTM511
+        <foreach item="rm" collection="insertRows" separator=" UNION ALL " index="index">
+        SELECT #{ssnEnterCd} AS ENTER_CD
+             , #{rm.leaveId} AS LEAVE_ID
+             , #{rm.sabun} AS SABUN
+             , #{rm.gntCd} AS GNT_CD
+             , #{rm.useSYmd} AS USE_S_YMD
+             , #{rm.useEYmd} AS USE_E_YMD
+             , #{rm.creCnt, jdbcType=DOUBLE} AS CRE_CNT
+             , #{rm.useCnt, jdbcType=DOUBLE} AS USE_CNT
+             , #{rm.usedCnt, jdbcType=DOUBLE} AS USED_CNT
+             , #{rm.restCnt, jdbcType=DOUBLE} AS REST_CNT
+             , #{rm.frdCnt, jdbcType=DOUBLE} AS FRD_CNT
+             , #{rm.comCnt, jdbcType=DOUBLE} AS COM_CNT
+             , #{rm.under1yYn, jdbcType=VARCHAR} AS UNDER_1Y_YN
+             , #{rm.note, jdbcType=VARCHAR} AS NOTE
+             , SYSDATE AS INSDATE
+             , #{ssnSabun} AS INSID
+             , SYSDATE AS CHKDATE
+             , #{ssnSabun} AS CHKID
+          FROM DUAL
+        </foreach>
+    </insert>
+
+    <!-- 1년 미만 대상자의 월차 ID 조회 -->
+    <select id="getWtmLeavesLeaveId" parameterType="map" resultType="cMap">
+        SELECT MAX(A.LEAVE_ID) KEEP ( DENSE_RANK FIRST ORDER BY A.USE_S_YMD DESC ) OVER ( PARTITION BY A.ENTER_CD, A.SABUN, A.GNT_CD ) AS LEAVE_ID
+          FROM TWTM511 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.SABUN = #{sabun}
+           AND A.GNT_CD = #{gntCd}
+           --AND A.USE_S_YMD = #{useSYmd}
+           AND A.UNDER_1Y_YN = 'Y'
+    </select>
+
+    <update id="saveWtmLeavesCreateLogicU1y" parameterType="map">
+        MERGE INTO TWTM509 T
+        USING (
+            <foreach item="rm" collection="mergeRows" separator=" UNION ALL " index="index">
+                SELECT #{ssnEnterCd} AS ENTER_CD
+                     , #{rm.leaveId} AS LEAVE_ID
+                     , #{rm.ym} AS YM
+                     , #{rm.sabun} AS SABUN
+                     , #{rm.gntCd} AS GNT_CD
+                     , #{rm.searchSeq} AS SEARCH_SEQ
+                     , #{rm.gntSYmd} AS GNT_S_YMD
+                     , #{rm.gntEYmd} AS GNT_E_YMD
+                     , #{rm.empYmd} AS EMP_YMD
+                     , #{rm.workYearCnt, jdbcType=INTEGER} AS WORK_YEAR_CNT
+                     , #{rm.workCnt, jdbcType=DOUBLE} AS WORK_CNT
+                     , #{rm.realWorkDays, jdbcType=INTEGER} AS REAL_WORK_DAYS
+                     , #{rm.totWorkDays, jdbcType=INTEGER} AS TOT_WORK_DAYS
+                     , #{rm.monthlyU1yCnt, jdbcType=DOUBLE} AS MONTHLY_U1Y_CNT
+                     , #{rm.useSYmd} AS USE_S_YMD
+                     , #{rm.useEYmd} AS USE_E_YMD
+                     , #{rm.applYn} AS APPL_YN
+                     , #{rm.note} AS NOTE
+                     , #{ssnSabun} AS INSID
+                     , #{ssnSabun} AS CHKID
+                  FROM DUAL
+            </foreach>
+        ) S
+        ON (
+            T.ENTER_CD = S.ENTER_CD
+            AND T.LEAVE_ID = S.LEAVE_ID
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.YM = S.YM
+                     , T.GNT_S_YMD = S.GNT_S_YMD
+                     , T.GNT_E_YMD = S.GNT_E_YMD
+                     , T.WORK_YEAR_CNT = S.WORK_YEAR_CNT
+                     , T.WORK_CNT = S.WORK_CNT
+                     , T.REAL_WORK_DAYS = S.REAL_WORK_DAYS
+                     , T.TOT_WORK_DAYS = S.TOT_WORK_DAYS
+                     , T.MONTHLY_U1Y_CNT = S.MONTHLY_U1Y_CNT
+                     , T.USE_S_YMD = S.USE_S_YMD
+                     , T.USE_E_YMD = S.USE_E_YMD
+                     , T.APPL_YN = S.APPL_YN
+                     , T.NOTE = S.NOTE
+                     , T.CHKDATE = SYSDATE
+                     , T.CHKID = S.CHKID
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                  T.ENTER_CD
+                , T.LEAVE_ID
+                , T.YM
+                , T.SABUN
+                , T.GNT_CD
+                , T.SEARCH_SEQ
+                , T.GNT_S_YMD
+                , T.EMP_YMD
+                , T.WORK_YEAR_CNT
+                , T.WORK_CNT
+                , T.REAL_WORK_DAYS
+                , T.TOT_WORK_DAYS
+                , T.CRE_ANNUAL_CNT
+                , T.ADD_ANNUAL_CNT
+                , T.MONTHLY_CNT
+                , T.MONTHLY_U1Y_CNT
+                , T.ANNUAL_U1Y_CNT
+                , T.USE_S_YMD
+                , T.NOTE
+                , T.INSID
+                , T.CHKID
+            )
+            VALUES
+            (
+                  S.ENTER_CD
+                , S.LEAVE_ID
+                , S.YM
+                , S.SABUN
+                , S.GNT_CD
+                , S.SEARCH_SEQ
+                , S.GNT_S_YMD
+                , S.EMP_YMD
+                , S.WORK_YEAR_CNT
+                , S.WORK_CNT
+                , S.REAL_WORK_DAYS
+                , S.TOT_WORK_DAYS
+                , S.CRE_ANNUAL_CNT
+                , S.ADD_ANNUAL_CNT
+                , S.MONTHLY_CNT
+                , S.MONTHLY_U1Y_CNT
+                , S.ANNUAL_U1Y_CNT
+                , S.USE_S_YMD
+                , S.NOTE
+                , S.INSID
+                , S.CHKID
+            )
+
+    </update>
+
+    <update id="saveWtmLeavesCreateLogicDetU1y" parameterType="map">
+        MERGE INTO TWTM510 T
+        USING (
+            <foreach item="rm" collection="insertRows" separator=" UNION ALL " index="index">
+                SELECT #{ssnEnterCd} AS ENTER_CD
+                     , #{leaveId} AS LEAVE_ID
+                     , #{rm.ymd} AS YMD
+                     , #{rm.reason} AS REASON
+                     , #{ssnSabun} AS INSID
+                     , #{ssnSabun} AS CHKID
+                  FROM DUAL
+            </foreach>
+        ) S
+        ON (
+            T.ENTER_CD = S.ENTER_CD
+            AND T.LEAVE_ID = S.LEAVE_ID
+            AND T.YMD = S.YMD
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.REASON = S.REASON
+                     , T.CHKID = S.CHKID
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                T.ENTER_CD, T.LEAVE_ID, T.YMD, T.REASON, T.INSID, T.CHKID
+            )
+            VALUES
+            (
+                S.ENTER_CD, S.LEAVE_ID, S.YMD, S.REASON, S.INSID, S.CHKID
+            )
+    </update>
+
+    <update id="saveWtmLeavesCreateU1y" parameterType="map">
+        MERGE INTO TWTM511 T
+        USING (
+            <foreach item="rm" collection="mergeRows" separator=" UNION ALL " index="index">
+                SELECT #{ssnEnterCd} AS ENTER_CD
+                    , #{rm.leaveId} AS LEAVE_ID
+                    , #{rm.sabun} AS SABUN
+                    , #{rm.gntCd} AS GNT_CD
+                    , #{rm.useSYmd} AS USE_S_YMD
+                    , #{rm.useEYmd} AS USE_E_YMD
+                    , #{rm.creCnt, jdbcType=DOUBLE} AS CRE_CNT
+                    , #{rm.under1yYn} AS UNDER_1Y_YN
+                    , #{rm.note} AS NOTE
+                    , #{ssnSabun} AS INSID
+                    , #{ssnSabun} AS CHKID
+                  FROM DUAL
+            </foreach>
+        ) S
+        ON (
+            T.ENTER_CD = S.ENTER_CD
+            AND T.LEAVE_ID = S.LEAVE_ID
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.CRE_CNT = S.CRE_CNT
+                     , T.USE_CNT = S.CRE_CNT
+                     , T.REST_CNT = S.CRE_CNT - T.USED_CNT
+                     , T.COM_CNT = S.CRE_CNT - T.USED_CNT
+                     , T.CHKID = S.CHKID
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                T.ENTER_CD, T.LEAVE_ID, T.SABUN, T.GNT_CD, T.USE_S_YMD
+                , T.USE_E_YMD, T.CRE_CNT, T.USE_CNT, T.USED_CNT, T.REST_CNT
+                , T.COM_CNT, T.UNDER_1Y_YN, T.NOTE, T.INSID, T.CHKID
+            )
+            VALUES
+            (
+                S.ENTER_CD, S.LEAVE_ID, S.SABUN, S.GNT_CD, S.USE_S_YMD
+                , S.USE_E_YMD, S.CRE_CNT, S.CRE_CNT, 0, S.CRE_CNT
+                , S.CRE_CNT, S.UNDER_1Y_YN, S.NOTE, S.INSID, S.CHKID
+            )
+    </update>
+
+    <select id="getWtmLeaveCreMgrU1yLeaveId" parameterType="map" resultType="cMap">
+        -- 1년미만 연차의 LEAVE_ID 조회
+        SELECT LEAVE_ID
+          FROM TWTM511
+         WHERE ENTER_CD = #{enterCd}
+           AND SABUN = #{sabun}
+           AND GNT_CD = #{gntCd}
+           AND USE_S_YMD = #{useSYmd}
+           AND UNDER_1Y_YN = 'Y'
+    </select>
+
+    <!-- 근태 사용내역 정보 조회-->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreMgrHistory">
+        SELECT A.ENTER_CD
+             , A.APPL_SEQ
+             , A.GNT_CD
+             , A.SABUN
+             , A.YMD
+             , A.APP_DAY
+             , F_WTM_GET_BASIC_GNT_CD(A.ENTER_CD, A.GNT_CD) AS BASIC_GNT_CD
+          FROM TWTM103 A
+         WHERE (A.ENTER_CD, A.SABUN) IN
+               <foreach item="rm" collection="emps" open="(" close=")" separator=" UNION " index="index">
+                   SELECT #{rm.enterCd}, #{rm.sabun} FROM DUAL
+               </foreach>
+    </select>
+
+    <!-- 근태코드 정보 조회-->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreGntCdList">
+        SELECT A.ENTER_CD
+             , A.GNT_CD
+             , A.SEQ
+             , A.GNT_GUBUN_CD
+             , A.GNT_NM
+             , A.BASIC_GNT_CD_YN
+             , A.USE_YN
+             , A.MOBILE_USE_YN
+             , A.GNT_SHORT_NM
+             , A.COLOR
+             , A.MEMO
+             , A.REQUEST_USE_TYPE
+             , A.BASE_CNT
+             , A.MAX_CNT
+             , A.HOL_INCL_YN
+             , A.STD_APPLY_HOUR
+             , A.VACATION_YN
+             , A.MINUS_ALLOW_YN
+             , A.ORG_LEVEL_CD
+             , A.EXCP_SEARCH_SEQ
+             , NVL(A.DIV_CNT, 0) AS DIV_CNT
+             , A.LANGUAGE_CD
+             , A.NOTE
+          FROM TWTM041 A
+    </select>
+
+    <!-- 근태코드 정보 조회-->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreLeaveStats">
+        SELECT A.ENTER_CD
+             , A.LEAVE_ID
+             , A.SABUN
+             , A.GNT_CD
+             , A.USE_S_YMD
+             , A.USE_E_YMD
+             , A.CRE_CNT
+             , A.USE_CNT
+             , A.USED_CNT
+             , A.REST_CNT
+             , A.FRD_CNT
+             , A.COM_CNT
+             , A.UNDER_1Y_YN
+             , A.NOTE
+          FROM TWTM511 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.SABUN IN
+               <foreach item="rm" collection="emps" open="(" close=")" separator=" UNION " index="index">
+                   SELECT #{rm.sabun} FROM DUAL
+               </foreach>
+    </select>
+
+    <update id="saveWtmLeavesCreateLeavesUpdate" parameterType="map">
+        MERGE INTO TWTM511 T
+        USING ( SELECT ENTER_CD, LEAVE_ID, USED_CNT, REST_CNT, COM_CNT, CHKDATE, CHKID
+                  FROM ( SELECT NULL AS ENTER_CD
+                              , NULL AS LEAVE_ID
+                              , NULL AS USED_CNT
+                              , NULL AS REST_CNT
+                              , NULL AS COM_CNT
+                              , NULL AS CHKDATE
+                              , NULL AS CHKID
+                           FROM DUAL
+        <foreach item="rm" collection="mergeRows" index="index">
+                         UNION ALL
+                         SELECT #{rm.enterCd} AS ENTER_CD
+                              , #{rm.leaveId} AS LEAVE_ID
+                              , #{rm.usedCnt} AS USED_CNT
+                              , #{rm.restCnt} AS REST_CNT
+                              , #{rm.comCnt} AS COM_CNT
+                              , SYSDATE AS CHKDATE
+                              , #{ssnSabun} AS CHKID
+                           FROM DUAL
+        </foreach>
+                       )
+                 WHERE ENTER_CD IS NOT NULL
+                   AND LEAVE_ID IS NOT NULL
+        ) S
+        ON (
+                T.ENTER_CD = S.ENTER_CD
+            AND T.LEAVE_ID = S.LEAVE_ID
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.USED_CNT = S.USED_CNT
+                     , T.REST_CNT = S.REST_CNT
+                     , T.COM_CNT = S.COM_CNT
+                     , T.CHKDATE = S.CHKDATE
+                     , T.CHKID = S.CHKID
+    </update>
+</mapper>

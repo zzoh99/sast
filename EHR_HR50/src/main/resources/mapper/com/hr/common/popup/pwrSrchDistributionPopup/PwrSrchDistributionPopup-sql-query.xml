@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.pwrSrchDistributionPopup">
+	
+	<select id="getPwrSrchDistributionPopupList" parameterType="map" resultType="cMap">
+	<![CDATA[
+         		SELECT	  A.SABUN
+				, A.SEARCH_SEQ
+				, A.DISTR_YMD
+				, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) AS NAME
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030', c.JIKWEE_CD) AS JIKWEE_NM
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010', c.JIKCHAK_CD) AS JIKGUB_NM
+				, F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020', c.JIKCHAK_CD) AS JIKCHAK_NM
+				, D.ORG_NM
+				, E.JOB_NM
+		FROM THRI217 A, THRM100 B, THRM151 C, TORG101 D, TORG201 E
+		WHERE A.ENTER_CD	= #{ssnEnterCd}
+		AND A.SEARCH_SEQ	= TO_NUMBER( TRIM(#{srchSeq}) )
+		AND A.ENTER_CD		= B.ENTER_CD
+		AND A.SABUN			= B.SABUN
+		AND B.ENTER_CD		= C.ENTER_CD
+		AND B.SABUN			= C.SABUN
+		AND C.ENTER_CD		= D.ENTER_CD
+		AND C.ORG_CD		= D.ORG_CD
+		AND C.ENTER_CD		= E.ENTER_CD(+)
+		AND C.JOB_CD		= E.JOB_CD(+)
+		ORDER BY B.NAME DESC
+	]]>
+	</select>
+	
+	<update id="savePwrSrchDistributionPopup" parameterType="map">
+	<![CDATA[
+					MERGE INTO THRI215 TARGETTABLE
+               	USING (
+            				SELECT    A.SEARCH_SEQ			AS SEARCH_SEQ	
+            						, A.COLUMN_NM			AS COLUMN_NM	
+                             	, A.SEARCH_ITEM_CD		AS SEARCH_ITEM_CD	
+                             	, A.SEQ					AS SEQ				
+                             	, A.COND_TYPE			AS COND_TYPE		
+                             	, A.OPERATOR			AS OPERATOR		
+                             	, A.INPUT_VALUE			AS INPUT_VALUE		
+                             	, A.INPUT_VALUE_DESC	AS INPUT_VALUE_DESC
+                             	, A.AND_OR				AS AND_OR			
+                             	, A.VALUE_TYPE			AS VALUE_TYPE		
+                  		FROM   (
+                            		SELECT    NULL			AS SEARCH_SEQ	
+                            				, NULL			AS COLUMN_NM		
+                             			, NULL			AS SEARCH_ITEM_CD	
+                             			, NULL			AS SEQ				
+                             			, NULL			AS COND_TYPE		
+                             			, NULL			AS OPERATOR		
+                             			, NULL			AS INPUT_VALUE		
+                             			, NULL			AS INPUT_VALUE_DESC
+                             			, NULL			AS AND_OR			
+                             			, NULL			AS VALUE_TYPE		
+                             	FROM   DUAL ]]>
+                 <foreach item="rm" collection="mergeRows">
+                 				UNION ALL
+                             	SELECT   
+                             			  TO_NUMBER(TRIM(#{rm.searchSeq}))	AS SEARCH_SEQ	
+                             			, TRIM(#{rm.columnNm})  		AS COLUMN_NM		
+                             			, TRIM(#{rm.searchItemCd})  	AS SEARCH_ITEM_CD	
+                             			, TRIM(#{rm.seq})  				AS SEQ				
+                             			, TRIM(#{rm.condType})  		AS COND_TYPE		
+                                   		, TRIM(#{rm.operator})  		AS OPERATOR		
+                                    		, TRIM(#{rm.inputValue})		AS INPUT_VALUE		
+                                    		, TRIM(#{rm.inputValueDesc})	AS INPUT_VALUE_DESC
+                                    		, TRIM(#{rm.andOr})				AS AND_OR			
+                                    		, TRIM(#{rm.valueType})			AS VALUE_TYPE		
+                             	FROM   DUAL
+                 </foreach>
+                 <![CDATA[
+						) A
+				WHERE A.SEARCH_SEQ IS NOT NULL
+				AND A.COLUMN_NM IS NOT NULL 
+                        ) SOURCETABLE
+                     ON (		TARGETTABLE.ENTER_CD		= #{ssnEnterCd}
+                            	AND	TARGETTABLE.SEARCH_SEQ 		= SOURCETABLE.SEARCH_SEQ
+                      		AND TARGETTABLE.COLUMN_NM 		= SOURCETABLE.COLUMN_NM
+                        )
+        			WHEN MATCHED THEN
+      				UPDATE SET    TARGETTABLE.SEARCH_ITEM_CD	= SOURCETABLE.SEARCH_ITEM_CD	
+                     			, TARGETTABLE.SEQ				= SOURCETABLE.SEQ				
+                               	, TARGETTABLE.COND_TYPE			= SOURCETABLE.COND_TYPE			
+                               	, TARGETTABLE.OPERATOR			= SOURCETABLE.OPERATOR			
+                               	, TARGETTABLE.INPUT_VALUE		= SOURCETABLE.INPUT_VALUE		
+                               	, TARGETTABLE.INPUT_VALUE_DESC	= SOURCETABLE.INPUT_VALUE_DESC	
+                               	, TARGETTABLE.AND_OR			= SOURCETABLE.AND_OR			
+                               	, TARGETTABLE.VALUE_TYPE		= SOURCETABLE.VALUE_TYPE		
+                               	, TARGETTABLE.CHKDATE			= SYSDATE
+                               	, TARGETTABLE.CHKID				= #{ssnSabun}
+   				WHEN NOT MATCHED THEN         		
+            			INSERT
+            			(
+            				  TARGETTABLE.ENTER_CD				
+            				, TARGETTABLE.SEARCH_SEQ			
+             			, TARGETTABLE.COLUMN_NM		
+             			, TARGETTABLE.SEARCH_ITEM_CD		
+                       	, TARGETTABLE.SEQ							
+                       	, TARGETTABLE.COND_TYPE				
+                       	, TARGETTABLE.OPERATOR				
+                       	, TARGETTABLE.INPUT_VALUE			
+                       	, TARGETTABLE.INPUT_VALUE_DESC
+                       	, TARGETTABLE.AND_OR					
+                       	, TARGETTABLE.VALUE_TYPE			
+                       	, TARGETTABLE.CHKDATE					
+                       	, TARGETTABLE.CHKID						
+            			) 
+            			VALUES 
+            			(
+            				  #{ssnEnterCd}
+            				, SOURCETABLE.SEARCH_SEQ	
+            				, SOURCETABLE.COLUMN_NM		
+            				, SOURCETABLE.SEARCH_ITEM_CD	
+            				, SOURCETABLE.SEQ				
+            				, SOURCETABLE.COND_TYPE		
+            				, SOURCETABLE.OPERATOR		
+            				, SOURCETABLE.INPUT_VALUE		
+            				, SOURCETABLE.INPUT_VALUE_DESC
+            				, SOURCETABLE.AND_OR			
+            				, SOURCETABLE.VALUE_TYPE		
+            				, SYSDATE
+            				, #{ssnSabun}
+            			)
+	]]>
+	</update>
+</mapper>
+

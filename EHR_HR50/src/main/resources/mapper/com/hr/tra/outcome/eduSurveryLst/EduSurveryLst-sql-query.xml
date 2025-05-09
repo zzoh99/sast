@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.outcome.eduSurveryLst">
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduSurveryLstList">
+			
+				<![CDATA[
+				SELECT A.EDU_SEQ
+				      ,B.EDU_COURSE_NM
+				      ,A.EDU_EVENT_SEQ
+				      ,C.EDU_EVENT_NM
+				      ,A.SABUN
+				      ,C.EDU_S_YMD
+				      ,C.EDU_E_YMD
+				      ,A.APPL_SEQ
+				      ,A.EDU_MEMO
+				      ,A.EDU_MEMO1
+				      ,A.EDU_MEMO2
+				      ,A.EDU_MEMO3
+				      ,A.EDU_SURVEY_YN
+				      ,D.*
+				      , DECODE(A.EDU_SURVEY_YN, 'Y', '2', '1') AS SELECT_IMG
+				      , '0' AS SELECT_IMG2
+				  FROM TTRA201 A -- 만족도조사관리
+				      ,TTRA101 B -- 교육과정종합관리
+				      ,TTRA121 C -- 교육과정_이벤트
+				      ,THRI103 D
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.EDU_SEQ  = B.EDU_SEQ
+				   AND A.ENTER_CD = C.ENTER_CD
+				   AND A.EDU_SEQ  = C.EDU_SEQ
+				   AND A.EDU_EVENT_SEQ = C.EDU_EVENT_SEQ
+				   AND A.ENTER_CD = D.ENTER_CD
+				   AND A.APPL_SEQ = D.APPL_SEQ
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN    = #{searchSabun}
+				   AND C.EDU_SATI_SKIP_YN = 'N'
+				   AND A.APPL_SEQ NOT IN (SELECT AP_APPL_SEQ FROM THRI103 X, TTRA205 Y WHERE X.ENTER_CD = A.ENTER_CD AND X.ENTER_CD = Y.ENTER_CD AND X.APPL_SEQ = Y.APPL_SEQ AND Y.AP_APPL_SEQ = A.APPL_SEQ AND Y.SABUN = A.SABUN)
+				ORDER BY C.EDU_S_YMD DESC
+				]]>
+		</select>
+
+<!-- 	팝업	조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduSurveryPopupList">
+			
+				<![CDATA[
+				SELECT /* EduSurveryLst-mapping-query.getEduSurveryPopupList */
+					   A.*
+					 , B.SABUN
+					 , B.POINT
+					 , NVL((CASE WHEN B.POINT = 10 THEN 'Y' ELSE 'N' END),'N') AS POINT_10
+					 , NVL((CASE WHEN B.POINT = 9 THEN 'Y' ELSE 'N' END),'N') AS POINT_9
+					 , NVL((CASE WHEN B.POINT = 8 THEN 'Y' ELSE 'N' END),'N') AS POINT_8
+					 , NVL((CASE WHEN B.POINT = 7 THEN 'Y' ELSE 'N' END),'N') AS POINT_7
+					 , NVL((CASE WHEN B.POINT = 6 THEN 'Y' ELSE 'N' END),'N') AS POINT_6
+					 , NVL((CASE WHEN B.POINT = 5 THEN 'Y' ELSE 'N' END),'N') AS POINT_5
+					 , NVL((CASE WHEN B.POINT = 4 THEN 'Y' ELSE 'N' END),'N') AS POINT_4
+					 , NVL((CASE WHEN B.POINT = 3 THEN 'Y' ELSE 'N' END),'N') AS POINT_3
+					 , NVL((CASE WHEN B.POINT = 2 THEN 'Y' ELSE 'N' END),'N') AS POINT_2
+					 , NVL((CASE WHEN B.POINT = 1 THEN 'Y' ELSE 'N' END),'N') AS POINT_1
+					 , C.MEMO
+				  FROM TTRA150 A
+					 , TTRA151 B
+					 , TTRA153 C
+				WHERE A.ENTER_CD=B.ENTER_CD(+)
+				  AND A.EDU_SEQ=B.EDU_SEQ(+)
+				  AND A.EDU_EVENT_SEQ=B.EDU_EVENT_SEQ(+)
+				  AND A.SURVEY_ITEM_CD=B.SURVEY_ITEM_CD(+)
+				  AND A.ENTER_CD=C.ENTER_CD(+)
+				  AND A.EDU_SEQ=C.EDU_SEQ(+)
+				  AND A.EDU_EVENT_SEQ=C.EDU_EVENT_SEQ(+)
+				  AND A.EDU_EVENT_SEQ=#{searchEduEventSeq}
+				  AND A.ENTER_CD=#{ssnEnterCd}
+				  AND B.SABUN(+)=#{searchApplSabun}
+				  AND C.SABUN(+)=#{searchApplSabun}
+			 ORDER BY A.SURVEY_ITEM_TYPE, TO_NUMBER(A.SURVEY_ITEM_TYPE2), A.SEQ
+				]]>
+			
+		</select>
+
+<!-- 	팝업memo	조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduSurveryPopupMemo">
+			
+				<![CDATA[
+				SELECT	/* EduSurveryLst-mapping-query.getEduSurveryPopupMemo */
+						ENTER_CD
+					 ,	EDU_SEQ
+					 ,	EDU_EVENT_SEQ
+					 ,	SABUN
+					 ,	MEMO
+					 ,	MEMO2
+				  FROM	TTRA153
+				 WHERE	ENTER_CD=#{ssnEnterCd}
+				   AND	EDU_SEQ=#{searchEduSeq}
+				   AND	EDU_EVENT_SEQ	=	#{searchEduEventSeq}
+				   AND	SABUN			=	#{searchApplSabun}
+				]]>
+			
+		</select>
+
+<!-- 	popup sheet	저장 -->
+		<update parameterType="map" id="saveEduSurveryLst">
+			
+					 MERGE INTO TTRA151 T 
+					 USING 
+					( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+					       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+					            , TRIM(#{searchEduSeq})  		AS  EDU_SEQ
+					            , TRIM(#{searchEduEventSeq})  AS  EDU_EVENT_SEQ
+					            , TRIM(#{searchApplSabun})  	AS  SABUN
+					            , TRIM(#{rm.surveyItemCd})  AS  SURVEY_ITEM_CD
+					            , TRIM(#{rm.point})  		AS  POINT
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 		= S.ENTER_CD 
+					     AND  T.EDU_SEQ 		= S.EDU_SEQ 
+					     AND  T.EDU_EVENT_SEQ 	= S.EDU_EVENT_SEQ 
+					     AND  T.SABUN 			= S.SABUN 
+					     AND  T.SURVEY_ITEM_CD 	= S.SURVEY_ITEM_CD 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE		= sysdate 
+					            , T.CHKID		= #{ssnSabun} 
+					            , T.POINT 		= S.POINT 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.EDU_SEQ
+					            , T.EDU_EVENT_SEQ
+					            , T.SABUN
+					            , T.SURVEY_ITEM_CD
+					            , T.POINT
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.EDU_SEQ
+					            , S.EDU_EVENT_SEQ
+					            , S.SABUN
+					            , S.SURVEY_ITEM_CD
+					            , S.POINT
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+		</update>
+
+<!-- 	popup memo저장 -->
+		<update parameterType="map" id="saveEduSurveryPopupMemo">
+					 MERGE INTO TTRA153 T 
+					 USING 
+					( 
+					       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+					            , TRIM(#{searchEduSeq})  		AS  EDU_SEQ
+					            , TRIM(#{searchEduEventSeq})  AS  EDU_EVENT_SEQ
+					            , TRIM(#{searchApplSabun})  	AS  SABUN
+					            , TRIM(#{memo})  				AS  MEMO
+					            , TRIM(#{memo2})  			AS  MEMO2
+					        FROM DUAL 
+					) S 
+					ON ( 
+					          T.ENTER_CD 		= S.ENTER_CD 
+					     AND  T.EDU_SEQ 		= S.EDU_SEQ 
+					     AND  T.EDU_EVENT_SEQ 	= S.EDU_EVENT_SEQ 
+					     AND  T.SABUN 			= S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE		= sysdate 
+					            , T.CHKID		= #{ssnSabun} 
+					            , T.MEMO 		= S.MEMO 
+					            , T.MEMO2 		= S.MEMO2 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.EDU_SEQ
+					            , T.EDU_EVENT_SEQ
+					            , T.SABUN
+					            , T.MEMO
+					            , T.MEMO2
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.EDU_SEQ
+					            , S.EDU_EVENT_SEQ
+					            , S.SABUN
+					            , S.MEMO
+					            , S.MEMO2
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+		</update>
+		
+<!-- 	popup YN 저장 -->
+		<update parameterType="map" id="saveEduSurveryPopupYn">
+				<![CDATA[
+						UPDATE TTRA201
+						   SET EDU_SURVEY_YN = 'Y'
+							 , CHKDATE		 = SYSDATE
+							 , CHKID		 = #{ssnSabun}
+					     WHERE ENTER_CD      = TRIM(#{ssnEnterCd})
+					       AND APPL_SEQ      = TRIM(#{searchApplSeq})	 
+				]]>
+		</update>
+		
+</mapper>

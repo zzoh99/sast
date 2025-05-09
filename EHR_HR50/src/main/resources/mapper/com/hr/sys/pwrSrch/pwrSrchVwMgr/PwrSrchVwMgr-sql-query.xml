@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.pwrSrch.">
+		<select parameterType="map" resultType="cMap" id="getPwrSrchVwMgrList">
+
+   					SELECT DISTINCT A.VIEW_CD
+		   					, A.VIEW_NM
+		   					, A.VIEW_DESC
+		   					, A.SEQ
+       				FROM THRI205 A
+ 					WHERE 1=1
+ 					<if test='viewNm != null and !viewNm.equals("")'>
+                    	AND A.VIEW_NM LIKE '%'||TRIM(#{viewNm})||'%'
+					</if>
+	       			ORDER BY A.SEQ
+
+
+		</select>
+		
+		<update parameterType="map" id="saveSysPwrSch">
+
+   					MERGE INTO THRI205 TARGETTABLE
+                  	USING (
+               				SELECT    A.VIEW_CD		AS VIEW_CD
+                            		, A.VIEW_NM		AS VIEW_NM
+                                	, A.SEQ			AS SEQ
+                                	, A.VIEW_DESC	AS VIEW_DESC
+                     		FROM   (
+                               		SELECT    NULL 		AS VIEW_CD
+                                   			, NULL   	AS VIEW_NM
+                                   			, NULL     	AS SEQ
+                              				, NULL		AS VIEW_DESC
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT   
+		                                	<if test='rm.viewCd != null and !rm.viewCd.equals("")'>
+		                    	 				TRIM(REPLACE(#{rm.viewCd},CHR(13),'')) 	AS VIEW_CD
+											</if>
+											<if test='rm.viewCd != null and rm.viewCd.equals("")'>
+		                    	 				TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(VIEW_CD)),0) + ${icnt}) FROM THRI205) )  	AS VIEW_CD
+												<bind name="icnt" value="icnt + 1" />
+											</if>
+                                      		, TRIM(REPLACE(#{rm.viewNm},CHR(13),''))  	AS VIEW_NM
+                                       		, TO_NUMBER( TRIM(REPLACE(#{rm.seq},CHR(13),'')) )  		AS SEQ
+                                       		, TRIM(REPLACE(#{rm.viewDesc},CHR(13),''))	AS VIEW_DESC
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.VIEW_CD IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               TARGETTABLE.VIEW_CD       = SOURCETABLE.VIEW_CD
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.VIEW_NM	= SOURCETABLE.VIEW_NM
+                        			, TARGETTABLE.SEQ    	= SOURCETABLE.SEQ
+                                  	, TARGETTABLE.VIEW_DESC	= SOURCETABLE.VIEW_DESC
+                                  	, TARGETTABLE.CHKDATE	= SYSDATE
+                                  	, TARGETTABLE.CHKID		= #{sabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  TARGETTABLE.VIEW_CD
+               				, TARGETTABLE.VIEW_NM
+               				, TARGETTABLE.SEQ
+               				, TARGETTABLE.VIEW_DESC
+               				, TARGETTABLE.CHKDATE
+               				, TARGETTABLE.CHKID
+               			) 
+               			VALUES 
+               			(
+               				  SOURCETABLE.VIEW_CD
+               				, SOURCETABLE.VIEW_NM
+               				, SOURCETABLE.SEQ
+               				, SOURCETABLE.VIEW_DESC
+               				, SYSDATE
+               				, #{sabun}
+               			)
+
+
+		</update>
+		
+		<insert parameterType="map" id="insertSysPwrSch">
+
+               			INSERT INTO THRI205
+               			(
+               				  VIEW_CD
+               				, VIEW_NM
+               				, SEQ
+               				, VIEW_DESC
+               				, CHKDATE
+               				, CHKID
+               			) 
+               			SELECT 	  A.VIEW_CD
+		               			, A.VIEW_NM
+		               			, A.SEQ
+		               			, A.VIEW_DESC
+		               			, sysdate
+		               			, #{userId}
+		               	FROM (
+		               			SELECT    NULL 	AS VIEW_CD
+		               					, NULL 	AS VIEW_NM
+				               			, NULL 	AS SEQ
+				               			, NULL 	AS VIEW_DESC
+                               	FROM   DUAL
+		<foreach item="rm" collection="insertRows" >
+                  	UNION ALL
+                               	SELECT   
+	                    	 				  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(VIEW_CD)),0) + 1) FROM THRI205) ) AS VIEW_CD
+                                     		, TRIM(REPLACE(#{rm.viewNm},CHR(13),''))  								AS VIEW_NM
+                                      		, TO_NUMBER( TRIM(REPLACE(#{rm.seq},CHR(13),'')) )  					AS SEQ
+                                      		, TRIM(REPLACE(#{rm.viewDesc},CHR(13),''))								AS VIEW_DESC
+                               	FROM   DUAL
+		</foreach>
+							) A
+						WHERE A.VIEW_CD IS NOT NULL
+							
+                     		
+
+
+		</insert>
+		
+		<update parameterType="map" id="updateSysPwrSch">
+
+    				UPDATE THRI205 T SET 
+    				( VIEW_NM, SEQ, VIEW_DESC, CHKDATE, CHKID ) 
+                   	= 
+                   	(   SELECT 	  S.VIEW_NM
+		               			, S.SEQ
+		               			, S.VIEW_DESC
+		               			, SYSDATE
+		               			, #{userId}
+		               	FROM (
+		               			SELECT    NULL 	AS VIEW_CD
+		               					, NULL 	AS VIEW_NM
+				               			, NULL 	AS SEQ
+				               			, NULL 	AS VIEW_DESC
+                               	FROM   DUAL
+		<foreach item="rm" collection="updateRows" >
+                  	UNION ALL
+                               	SELECT   
+                   	 				  	  TRIM(REPLACE(#{rm.viewCd},CHR(13),''))  								AS VIEW_CD
+                   	 				  	, TRIM(REPLACE(#{rm.viewNm},CHR(13),''))  								AS VIEW_NM
+                                		, TO_NUMBER( TRIM(REPLACE(#{rm.seq},CHR(13),'')) )  					AS SEQ
+                           				, TRIM(REPLACE(#{rm.viewDesc},CHR(13),''))								AS VIEW_DESC
+                               	FROM   DUAL
+		</foreach>
+							) S
+						WHERE S.VIEW_CD IS NOT NULL
+                   	) 
+                   	WHERE EXISTS ( SELECT 1 
+                   					FROM (
+			                   				SELECT 	  S.VIEW_CD
+					               			FROM (
+					               					SELECT    NULL 	AS VIEW_CD
+			                               			FROM   DUAL
+					<foreach item="rm" collection="updateRows" >
+			                  			UNION ALL
+			                               			SELECT   
+			                   	 				  	  		  TRIM(REPLACE(#{rm.viewCd},CHR(13),''))	AS VIEW_CD
+			                               			FROM   DUAL
+					</foreach>
+													) S
+											WHERE S.VIEW_CD IS NOT NULL 
+                   						)S
+              						 WHERE T.VIEW_CD = S.VIEW_CD)
+
+
+		</update>
+		
+		<delete parameterType="map" id="deleteSysPwrSch">
+
+   					DELETE FROM THRI205 
+					WHERE
+							VIEW_CD IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+,
+		                                	<if test='rm.viewCd != null and !rm.viewCd.equals("")'>
+		                    	 				TRIM(REPLACE(#{rm.viewCd},CHR(13),''))
+											</if>
+</foreach>
+)
+
+
+
+		</delete>
+		
+		
+
+</mapper>
+

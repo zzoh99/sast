@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.config.wtmLeaveCreStd">
+
+    <!-- 휴가생성기준_연차코드 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreStdLeaveCdMap">
+        SELECT A.GNT_CD AS CODE
+             , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'TWTM041', A.LANGUAGE_CD, #{ssnLocaleCd}), A.GNT_NM) AS CODE_NM
+          FROM TWTM041 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.GNT_GUBUN_CD = '1' -- 연차휴가
+           AND A.BASIC_GNT_CD_YN = 'Y' -- 기본근태코드여부 Y
+    </select>
+
+    <!-- 휴가생성기준_연차코드 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreStdSearchSeqList">
+        SELECT A.SEARCH_SEQ AS CODE
+             , B.SEARCH_DESC AS CODE_NM
+          FROM TWTM011 A
+         INNER JOIN THRI201 B
+            ON B.ENTER_CD = A.ENTER_CD
+           AND B.SEARCH_SEQ = A.SEARCH_SEQ
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.GNT_CD = #{gntCd}
+        <if test='searchSeq != null and !searchSeq.equals("")'>
+            AND A.SEARCH_SEQ = #{searchSeq}
+        </if>
+    </select>
+
+    <!-- 휴가생성기준 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreStdMap">
+        <![CDATA[
+        SELECT A.ENTER_CD
+             , A.GNT_CD
+             , A.SEARCH_SEQ
+             , B.SEARCH_DESC
+             , A.ANNUAL_CRE_TYPE
+             , A.ANNUAL_CRE_JOIN_TYPE
+             , A.FIN_DATE_MONTH
+             , A.FIN_DATE_DAY
+             , A.TOT_DAYS_TYPE
+             , A.REWARD_TYPE
+             , A.NO_CHECK_WORK_RATE_YN
+             , A.AUTO_CRE_U1Y_YN
+             , A.MONTHLY_CRE_TYPE_U1Y
+             , A.ANNUAL_CRE_TYPE_U1Y
+             , A.REWARD_TYPE_U1Y
+             , A.UPBASE_U1Y
+             , A.UNIT_U1Y
+             , A.UPBASE
+             , A.UNIT
+             , A.START_AT_EMP_YMD_U1Y
+          FROM TWTM011 A
+          LEFT JOIN THRI201 B
+            ON A.ENTER_CD = B.ENTER_CD
+           AND A.SEARCH_SEQ = B.SEARCH_SEQ
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+           AND A.GNT_CD = #{gntCd}
+       ]]>
+       <if test='searchSeq != null and !searchSeq.equals("")'>
+           AND A.SEARCH_SEQ = #{searchSeq}
+       </if>
+           AND ROWNUM = 1
+    </select>
+
+    <update parameterType="map" id="saveWtmLeaveCreStdAddSearchSeq">
+        MERGE INTO TWTM011 T
+        USING (
+            SELECT #{ssnEnterCd} AS ENTER_CD
+                 , #{gntCd} AS GNT_CD
+                 , #{searchSeq} AS SEARCH_SEQ
+              FROM DUAL
+        ) S
+        ON (
+                T.ENTER_CD = S.ENTER_CD
+            AND T.GNT_CD = S.GNT_CD
+            AND T.SEARCH_SEQ = S.SEARCH_SEQ
+        )
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                  T.ENTER_CD
+                , T.GNT_CD
+                , T.SEARCH_SEQ
+                , T.CHKDATE
+                , T.CHKID
+            )
+            VALUES
+            (
+                  S.ENTER_CD
+                , S.GNT_CD
+                , S.SEARCH_SEQ
+                , SYSDATE
+                , #{ssnSabun}
+            )
+    </update>
+
+    <update parameterType="map" id="saveWtmLeaveCreStdModifySearchSeq">
+        UPDATE TWTM011
+           SET SEARCH_SEQ = #{searchNewSeq}
+             , CHKDATE = SYSDATE
+             , CHKID = #{ssnSabun}
+         WHERE ENTER_CD = #{ssnEnterCd}
+           AND GNT_CD = #{gntCd}
+           AND SEARCH_SEQ = #{searchSeq}
+    </update>
+
+    <update parameterType="map" id="saveWtmLeaveCreStd">
+        MERGE INTO TWTM011 T
+        USING (
+            SELECT #{ssnEnterCd} AS ENTER_CD
+                 , #{gntCd} AS GNT_CD
+                 , #{searchSeq} AS SEARCH_SEQ
+                 , #{annualCreType} AS ANNUAL_CRE_TYPE
+                 , #{annualCreJoinType} AS ANNUAL_CRE_JOIN_TYPE
+                 , #{finDateMonth} AS FIN_DATE_MONTH
+                 , #{finDateDay} AS FIN_DATE_DAY
+                 , #{totDaysType} AS TOT_DAYS_TYPE
+                 , #{rewardType} AS REWARD_TYPE
+                 , #{noCheckWorkRateYn} AS NO_CHECK_WORK_RATE_YN
+                 , #{autoCreU1yYn} AS AUTO_CRE_U1Y_YN
+                 , #{monthlyCreTypeU1y} AS MONTHLY_CRE_TYPE_U1Y
+                 , #{annualCreTypeU1y} AS ANNUAL_CRE_TYPE_U1Y
+                 , #{rewardTypeU1y} AS REWARD_TYPE_U1Y
+                 , #{upbaseU1y} AS UPBASE_U1Y
+                 , #{unitU1y} AS UNIT_U1Y
+                 , #{upbase} AS UPBASE
+                 , #{unit} AS UNIT
+                 , #{startAtEmpYmdU1y} AS START_AT_EMP_YMD_U1Y
+              FROM DUAL
+        ) S
+        ON (
+                T.ENTER_CD = S.ENTER_CD
+            AND T.GNT_CD = S.GNT_CD
+            AND T.SEARCH_SEQ = S.SEARCH_SEQ
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.ANNUAL_CRE_TYPE = S.ANNUAL_CRE_TYPE
+                     , T.ANNUAL_CRE_JOIN_TYPE = S.ANNUAL_CRE_JOIN_TYPE
+                     , T.FIN_DATE_MONTH = S.FIN_DATE_MONTH
+                     , T.FIN_DATE_DAY = S.FIN_DATE_DAY
+                     , T.TOT_DAYS_TYPE = S.TOT_DAYS_TYPE
+                     , T.REWARD_TYPE = S.REWARD_TYPE
+                     , T.NO_CHECK_WORK_RATE_YN = S.NO_CHECK_WORK_RATE_YN
+                     , T.AUTO_CRE_U1Y_YN = S.AUTO_CRE_U1Y_YN
+                     , T.MONTHLY_CRE_TYPE_U1Y = S.MONTHLY_CRE_TYPE_U1Y
+                     , T.ANNUAL_CRE_TYPE_U1Y = S.ANNUAL_CRE_TYPE_U1Y
+                     , T.REWARD_TYPE_U1Y = S.REWARD_TYPE_U1Y
+                     , T.UPBASE_U1Y = S.UPBASE_U1Y
+                     , T.UNIT_U1Y = S.UNIT_U1Y
+                     , T.UPBASE = S.UPBASE
+                     , T.UNIT = S.UNIT
+                     , T.START_AT_EMP_YMD_U1Y = S.START_AT_EMP_YMD_U1Y
+                     , T.CHKDATE = SYSDATE
+                     , T.CHKID = #{ssnSabun}
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                  T.ENTER_CD
+                , T.GNT_CD
+                , T.SEARCH_SEQ
+                , T.ANNUAL_CRE_TYPE
+                , T.ANNUAL_CRE_JOIN_TYPE
+                , T.FIN_DATE_MONTH
+                , T.FIN_DATE_DAY
+                , T.TOT_DAYS_TYPE
+                , T.REWARD_TYPE
+                , T.NO_CHECK_WORK_RATE_YN
+                , T.AUTO_CRE_U1Y_YN
+                , T.MONTHLY_CRE_TYPE_U1Y
+                , T.ANNUAL_CRE_TYPE_U1Y
+                , T.REWARD_TYPE_U1Y
+                , T.UPBASE_U1Y
+                , T.UNIT_U1Y
+                , T.UPBASE
+                , T.UNIT
+                , T.START_AT_EMP_YMD_U1Y
+                , T.CHKDATE
+                , T.CHKID
+            )
+            VALUES
+            (
+                  S.ENTER_CD
+                , S.GNT_CD
+                , S.SEARCH_SEQ
+                , S.ANNUAL_CRE_TYPE
+                , S.ANNUAL_CRE_JOIN_TYPE
+                , S.FIN_DATE_MONTH
+                , S.FIN_DATE_DAY
+                , S.TOT_DAYS_TYPE
+                , S.REWARD_TYPE
+                , S.NO_CHECK_WORK_RATE_YN
+                , S.AUTO_CRE_U1Y_YN
+                , S.MONTHLY_CRE_TYPE_U1Y
+                , S.ANNUAL_CRE_TYPE_U1Y
+                , S.REWARD_TYPE_U1Y
+                , S.UPBASE_U1Y
+                , S.UNIT_U1Y
+                , S.UPBASE
+                , S.UNIT
+                , S.START_AT_EMP_YMD_U1Y
+                , SYSDATE
+                , #{ssnSabun}
+            )
+    </update>
+
+    <delete parameterType="map" id="deleteWtmLeaveCreStd">
+        DELETE FROM TWTM011
+         WHERE ENTER_CD = #{ssnEnterCd}
+           AND GNT_CD = #{gntCd}
+           AND SEARCH_SEQ = #{searchSeq}
+    </delete>
+
+    <!-- 전체 휴가생성기준 조회 -->
+    <select parameterType="map" resultType="cMap" id="getWtmLeaveCreStdAllList">
+        SELECT A.ENTER_CD
+             , A.GNT_CD
+             , A.SEARCH_SEQ
+             , A.ANNUAL_CRE_TYPE
+             , A.ANNUAL_CRE_JOIN_TYPE
+             , A.FIN_DATE_MONTH
+             , A.FIN_DATE_DAY
+             , A.TOT_DAYS_TYPE
+             , A.REWARD_TYPE
+             , A.NO_CHECK_WORK_RATE_YN
+             , A.AUTO_CRE_U1Y_YN
+             , A.MONTHLY_CRE_TYPE_U1Y
+             , A.ANNUAL_CRE_TYPE_U1Y
+             , A.REWARD_TYPE_U1Y
+             , A.UPBASE_U1Y
+             , A.UNIT_U1Y
+             , A.UPBASE
+             , A.UNIT
+             , A.START_AT_EMP_YMD_U1Y
+          FROM TWTM011 A
+         WHERE A.ENTER_CD = #{ssnEnterCd}
+    </select>
+</mapper>

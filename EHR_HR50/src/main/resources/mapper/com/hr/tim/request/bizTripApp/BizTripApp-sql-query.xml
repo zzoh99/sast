@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.bizTripApp">
+<!-- 해외출장신청/보고서 신청 내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripAppList">
+
+				<![CDATA[
+				    SELECT A.ENTER_CD
+					     , A.APPL_SEQ
+					     , A.SABUN
+					     , A.BIZ_SDATE
+					     , A.BIZ_EDATE
+					     , A.BIZ_DAYS
+					     , A.BIZ_PURPOSE
+						
+                            , (    SELECT LISTAGG(F_COM_GET_NAMES(ENTER_CD, EMP_SABUN), ',') WITHIN GROUP (ORDER BY F_COM_JIKJE_SORT(ENTER_CD, EMP_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+						          FROM TTIM852
+						         WHERE ENTER_CD   = A.ENTER_CD
+						           AND APPL_SEQ   = A.APPL_SEQ
+						  ) AS BIZ_SABUNS
+						  
+						 , B.APPL_YMD
+						 , B.APPL_STATUS_CD
+						 , B.AGREE_YMD
+						 , B.AGREE_YMD
+						 , B.APPL_SABUN
+						 , B.APPL_IN_SABUN
+						
+						 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">' || DECODE(#{ssnLocaleCd}, NULL, '삭제', NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', '113460'), '삭제')) || '</a>', '') AS BTN_DEL
+						 , 0 AS DETAIL
+						 
+						 
+						 , D.APPL_SEQ 		AS APPL_SEQ2
+						 , D.APPL_YMD		AS APPL_YMD2
+						 , D.APPL_SABUN		AS APPL_SABUN2
+						 , D.APPL_IN_SABUN 	AS APPL_IN_SABUN2
+						 , D.APPL_STATUS_CD	AS APPL_STATUS_CD2
+						 
+					     , CASE WHEN D.APPL_STATUS_CD = '11' THEN '<a class="sbasic">' || DECODE(#{ssnLocaleCd}, NULL, '삭제', NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', '113460'), '삭제')) || '</a>'
+							    ELSE '' END AS BTN_DEL2
+							    
+					     , CASE WHEN B.APPL_STATUS_CD <> '99' THEN ''
+					            WHEN D.RNUM <> 1 THEN ''
+					            WHEN D.APPL_SEQ IS NULL OR D.APPL_STATUS_CD IN ('23', '33') THEN '<a class="btn thinner filled">' || DECODE(#{ssnLocaleCd}, NULL, '신청', NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', 'appComLayout', #{ssnLocaleCd}), '신청')) || '</a>'
+							    ELSE '' END AS BTN_APP2
+						 
+						 , CASE WHEN D.APPL_SEQ IS NULL THEN '1' ELSE '0' END AS DETAIL2
+						 
+					  FROM TTIM851 A, THRI103 B
+				         , ( SELECT X.BF_APPL_SEQ, Y.*  --근태취소신청내역 
+				                  , ROW_NUMBER()OVER(PARTITION BY X.ENTER_CD, X.BF_APPL_SEQ ORDER BY Y.APPL_SEQ DESC ) AS RNUM
+				               FROM TTIM851 X, THRI103 Y
+				              WHERE X.ENTER_CD     = #{ssnEnterCd}
+				                AND X.ENTER_CD     = Y.ENTER_CD
+				                AND X.APPL_SEQ     = Y.APPL_SEQ
+				                AND X.SABUN        = TRIM( #{searchSabun} )
+					            AND Y.APPL_CD      = '128' --해외출장보고서
+				           ) D
+					 WHERE A.ENTER_CD   = #{ssnEnterCd}
+					   AND A.SABUN      = #{searchSabun}
+					   AND A.ENTER_CD   = B.ENTER_CD
+					   AND A.APPL_SEQ   = B.APPL_SEQ
+					   AND B.APPL_CD    = '126'  -- 해외출장신청
+                       AND A.ENTER_CD   = D.ENTER_CD(+)
+                       AND A.APPL_SEQ   = D.BF_APPL_SEQ(+)
+					 ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC, D.RNUM
+				]]>
+
+
+		</select>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteBizTripApp">
+
+					DELETE FROM TTIM851
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<choose>
+		<when test='rm.delGubun != null and rm.delGubun.equals("1")'>
+			<if test='rm.applSeq != null and !rm.applSeq.equals("")'>
+						,TRIM(#{rm.applSeq})
+			</if>
+		</when>
+		<otherwise>
+			<if test='rm.applSeq2 != null and !rm.applSeq2.equals("")'>
+						,TRIM(#{rm.applSeq2})
+			</if>
+		</otherwise>
+	</choose>
+</foreach>
+						)
+		</delete>
+
+		<delete parameterType="map" id="deleteBizTripApp2">
+
+					DELETE FROM TTIM852
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<choose><when test='rm.delGubun != null and rm.applSeq.equals("1")'>
+		<if test='rm.applSeq != null and !rm.applSeq.equals("")'>
+						,TRIM(#{rm.applSeq})
+		</if>
+	</when><otherwise>
+		<if test='rm.applSeq2 != null and !rm.applSeq2.equals("")'>
+						,TRIM(#{rm.applSeq2})
+		</if>
+	</otherwise>
+	</choose>
+</foreach>
+						)
+		</delete>
+				
+		<delete parameterType="map" id="deleteBizTripApp3">
+
+					DELETE FROM TTIM853
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<choose><when test='rm.delGubun != null and rm.applSeq.equals("1")'>
+		<if test='rm.applSeq != null and !rm.applSeq.equals("")'>
+						,TRIM(#{rm.applSeq})
+		</if>
+</when><otherwise>
+		<if test='rm.applSeq2 != null and !rm.applSeq2.equals("")'>
+						,TRIM(#{rm.applSeq2})
+		</if>
+	</otherwise>
+	</choose>
+</foreach>
+						)
+		</delete>
+
+		<delete parameterType="map" id="deleteBizTripApp4">
+
+					DELETE FROM TTIM854
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<choose><when test='rm.delGubun != null and rm.applSeq.equals("1")'>
+		<if test='rm.applSeq != null and !rm.applSeq.equals("")'>
+						,TRIM(#{rm.applSeq})
+		</if>
+</when><otherwise>
+		<if test='rm.applSeq2 != null and !rm.applSeq2.equals("")'>
+						,TRIM(#{rm.applSeq2})
+		</if>
+	</otherwise>
+	</choose>
+</foreach>
+						)
+		</delete>
+				
+
+</mapper>

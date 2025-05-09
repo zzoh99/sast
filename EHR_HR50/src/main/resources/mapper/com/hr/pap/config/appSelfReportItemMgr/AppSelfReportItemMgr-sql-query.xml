@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appSelfReportItemMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfReportItemMgrList">
+
+				<![CDATA[
+					  SELECT A.APPRAISAL_CD
+					        ,A.ITEM_CD
+					        ,A.ITEM_NM
+					        ,CASE
+					            WHEN (SELECT COUNT (*)
+					                    FROM TPAP107
+				                   	   WHERE ENTER_CD = A.ENTER_CD
+				                         AND APPRAISAL_CD = A.APPRAISAL_CD
+				                         AND ITEM_CD = A.ITEM_CD
+				                      ) = 0
+					            THEN
+					               1
+					            ELSE
+					               0
+					         END	AS VALUE
+					        ,A.SUNBUN
+					        ,'0' AS DETAIL
+					    FROM TPAP106 A
+					   WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   ]]>
+					   <if test='searchAppraisalCd != null and !searchAppraisalCd.equals("")'>
+					     AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   </if>
+					ORDER BY A.SUNBUN
+
+		</select>
+		
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSelfReportItemMgrValuePopList">
+
+				<![CDATA[
+					  SELECT   B.APPRAISAL_CD
+					          ,B.ITEM_CD
+					          ,B.VALUE_CD
+					          ,B.VALUE_NM
+					          ,B.SUNBUN
+					  FROM     TPAP106 A
+					          ,TPAP107 B
+					  WHERE    A.ENTER_CD = B.ENTER_CD
+					  AND      A.APPRAISAL_CD = B.APPRAISAL_CD
+					  AND      A.ITEM_CD = B.ITEM_CD
+					  AND      A.ENTER_CD = #{ssnEnterCd}
+					  AND      B.APPRAISAL_CD = #{searchAppraisalCd}
+					  AND      B.ITEM_CD = #{searchItemCd}
+					  ORDER BY B.SUNBUN
+				]]>
+
+
+		</select>
+		
+		
+		
+		
+		
+		
+		
+		
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveAppSelfReportItemMgr">
+
+					MERGE INTO TPAP106 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.ITEM_CD
+									, A.ITEM_NM
+									, A.SUNBUN
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD    
+											, NULL	AS APPRAISAL_CD
+											, NULL	AS ITEM_CD     
+											, NULL	AS ITEM_NM     
+											, NULL	AS SUNBUN      
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	AS APPRAISAL_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.itemCd != null and !rm.itemCd.equals("")'>
+											, TRIM(#{rm.itemCd}) 			AS ITEM_CD
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+											, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(ITEM_CD)),0) + ${icnt}) FROM TPAP106
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND   APPRAISAL_CD = #{rm.appraisalCd}
+												) )	AS ITEM_CD
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM( #{rm.itemNm     })	AS ITEM_NM
+											, TRIM( #{rm.sunbun     })	AS SUNBUN
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		    = S.ENTER_CD 
+					AND  T.APPRAISAL_CD		= S.APPRAISAL_CD
+					AND  T.ITEM_CD		    = S.ITEM_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	     
+									  T.ITEM_NM    	    = S.ITEM_NM   
+									, T.SUNBUN    	    = S.SUNBUN   
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD    
+   							, T.APPRAISAL_CD
+   							, T.ITEM_CD     
+   							, T.ITEM_NM     
+   							, T.SUNBUN      
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+ 							  S.ENTER_CD    
+ 							, S.APPRAISAL_CD
+ 							, S.ITEM_CD     
+ 							, S.ITEM_NM     
+ 							, S.SUNBUN      
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppSelfReportItemMgr">
+
+					DELETE FROM TPAP106 
+					WHERE 	(ENTER_CD,APPRAISAL_CD,ITEM_CD) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											, TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.itemCd != null and !rm.itemCd.equals("")'>
+											, TRIM( #{rm.itemCd} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+		
+		<!-- 		저장 -->	
+		<update parameterType="map" id="saveAppSelfReportItemMgrValuePop">
+
+					MERGE INTO TPAP107 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.ITEM_CD
+									, A.VALUE_CD
+									, A.VALUE_NM
+									, A.SUNBUN
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD    
+											, NULL	AS APPRAISAL_CD
+											, NULL	AS ITEM_CD     
+											, NULL	AS VALUE_CD    
+											, NULL	AS VALUE_NM    
+											, NULL	AS SUNBUN      
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	            AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	AS APPRAISAL_CD
+											, TRIM( #{rm.itemCd} )	    AS ITEM_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.valueCd != null and !rm.valueCd.equals("")'>
+											, TRIM(#{rm.valueCd}) 			AS VALUE_CD
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when>
+											<otherwise>
+											, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(VALUE_CD)),0) + ${icnt})
+														FROM    TPAP107 
+														WHERE   ENTER_CD = #{ssnEnterCd}
+														AND     APPRAISAL_CD = #{rm.appraisalCd}
+														AND     ITEM_CD      = #{rm.itemCd}  ) )	AS VALUE_CD
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM( #{rm.valueNm})	    AS VALUE_NM
+											, TRIM( #{rm.sunbun})	    AS SUNBUN
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD 
+					AND  T.APPRAISAL_CD = S.APPRAISAL_CD
+					AND  T.ITEM_CD      = S.ITEM_CD
+					AND  T.VALUE_CD     = S.VALUE_CD 
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	     
+									  T.VALUE_NM    	= S.VALUE_NM   
+									, T.SUNBUN      	= S.SUNBUN     
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD    
+   							, T.APPRAISAL_CD
+   							, T.ITEM_CD     
+   							, T.VALUE_CD    
+   							, T.VALUE_NM    
+   							, T.SUNBUN      
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+ 							  S.ENTER_CD    
+ 							, S.APPRAISAL_CD
+ 							, S.ITEM_CD     
+ 							, S.VALUE_CD    
+ 							, S.VALUE_NM    
+ 							, S.SUNBUN      
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppSelfReportItemMgrValuePop">
+
+					DELETE FROM TPAP107 
+					WHERE 	(ENTER_CD,APPRAISAL_CD,ITEM_CD,VALUE_CD) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											, TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.itemCd != null and !rm.itemCd.equals("")'>
+											, TRIM( #{rm.itemCd} )
+										</if>
+										<if test='rm.valueCd != null and !rm.valueCd.equals("")'>
+											, TRIM( #{rm.valueCd} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+		
+		
+		
+		<!-- 		저장 -->	
+		<update parameterType="map" id="saveAppSelfReportItemMgrCopyPop1">
+
+				<![CDATA[
+					INSERT INTO TPAP106 T
+					(
+                              ENTER_CD
+							, APPRAISAL_CD
+							, ITEM_CD
+                            , ITEM_NM
+                            , SUNBUN
+                            , CHKDATE
+                            , CHKID
+					)
+					SELECT	  A.ENTER_CD
+							, #{tgtAppraisalCd}
+							, A.ITEM_CD
+							, A.ITEM_NM
+							, A.SUNBUN
+							, SYSDATE
+							, #{ssnSabun}
+					FROM	TPAP106 A
+					WHERE   A.ENTER_CD = #{ssnEnterCd}
+					AND     A.APPRAISAL_CD = #{orgnAppraisalCd}
+				
+				]]>
+
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppSelfReportItemMgrCopyPop1">
+
+				<![CDATA[
+					DELETE FROM TPAP106 
+					WHERE 	ENTER_CD       =    #{ssnEnterCd}
+					AND     APPRAISAL_CD   = 	#{tgtAppraisalCd}
+				]]>
+
+		</delete>
+		
+		<!-- 		저장 -->	
+		<update parameterType="map" id="saveAppSelfReportItemMgrCopyPop2">
+
+				<![CDATA[ 
+					INSERT INTO TPAP107 T
+					(
+						  ENTER_CD
+						, APPRAISAL_CD
+						, ITEM_CD
+						, VALUE_CD
+						, VALUE_NM
+						, SUNBUN
+						, CHKDATE
+						, CHKID
+					)
+					SELECT	  A.ENTER_CD    
+							, #{tgtAppraisalCd}
+							, A.ITEM_CD     
+							, A.VALUE_CD    
+							, A.VALUE_NM    
+							, A.SUNBUN      
+							, SYSDATE     
+							, #{ssnSabun}
+					FROM      TPAP107 A
+					WHERE   A.ENTER_CD = #{ssnEnterCd}
+					AND     A.APPRAISAL_CD = #{orgnAppraisalCd}
+				]]>
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppSelfReportItemMgrCopyPop2">
+
+				<![CDATA[
+					DELETE FROM TPAP107 
+					WHERE 	ENTER_CD       =    #{ssnEnterCd}
+					AND     APPRAISAL_CD   = 	#{tgtAppraisalCd}
+				]]>
+
+		</delete>
+		
+		
+		
+		
+<!-- 		생성 -->	
+		<insert parameterType="map" id="insertAppSelfReportItemMgr">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  PRG_CD       
+							, PRG_NM       
+							, PRG_ENG_NM   
+							, PRG_PATH     
+							, USE          
+							, VERSION      
+							, MEMO         
+							, DATE_TRACK_YN
+							, LOG_SAVE_YN  
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.PRG_CD       
+								, S.PRG_NM       
+								, S.PRG_ENG_NM   
+								, S.PRG_PATH     
+								, S.USE          
+								, S.VERSION      
+								, S.MEMO         
+								, S.DATE_TRACK_YN
+								, S.LOG_SAVE_YN  
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS PRG_CD       
+										, NULL 	AS PRG_NM       
+										, NULL 	AS PRG_ENG_NM   
+										, NULL 	AS PRG_PATH     
+										, NULL 	AS USE          
+										, NULL 	AS VERSION      
+										, NULL 	AS MEMO         
+										, NULL 	AS DATE_TRACK_YN
+										, NULL 	AS LOG_SAVE_YN
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TRIM( #{rm.prgCd})	AS PRG_CD
+										, TRIM( #{rm.prgNm})	AS PRG_NM
+										, TRIM( #{rm.prgEngNm})	AS PRG_ENG_NM
+										, TRIM( #{rm.prgPath})	AS PRG_PATH
+										, TRIM( #{rm.use})	AS USE
+										, TRIM( #{rm.version})	AS VERSION
+										, TRIM( #{rm.memo})	AS MEMO
+										, TRIM( #{rm.dateTrackYn})	AS DATE_TRACK_Y
+										, TRIM( #{rm.logSaveYn})	AS LOG_SAVE_YN
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.PRG_CD IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppSelfReportItemMgr">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET 
+					( COL1, COL2, COL3, COL4, CHKDATE, CHKID ) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT   
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+
+</mapper>

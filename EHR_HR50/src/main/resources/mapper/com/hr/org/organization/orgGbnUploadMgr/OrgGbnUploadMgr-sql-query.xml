@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.orgGbnUploadMgr">
+<!-- 		조직구분업로드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgGbnUploadMgrList">
+
+				<![CDATA[
+
+				SELECT  T1.ENTER_CD AS ENTER_CD                                        /*-- 회사구분(TORG900)*/
+				      , T1.ORG_CD AS ORG_CD                                            /*-- 조직코드(TORG101)*/
+				      , F_COM_GET_ORG_NM(T1.ENTER_CD, T1.ORG_CD, T1.SDATE, #{ssnLocaleCd}) AS ORG_NM                                            /*-- 조직코드(TORG101)*/
+				      , T1.MAP_TYPE_CD AS MAP_TYPE_CD                                  /*-- 조직맵핑구분코드(W20020)*/
+				      , T1.MAP_CD AS MAP_CD                                            /*-- 조직맵핑코드(TORG109)*/
+				      , B.MAP_NM
+				      , T1.SDATE AS SDATE                                              /*-- 시작일자*/
+				      , T1.EDATE AS EDATE                                              /*-- 종료일자*/
+				      , T1.CHKDATE AS CHKDATE                                          /*-- 최종수정시간*/
+				      , T1.CHKID AS CHKID                                              /*-- 최종수정자*/
+				      ,REPLACE( F_COM_GET_ORG_PATH_NM(#{ssnEnterCd}, '', T1.ORG_CD, T1.SDATE), '|', ' > ') AS ORG_PATH
+				 FROM   TORG107 T1    /*-- 조직맵핑(TABLE)*/
+				    , ( SELECT ENTER_CD, MAP_TYPE_CD, MAP_CD, MAP_NM, SDATE, EDATE FROM TORG109
+                              UNION ALL
+                              SELECT ENTER_CD,'900' AS MAP_TYPE_CD,JOB_CD AS MAP_CD, JOB_NM AS  MAP_NM, SDATE, EDATE FROM TORG201)  B
+				      , TORG101 T2    /*-- 조직기본관리(TABLE)*/
+				 WHERE  T1.ENTER_CD = TRIM(#{ssnEnterCd})                      			/*-- 회사구분(TORG900)*/
+				   AND T1.ENTER_CD = B.ENTER_CD
+				   AND T1.MAP_TYPE_CD = B.MAP_TYPE_CD
+				   AND T1.MAP_CD = B.MAP_CD
+				 ]]>
+<if test='searchMapTypeCd != null and !searchMapTypeCd.equals("") '>
+				   AND  T1.MAP_TYPE_CD LIKE '%'||TRIM(#{searchMapTypeCd})||'%'			/*-- 조직맵핑구분코드(W20020)*/
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("") '>
+				   AND  T2.ORG_NM LIKE '%'||TRIM(#{searchOrgNm})||'%'
+</if>
+<if test='searchMapNm != null and !searchMapNm.equals("") '>
+				   AND  (SELECT MAP_NM
+				   		   FROM TORG109 I1
+				   		  WHERE ENTER_CD = T1.ENTER_CD
+				   		    AND MAP_TYPE_CD = T1.MAP_TYPE_CD
+				   		    AND MAP_CD = T1.MAP_CD
+					        AND SDATE = (SELECT MAX (SDATE) FROM TORG109
+						                   WHERE ENTER_CD = I1.ENTER_CD
+						                     AND MAP_TYPE_CD = I1.MAP_TYPE_CD
+						                     AND MAP_CD = I1.MAP_CD
+						                     AND T1.SDATE BETWEEN SDATE AND NVL(EDATE,'99991231'))
+				   		    ) LIKE '%'||TRIM(#{searchMapNm})||'%'
+</if>
+				   AND  T1.ENTER_CD = T2.ENTER_CD(+)
+				   AND  T1.ORG_CD = T2.ORG_CD(+)
+				   AND  T1.SDATE BETWEEN T2.SDATE(+) AND NVL(T2.EDATE(+),'99991231')
+				ORDER BY T1.ORG_CD, T1.MAP_TYPE_CD, T1.SDATE DESC
+
+
+
+		</select>
+
+<!-- 		조직구분업로드 저장 -->
+		<update parameterType="map" id="saveOrgGbnUploadMgrFirst">
+
+					MERGE INTO TORG107 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.ORG_CD
+									, A.MAP_TYPE_CD
+									, A.MAP_CD
+									, A.SDATE
+									, A.EDATE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORG_CD
+											, NULL		AS MAP_TYPE_CD
+											, NULL		AS MAP_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.orgCd} )		AS ORG_CD
+											, TRIM( #{rm.mapTypeCd})	AS MAP_TYPE_CD
+											, TRIM( #{rm.mapCd})		AS MAP_CD
+											, TRIM( #{rm.sdate} )		AS SDATE
+											, TRIM( #{rm.edate} )		AS EDATE
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.ORG_CD = S.ORG_CD AND T.MAP_TYPE_CD = S.MAP_TYPE_CD AND T.MAP_CD = S.MAP_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET
+								   T.EDATE = S.EDATE
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.ORG_CD
+							, T.MAP_TYPE_CD
+							, T.MAP_CD
+							, T.SDATE
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.ORG_CD
+							, S.MAP_TYPE_CD
+							, S.MAP_CD
+							, S.SDATE
+                            , S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		조직구분업로드 저장 -->
+		<update parameterType="map" id="saveOrgGbnUploadMgrSecond">
+
+					MERGE INTO TORG107 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.ORG_CD
+									, A.MAP_TYPE_CD
+									, A.MAP_CD
+									, A.SDATE
+									, A.EDATE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS ORG_CD
+											, NULL		AS MAP_TYPE_CD
+											, NULL		AS MAP_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+									FROM	DUAL
+	<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+										SELECT	ENTER_CD, ORG_CD, MAP_TYPE_CD, MAP_CD, SDATE
+										     ,  NVL( TO_CHAR(TO_DATE ( LAG(SDATE) OVER ( ORDER BY ORG_CD, MAP_TYPE_CD, SDATE DESC), 'YYYYMMDD') -1, 'YYYYMMDD'), '99991231') AS EDATE
+										  FROM  TORG107
+										 WHERE  ENTER_CD    = #{ssnEnterCd}
+										   AND  ORG_CD      = TRIM( #{rm.orgCd} )
+										   AND  MAP_TYPE_CD = TRIM( #{rm.mapTypeCd})
+	</foreach>
+	<foreach item="rm" collection="deleteRows" >
+								UNION ALL
+										SELECT	ENTER_CD, ORG_CD, MAP_TYPE_CD, MAP_CD, SDATE
+										     ,  NVL( TO_CHAR(TO_DATE ( LAG(SDATE) OVER ( ORDER BY ORG_CD, MAP_TYPE_CD, SDATE DESC), 'YYYYMMDD') -1, 'YYYYMMDD'), '99991231') AS EDATE
+										  FROM  TORG107
+										 WHERE  ENTER_CD    = #{ssnEnterCd}
+										   AND  ORG_CD      = TRIM( #{rm.orgCd} )
+										   AND  MAP_TYPE_CD = TRIM( #{rm.mapTypeCd})
+	</foreach>
+									) A WHERE A.MAP_TYPE_CD IS NOT NULL
+										  AND A.MAP_CD IS NOT NULL
+									      AND A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.ORG_CD = S.ORG_CD AND T.MAP_TYPE_CD = S.MAP_TYPE_CD AND T.MAP_CD = S.MAP_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET
+								   T.EDATE = S.EDATE
+		</update>
+<!-- 		조직구분업로드 삭제 -->
+		<delete parameterType="map" id="deleteOrgGbnUploadMgr">
+
+
+					DELETE FROM TORG107
+					WHERE ENTER_CD||'_'||ORG_CD||'_'||MAP_TYPE_CD||'_'||MAP_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.orgCd != null and !rm.orgCd.equals("") and rm.mapTypeCd != null and !rm.mapTypeCd.equals("") and rm.mapCd != null and !rm.mapCd.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.orgCd})||'_'||TRIM(#{rm.mapTypeCd})||'_'||TRIM(#{rm.mapCd})||'_'||TRIM(#{rm.sdate})
+							</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

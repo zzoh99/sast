@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appGradeRateStd">
+
+
+		<update parameterType="map" id="saveAppGradeRateStd">
+
+						MERGE INTO TPAP219 T
+						USING (
+						       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+						            , SYSDATE AS CHKDATE
+						            , #{ssnSabun} AS CHKID
+						            , APPRAISAL_CD
+						            , ORG_GRADE_CD
+						            , ORG_INWON
+						            , NOTE
+						         FROM (
+						               SELECT NULL AS APPRAISAL_CD
+						                    , NULL AS ORG_GRADE_CD
+						                    , NULL AS ORG_INWON
+						                    , NULL AS NOTE
+						                 FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+						                UNION ALL
+						               SELECT TRIM(#{rm.appraisalCd}) AS APPRAISAL_CD
+						                    , TRIM(#{rm.orgGradeCd}) AS ORG_GRADE_CD
+						                    , TRIM(#{rm.orgInwon}) AS ORG_INWON
+						                    , TRIM(#{rm.note}) AS NOTE
+						                 FROM DUAL
+</foreach>
+						              )
+						        WHERE APPRAISAL_CD IS NOT NULL
+						          AND ORG_GRADE_CD IS NOT NULL
+						          AND ORG_INWON    IS NOT NULL
+						      ) S
+						   ON (
+						              T.ENTER_CD     = S.ENTER_CD
+						          AND T.APPRAISAL_CD = S.APPRAISAL_CD
+						          AND T.ORG_GRADE_CD = S.ORG_GRADE_CD
+						          AND T.ORG_INWON    = S.ORG_INWON
+						      )
+						WHEN MATCHED THEN
+						     UPDATE SET
+						              T.CHKDATE         = S.CHKDATE
+						            , T.CHKID           = S.CHKID
+						            , T.NOTE            = S.NOTE
+						WHEN NOT MATCHED THEN
+						     INSERT (
+						              T.ENTER_CD
+						            , T.APPRAISAL_CD
+						            , T.ORG_GRADE_CD
+						            , T.ORG_INWON
+						            , T.NOTE
+						            , T.CHKDATE
+						            , T.CHKID
+						     ) VALUES (
+						              S.ENTER_CD
+						            , S.APPRAISAL_CD
+						            , S.ORG_GRADE_CD
+						            , S.ORG_INWON
+						            , S.NOTE
+						            , S.CHKDATE
+						            , S.CHKID
+						)
+		</update>
+
+		<delete parameterType="map" id="deleteAppGradeRateStd">
+
+					DELETE FROM TPAP219
+					 WHERE (ENTER_CD, APPRAISAL_CD, ORG_GRADE_CD, ORG_INWON) IN ((NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+		<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+			<if test='rm.orgGradeCd != null and !rm.orgGradeCd.equals("")'>
+				<if test='rm.orgInwon != null and !rm.orgInwon.equals("")'>
+					            , ( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.appraisalCd} ) , TRIM( #{rm.orgGradeCd}) , TRIM( #{rm.orgInwon}) )
+				</if>
+			</if>
+		</if>
+	</if>
+</foreach>
+					       )
+		</delete>
+ 
+		<select parameterType="map" resultType="cMap" id="getAppGradeRateStdList">
+
+				<![CDATA[
+					SELECT T.*
+					     , C.NOTE
+					  FROM (
+					            SELECT A.ENTER_CD
+					                 , A.APPRAISAL_CD
+					                 , A.ORG_GRADE_CD
+					                 , A.ORG_INWON
+					                 , LISTAGG(A.CNT, '@')     WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON, B.SEQ) CNT_ARR
+					                 , LISTAGG(A.MIN_CNT, '@') WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON, B.SEQ) MIN_CNT_ARR
+					                 , LISTAGG(A.MAX_CNT, '@') WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON, B.SEQ) MAX_CNT_ARR
+					              FROM TPAP218 A
+					                 , TPAP217 B
+					             WHERE A.ENTER_CD     = B.ENTER_CD
+					               AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					               AND A.APP_CLASS_CD = B.APP_CLASS_CD
+					               AND A.ENTER_CD     = TRIM( #{ssnEnterCd} )
+					               AND A.APPRAISAL_CD = TRIM( #{searchAppraisalCd} )
+					             ]]>
+					<if test='searchOrgGradeCd != null and !searchOrgGradeCd.equals("")'>
+					               AND A.ORG_GRADE_CD = TRIM( #{searchOrgGradeCd} )
+					</if>
+					             GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON
+					       ) T
+					     , TPAP219 C
+					 WHERE T.ENTER_CD     = C.ENTER_CD(+)
+					   AND T.APPRAISAL_CD = C.APPRAISAL_CD(+)
+					   AND T.ORG_GRADE_CD = C.ORG_GRADE_CD(+)
+					   AND T.ORG_INWON    = C.ORG_INWON(+)
+					 ORDER BY T.ORG_GRADE_CD
+					        , CAST(T.ORG_INWON AS NUMBER) /*DESC*/
+
+		</select>
+
+		<update parameterType="map" id="saveAppGradeRateStdForTPAP218">
+
+					MERGE INTO TPAP218 T
+					USING (
+					        SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					             , SYSDATE AS CHKDATE
+					             , #{ssnSabun} AS CHKID
+					             , APPRAISAL_CD
+					             , ORG_GRADE_CD
+					             , ORG_INWON
+					             , APP_CLASS_CD
+					             , CNT
+					             , MIN_CNT
+					             , MAX_CNT
+					          FROM (
+					                 SELECT NULL AS APPRAISAL_CD
+					                      , NULL AS ORG_GRADE_CD
+					                      , NULL AS ORG_INWON
+					                      , NULL AS APP_CLASS_CD
+					                      , NULL AS CNT
+					                      , NULL AS MIN_CNT
+					                      , NULL AS MAX_CNT
+					                   FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+	<foreach item="appClassCd" collection="saveClassList" index="index">
+					                  UNION ALL
+					                 SELECT TRIM(#{rm.appraisalCd}) AS APPRAISAL_CD
+					                      , TRIM(#{rm.orgGradeCd}) AS ORG_GRADE_CD
+					                      , TRIM(#{rm.orgInwon}) AS ORG_INWON
+					                      , TRIM(#{appClassCd}) AS APP_CLASS_CD
+					                      , TRIM(#{rm.appClassCd_${index+1}}) AS CNT
+					                      , TRIM(#{rm.appClassCd_min_${index+1}}) AS MIN_CNT
+					                      , TRIM(#{rm.appClassCd_max_${index+1}}) AS MAX_CNT
+					                   FROM DUAL
+	</foreach>
+</foreach>
+					               )
+					         WHERE APPRAISAL_CD IS NOT NULL
+					           AND ORG_GRADE_CD IS NOT NULL
+					           AND ORG_INWON IS NOT NULL
+					           AND APP_CLASS_CD IS NOT NULL
+					      ) S
+					   ON (
+					               T.ENTER_CD     = S.ENTER_CD
+					           AND T.APPRAISAL_CD = S.APPRAISAL_CD
+					           AND T.ORG_GRADE_CD = S.ORG_GRADE_CD
+					           AND T.ORG_INWON    = S.ORG_INWON
+					           AND T.APP_CLASS_CD = S.APP_CLASS_CD
+					      )
+					WHEN MATCHED THEN
+					     UPDATE SET
+					               T.CHKDATE      = S.CHKDATE
+					             , T.CHKID        = S.CHKID
+					             , T.CNT          = S.CNT
+					             , T.MIN_CNT      = S.MIN_CNT
+					             , T.MAX_CNT      = S.MAX_CNT
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					               T.ENTER_CD
+					             , T.APPRAISAL_CD
+					             , T.ORG_GRADE_CD
+					             , T.ORG_INWON
+					             , T.APP_CLASS_CD
+					             , T.CNT
+					             , T.MIN_CNT
+					             , T.MAX_CNT
+					             , T.CHKDATE
+					             , T.CHKID
+					     ) VALUES (
+					               S.ENTER_CD
+					             , S.APPRAISAL_CD
+					             , S.ORG_GRADE_CD
+					             , S.ORG_INWON
+					             , S.APP_CLASS_CD
+					             , S.CNT
+					             , S.MIN_CNT
+					             , S.MAX_CNT
+					             , S.CHKDATE
+					             , S.CHKID
+					     )
+		</update>
+
+		<delete parameterType="map" id="deleteAppGradeRateStdForTPAP218">
+
+					DELETE FROM TPAP218
+					 WHERE (ENTER_CD, APPRAISAL_CD, ORG_GRADE_CD, ORG_INWON) IN ((NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+		<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+			<if test='rm.orgGradeCd != null and !rm.orgGradeCd.equals("")'>
+				<if test='rm.orgInwon != null and !rm.orgInwon.equals("")'>
+					            , ( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.appraisalCd} ) , TRIM( #{rm.orgGradeCd}) , TRIM( #{rm.orgInwon}) )
+				</if>
+			</if>
+		</if>
+	</if>
+</foreach>
+					       )
+		</delete>
+		
+<!--  평가등급배분항목관리 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppGradeRateStdClassItemList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					     , APPRAISAL_CD
+					     , APP_CLASS_CD
+					     , APP_CLASS_NM
+					     , SEQ
+					     , CHKDATE
+					     , CHKID
+					     , NOTE
+					  FROM TPAP217
+					 WHERE ENTER_CD     = #{ssnEnterCd}
+					   AND APPRAISAL_CD = #{searchAppraisalCd}
+					 ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+<!-- 평가등급배분항목관리 저장 -->
+		<update parameterType="map" id="saveAppGradeRateStdClassItem">
+
+					MERGE INTO TPAP217 T
+					USING (
+					           SELECT A.ENTER_CD
+					                , A.APPRAISAL_CD
+					                , A.APP_CLASS_CD
+					                , A.APP_CLASS_NM
+					                , A.SEQ
+					                , A.NOTE
+					             FROM (
+					                       SELECT NULL AS ENTER_CD
+					                            , NULL AS APPRAISAL_CD
+					                            , NULL AS APP_CLASS_CD
+					                            , NULL AS APP_CLASS_NM
+					                            , NULL AS SEQ
+					                            , NULL AS NOTE
+					                         FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					                        UNION ALL
+					                       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					                            , TRIM(#{rm.appraisalCd}) AS APPRAISAL_CD
+					                            , TRIM(#{rm.appClassCd}) AS APP_CLASS_CD
+					                            , TRIM(#{rm.appClassNm}) AS APP_CLASS_NM
+					                            , TRIM(#{rm.seq}) AS SEQ
+					                            , TRIM(#{rm.note}) AS NOTE
+					                         FROM DUAL
+</foreach>
+					                  )	A
+					            WHERE A.ENTER_CD IS NOT NULL
+					              AND A.APPRAISAL_CD IS NOT NULL
+					              AND A.APP_CLASS_CD IS NOT NULL
+					       ) S
+					    ON (
+					                T.ENTER_CD     = S.ENTER_CD
+					            AND T.APPRAISAL_CD = S.APPRAISAL_CD
+					            AND T.APP_CLASS_CD = S.APP_CLASS_CD
+					       )
+					WHEN MATCHED THEN
+					     UPDATE
+					        SET T.APP_CLASS_NM = S.APP_CLASS_NM
+					          , T.SEQ          = S.SEQ
+					          ,	T.NOTE         = S.NOTE
+					          , T.CHKDATE      = SYSDATE
+					          , T.CHKID        = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					            T.ENTER_CD
+					          , T.APPRAISAL_CD
+					          , T.APP_CLASS_CD
+					          , T.APP_CLASS_NM
+					          , T.SEQ
+					          , T.CHKDATE
+					          , T.CHKID
+					          , T.NOTE
+					     ) VALUES (
+					            S.ENTER_CD
+					          , S.APPRAISAL_CD
+					          , S.APP_CLASS_CD
+					          , S.APP_CLASS_NM
+					          , S.SEQ
+					          , SYSDATE
+					          , #{ssnSabun}
+					          , S.NOTE
+					     )
+		</update>
+
+<!-- 평가등급배분항목관리 삭제 -->
+		<delete parameterType="map" id="deleteAppGradeRateStdClassItem">
+
+					DELETE FROM TPAP217
+					 WHERE (ENTER_CD, APPRAISAL_CD, APP_CLASS_CD) IN ((NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("") != null and rm.appraisalCd != null and !rm.appraisalCd.equals("") != null and rm.appClassCd != null and !rm.appClassCd.equals("")'>
+					           , ( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.appraisalCd} ) , TRIM( #{rm.appClassCd}) )
+	</if>
+</foreach>
+					       )
+		</delete>
+		
+
+</mapper>

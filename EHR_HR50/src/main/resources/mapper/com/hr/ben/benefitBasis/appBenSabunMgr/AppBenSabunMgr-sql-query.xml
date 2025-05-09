@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.benefitBasis.appBenSabunMgr">
+
+	<!-- 조회 -->
+	<select id="getAppBenSabunMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+        SELECT A.*
+             , F_COM_GET_NAMES     (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+             , F_COM_GET_ORG_NM2   (A.ENTER_CD, A.SABUN, TO_CHAR(sysdate, 'YYYYMMDD')) AS ORG_NM
+             , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR(sysdate, 'YYYYMMDD')) AS JIKWEE_NM
+             , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(sysdate, 'YYYYMMDD')) AS JIKCHAK_NM
+             , F_COM_GET_JOB_NM    (A.ENTER_CD, A.SABUN, TO_CHAR(sysdate, 'YYYYMMDD')) AS JOB_NM
+          FROM TBEN993 A
+         WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) ]]>
+		<if test="searchBenefitBizCd != null and searchBenefitBizCd neq ''">
+		   AND BENEFIT_BIZ_CD = #{searchBenefitBizCd}
+		</if>
+		<if test="searchName != null and searchName neq ''">
+		   AND (A.SABUN LIKE '%' || #{searchName} || '%'
+            OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%' || #{searchName} || '%')
+		</if>        
+         ORDER BY A.CHKDATE DESC
+	</select>
+
+	<!-- 저장 -->
+	<update id="saveAppBenSabunMgr" parameterType="map">
+	<![CDATA[
+			MERGE INTO TBEN993 T
+			USING	(
+					SELECT	  A.ENTER_CD
+					        , A.BENEFIT_BIZ_CD
+							, A.SABUN
+							, A.NOTE
+					FROM	(
+							SELECT
+							          NULL	AS ENTER_CD
+							        , NULL  AS BENEFIT_BIZ_CD
+									, NULL	AS SABUN
+									, NULL	AS NOTE
+							FROM	DUAL ]]>
+			<foreach item="rm" collection="mergeRows">
+							UNION ALL
+							SELECT
+									  #{ssnEnterCd}	             AS ENTER_CD
+									, TRIM( #{rm.benefitBizCd} ) AS BENEFIT_BIZ_CD
+									, TRIM( #{rm.sabun} )	     AS SABUN
+									, TRIM( #{rm.note} )	     AS NOTE
+									FROM   DUAL
+			</foreach>
+							) A WHERE ENTER_CD IS NOT NULL
+					) S
+			ON ( T.ENTER_CD			= S.ENTER_CD
+			AND  T.BENEFIT_BIZ_CD   = S.BENEFIT_BIZ_CD
+			AND  T.SABUN        	= S.SABUN
+			)
+			WHEN MATCHED THEN
+				UPDATE SET
+							  T.NOTE        	= S.NOTE
+							, T.CHKDATE			= SYSDATE
+							, T.CHKID			= #{ssnSabun}
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					  T.ENTER_CD
+				    , T.BENEFIT_BIZ_CD
+ 							, T.SABUN
+ 							, T.NOTE
+					, T.CHKDATE
+					, T.CHKID
+				)
+				VALUES
+				(
+						  S.ENTER_CD
+						, S.BENEFIT_BIZ_CD
+						, S.SABUN
+						, S.NOTE
+					, SYSDATE
+					, #{ssnSabun}
+				)
+	</update>
+
+	<!-- 삭제 -->
+	<delete id="deleteAppBenSabunMgr" parameterType="map">
+	<![CDATA[
+		DELETE  TBEN993
+		WHERE 	(ENTER_CD,BENEFIT_BIZ_CD,SABUN) IN 	(  (NULL,NULL,NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.benefitBizCd != null and rm.benefitBizCd neq '' and rm.sabun != null and rm.sabun neq ''">
+				(#{ssnEnterCd}, TRIM(#{rm.benefitBizCd}), TRIM(#{rm.sabun}))
+			</if>
+		</foreach>
+		)
+	</delete>
+	
+</mapper>

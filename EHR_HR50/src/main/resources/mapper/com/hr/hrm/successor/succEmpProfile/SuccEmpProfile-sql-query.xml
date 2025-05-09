@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.successor.succEmpProfile">
+
+<!-- 임직원 Timeline 조회 > 임직원 목록 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSuccEmpTimelineSrchEmpList">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.NAME
+					     , A.EMP_YMD
+					     , A.GEMP_YMD
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, B.SDATE, #{ssnLocaleCd}) AS ORG_NM
+					     , B.JIKCHAK_CD
+					     , B.JIKCHAK_NM
+					     , B.JIKWEE_CD
+					     , B.JIKWEE_NM
+					     , B.JIKGUB_CD
+					     , B.JIKGUB_NM
+					  FROM THRM100 A
+					     , THRM151 B
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN    = B.SABUN
+					   AND B.STATUS_CD <> 'RA'
+					   AND B.SDATE    = (SELECT MAX(SDATE)
+					                        FROM THRM151
+					                       WHERE ENTER_CD = B.ENTER_CD
+					                         AND SABUN    = B.SABUN 
+					                         AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					                      ]]>      
+   <if test='searchSabunList != null and !searchSabunList.equals("")'>
+                       AND A.SABUN IN
+          <foreach collection="searchSabunList" item="item" index="index" open="(" close=")"  separator=",">
+                 #{item}
+          </foreach>
+  </if>
+  
+  <if test='searchOrgCd != null and !searchOrgCd.equals("0")'>
+					   AND F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, #{searchYmd}) IN (
+					                                                              SELECT ORG_CD
+					                                                                FROM (
+					                                                                      SELECT ENTER_CD, SDATE, PRIOR_ORG_CD, ORG_CD, SEQ
+					                                                                        FROM TORG105 X
+					                                                                       WHERE ENTER_CD = #{ssnEnterCd}
+					                                                                         AND SDATE    = (SELECT MAX(S.SDATE)
+					                                                                                           FROM TORG103 S
+					                                                                                          WHERE S.ENTER_CD = X.ENTER_CD
+					                                                                                            AND #{searchYmd} BETWEEN S.SDATE AND NVL(S.EDATE,'99991231'))
+					                                                                     )
+					                                                               START WITH ORG_CD = TRIM(#{searchOrgCd})
+					                                                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					                                                                    AND PRIOR SDATE   = SDATE
+					                                                                    AND PRIOR ORG_CD  = PRIOR_ORG_CD
+					                                                            )
+  </if>
+		</select>
+
+<!-- 임직원 Timeline 조회 > Timeline 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSuccAppmtTimelineSrchTimelineList">
+			
+				<![CDATA[
+					SELECT T.BASE_YMD
+					     , T.YEAR
+					     , T.MONTH_DAY
+					     , T.TIMELINE_SUMMARY
+					  FROM (
+					        SELECT T1.ENTER_CD
+					             , T1.SABUN
+					             , T1.BIR_YMD AS BASE_YMD
+					             , SUBSTR(T1.BIR_YMD, 1,4) AS YEAR
+					             , TO_CHAR(TO_DATE(T1.BIR_YMD, 'YYYYMMDD'), 'MM-DD') AS MONTH_DAY
+					             , ( CASE WHEN ADDR1 IS NOT NULL THEN ' "' || ADDR1 || '" 에서 출생' ELSE ' 출생 ' END ) TIMELINE_SUMMARY
+					          FROM THRM100 T1
+					             , THRM123 T2
+					         WHERE T1.ENTER_CD    = T2.ENTER_CD(+)
+					           AND T1.SABUN       = T2.SABUN(+)
+					           AND T2.ADD_TYPE(+) = '1'
+					           AND T1.ENTER_CD    = #{ssnEnterCd}
+					           AND T1.SABUN       = #{searchSabun}
+					         UNION ALL
+					        SELECT T1.ENTER_CD
+					             , T1.SABUN
+					             , T2.ACA_S_YM AS BASE_YMD
+					             , SUBSTR(T2.ACA_S_YM, 1,4) AS YEAR
+					             --, TO_CHAR(TO_DATE(T2.ACA_S_YM, 'YYYYMMDD'), 'MM-DD') AS MONTH_DAY
+					             , TO_CHAR(TO_DATE(CASE WHEN LENGTH(ACA_S_YM) < 8 THEN ACA_S_YM||'01' ELSE ACA_S_YM END, 'YYYYMMDD'), 'YYYY-MM') AS MONTH_DAY
+					             , ( CASE WHEN ACA_SCH_NM IS NOT NULL THEN ' "' || ACA_SCH_NM || '" 에 입학' ELSE '' END ) TIMELINE_SUMMARY
+					          FROM THRM100 T1
+					             , THRM115 T2
+					         WHERE T1.ENTER_CD = T2.ENTER_CD
+					           AND T1.SABUN    = T2.SABUN
+					           AND T1.ENTER_CD = #{ssnEnterCd}
+					           AND T1.SABUN    = #{searchSabun}
+					         UNION ALL
+					        SELECT S.ENTER_CD
+					             , S.SABUN
+					             , S.ORD_YMD AS BASE_YMD
+					             , SUBSTR(S.ORD_YMD, 1, 4) AS YEAR
+					             , TO_CHAR(TO_DATE(S.ORD_YMD, 'YYYYMMDD'), 'MM-DD') AS MONTH_DAY
+					             , LISTAGG('[' || S.ORD_DETAIL_NM || ']' || S.ORG_NM, CHR(13)||'<BR/>') WITHIN GROUP (ORDER BY 1) AS TIMELINE_SUMMARY
+					          FROM (
+					                SELECT X.ENTER_CD
+					                     , X.ORD_YMD
+					                     , Y.ORD_TYPE_CD
+					                     , Y.ORD_DETAIL_CD
+					                     , Y.ORD_DETAIL_NM
+					                     , X.SABUN
+					                     , F_COM_GET_NAMES(X.ENTER_CD, X.SABUN) AS NAME
+					                     , X.ORG_NM
+					                     , ROW_NUMBER() OVER(PARTITION BY X.ORD_YMD ORDER BY Y.SEQ, X.APPLY_SEQ) AS RNUM
+					                  FROM THRM191 X
+					                     , TSYS013 Y
+					                 WHERE X.ENTER_CD = Y.ENTER_CD
+					                   AND X.ORD_TYPE_CD = Y.ORD_TYPE_CD
+					                   AND X.ORD_DETAIL_CD = Y.ORD_DETAIL_CD
+					                   AND X.ENTER_CD = #{ssnEnterCd}
+					                 AND X.SABUN = #{searchSabun}
+					               ) S
+					         WHERE S.RNUM < 11
+					         GROUP BY S.ORD_YMD, S.ENTER_CD, S.SABUN
+					         UNION ALL
+					        SELECT ENTER_CD
+					             , SABUN
+					             , SDATE AS BASE_YMD
+					             , SUBSTR(S.SDATE, 1,4) AS YEAR
+					             , TO_CHAR(TO_DATE(S.SDATE, 'YYYYMMDD'), 'MM-DD') AS MONTH_DAY
+					             , CMP_NM || '에 입사 (직무 : ' || JOB_NM || ')' AS TIMELINE_SUMMARY
+					          FROM THRM117 S
+					         WHERE SABUN = #{searchSabun}
+					           AND ENTER_CD = #{ssnEnterCd}
+					           AND CMP_NM IS NOT NULL
+					       ) T
+					 ORDER BY T.BASE_YMD DESC
+				]]>
+		</select>
+
+<!-- 임직원 Timeline 조회 > 연봉 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSuccAppmtTimelineSrchCpnChartList">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , '연봉' AS LEGEND_LABEL
+					     , TO_CHAR(TO_DATE(A.SDATE, 'YYYYMMDD'), 'YYYY') || '년' AS LABEL 
+					     , TO_CHAR(ROUND(SUM(B.ELEMENT_MON)*12/1000000, 1)) AS VALUE
+					  FROM TCPN403 A
+					     , TCPN404 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN = B.SABUN
+					   AND A.SDATE = B.SDATE
+					   AND SUBSTR(A.SDATE, 1,4) BETWEEN '2011' AND '2020'
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN    = #{searchSabun}
+					 GROUP BY A.ENTER_CD, A.SABUN, A.SDATE
+					 ORDER BY A.SABUN, A.SDATE ASC
+				]]>
+		</select>
+
+<!-- 임직원 Timeline 조회 > 성과 다건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSuccAppmtTimelineSrchPapChartList">
+			
+				<![CDATA[
+					SELECT '등급' AS LEGEND_LABEL
+					     , PAP_YY || '년' AS LABEL
+					     , DECODE(FINAL_GRADE,'D','6','P','5','G','4','S','3','B','2','N','1') AS VALUE
+					     , PAP_NM
+					     , FINAL_GRADE
+					  FROM (
+					        SELECT ROW_NUMBER() OVER(ORDER BY APPRAISAL_YY ASC) AS RNK
+					             , B.APPRAISAL_YY AS PAP_YY
+					             , B.APPRAISAL_NM AS PAP_NM
+					             , A.FINAL_GRADE
+					          FROM TPAP707 A, TPAP101 B
+					         WHERE A.ENTER_CD = #{ssnEnterCd}
+					           AND A.ENTER_cD = B.ENTER_CD
+					           AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					           AND A.SABUN = #{searchSabun}
+					       )
+					 WHERE RNK <= 10
+					 ORDER BY PAP_YY
+				]]>
+		</select>
+
+<!-- 임직원 Timeline 조회 > 근속연수 단건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSuccAppmtTimelineSrchWorkYearChartList">
+			
+				<![CDATA[
+					SELECT TRUNC(TO_NUMBER(F_COM_GET_CAREER_CNT(#{ssnEnterCd}, #{searchSabun}, 'W', 'MM', NULL, NULL, NULL)) / 12) AS CNT1
+					     , (
+					        SELECT TRUNC(AVG(TRUNC(TO_NUMBER(F_COM_GET_CAREER_CNT (A.ENTER_CD, A.SABUN, 'W', 'MM', NULL, NULL, NULL)) / 12)))
+					          FROM THRM100 A
+					             , THRM151 B
+					         WHERE A.ENTER_CD = B.ENTER_CD
+					           AND A.SABUN    = B.SABUN
+					           AND B.SDATE    = (SELECT MAX(SDATE)
+					                                FROM THRM151
+					                               WHERE ENTER_CD = B.ENTER_CD
+					                                 AND SABUN    = B.SABUN 
+					                                 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231') )
+					           AND B.STATUS_CD = 'AA'
+					           AND A.ENTER_CD  = #{ssnEnterCd}
+					       ) AS CNT2
+					  FROM DUAL
+				]]>
+		</select>
+
+<!-- 임직원 Timeline 조회 > 연차 단건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSuccAppmtTimelineSrchVacationChartList">
+			
+				<![CDATA[
+					--휴가사용실적
+					SELECT NVL(USED_CNT,0) + NVL(APP_CNT,0) AS USED_CNT --사용
+					     , NVL(REST_CNT,0) - NVL(APP_CNT,0) AS REST_CNT--잔여일수
+					FROM (  SELECT '2' AS GUBUN
+					            ,'Total' AS GNT_NM
+					            ,TO_CHAR(NVL(SUM(CRE_CNT),0)) AS CRE_CNT
+					            ,TO_CHAR(NVL(SUM(USED_CNT),0)) AS USED_CNT
+					            ,TO_CHAR(NVL(SUM(REST_CNT),0)) AS REST_CNT
+					            ,MAX(( SELECT SUM(X.CLOSE_DAY)
+					                  FROM TTIM301 X, THRI103 Y
+					                 WHERE X.ENTER_CD = A.ENTER_CD
+					                   AND X.SABUN = A.SABUN
+					                   AND X.ENTER_CD = X.ENTER_CD
+					                   AND X.APPL_SEQ = Y.APPL_SEQ
+					                   AND X.APPL_STATUS_CD IN ('21', '31')
+					                   AND X.GNT_CD IN ('10', '14')
+					                   AND X.S_YMD BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+					               )) AS APP_CNT    
+					        FROM TTIM511 A
+					        WHERE A.ENTER_CD = #{ssnEnterCd}
+					        AND A.SABUN = #{searchSabun}
+					        AND A.GNT_CD IN ('10', '14')
+					        AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+					        )
+				]]>
+		</select>
+
+
+	</mapper>

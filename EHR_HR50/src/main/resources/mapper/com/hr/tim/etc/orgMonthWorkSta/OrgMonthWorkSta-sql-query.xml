@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="tim.etc.orgMonthWorkSta">
+<!-- 조직코드 조회 -->
+        <select parameterType="map" resultType="cMap" id="getOrgMonthWorkStaOrgList">
+
+                    --조직가져오기
+<choose><when test='ssnSearchType != null and ssnSearchType.equals("A")'>
+                        SELECT '전체' AS CODE_NM, '0' AS CODE FROM DUAL
+                         UNION ALL
+                        SELECT ORG_NM AS CODE_NM, ORG_CD AS CODE
+                          FROM
+                               (
+                                 SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM, A.ORG_CD
+                                   FROM ( SELECT T.ENTER_CD, T.ORG_CD, T.PRIOR_ORG_CD, T.SEQ, T.SDATE
+                                            FROM TORG105 T
+                                           WHERE T.ENTER_CD = #{ssnEnterCd}
+                                             AND T.SDATE =
+                                                 (
+                                                     SELECT MAX(SDATE)
+                                                       FROM TORG103
+                                                      WHERE ENTER_CD = T.ENTER_CD
+                                                      <if test='searchYmd != null and !searchYmd.equals("")'>
+                                                          AND CASE WHEN LENGTH(REPLACE(#{searchYmd},'-','')) = 6 THEN TO_CHAR(LAST_DAY(TO_DATE(REPLACE(#{searchYmd},'-',''),'YYYYMM')), 'YYYYMMDD')
+                                                                   ELSE REPLACE(#{searchYmd},'-','') END BETWEEN SDATE AND NVL(EDATE, '29991231')
+                                                      </if>
+                                                 )
+                                        ) A, TORG101 B
+                                  WHERE A.ENTER_CD = B.ENTER_CD
+                                    AND A.ORG_CD   = B.ORG_CD
+                                    AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                                  START WITH A.PRIOR_ORG_CD = '0'
+                                CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+                                    AND    PRIOR A.SDATE    = A.SDATE
+                                    AND    PRIOR A.ORG_CD   = A.PRIOR_ORG_CD
+                                ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+                               )
+
+        </when><otherwise>
+                        SELECT F_COM_GET_ORG_NM(ENTER_CD,SCOPE_VALUE,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CODE_NM, SCOPE_VALUE AS CODE
+                          FROM TSYS319
+                         WHERE ENTER_CD      = #{ssnEnterCd}
+                           AND AUTH_SCOPE_CD = 'W10'
+                           AND GRP_CD        = #{ssnGrpCd}
+                           AND SABUN         = #{ssnSabun}
+</otherwise>
+</choose>
+
+        </select>
+        
+<!-- 일별  -->
+        <select parameterType="map" resultType="cMap" id="getOrgMonthWorkStaTitleList">
+
+                <![CDATA[
+                    SELECT A.DD AS DAY
+                         , TO_NUMBER(A.DD) AS V_DAY
+                         , 'day' || A.DD AS SAVE_NAME
+                         , A.YM || A.DD AS YMD
+                         , CASE WHEN A.WEEK IN ( '토', '일' ) THEN '#ff0000'
+                                WHEN B.HOLIDAY_NM IS NOT NULL THEN '#ff0000'
+                                ELSE '#000000' END AS FONT_COLOR
+                     FROM
+                         (  SELECT TO_CHAR(YMD+(LEVEL - 1), 'DD') AS DD
+                                 , TO_CHAR(YMD, 'YYYYMM')         AS YM
+                                 , TO_CHAR(YMD+(LEVEL - 1), 'dy')        AS WEEK
+                                 , TO_CHAR(YMD+(LEVEL - 1), 'YYYYMMDD')  AS YMD
+                              FROM ( SELECT TO_DATE(REPLACE(#{searchYm},'-','') || '01', 'YYYYMMDD') AS YMD FROM DUAL)
+                           CONNECT BY YMD+(LEVEL-1) <= ADD_MONTHS(YMD, 1)-1
+                          ) A 
+                       , (  SELECT HOLIDAY_NM
+                                 , YY||MM||DD  AS YMD
+                              FROM TTIM001 A
+                             WHERE A.ENTER_CD = #{ssnEnterCd}
+                             ]]>
+<choose><when test='searchOrgCd != null and !searchOrgCd.equals("0")'>
+                               AND A.BUSINESS_PLACE_CD = F_COM_GET_ORG_MAP_CD(#{ssnEnterCd}, '100', #{searchOrgCd}, REPLACE(#{searchYm},'-','')|| '01' )
+        </when><otherwise>
+                               AND A.BUSINESS_PLACE_CD = '100'  -- 본사
+</otherwise>
+</choose>
+                               AND YY||MM = REPLACE(TRIM(#{searchYm}),'-','')
+                         ) B
+                    WHERE A.YMD = B.YMD(+)
+                    ORDER BY DD
+
+        </select>
+        
+                
+<!-- 부서별월근태현황 조회 -->
+        <select parameterType="map" resultType="cMap" id="getOrgMonthWorkStaList">
+
+                WITH TMP AS (
+                               SELECT A.ENTER_CD
+                                    , A.SABUN
+                                    , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+                                    , A.EMP_YMD
+                                    , B.ORG_CD
+                                    , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD)    AS JIKGUB_NM
+                                    , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, REPLACE(TRIM(#{searchYm}), '-', '')||'01') AS ORG_NM
+                                    
+                                    , NVL(F_COM_GET_PRIOR_ORG_TYPE_NM(B.ENTER_CD, B.ORG_CD, 'B0400', REPLACE(TRIM(#{searchYm}), '-', '')||'01')
+                                        ,  F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, REPLACE(TRIM(#{searchYm}), '-', '')||'01') )  AS P_ORG_NM
+                                        
+                                    , NVL(F_COM_GET_PRIOR_ORG_TYPE_CD(B.ENTER_CD, B.ORG_CD, 'B0400', REPLACE(TRIM(#{searchYm}), '-', '')||'01' )
+                                        ,  B.ORG_CD )  AS P_ORG_CD
+                                        
+<foreach item="tit" collection="titles" >
+                                    , F_TIM_GET_DAY_GNT_NM2(A.ENTER_CD, A.SABUN, #{tit.ymd}) AS "${tit.saveName}"
+</foreach>
+    <![CDATA[
+                                  FROM THRM100 A, THRM151 B
+                                 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                                   AND A.ENTER_CD = B.ENTER_CD
+                                   AND A.SABUN    = B.SABUN
+                                   AND REPLACE(TRIM(#{searchYm}), '-', '')||'01' BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+                                   AND B.STATUS_CD NOT LIKE 'RA%'   -- 해당월 1일 기준으로 재직, 휴직자
+                                   
+                                   
+                                   AND NVL(A.RET_YMD, '99991231' ) >  REPLACE(TRIM(#{searchYm}), '-', '')||'31'
+             ]]>
+<if test='searchOrgCd != null and !searchOrgCd.equals("0")'>
+                                   AND B.ORG_CD = TRIM( #{searchOrgCd} )
+</if>
+<if test='searchWorkType != null and !searchWorkType.equals("")'>
+                                   AND B.WORK_TYPE = TRIM( #{searchWorkType} )
+</if>
+<if test="jikgubCd != null and jikgubCd neq ''">
+                                   AND B.JIKGUB_CD IN
+    <foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+        #{item}
+    </foreach>
+</if>
+
+<if test='ssnSearchType.equals("O") and searchOrgCd.equals("")'>
+
+    <choose><when test='searchGubunCd != null and searchGubunCd.equals("A")'>
+                                   AND A.SABUN IN (SELECT SABUN 
+                                                        FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+                                                      )
+</when><otherwise>
+                                   AND B.ORG_CD IN (SELECT SCOPE_VALUE
+                                                      FROM TSYS319
+                                                     WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+                                                       AND GRP_CD   = #{ssnGrpCd}
+                                                       AND AUTH_SCOPE_CD = 'W10'
+                                                       AND SABUN = #{ssnSabun}
+                                                   )
+    </otherwise>
+    </choose>
+</if>
+                )
+                
+                SELECT 0 AS DETAIL 
+                     , A.ENTER_CD
+                     , A.SABUN
+                     , A.NAME
+                     , A.EMP_YMD
+                     , A.ORG_CD
+                     , A.JIKGUB_NM
+                     , A.ORG_NM
+                     , A.P_ORG_NM
+                     , A.P_ORG_CD
+                     , B.CNT1, B.CNT2, B.CNT3, B.CNT4, B.CNT5
+
+<foreach item="tit" collection="titles" >
+                     , CASE WHEN "${tit.saveName}" = 'CA' THEN '휴직'
+                            WHEN "${tit.saveName}" = 'RA' THEN '퇴직'
+                            WHEN "${tit.saveName}" = 'SAT' THEN '土'
+                            WHEN "${tit.saveName}" = 'SUN' THEN '日'
+                            WHEN "${tit.saveName}" = 'GH' THEN '공휴'
+                            WHEN "${tit.saveName}" = 'WO' THEN '당직'
+                            WHEN "${tit.saveName}" = 'Y' THEN 'O'
+                            WHEN "${tit.saveName}" IS NULL THEN ''
+                            ELSE F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'T10003', #{tit.saveName}, 2 )
+                       END AS "${tit.saveName}"
+</foreach>
+                  FROM               
+                       (                      
+                          SELECT A.*
+                               , F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, REPLACE(TRIM(#{searchYm}), '-', '')||'01') AS SEQ
+                            FROM TMP A 
+                       ) A            
+                     , ( 
+                            SELECT SABUN   -- T10003 (근태종류)
+                                 , SUM( CASE WHEN TXT IN ( 'CA', '23' ) THEN 1 ELSE 0 END ) AS CNT1  --휴직/병가
+                                 , SUM( CASE WHEN TXT IN ( '25', '27' ) THEN 1 ELSE 0 END ) AS CNT2  --지각/조퇴
+                                 , SUM( CASE WHEN TXT IN ( 'WO' ) THEN 1 ELSE 0 END )       AS CNT3  --당직
+                                 , SUM( CASE WHEN TXT IN ( '3','7','9','11','13','17','32','33','34'  ) THEN 1 ELSE 0 END ) AS CNT4        --건강/휴가
+                                 , SUM( CASE WHEN TXT = '1' THEN 1 WHEN TXT = '15' THEN 0.5 WHEN TXT = '16' THEN 0.25 ELSE 0 END )  AS CNT5  --년/월차
+                              FROM (
+<foreach item="tit" collection="titles" separator=" UNION ALL " >
+            SELECT SABUN, "${tit.saveName}" AS TXT FROM TMP
+</foreach>
+                                    ) 
+                              WHERE TXT IS NOT NULL
+                              GROUP BY SABUN
+                       ) B
+                  WHERE A.SABUN = B.SABUN(+)     
+                 ORDER BY SEQ
+                
+
+
+        </select>
+        
+                
+<!-- 부서별월근태현황 팝업 조회 -->
+        <select parameterType="map" resultType="cMap" id="getOrgMonthWorkStaPopList">
+
+                <![CDATA[
+
+                    SELECT *
+                      FROM (
+                           SELECT D.GNT_NM
+                                  || ( CASE WHEN C.GNT_CD = '70' THEN
+                                            '(' || F_COM_GET_GRCODE_NAME(c.ENTER_CD, 'B60020', C.OCC_CD) || '-' || F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'B60030', C.FAM_CD) || ')'
+                                            ELSE '' END ) AS GNT_NM
+                                , C.S_YMD, C.E_YMD, C.CLOSE_DAY    
+                             FROM TTIM405 A, THRI103 B, TTIM301 C, TTIM014 D
+                            WHERE A.ENTER_CD = B.ENTER_CD
+                              AND A.APPL_SEQ = B.APPL_SEQ
+                              AND A.ENTER_CD = C.ENTER_CD
+                              AND A.APPL_SEQ = C.APPL_SEQ
+                              AND NVL(C.UPDATE_YN,'N') = 'N'
+                              AND B.APPL_STATUS_CD = '99'
+                              AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+                              AND A.SABUN    = TRIM( #{searchSabun} )
+                              AND A.YMD LIKE TRIM( #{searchYm} ) || '%'
+                              AND A.ENTER_CD = D.ENTER_CD 
+                              AND A.GNT_CD   = D.GNT_CD
+                            UNION ALL
+                            
+                            SELECT '당직'  AS GNT_NM
+                                 , A.YMD  AS S_YMD
+                                 , A.YMD  AS E_YMD
+                                 , 1      AS CLOSE_DAY
+                              FROM TTIM621 A, THRI103 B
+                             WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+                               AND A.SABUN    = TRIM( #{searchSabun} )
+                               AND A.YMD LIKE TRIM( #{searchYm} ) || '%'
+                               AND A.ENTER_CD = B.ENTER_CD
+                               AND A.APPL_SEQ = B.APPL_SEQ
+                               AND B.APPL_STATUS_CD = '99'
+                            )
+                    ORDER BY S_YMD
+
+                
+                ]]>
+
+
+        </select>
+        
+        
+
+</mapper>

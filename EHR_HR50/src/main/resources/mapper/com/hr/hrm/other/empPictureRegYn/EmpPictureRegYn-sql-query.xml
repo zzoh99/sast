@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.empPictureRegYn">
+
+	<!-- 개인사진 미리 셋팅하기 위한 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpPictureNameList">
+
+				<![CDATA[
+					SELECT  T2.ENTER_CD,
+						    T2.SABUN,
+						    T2.NAME,
+							DECODE (T4.FILENAME, NULL, 123003, ROWNUM + 100) AS PIC_SEQ,
+							DECODE (T4.SIGN, NULL, 1230003, ROWNUM + 100000) AS SIGN_SEQ,
+							DECODE (T4.FILENAME, NULL, '/common/images/common/img_photo.gif', (SELECT STD_CD_DESC FROM TSYS955 WHERE ENTER_CD = #{ssnEnterCd} AND STD_CD = 'EMP_PICTURE_LOCATION') || T4.FILENAME) AS PHOTO_SRC,
+							DECODE (T4.SIGN, NULL, '/common/images/common/defaultApp.gif', (SELECT STD_CD_DESC FROM TSYS955 WHERE ENTER_CD = #{ssnEnterCd} AND STD_CD = 'EMP_SIGN_LOCATION') || T4.SIGN) AS SIGN_SRC
+					FROM THRM100 T2,
+					     THRM151 T3,
+					     THRM911 T4
+					WHERE T2.ENTER_CD = T3.ENTER_CD
+					AND T2.SABUN = T3.SABUN
+					AND T2.ENTER_CD = T4.ENTER_CD(+)
+					AND T2.SABUN = T4.SABUN(+)
+					AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN T3.SDATE AND NVL (T3.EDATE, '99991231')
+					AND T2.ENTER_CD = #{ssnEnterCd}
+					AND (T3.ENTER_CD, T3.SABUN, T3.SDATE) =
+					    (SELECT /*+ INDEX_DESC(THRM151 PK_HRM151)*/ ENTER_CD, SABUN, SDATE
+					    FROM THRM151
+					    WHERE     ENTER_CD = T2.ENTER_CD
+					    AND SABUN = T2.SABUN
+					    AND SDATE <= TO_CHAR (SYSDATE, 'YYYYMMDD')
+					    AND STATUS_CD <> 'RAA'
+					    AND ROWNUM = 1)
+					AND T3.STATUS_CD <> 'RAA'    ]]>
+				<if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+					AND F_COM_GET_ORG_NM2(T3.ENTER_CD,T3.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%'|| TRIM( #{searchOrgNm} ) ||'%'
+				</if>
+				<if test='searchName != null and !searchName.equals("")'>
+					AND (T2.NAME LIKE '%'|| TRIM( #{searchName} ) ||'%' OR T2.SABUN=TRIM( #{searchName} ))
+				</if>
+				<if test='statusCd != null and !statusCd.equals("")'>
+					AND T3.STATUS_CD != #{statusCd}
+				</if>
+					ORDER BY F_COM_JIKJE_SORT (T3.ENTER_CD, T3.SABUN, T3.SDATE)
+
+
+
+		</select>
+
+<!-- 개인사진등록여부 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpPictureRegYnList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+					     , A.ORG_NM
+					     , A.MANAGE_NM
+					     , A.WORK_TYPE_NM
+					     , A.JIKCHAK_NM
+					     , A.JIKWEE_NM
+					     , A.JIKGUB_NM
+					     , A.STATUS_CD
+					     , A.FILE_YN
+					     , A.SIGN_YN
+					     , A.PHOTO
+					     , A.SIGN
+					     , CASE WHEN A.FILE_YN > 0 THEN 'Y' ELSE 'N' END AS FILEYNVAL
+					  FROM (SELECT  T2.ENTER_CD,
+								    T2.SABUN,
+								    T2.NAME,
+								    F_COM_GET_ORG_NM2(T3.ENTER_CD,T3.SABUN,T3.SDATE, #{ssnLocaleCd}) AS ORG_NM,
+								    F_COM_GET_GRCODE_NAME(T3.ENTER_CD,'H10030',T3.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM,
+								    F_COM_GET_GRCODE_NAME(T3.ENTER_CD,'H10050',T3.WORK_TYPE, #{ssnLocaleCd}) AS WORK_TYPE_NM,
+								    F_COM_GET_GRCODE_NAME(T3.ENTER_CD,'H20020',T3.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM,
+								    F_COM_GET_GRCODE_NAME(T3.ENTER_CD,'H20030',T3.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM,
+								    F_COM_GET_JIKGUB_NM(T3.ENTER_CD,T3.SABUN,T3.SDATE, #{ssnLocaleCd}) AS JIKGUB_NM,
+								    T3.STATUS_CD,
+									F_COM_JIKJE_SORT (T3.ENTER_CD, T3.SABUN, T3.SDATE) AS SORT_KEY,
+									(SELECT COUNT(1) FROM THRM911 WHERE ENTER_CD = T2.ENTER_CD AND SABUN = T2.SABUN AND IMAGE_TYPE = '1' ) AS FILE_YN,
+									(SELECT COUNT(1) FROM THRM911 WHERE ENTER_CD = T2.ENTER_CD AND SABUN = T2.SABUN AND IMAGE_TYPE = '2' ) AS SIGN_YN,
+								    '/EmpPhotoOut.do'||chr(63)||'enterCd=' || T2.ENTER_CD || chr(38) || 'searchKeyword=' || T2.SABUN ||  chr(38) || 'type=1' AS PHOTO,
+								    '/EmpPhotoOut.do'||chr(63)||'enterCd=' || T2.ENTER_CD || chr(38) || 'searchKeyword=' || T2.SABUN ||  chr(38) || 'type=2' AS SIGN
+								FROM THRM100 T2,
+								     THRM151 T3
+								WHERE T2.ENTER_CD = T3.ENTER_CD
+								AND T2.SABUN = T3.SABUN
+								AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN T3.SDATE AND NVL (T3.EDATE, '99991231')
+								AND T2.ENTER_CD = #{ssnEnterCd}
+								AND (T3.ENTER_CD, T3.SABUN, T3.SDATE) =
+							    										(SELECT /*+ INDEX_DESC(THRM151 PK_HRM151)*/ ENTER_CD, SABUN, SDATE
+								    									   FROM THRM151
+								    									  WHERE ENTER_CD = T2.ENTER_CD
+								    										AND SABUN = T2.SABUN
+								    										AND SDATE <= TO_CHAR (SYSDATE, 'YYYYMMDD')
+								    										AND STATUS_CD <> 'RAA'
+								    										AND ROWNUM = 1)
+					            AND T3.STATUS_CD <> 'RAA'		 ]]>
+					            <if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+					              AND F_COM_GET_ORG_NM2(T3.ENTER_CD,T3.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%'|| TRIM( #{searchOrgNm} ) ||'%'
+								</if>
+					            <if test='searchName != null and !searchName.equals("")'>
+					            AND ( T2.SABUN LIKE '%'||TRIM( #{searchName} )||'%' OR F_COM_GET_NAMES (T2.ENTER_CD, T2.SABUN) LIKE '%'||TRIM( #{searchName} )||'%' )
+								</if>
+					            <if test='statusCd != null and !statusCd.equals("")'>
+					              AND T3.STATUS_CD != #{statusCd}
+								</if>
+					       ) A
+					WHERE 1=1
+		            <if test='fileYn != null and !fileYn.equals("")'>
+		              AND DECODE(NVL(A.FILE_YN, '0'), '0', '0', '1') = TRIM( #{fileYn} )
+					</if>
+		            <if test='signYn != null and !signYn.equals("")'>
+		              AND DECODE(NVL(A.SIGN_YN, '0'), '0', '0', '1') = TRIM( #{signYn} )
+					</if>
+					ORDER BY A.SORT_KEY
+
+
+		</select>
+
+
+</mapper>

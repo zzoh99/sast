@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobSchemeMgrBS">
+		
+		<!-- 직무분류표 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobSchemeMgrBSList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.WORK_TYPE
+					     , A.JOB_M_TYPE
+					     , A.JOB_D_TYPE
+					     , A.JOB_CD
+					     , A.TASK_CD
+					     , A.SDATE
+					     , A.EDATE
+					     , A.SEQ
+					     , A.KNOWLEDGE
+					  FROM TORG214 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					           ]]>
+				 <if test='searchSdate != null and !searchSdate.equals("")'>
+				       AND REPLACE(TRIM(#{searchSdate}),'-','') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+				 </if>
+				 	 ORDER BY A.SEQ ASC
+
+
+		</select>
+		
+		<!-- 직무분류표 저장 -->
+		<update parameterType="map" id="saveJobSchemeMgrBS">
+
+					MERGE INTO TORG214 T 	
+						 USING 	
+						( 	
+			<bind name="icnt" value="1" />
+			<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+			               SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD
+			                    , TRIM(#{rm.seq})     AS SEQ
+			                    , TRIM(#{rm.workType})  AS  WORK_TYPE
+			                    , TRIM(#{rm.jobMType})  AS  JOB_M_TYPE
+			                    , TRIM(#{rm.jobDType})  AS  JOB_D_TYPE
+			                    , TRIM(#{rm.jobCd})  AS  JOB_CD
+			                    , TRIM(#{rm.taskCd})  AS  TASK_CD
+			                    , TRIM(#{rm.sdate})  AS  SDATE
+			                    , TRIM(#{rm.edate})  AS  EDATE
+			                FROM DUAL	
+			</foreach>
+						) S 	
+						ON ( 	
+						          T.ENTER_CD = S.ENTER_CD
+			                  AND T.WORK_TYPE = S.WORK_TYPE
+			                  AND T.JOB_M_TYPE = S.JOB_M_TYPE
+			                  AND T.JOB_D_TYPE = S.JOB_D_TYPE
+			                  AND T.JOB_CD = S.JOB_CD
+			                  AND T.TASK_CD = S.TASK_CD
+			                  AND T.SDATE = S.SDATE
+						) 	
+						WHEN MATCHED THEN 	
+						   UPDATE SET T.CHKDATE	= sysdate
+						            , T.CHKID	= #{ssnSabun}
+						            , T.EDATE = S.EDATE 	
+						            , T.SEQ = S.SEQ 	
+						WHEN NOT MATCHED THEN 	
+						   INSERT 	
+						   ( 	
+						              T.ENTER_CD	
+						            , T.WORK_TYPE	
+						            , T.JOB_M_TYPE	
+						            , T.JOB_D_TYPE	
+						            , T.JOB_CD	
+						            , T.TASK_CD	
+						            , T.SDATE	
+						            , T.EDATE	
+						            , T.SEQ	
+						            , T.CHKDATE	
+						            , T.CHKID	
+						   ) 	
+						   VALUES 	
+						   ( 	
+						              S.ENTER_CD	
+						            , S.WORK_TYPE	
+						            , S.JOB_M_TYPE	
+						            , S.JOB_D_TYPE	
+						            , S.JOB_CD	
+						            , S.TASK_CD	
+						            , S.SDATE	
+						            , S.EDATE	
+						            , S.SEQ	
+						            , sysdate	
+						            , #{ssnSabun}
+						   ) 
+		</update>
+		<!-- 직무분류표 삭제 -->
+		<delete parameterType="map" id="deleteJobSchemeMgrBS">
+
+					DELETE 
+                      FROM TORG214
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND WORK_TYPE||'_'||JOB_M_TYPE||'_'||JOB_D_TYPE||'_'||JOB_CD||'_'||TASK_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+                        <if test='rm.jobCd != null and !rm.jobCd.equals("")'>
+                            TRIM(#{rm.workType})||'_'||TRIM(#{rm.jobMType})||'_'||TRIM(#{rm.jobDType})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.taskCd})||'_'||TRIM(#{rm.sdate})
+						</if>
+</foreach>
+                        )
+		</delete>
+
+
+</mapper>

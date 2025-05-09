@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.empContract.empContractMgr">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpContractMgrList">
+
+				<![CDATA[
+					SELECT A.CONT_TYPE
+					     , A.SDATE
+					     , A.EDATE
+					     , A.PATH
+					     , A.FILE_NM
+					     , A.CONTENTS
+					     , '0' AS DETAIL
+					     , A.SIGN_USE_YN
+					  FROM THRM410 A
+					     , TSYS005 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.CONT_TYPE = B.CODE
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND B.GRCODE_CD = 'Z00001' AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD
+					           ]]>
+<if test='searchStdDate != null and !searchStdDate.equals("")'>
+					   AND REPLACE(TRIM( #{searchStdDate} ), '-', '') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+</if>
+					 ORDER BY A.SDATE DESC, B.SEQ
+		</select>
+		
+		<!-- 		저장 -->	
+		<update parameterType="map" id="saveEmpContractMgr">
+
+					MERGE INTO THRM410 T
+					USING (
+					       SELECT A.ENTER_CD
+					            , A.CONT_TYPE
+					            , A.SDATE
+					            , A.EDATE
+					            , A.PATH
+					            , A.FILE_NM
+					            , A.SIGN_USE_YN
+					         FROM (
+					               SELECT NULL AS ENTER_CD
+					                    , NULL AS CONT_TYPE
+					                    , NULL AS SDATE
+					                    , NULL AS EDATE
+					                    , NULL AS PATH
+					                    , NULL AS FILE_NM
+					                    , NULL AS SIGN_USE_YN
+					                 FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+              UNION ALL
+					               SELECT TRIM( #{ssnEnterCd} )  AS ENTER_CD
+					                    , TRIM(#{rm.contType})  AS CONT_TYPE
+					                    , TRIM(#{rm.sdate})     AS SDATE
+					                    , TRIM(#{rm.edate})     AS EDATE
+					                    , TRIM(#{rm.path})      AS PATH
+					                    , TRIM(#{rm.fileNm})    AS FILE_NM
+					                    , TRIM(#{rm.signUseYn})    AS SIGN_USE_YN
+					                 FROM DUAL
+</foreach>
+					            ) A WHERE A.SDATE IS NOT NULL
+					    ) S
+					   ON (      T.ENTER_CD = #{ssnEnterCd}
+					         AND T.CONT_TYPE= S.CONT_TYPE
+					         AND T.SDATE    = S.SDATE
+					    )
+					WHEN MATCHED THEN
+					     UPDATE SET T.EDATE = S.EDATE
+					              , T.PATH = S.PATH
+					              , T.FILE_NM = S.FILE_NM
+					              , T.SIGN_USE_YN = S.SIGN_USE_YN
+					              , T.CHKDATE = SYSDATE
+					              , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					     INSERT 
+					     (
+					         T.ENTER_CD
+					       , T.CONT_TYPE
+					       , T.SDATE
+					       , T.EDATE
+					       , T.PATH
+					       , T.FILE_NM
+					       , T.SIGN_USE_YN
+					       , T.CHKDATE
+					       , T.CHKID
+					     ) 
+					     VALUES 
+					     (
+					         #{ssnEnterCd}
+					       , S.CONT_TYPE
+					       , S.SDATE
+					       , S.EDATE
+					       , S.PATH
+					       , S.FILE_NM
+					       , S.SIGN_USE_YN
+					       , SYSDATE
+					       , #{ssnSabun}
+					     )
+		</update>
+		
+		<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteEmpContractMgr">
+
+					DELETE FROM THRM410
+					WHERE (ENTER_CD, CONT_TYPE, SDATE)  IN 	(  (NULL, NULL, NULL)  
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test='rm.contType != null and !rm.contType.equals("")'>
+										    (#{ssnEnterCd} , #{rm.contType} , REPLACE(#{rm.sdate}, '-', ''))
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+		
+		<update parameterType="map" id ="saveEmpContractMgrContentsEmpty">
+
+                <![CDATA[
+                    UPDATE THRM410 SET
+   							  CONTENTS  = EMPTY_CLOB()
+   							, CHKDATE 	= SYSDATE
+   							, CHKID		= #{ssnSabun}
+   					WHERE 	ENTER_CD 	= #{ssnEnterCd}
+   					  AND SDATE =  #{sdate}
+   					  AND CONT_TYPE =  #{contType}
+                ]]>
+
+
+		</update>
+
+		<update parameterType="map" id="saveEmpContractMgrContents">
+
+				<![CDATA[
+   					UPDATE THRM410
+   					   SET CONTENTS = #{content}
+   				  	 WHERE ENTER_CD = #{ssnEnterCd}
+   				  	   AND CONT_TYPE = #{contType}
+   					   AND SDATE = #{sdate}
+				]]>
+		</update>
+
+</mapper>

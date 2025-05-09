@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.commonApproval.comAppFormMgr">
+<!-- 신청서 양식 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppFormMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_CD
+					     , A.APPL_TYPE_CD
+					     , A.CONTENTS
+					     , '0' AS BTN_VIEW
+					  FROM THRI800 A, THRI101 B
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_CD  = B.APPL_CD
+					 ORDER BY B.SEQ 
+
+				]]>
+
+
+		</select>
+
+
+<!-- 신청서코드 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppFormMgrApplCdList">
+
+				<![CDATA[
+					SELECT B.APPL_CD	AS CODE
+					     , B.APPL_NM	AS CODE_NM
+					     , A.APPL_TYPE_CD
+					  FROM THRI800 A, THRI101 B
+					 WHERE B.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND B.BIZ_CD = TRIM( 'CAPPL' )
+					   AND B.ENTER_CD = A.ENTER_CD(+)
+					   AND B.APPL_CD  = A.APPL_CD(+)
+					 ORDER BY B.SEQ 
+
+				]]>
+
+
+		</select>
+
+<!-- 신청서코드 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppFormMgrItemComboList">
+
+				<![CDATA[
+					SELECT A.SEARCH_ITEM_CD	AS CODE
+					     , A.SEARCH_ITEM_NM	AS CODE_NM
+					  FROM THRI203 A
+					 WHERE A.ENTER_CD       = TRIM(#{ssnEnterCd})
+					   AND A.SEARCH_ITEM_CD = TRIM(#{searchItemCd})
+					 ORDER BY A.SEQ 
+
+				]]>
+
+
+		</select>
+
+
+<!-- 신청서 항목 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppFormMgrColList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_CD
+					     , A.SEQ
+					     , A.COLUMN_NM
+					     , A.COLUMN_TYPE_CD
+					     , A.COLUMN_FORMAT
+					     , A.COLUMN_WIDTH
+                         , A.COLUMN_ALIGN
+                         
+					     , A.MAX_LENGTH
+					     , A.KEYFIELD_YN
+					     , A.DEF_GUBUN
+					     , A.DEF_VALUE
+					     , A.SEARCH_ITEM_CD
+					     , A.POPUP_ITEM_CD
+					     , A.LAYOUT_SEQ
+					     , A.APP_VIEW_YN
+                         , A.APR_VIEW_YN
+                         
+					     , (SELECT SEARCH_ITEM_NM
+					          FROM THRI203 
+					         WHERE ENTER_CD = A.ENTER_CD
+					           AND SEARCH_ITEM_CD = A.SEARCH_ITEM_CD ) AS SEARCH_ITEM_NM
+					  FROM THRI804 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPL_CD  = TRIM(#{searchApplCd})
+					 ORDER BY A.LAYOUT_SEQ
+
+				]]>
+
+
+		</select>
+		
+<!-- 신청서 항목 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppFormMgrColViewList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_CD
+					     , A.SEQ
+					     , A.COLUMN_NM
+					     , A.COLUMN_TYPE_CD
+					     
+					     , A.COLUMN_FORMAT
+					     , A.COLUMN_WIDTH
+                         , A.COLUMN_ALIGN
+					     , A.MAX_LENGTH
+					     , A.KEYFIELD_YN
+					     , A.DEF_GUBUN
+					     , A.SEARCH_ITEM_CD
+					     , A.POPUP_ITEM_CD
+                         , A.APP_VIEW_YN
+                         , A.APR_VIEW_YN
+					     
+					     , A.DEF_GUBUN
+                         , CASE WHEN NVL(A.DEF_GUBUN,'-1') = '0' THEN F_HRI_GET_APP_FORMAT_ITEM( A.ENTER_CD, A.DEF_VALUE, TRIM(#{ssnSabun}))
+                                ELSE A.DEF_VALUE END AS DEF_VALUE
+					     , B.CODE AS LAYOUT_SEQ
+                         , LEAD(A.LAYOUT_SEQ) OVER(ORDER BY B.SEQ) AS NEXT_SEQ
+					  FROM TSYS005 B, THRI804 A 
+					 WHERE B.ENTER_CD  			= TRIM(#{ssnEnterCd})
+                       AND B.GRCODE_CD 			= 'Z80230'
+                       AND B.USE_YN 			= 'Y' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.S_YMD AND B.E_YMD
+                       AND B.ENTER_CD  			= A.ENTER_CD(+)
+                       AND B.CODE      			= A.LAYOUT_SEQ(+)
+					   AND TRIM(#{searchApplCd})  = A.APPL_CD(+)
+					 ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+
+<!-- 신청서 양식 저장 -->
+		<update parameterType="map" id="saveComAppFormMgr">
+
+					 MERGE INTO THRI800 T 
+					 USING 
+					( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  	 AS  ENTER_CD
+					            , TRIM(#{rm.applCd})  	 AS  APPL_CD
+					            , TRIM(#{rm.applTypeCd}) AS  APPL_TYPE_CD
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.APPL_CD 	= S.APPL_CD 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE		 = sysdate 
+					            , T.CHKID		 = #{ssnSabun}
+					            , T.APPL_TYPE_CD = S.APPL_TYPE_CD
+					            , T.CONTENTS 	 = EMPTY_CLOB()
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_CD
+					            , T.APPL_TYPE_CD
+					            , T.CONTENTS
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_CD
+					            , S.APPL_TYPE_CD
+					            , EMPTY_CLOB()
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+		
+
+
+<!-- 신청서 양식 항목 저장 -->
+		<update parameterType="map" id="saveComAppItemMgrCol">
+
+					 MERGE INTO THRI804 T 
+					 USING 
+					( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD
+					            , TRIM(#{searchApplCd})  	AS  APPL_CD
+			
+	<choose><when test='rm.seq != null and !rm.seq.equals("") '>
+					            , TRIM(#{rm.seq})  		AS  SEQ
+	</when><otherwise>
+			               		, TO_CHAR( (SELECT (NVL(MAX(SEQ),0) + ${icnt}) FROM THRI804 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_CD=TRIM(#{searchApplCd}) ))  AS SEQ
+	<bind name="icnt" value="icnt + 1" />
+	</otherwise>
+	</choose>
+					            , TRIM(#{rm.columnNm})  	AS  COLUMN_NM
+					            , TRIM(#{rm.columnTypeCd})  AS  COLUMN_TYPE_CD
+					           	, TRIM(#{rm.columnFormat}) 	AS  COLUMN_FORMAT
+								, TRIM(#{rm.columnWidth})  	AS  COLUMN_WIDTH
+                                , TRIM(#{rm.columnAlign})   AS  COLUMN_ALIGN
+					            , TRIM(#{rm.maxLength})  	AS  MAX_LENGTH
+					            , TRIM(#{rm.keyfieldYn})  	AS  KEYFIELD_YN
+					            , TRIM(#{rm.defGubun})  	AS  DEF_GUBUN
+					            , TRIM(#{rm.defValue})  	AS  DEF_VALUE
+					            , TRIM(#{rm.searchItemCd})  AS  SEARCH_ITEM_CD
+					            , TRIM(#{rm.popupItemCd})   AS  POPUP_ITEM_CD
+					            , TRIM(#{rm.layoutSeq})  	AS  LAYOUT_SEQ
+                                , TRIM(#{rm.appViewYn})     AS  APP_VIEW_YN
+                                , TRIM(#{rm.aprViewYn})     AS  APR_VIEW_YN
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 		= S.ENTER_CD 
+					     AND  T.APPL_CD 		= S.APPL_CD 
+					     AND  T.SEQ 			= S.SEQ 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+					            , T.COLUMN_NM 		= S.COLUMN_NM 
+					            , T.COLUMN_TYPE_CD 	= S.COLUMN_TYPE_CD 
+					            , T.COLUMN_FORMAT 	= S.COLUMN_FORMAT 
+					            , T.COLUMN_WIDTH 	= S.COLUMN_WIDTH
+                                , T.COLUMN_ALIGN    = S.COLUMN_ALIGN 
+					            , T.MAX_LENGTH 		= S.MAX_LENGTH 
+					            , T.KEYFIELD_YN 	= S.KEYFIELD_YN 
+					            , T.DEF_GUBUN 		= S.DEF_GUBUN 
+					            , T.DEF_VALUE 		= S.DEF_VALUE 
+					            , T.SEARCH_ITEM_CD 	= S.SEARCH_ITEM_CD
+					            , T.POPUP_ITEM_CD 	= S.POPUP_ITEM_CD 
+					            , T.LAYOUT_SEQ 		= S.LAYOUT_SEQ 
+                                , T.APP_VIEW_YN     = S.APP_VIEW_YN 
+                                , T.APR_VIEW_YN     = S.APR_VIEW_YN 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_CD
+					            , T.SEQ
+					            , T.COLUMN_NM
+					            , T.COLUMN_TYPE_CD
+					            , T.COLUMN_FORMAT
+					            , T.COLUMN_WIDTH
+                                , T.COLUMN_ALIGN
+					            , T.MAX_LENGTH
+					            , T.KEYFIELD_YN
+					            , T.DEF_GUBUN
+					            , T.DEF_VALUE
+					            , T.SEARCH_ITEM_CD
+					            , T.POPUP_ITEM_CD
+					            , T.LAYOUT_SEQ
+                                , T.APP_VIEW_YN
+                                , T.APR_VIEW_YN
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_CD
+					            , S.SEQ
+					            , S.COLUMN_NM
+					            , S.COLUMN_TYPE_CD
+					            , S.COLUMN_FORMAT
+					            , S.COLUMN_WIDTH
+                                , S.COLUMN_ALIGN
+					            , S.MAX_LENGTH
+					            , S.KEYFIELD_YN
+					            , S.DEF_GUBUN
+					            , S.DEF_VALUE
+					            , S.SEARCH_ITEM_CD
+					            , S.POPUP_ITEM_CD
+					            , S.LAYOUT_SEQ
+                                , S.APP_VIEW_YN
+                                , S.APR_VIEW_YN
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+
+		</update>
+		
+<!-- 신청서 양식 저장 -->
+		<update parameterType="map" id="updateComAppFormMgr">
+
+				<![CDATA[			
+					 UPDATE THRI800
+					     SET CONTENTS = #{contents}
+					   WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					     AND APPL_CD  = TRIM(#{applCd})
+
+				]]>
+
+		</update>
+
+<!-- 신청서 양식 삭제 -->
+		<delete parameterType="map" id="deleteComAppFormMgr">
+
+					DELETE FROM THRI800
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND ( APPL_CD ) IN ( ( NULL) 
+<foreach item="rm" collection="deleteRows" >
+    <if test='rm.applCd != null and !rm.applCd.equals("") '>
+		     								, ( TRIM( #{rm.applCd} ) )
+	</if>
+</foreach>
+		       								)
+
+		</delete>
+		
+<!-- 신청서 항목 삭제 -->
+		<delete parameterType="map" id="deleteComAppItemMgrCol">
+
+					DELETE FROM THRI804
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					 	AND APPL_CD = TRIM(#{searchApplCd})
+					    AND SEQ IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+    <if test='rm.applCd != null and !rm.applCd.equals("") and rm.seq != null and !rm.seq.equals("") '>
+		     				, TRIM( #{rm.seq} )
+	</if>
+</foreach>
+		       				)
+
+
+		</delete>
+
+</mapper>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.payBonus.bonusConfirm1">
+
+    <!-- 성과급평가1차 조회 -->
+    <select parameterType="map" resultType="cMap" id="getBonusConfirm1List">
+        <![CDATA[
+            SELECT A.YYYY
+                 , A.BONUS_GRP
+                 , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, B.SDATE) AS ORG_NM
+                 , A.SABUN
+                 , C.NAME
+                 , B.JIKWEE_NM
+                 , B.JIKCHAK_NM
+                 , A.RATE
+                 , A.PLAN_MON
+                 , A.RESULT_MON
+                 , NVL(A.CONFIRM1_MON, A.RESULT_MON) AS CONFIRM1_MON
+                 , A.CONFIRM1_YN
+              FROM TCPN615 A
+                 , THRM151 B
+                 , THRM100 C
+             WHERE A.ENTER_CD  = B.ENTER_CD
+               AND A.SABUN     = B.SABUN
+               AND A.ENTER_CD  = C.ENTER_CD
+               AND A.SABUN     = C.SABUN
+               AND A.ENTER_CD  = TRIM(#{ssnEnterCd}) /*회사코드*/
+               AND A.YYYY      = TRIM(#{searchYear})
+               AND B.SDATE     = ( SELECT BB.SDATE
+                                     FROM THRM151 BB
+                                    WHERE BB.ENTER_CD = B.ENTER_CD
+                                      AND BB.SABUN    = B.SABUN
+                                      AND TRIM(#{searchYear}) ||'1231' BETWEEN BB.SDATE AND NVL(BB.EDATE, '99991231')
+                                 )
+         ]]>
+     </select>
+
+    <!--성과급평가1차 저장 -->
+    <update parameterType="map" id="saveBonusConfirm1">
+        MERGE INTO TCPN615 T 
+             USING 
+                ( 
+                SELECT A.ENTER_CD       AS ENTER_CD 
+                     , A.YYYY           AS YYYY
+                     , A.BONUS_GRP      AS BONUS_GRP
+                     , A.SABUN          AS SABUN
+                     , A.CONFIRM1_MON   AS CONFIRM1_MON
+                     , A.CONFIRM1_YN    AS CONFIRM1_YN
+                  FROM ( SELECT NULL AS ENTER_CD 
+                              , NULL AS YYYY
+                              , NULL AS BONUS_GRP
+                              , NULL AS SABUN
+                              , NULL AS CONFIRM1_MON
+                              , NULL AS CONFIRM1_YN
+                           FROM DUAL
+                    <foreach item="rm" collection="mergeRows" >
+                                UNION ALL   
+                               SELECT TRIM(#{ssnEnterCd})     AS ENTER_CD 
+                                    , TRIM(#{rm.yyyy})        AS YYYY
+                                    , TRIM(#{rm.bonusGrp})    AS BONUS_GRP
+                                    , TRIM(#{rm.sabun})       AS SABUN
+                                    , TRIM(#{rm.confirm1Mon}) AS CONFIRM1_MON
+                                    , TRIM(#{rm.confirm1Yn})  AS CONFIRM1_YN
+                                FROM DUAL
+                    </foreach>
+                        ) A 
+                         WHERE A.YYYY       IS NOT NULL
+                           AND A.BONUS_GRP  IS NOT NULL
+                           AND A.SABUN      IS NOT NULL
+                ) S 
+                ON ( 
+                          T.ENTER_CD  = S.ENTER_CD 
+                     AND  T.YYYY      = S.YYYY 
+                     AND  T.BONUS_GRP = S.BONUS_GRP 
+                     AND  T.SABUN     = S.SABUN 
+                ) 
+                WHEN MATCHED THEN 
+                   UPDATE SET T.CHKDATE      = SYSDATE 
+                            , T.CHKID        = #{ssnSabun}
+                            , T.CONFIRM1_MON = S.CONFIRM1_MON 
+                            , T.CONFIRM1_YN  = S.CONFIRM1_YN 
+                WHEN NOT MATCHED THEN 
+                   INSERT 
+                   ( 
+                              T.ENTER_CD
+                            , T.YYYY
+                            , T.BONUS_GRP
+                            , T.SABUN
+                            , T.CONFIRM1_MON
+                            , T.CONFIRM1_YN
+                            , T.CHKDATE
+                            , T.CHKID
+                   ) 
+                   VALUES 
+                   ( 
+                              S.ENTER_CD
+                            , S.YYYY
+                            , S.BONUS_GRP
+                            , S.SABUN
+                            , S.CONFIRM1_MON
+                            , S.CONFIRM1_YN
+                            , SYSDATE
+                            , #{ssnSabun}
+                   ) 
+    </update>
+        
+    <!--성과급평가1차 삭제 -->
+    <delete parameterType="map" id="deleteBonusConfirm1">
+        DELETE FROM TCPN615
+              WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+                AND ( YYYY,BONUS_GRP,SABUN ) IN ( ( NULL,NULL,NULL) 
+        <foreach item="rm" collection="deleteRows" >
+            <if test='rm.yyyy and !rm.yyyy.equals("") and rm.bonusGrp and !rm.bonusGrp.equals("") and rm.sabun and !rm.sabun.equals("")'>
+                  , ( TRIM( #{rm.yyyy} ),TRIM( #{rm.bonusGrp} ),TRIM( #{rm.sabun} )) 
+            </if>
+        </foreach>
+                    )
+    </delete>
+
+</mapper>

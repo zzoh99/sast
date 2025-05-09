@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.holAlterAppDet">
+<!-- 	대체휴일 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolAlterAppDetMap">
+
+				<![CDATA[
+						SELECT A.YMD AS HOL_YMD
+						     , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '1' ) AS HOL_SHM 
+						     , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '2' ) AS HOL_EHM
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'T11010' , A.REQ_TIME_CD) AS HOL_REQ_TIME_NM
+						     , A.REQ_TIME_CD
+						     , A.REQUEST_HOUR AS HOL_WORK_TIME  -- [벽산]신청시간이 인정시간임
+						     
+						     --대체휴가
+						     , NULL AS GNT_CD
+						     , A.ALTER_YMD AS YMD
+						     , NULL AS NOTE
+						     , A.APPL_SEQ AS BF_APPL_SEQ
+						  FROM TTIM601 A
+						 WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+						   AND A.APPL_SEQ = TRIM( #{searchBfApplSeq} )
+						   AND NOT EXISTS ( SELECT 1 FROM TTIM301 X WHERE X.ENTER_CD = TRIM( #{ssnEnterCd} ) AND X.APPL_SEQ = TRIM( #{searchApplSeq} ) )
+						  UNION
+						SELECT A.YMD AS HOL_YMD
+						     , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '1' ) AS HOL_SHM 
+						     , F_TIM_SECOM_TIME_HM(A.ENTER_CD, A.YMD , A.SABUN, '2' ) AS HOL_EHM
+						     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'T11010' , A.REQ_TIME_CD) AS HOL_REQ_TIME_NM
+						     , A.REQ_TIME_CD
+						     , A.REQUEST_HOUR AS HOL_WORK_TIME  -- [벽산]신청시간이 인정시간임
+						     
+						     --대체휴가
+						     , B.GNT_CD
+						     , B.S_YMD AS YMD
+						     , B.NOTE
+						     , B.BF_APPL_SEQ AS BF_APPL_SEQ
+						     
+						  FROM TTIM601 A, TTIM301 B
+						 WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+				           AND A.ENTER_CD = B.ENTER_CD
+						   AND A.APPL_SEQ = B.BF_APPL_SEQ
+						   AND B.APPL_SEQ = TRIM( #{searchApplSeq} )
+							
+				]]>
+
+
+		</select>
+
+
+<!-- 근태코드 콤보  -->
+		<select parameterType="map" resultType="cMap" id="getHolAlterAppDetGntCd">
+
+				<![CDATA[
+                    SELECT B.GNT_CD AS CODE
+                         , B.GNT_NM AS CODE_NM
+                      FROM ( SELECT A.ENTER_CD, F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'T11010', A.REQ_TIME_CD, '1') AS CODE    
+	                    	   FROM TTIM601 A
+							  WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+							    AND A.APPL_SEQ = TRIM( #{searchBfApplSeq} )
+	                          UNION   
+							 SELECT A.ENTER_CD, F_COM_GET_GRCODE_NOTE_VAL(A.ENTER_CD, 'T11010', A.REQ_TIME_CD, '2') AS CODE    
+							   FROM TTIM601 A
+							  WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+							    AND A.APPL_SEQ = TRIM( #{searchBfApplSeq} )
+                           ) A, TTIM014 B
+                     WHERE A.ENTER_CD   = B.ENTER_CD
+                       AND TRIM(A.CODE) = B.GNT_CD
+                     ORDER BY B.SEQ 
+
+				]]>
+
+
+		</select>
+		
+		
+<!-- 재직상태, 휴일  체크  -->
+		<select parameterType="map" resultType="cMap" id="getHolAlterAppDetHoliChk">
+
+				<![CDATA[
+					SELECT F_COM_GET_STATUS_CD( #{ssnEnterCd} , TRIM( #{searchApplSabun} ), REPLACE(TRIM( #{tdYmd} ), '-', '')) AS STATUS_CD --재직상태
+					     , F_TIM_GET_HOLIDAY_CNT( #{ssnEnterCd} , TRIM( #{searchApplSabun} ), TRIM( 'HOLCHK' ), TRIM( nvl(REPLACE(TRIM( #{tdYmd} ), '-', ''), '99991231') ), TRIM( nvl(REPLACE(TRIM( #{tdYmd} ), '-', ''), '99991231') )) AS HOLIDAY_CNT --휴일인지 여부
+					     , F_COM_GET_STD_CD_VALUE(#{ssnEnterCd} , 'TIM_ALTVAC_DEDLINE') AS DEDLINE
+					     , TO_CHAR(TO_DATE(#{holYmd}, 'YYYYMMDD') + TO_NUMBER(NVL(F_COM_GET_STD_CD_VALUE(#{ssnEnterCd} , 'TIM_ALTVAC_DEDLINE'), '99')), 'YYYY-MM-DD') AS DEDLINE_DATE
+					  FROM TTIM120_V A
+					 WHERE A.ENTER_CD    =  #{ssnEnterCd}
+					   AND A.SABUN       = TRIM( #{searchApplSabun} )
+					   AND A.YMD         = REPLACE(TRIM( #{tdYmd} ), '-', '')
+				]]>
+
+
+		</select>
+		
+<!-- 기 신청 건 체크   -->
+		<select parameterType="map" resultType="cMap" id="getHolAlterAppDetDupCnt">
+
+				<![CDATA[
+					SELECT COUNT(1) AS DUP_CNT
+					  FROM TTIM601 A, THRI103 B
+					 WHERE A.ENTER_CD     = #{ssnEnterCd}
+					   AND A.SABUN        = #{searchApplSabun}
+					   AND A.APPL_SEQ    != #{searchApplSeq}
+					   AND A.YMD          = REPLACE( #{tdYmd} ,'-','')
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD NOT IN ( '11', '23', '33', 'ZZ' )   -- 11:임시저장, 23:결재반려, 33:수신반려, ZZ:취소완료
+				]]>
+
+
+		</select>
+		
+		
+<!-- 대체휴일 세부내역 저장 -->		
+		<update parameterType="map" id="saveHolAlterAppDet">
+
+					MERGE INTO TTIM301 T
+					USING	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+								SELECT  #{ssnEnterCd} 							AS ENTER_CD
+										, TRIM(#{rm.searchApplSeq})     		AS APPL_SEQ
+										, TRIM(#{rm.searchApplSabun})    		AS SABUN
+										, TRIM(#{rm.gntCd}) 					AS GNT_CD
+										, REPLACE( TRIM(#{rm.tdYmd})  ,'-','') 	AS S_YMD
+										, REPLACE( TRIM(#{rm.tdYmd})  ,'-','') 	AS E_YMD
+										, CASE WHEN TRIM(#{rm.gntCd}) = '90' THEN '1' ELSE '0.5' END AS HOL_DAY
+										, CASE WHEN TRIM(#{rm.gntCd}) = '90' THEN '1' ELSE '0.5' END AS CLOSE_DAY
+										, TRIM(#{rm.searchBfApplSeq})  			AS BF_APPL_SEQ
+										, TRIM(#{rm.note}) 	            		AS NOTE
+								FROM   DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.APPL_SEQ = S.APPL_SEQ 
+					     AND  T.SABUN    = S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+						        , T.GNT_CD			= S.GNT_CD
+						        , T.S_YMD			= S.S_YMD
+						        , T.E_YMD			= S.E_YMD
+								, T.HOL_DAY			= S.HOL_DAY
+								, T.CLOSE_DAY		= S.CLOSE_DAY
+								, T.BF_APPL_SEQ		= S.BF_APPL_SEQ
+								, T.NOTE			= S.NOTE
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+								, T.GNT_CD
+								, T.S_YMD
+								, T.E_YMD
+								, T.HOL_DAY
+								, T.CLOSE_DAY
+								, T.BF_APPL_SEQ
+								, T.NOTE
+								, T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+								, S.GNT_CD
+								, S.S_YMD
+								, S.E_YMD
+								, S.HOL_DAY
+								, S.CLOSE_DAY
+								, S.BF_APPL_SEQ
+								, S.NOTE
+								, SYSDATE
+								, #{ssnSabun}
+						)
+		</update>
+
+
+</mapper>

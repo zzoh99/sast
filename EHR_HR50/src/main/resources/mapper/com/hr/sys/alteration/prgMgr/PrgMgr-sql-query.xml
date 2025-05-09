@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.alteration.prgMgr">
+<!-- 		조회 -->
+		<select id="getPrgMgrList" parameterType="map"  resultType="cMap">
+
+					SELECT 	  ROWNUM AS RN
+							, PRG_CD
+							, PRG_NM
+							, PRG_ENG_NM
+							, PRG_PATH
+							, USE
+							, VERSION
+							, MEMO
+							, DATE_TRACK_YN
+							, LOG_SAVE_YN
+					FROM TSYS301 
+					WHERE 1 =1 
+				<if test='prgCd != null and !prgCd.equals("")'>
+					AND	PRG_CD 	LIKE '%'||TRIM(#{prgCd})||'%'
+				</if>
+				<if test='prgNm != null and !prgNm.equals("")'>
+					AND	PRG_NM 	LIKE '%'||TRIM(#{prgNm})||'%'
+				</if>
+				<if test='use != null and !use.equals("")'>
+					AND	USE 	=  TRIM(#{use})
+				</if>
+					ORDER BY CHKDATE DESC, PRG_NM, PRG_CD
+
+
+		</select>
+<!-- 		저장 -->	
+		<update id="savePrgMgr" parameterType="map">
+
+					MERGE INTO TSYS301 T
+					USING	(
+							SELECT	  A.PRG_CD
+									, A.PRG_NM
+									, A.PRG_ENG_NM
+									, A.PRG_PATH
+									, A.USE
+									, A.VERSION
+									, A.MEMO
+									, A.DATE_TRACK_YN
+									, A.LOG_SAVE_YN
+							FROM	(
+									SELECT	  NULL	AS PRG_CD       
+											, NULL	AS PRG_NM       
+											, NULL	AS PRG_ENG_NM   
+											, NULL	AS PRG_PATH     
+											, NULL	AS USE          
+											, NULL	AS VERSION      
+											, NULL	AS MEMO         
+											, NULL	AS DATE_TRACK_YN
+											, NULL	AS LOG_SAVE_YN  
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{rm.prgCd} )	AS PRG_CD
+											, TRIM( #{rm.prgNm} )	AS PRG_NM
+											, TRIM( #{rm.prgEngNm} )	AS PRG_ENG_NM
+											, TRIM( #{rm.prgPath} )	AS PRG_PATH
+											, TRIM( #{rm.use} )	AS USE
+											, TRIM( #{rm.version} )	AS VERSION
+											, TRIM( #{rm.memo} )	AS MEMO
+											, TRIM( #{rm.dateTrackYn} )	AS DATE_TRACK_YN
+											, TRIM( #{rm.logSaveYn} )	AS LOG_SAVE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE PRG_CD IS NOT NULL
+							) S
+					ON ( T.PRG_CD		= S.PRG_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	     
+									  T.PRG_NM        	= S.PRG_NM       
+									, T.PRG_ENG_NM    	= S.PRG_ENG_NM   
+			                      	, T.PRG_PATH      	= S.PRG_PATH     
+			                   		, T.USE           	= S.USE          
+			                    	, T.VERSION       	= S.VERSION      
+			                      	, T.MEMO          	= S.MEMO         
+			                     	, T.DATE_TRACK_YN 	= S.DATE_TRACK_YN
+			                       	, T.LOG_SAVE_YN		= S.LOG_SAVE_YN 
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.PRG_CD       
+   							, T.PRG_NM       
+   							, T.PRG_ENG_NM   
+   							, T.PRG_PATH     
+   							, T.USE          
+   							, T.VERSION      
+   							, T.MEMO         
+   							, T.DATE_TRACK_YN
+   							, T.LOG_SAVE_YN    
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+ 							  S.PRG_CD       
+ 							, S.PRG_NM       
+ 							, S.PRG_ENG_NM   
+ 							, S.PRG_PATH     
+ 							, S.USE          
+ 							, S.VERSION      
+ 							, S.MEMO         
+ 							, S.DATE_TRACK_YN
+ 							, S.LOG_SAVE_YN  
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePrgMgr">
+
+					DELETE FROM TSYS301 
+					WHERE 	PRG_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.prgCd != null and !rm.prgCd.equals("")'>
+											TRIM( #{rm.prgCd} )
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+
+
+</mapper>

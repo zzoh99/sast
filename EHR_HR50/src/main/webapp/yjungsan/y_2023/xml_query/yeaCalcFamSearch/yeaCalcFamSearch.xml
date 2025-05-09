@@ -1,0 +1,641 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	가족별입력공제현황
+ -->
+<root>
+
+	<!-- 가족별입력공제현황 조회 -->
+	<query id="selectYeaCalcFamSearch_bak">
+		<![CDATA[
+			SELECT A.ENTER_CD --회사구분
+			     , A.WORK_YY
+			     , A.ADJUST_TYPE
+			     , A.SABUN
+			     , Y.NAME
+			     , A.FAMRES --가족주민번호
+			     , FAM_CD_NM --가족관계
+			     , FAM_NM --가족성명
+			     , LAST_DPNDNT_YN --작년기본공제
+			     , DPNDNT_YN --기본공제
+			     , SPOUSE_YN --배우자공제
+			     , SENIOR_YN --경로우대공제
+			     , WOMAN_YN --부녀자공제
+			     , ONE_PARENT_YN --한부모공제
+			     , CHILD_YN --자녀양육여부
+			     , ADD_CHILD_YN --자녀세액여부
+			     , HNDCP_YN --장애자여부
+			     , HNDCP_TYPE --장애구분
+			     , (SELECT X.SDATE
+			          FROM TCPN824 X
+			         WHERE X.ENTER_CD = A.ENTER_CD
+			           AND X.ADJUST_TYPE = A.ADJUST_TYPE
+			           AND X.SABUN = A.SABUN
+			           AND F_COM_DECRYPT(X.FAMRES, X.ENTER_CD) = A.FAMRES
+			           AND X.WORK_YY = (SELECT MAX(Y.WORK_YY)
+			           					FROM TCPN824 Y
+			           				   WHERE Y.ENTER_CD = X.ENTER_CD
+			           				     AND Y.ADJUST_TYPE = X.ADJUST_TYPE
+			           				     AND Y.SABUN = X.SABUN
+			           				     AND F_YEA_GET_EX_DECRYPT(Y.FAMRES, Y.ENTER_CD) = F_YEA_GET_EX_DECRYPT(X.FAMRES, X.ENTER_CD)
+			           				     AND #searchWorkYy#||'1231' BETWEEN NVL(Y.SDATE,#searchWorkYy#||'0101') AND NVL(Y.EDATE,'99991231'))
+			       ) AS SDATE
+			     , (SELECT X.EDATE
+			          FROM TCPN824 X
+			         WHERE X.ENTER_CD = A.ENTER_CD
+			           AND X.ADJUST_TYPE = A.ADJUST_TYPE
+			           AND X.SABUN = A.SABUN
+			           AND F_COM_DECRYPT(X.FAMRES, X.ENTER_CD) = A.FAMRES
+			           AND X.WORK_YY = (SELECT MAX(Y.WORK_YY)
+			           					FROM TCPN824 Y
+			           				   WHERE Y.ENTER_CD = X.ENTER_CD
+			           				     AND Y.ADJUST_TYPE = X.ADJUST_TYPE
+			           				     AND Y.SABUN = X.SABUN
+			           				     AND F_YEA_GET_EX_DECRYPT(Y.FAMRES, Y.ENTER_CD) = F_YEA_GET_EX_DECRYPT(X.FAMRES, X.ENTER_CD)
+			           				     AND #searchWorkYy#||'1231' BETWEEN NVL(Y.SDATE,#searchWorkYy#||'0101') AND NVL(Y.EDATE,'99991231'))
+			       ) AS EDATE
+			     , ADOPT_BORN_YN --출산입양공제
+			     , INSURANCE_YN --보험료공제
+			     , MEDICAL_YN --의료비공제
+			     , EDUCATION_YN --교육공제
+			     , CREDIT_YN --신용카드등공제
+			     , NVL(CARD_NTS_MON,0) AS CARD_NTS_MON --국세청_신용카드
+			     , NVL(CARD_MON,0) AS CARD_MON --신용카드
+			     , NVL(CHCK_NTS_MON,0) AS CHCK_NTS_MON --국세청_직불기명식선불카드
+			     , NVL(CHECK_MON,0) AS CHECK_MON --직불기명식선불카드
+			     , NVL(BILL_NITS_MON,0) AS BILL_NITS_MON --국세청_현금영수증
+			     , NVL(BILL_MON,0) AS BILL_MON --현금영수증
+			     , NVL(MARKET_NTS_MON,0) AS MARKET_NTS_MON --국세청_전통시장사용분
+			     , NVL(MARKET_MON,0) AS MARKET_MON --전통시장사용분
+			     , NVL(BUS_NTS_MON,0) AS BUS_NTS_MON --국세청_대중교통이용분
+			     , NVL(BUS_MON,0) AS BUS_MON --대중교통이용분
+			     , NVL(SUM_D0,0) AS SUM_D0 --신용카드등사용공제금액
+			     , NVL(MEDI_NTS_MON,0) AS MEDI_NTS_MON --국세청_의료비
+			     , NVL(MEDI_MON,0) AS MEDI_MON --의료비
+			     , NVL(SUM_D4,0) AS SUM_D4 --의료비공제금액
+			     , NVL(EDU_NTS_MON,0) AS EDU_NTS_MON --국세청_교육비
+			     , NVL(EDU_MON,0) AS EDU_MON --교육비
+			     , NVL(SUM_D5,0) AS SUM_D5 --교육비공제금액
+			     , NVL(INSU_NTS_MON,0) AS INSU_NTS_MON --국세청_보험료
+			     , NVL(INSU_MON,0) + (CASE WHEN A.FAM_CD='0' THEN H.HEL_MON ELSE 0 END) AS INSU_MON --보험료
+			     , NVL(SUM_D6,0) AS SUM_D6 --보험료공제금액
+			     , NVL(DONA_NTS_MON,0) AS DONA_NTS_MON --국세청_기부금
+			     , NVL(DONA_MON,0) AS DONA_MON --기부금
+			     , NVL(SUM_D7,0) AS SUM_D7 --기부금공제금액
+			FROM
+			  (SELECT A.ENTER_CD
+			        , A.WORK_YY
+			        , A.ADJUST_TYPE
+			        , A.SABUN
+			        , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+			        , A.FAM_CD
+			        , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'C00309', A.FAM_CD) AS FAM_CD_NM --가족관계
+			        , A.FAM_NM AS FAM_NM --가족성명
+			        , NVL((SELECT NVL(G.DPNDNT_YN,'N')
+			           	 FROM TCPN823 G
+			           	WHERE G.ENTER_CD = A.ENTER_CD
+			           	  AND G.WORK_YY = A.WORK_YY-1
+			           	  AND G.ADJUST_TYPE = A.ADJUST_TYPE
+			           	  AND G.SABUN = A.SABUN
+			           	  AND G.FAM_CD = A.FAM_CD
+			           	  AND F_COM_DECRYPT(G.FAMRES, G.ENTER_CD) = F_COM_DECRYPT(A.FAMRES, A.ENTER_CD)
+			           	  AND NVL(G.DPNDNT_YN,'N') = 'Y'),'N') AS LAST_DPNDNT_YN
+			        , A.DPNDNT_YN AS DPNDNT_YN --기본공제
+			        , A.SPOUSE_YN AS SPOUSE_YN --배우자공제
+			        , A.SENIOR_YN AS SENIOR_YN --경로우대공제
+			        , A.WOMAN_YN AS WOMAN_YN --부녀자공제
+			        , A.ONE_PARENT_YN AS ONE_PARENT_YN --한부모공제
+			        , A.CHILD_YN AS CHILD_YN --자녀양육여부
+			        , A.ADD_CHILD_YN AS ADD_CHILD_YN --자녀세액여부
+			        , A.HNDCP_YN AS HNDCP_YN --장애자여부
+			        , A.ADOPT_BORN_YN AS ADOPT_BORN_YN --출산입양공제
+			        , A.INSURANCE_YN AS INSURANCE_YN --보험료공제
+			        , A.MEDICAL_YN AS MEDICAL_YN --의료비공제
+			        , A.EDUCATION_YN AS EDUCATION_YN --교육공제
+			        , A.CREDIT_YN AS CREDIT_YN --신용카드등공제
+			        , A.HNDCP_TYPE
+			   FROM TCPN823 A
+			    ) A,
+			  (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(CARD_NTS_MON) AS CARD_NTS_MON --국세청_신용카드
+			        , SUM(CARD_MON) AS CARD_MON --신용카드
+			        , SUM(CHECK_NTS_MON) AS CHCK_NTS_MON --국세청_직불기명식선불카드
+			        , SUM(CHECK_MON) AS CHECK_MON --직불기명식선불카드
+			        , SUM(BILL_NTS_MON) AS BILL_NITS_MON --국세청_현금영수증
+			        , SUM(BILL_MON) AS BILL_MON --현금영수증
+			        , SUM(MARKET_NTS_MON) AS MARKET_NTS_MON --국세청_전통시장사용분
+			        , SUM(MARKET_MON) AS MARKET_MON --전통시장사용분
+			        , SUM(BUS_NTS_MON) AS BUS_NTS_MON --국세청_대중교통이용분
+			        , SUM(BUS_MON) AS BUS_MON --대중교통이용분
+			       FROM
+			       (
+			         SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+			         (CASE WHEN CARD_TYPE = '1'  AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS CARD_NTS_MON,
+			         (CASE WHEN CARD_TYPE = '1'  AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS CARD_MON,
+			         (CASE WHEN CARD_TYPE = '2' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS CHECK_NTS_MON,
+			         (CASE WHEN CARD_TYPE = '2' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS CHECK_MON,
+			         (CASE WHEN CARD_TYPE = '7' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS BILL_NTS_MON,
+			         (CASE WHEN CARD_TYPE = '7' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS BILL_MON,
+			         (CASE WHEN CARD_TYPE = '9' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS MARKET_NTS_MON,
+			         (CASE WHEN CARD_TYPE = '9' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS MARKET_MON,
+			         (CASE WHEN CARD_TYPE = '10' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS BUS_NTS_MON,
+			         (CASE WHEN CARD_TYPE = '10' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS BUS_MON
+			          FROM TCPN821 A
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD), A.CARD_TYPE, A.NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, FAMRES
+			   ) B,
+			  (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(EDU_NTS_MON) AS EDU_NTS_MON --국세청_교육비
+			        , SUM(EDU_MON) AS EDU_MON --교육비
+			       FROM
+			       (
+			          SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+			         (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS EDU_NTS_MON,
+			         (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS EDU_MON
+			          FROM TCPN829 A
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,SABUN, FAMRES
+			   ) C,
+			   (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN, FAMRES
+			        , SUM(MEDI_NTS_MON) AS MEDI_NTS_MON --국세청_의료비
+			        , SUM(MEDI_MON) AS MEDI_MON --의료비
+			       FROM
+			       (
+			          SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+			         (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS MEDI_NTS_MON,
+			         (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS MEDI_MON
+			          FROM TCPN825 A
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,SABUN, FAMRES
+			   ) D,
+			   (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(INSU_NTS_MON) AS INSU_NTS_MON --국세청_보험료
+			        , SUM(INSU_MON) AS INSU_MON --보험료
+			       FROM
+			       (
+			          SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES_INSURED, A.ENTER_CD) AS FAMRES,
+			         (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS INSU_NTS_MON,
+			         (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS INSU_MON
+			          FROM TCPN828 A
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES_INSURED, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, FAMRES
+			   ) E,
+			   (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(DONA_NTS_MON) AS DONA_NTS_MON --국세청_기부금
+			        , SUM(DONA_MON) AS DONA_MON --기부금
+			       FROM
+			       (
+			       SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+			      (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS DONA_NTS_MON,
+			      (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS DONA_MON
+			       FROM TCPN827 A
+			       GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,SABUN, FAMRES
+			   ) F,
+			   (   SELECT ENTER_CD
+			            , WORK_YY
+			            , ADJUST_TYPE, SABUN
+			            , '0' AS FAM_CD
+			            , SUM(D0) AS SUM_D0 --신용카드등사용공제금액
+			            , SUM(D4) AS SUM_D4 --의료비공제금액
+			            , SUM(D5) AS SUM_D5 --교육비공제금액
+			            , SUM(D6) AS SUM_D6 --보험료공제금액
+			            , SUM(D7) AS SUM_D7 --기부금공제금액
+			         FROM (
+			            SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_23' THEN MAX(DATA_MON) ELSE 0 END) AS D0,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_15' THEN MAX(DATA_MON) ELSE 0 END) AS D1,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_22' THEN MAX(DATA_MON) ELSE 0 END) AS D2,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_13' THEN MAX(DATA_MON) ELSE 0 END) AS D3,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A050_01' THEN MAX(DATA_MON) ELSE 0 END) AS D4,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A060_01' THEN MAX(DATA_MON) ELSE 0 END) AS D5,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A040_01' THEN MAX(DATA_MON) ELSE 0 END) AS D6,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A080_01' THEN MAX(DATA_MON) ELSE 0 END) AS D7
+			            FROM (
+			            SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, ADJ_ELEMENT_CD, DATA_MON
+			            FROM TCPN843
+			            WHERE ADJ_ELEMENT_CD IN ('A060_01', 'A050_01','A040_01','A100_13', 'A100_15', 'A100_22', 'A080_01', 'A100_23')
+			            )   GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, ADJ_ELEMENT_CD
+			         )  GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			   ) G,
+			   (
+			       SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, SUM(DATA_MON) AS HEL_MON
+			         FROM (
+			                     SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN,  NVL(SUM(HEL_MON), 0) + NVL(SUM(EMP_MON), 0) AS DATA_MON
+			                       FROM TCPN813
+			                     GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			                     UNION ALL
+			                     SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, NVL(SUM(HEL_MON), 0) + NVL(SUM(EMP_MON), 0) AS DATA_MON
+			                       FROM TCPN817
+			                     GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			             )
+			       GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			   ) H,
+			   TSYS005 X,
+			   THRM100 Y
+			WHERE A.ENTER_CD = X.ENTER_CD
+			   AND A.FAM_CD = X.CODE
+			   AND X.GRCODE_CD = 'C00309'
+			   AND A.ENTER_CD = B.ENTER_CD(+)
+			   AND A.WORK_YY = B.WORK_YY(+)
+			   AND A.ADJUST_TYPE = B.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = C.ENTER_CD(+)
+			   AND A.WORK_YY = C.WORK_YY(+)
+			   AND A.ADJUST_TYPE = C.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = D.ENTER_CD(+)
+			   AND A.WORK_YY = D.WORK_YY(+)
+			   AND A.ADJUST_TYPE = D.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = E.ENTER_CD(+)
+			   AND A.WORK_YY = E.WORK_YY(+)
+			   AND A.ADJUST_TYPE = E.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = F.ENTER_CD(+)
+			   AND A.WORK_YY = F.WORK_YY(+)
+			   AND A.ADJUST_TYPE = F.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = G.ENTER_CD(+)
+			   AND A.WORK_YY = G.WORK_YY(+)
+			   AND A.ADJUST_TYPE = G.ADJUST_TYPE(+)
+			   AND A.SABUN = B.SABUN(+)
+			   AND A.FAMRES = B.FAMRES(+)
+			   AND A.SABUN = C.SABUN(+)
+			   AND A.FAMRES = C.FAMRES(+)
+			   AND A.SABUN = D.SABUN(+)
+			   AND A.FAMRES = D.FAMRES(+)
+			   AND A.SABUN = E.SABUN(+)
+			   AND A.FAMRES = E.FAMRES(+)
+			   AND A.SABUN = F.SABUN(+)
+			   AND A.FAMRES = F.FAMRES(+)
+			   AND A.SABUN = G.SABUN(+)
+			   AND A.FAM_CD = G.FAM_CD(+)
+			   AND A.ENTER_CD = H.ENTER_CD(+)
+			   AND A.ADJUST_TYPE = H.ADJUST_TYPE(+)
+			   AND A.WORK_YY = H.WORK_YY(+)
+			   AND A.SABUN = H.SABUN(+)
+			   AND A.ENTER_CD = Y.ENTER_CD
+			   AND A.SABUN = Y.SABUN
+			   AND A.ENTER_CD = #ssnEnterCd#
+			   AND A.WORK_YY        = #searchWorkYy#
+			   AND A.ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			   AND A.ADJUST_TYPE    IN (SELECT CODE
+					                     FROM TSYS005
+					                    WHERE ENTER_CD = #ssnEnterCd#
+					                      AND GRCODE_CD = 'C00303'
+					                      AND USE_YN = 'Y')
+			   AND (A.SABUN LIKE '%'||#searchSbNm#||'%' OR Y.NAME LIKE '%'||#searchSbNm#||'%')
+			 ORDER BY A.SABUN, A.FAM_CD
+		]]>
+	</query>
+
+	<!-- 가족별입력공제현황 조회 (selectYeaCalcFamSearch 쿼리 조회속도 안나올때 이쿼리 호출되도록 수정) -->
+	<query id="selectYeaCalcFamSearch">
+		<![CDATA[
+			SELECT A.ENTER_CD --회사구분
+			     , A.WORK_YY
+			     , A.ADJUST_TYPE
+			     , A.SABUN
+			     , Y.NAME
+			     , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES --가족주민번호
+			     , FAM_CD_NM --가족관계
+			     , FAM_NM --가족성명
+			     , LAST_DPNDNT_YN --작년기본공제
+			     , DPNDNT_YN --기본공제
+			     , SPOUSE_YN --배우자공제
+			     , SENIOR_YN --경로우대공제
+			     , WOMAN_YN --부녀자공제
+			     , ONE_PARENT_YN --한부모공제
+			     , CHILD_YN --자녀양육여부
+			     , ADD_CHILD_YN --자녀세액여부
+			     , HNDCP_YN --장애자여부
+			     , HNDCP_TYPE --장애구분
+			     , (SELECT X.SDATE
+			          FROM TCPN824 X
+			         WHERE X.ENTER_CD = A.ENTER_CD
+			           AND X.ADJUST_TYPE = A.ADJUST_TYPE
+			           AND X.SABUN = A.SABUN
+			           AND F_YEA_GET_EX_DECRYPT(X.FAMRES, X.ENTER_CD) = A.FAMRES
+			           AND X.WORK_YY = (SELECT MAX(Y.WORK_YY)
+			           					FROM TCPN824 Y
+			           				   WHERE Y.ENTER_CD = X.ENTER_CD
+			           				     AND Y.ADJUST_TYPE = X.ADJUST_TYPE
+			           				     AND Y.SABUN = X.SABUN
+			           				     AND F_YEA_GET_EX_DECRYPT(Y.FAMRES, Y.ENTER_CD) = F_YEA_GET_EX_DECRYPT(X.FAMRES, X.ENTER_CD)
+			           				     AND #searchWorkYy#||'1231' BETWEEN NVL(Y.SDATE,#searchWorkYy#||'0101') AND NVL(Y.EDATE,'99991231'))
+			       ) AS SDATE
+			     , (SELECT X.EDATE
+			          FROM TCPN824 X
+			         WHERE X.ENTER_CD = A.ENTER_CD
+			           AND X.ADJUST_TYPE = A.ADJUST_TYPE
+			           AND X.SABUN = A.SABUN
+			           AND F_YEA_GET_EX_DECRYPT(X.FAMRES, X.ENTER_CD) = A.FAMRES
+			           AND X.WORK_YY = (SELECT MAX(Y.WORK_YY)
+			           					FROM TCPN824 Y
+			           				   WHERE Y.ENTER_CD = X.ENTER_CD
+			           				     AND Y.ADJUST_TYPE = X.ADJUST_TYPE
+			           				     AND Y.SABUN = X.SABUN
+			           				     AND F_YEA_GET_EX_DECRYPT(Y.FAMRES, Y.ENTER_CD) = F_YEA_GET_EX_DECRYPT(X.FAMRES, X.ENTER_CD)
+			           				     AND #searchWorkYy#||'1231' BETWEEN NVL(Y.SDATE,#searchWorkYy#||'0101') AND NVL(Y.EDATE,'99991231'))
+			       ) AS EDATE
+			     , ADOPT_BORN_YN --출산입양공제
+			     , INSURANCE_YN --보험료공제
+			     , MEDICAL_YN --의료비공제
+			     , EDUCATION_YN --교육공제
+			     , CREDIT_YN --신용카드등공제
+			     , NVL(CARD_NTS_MON,0) AS CARD_NTS_MON --국세청_신용카드
+			     , NVL(CARD_MON,0) AS CARD_MON --신용카드
+			     , NVL(CHCK_NTS_MON,0) AS CHCK_NTS_MON --국세청_직불기명식선불카드
+			     , NVL(CHECK_MON,0) AS CHECK_MON --직불기명식선불카드
+			     , NVL(BILL_NITS_MON,0) AS BILL_NITS_MON --국세청_현금영수증
+			     , NVL(BILL_MON,0) AS BILL_MON --현금영수증
+			     , NVL(MARKET_NTS_MON,0) AS MARKET_NTS_MON --국세청_전통시장사용분
+			     , NVL(MARKET_MON,0) AS MARKET_MON --전통시장사용분
+			     , NVL(BUS_NTS_MON,0) AS BUS_NTS_MON --국세청_대중교통이용분
+			     , NVL(BUS_MON,0) AS BUS_MON --대중교통이용분
+			     , NVL(SUM_D0,0) AS SUM_D0 --신용카드등사용공제금액
+			     , NVL(MEDI_NTS_MON,0) AS MEDI_NTS_MON --국세청_의료비
+			     , NVL(MEDI_MON,0) AS MEDI_MON --의료비
+			     , NVL(SUM_D4,0) AS SUM_D4 --의료비공제금액
+			     , NVL(EDU_NTS_MON,0) AS EDU_NTS_MON --국세청_교육비
+			     , NVL(EDU_MON,0) AS EDU_MON --교육비
+			     , NVL(SUM_D5,0) AS SUM_D5 --교육비공제금액
+			     , NVL(INSU_NTS_MON,0) AS INSU_NTS_MON --국세청_보험료
+			     , NVL(INSU_MON,0) + (CASE WHEN A.FAM_CD='0' THEN H.HEL_MON ELSE 0 END) AS INSU_MON --보험료
+			     , NVL(SUM_D6,0) AS SUM_D6 --보험료공제금액
+			     , NVL(DONA_NTS_MON,0) AS DONA_NTS_MON --국세청_기부금
+			     , NVL(DONA_MON,0) AS DONA_MON --기부금
+			     , NVL(SUM_D7,0) AS SUM_D7 --기부금공제금액
+			FROM
+			  (SELECT --/*+ RULE */
+			          A.ENTER_CD
+			        , A.WORK_YY
+			        , A.ADJUST_TYPE
+			        , A.SABUN
+			        , F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+			        , A.FAM_CD
+			        , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'C00309', A.FAM_CD) AS FAM_CD_NM --가족관계
+			        , A.FAM_NM AS FAM_NM --가족성명
+			        , NVL((SELECT NVL(G.DPNDNT_YN,'N')
+			           	 FROM TCPN823 G
+			           	WHERE G.ENTER_CD = A.ENTER_CD
+			           	  AND G.WORK_YY = A.WORK_YY-1
+			           	  AND G.ADJUST_TYPE = A.ADJUST_TYPE
+			           	  AND G.SABUN = A.SABUN
+			           	  AND G.FAM_CD = A.FAM_CD
+			           	  AND F_YEA_GET_EX_DECRYPT(G.FAMRES, G.ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+			           	  AND NVL(G.DPNDNT_YN,'N') = 'Y'),'N') AS LAST_DPNDNT_YN
+			        , A.DPNDNT_YN AS DPNDNT_YN --기본공제
+			        , A.SPOUSE_YN AS SPOUSE_YN --배우자공제
+			        , A.SENIOR_YN AS SENIOR_YN --경로우대공제
+			        , A.WOMAN_YN AS WOMAN_YN --부녀자공제
+			        , A.ONE_PARENT_YN AS ONE_PARENT_YN --한부모공제
+			        , A.CHILD_YN AS CHILD_YN --자녀양육여부
+			        , A.ADD_CHILD_YN AS ADD_CHILD_YN --자녀세액여부
+			        , A.HNDCP_YN AS HNDCP_YN --장애자여부
+			        , A.ADOPT_BORN_YN AS ADOPT_BORN_YN --출산입양공제
+			        , A.INSURANCE_YN AS INSURANCE_YN --보험료공제
+			        , A.MEDICAL_YN AS MEDICAL_YN --의료비공제
+			        , A.EDUCATION_YN AS EDUCATION_YN --교육공제
+			        , A.CREDIT_YN AS CREDIT_YN --신용카드등공제
+			        , A.HNDCP_TYPE
+			     FROM TCPN823 A
+                WHERE 1 = 1
+                  AND ENTER_CD = #ssnEnterCd#
+                  AND WORK_YY        = #searchWorkYy#
+                  AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			    ) A,
+			  (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(CARD_NTS_MON) AS CARD_NTS_MON --국세청_신용카드
+			        , SUM(CARD_MON) AS CARD_MON --신용카드
+			        , SUM(CHECK_NTS_MON) AS CHCK_NTS_MON --국세청_직불기명식선불카드
+			        , SUM(CHECK_MON) AS CHECK_MON --직불기명식선불카드
+			        , SUM(BILL_NTS_MON) AS BILL_NITS_MON --국세청_현금영수증
+			        , SUM(BILL_MON) AS BILL_MON --현금영수증
+			        , SUM(MARKET_NTS_MON) AS MARKET_NTS_MON --국세청_전통시장사용분
+			        , SUM(MARKET_MON) AS MARKET_MON --전통시장사용분
+			        , SUM(BUS_NTS_MON) AS BUS_NTS_MON --국세청_대중교통이용분
+			        , SUM(BUS_MON) AS BUS_MON --대중교통이용분
+			       FROM
+			       (
+			         SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+					         (CASE WHEN CARD_TYPE = '1'  AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS CARD_NTS_MON,
+					         (CASE WHEN CARD_TYPE = '1'  AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS CARD_MON,
+					         (CASE WHEN CARD_TYPE = '2' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS CHECK_NTS_MON,
+					         (CASE WHEN CARD_TYPE = '2' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS CHECK_MON,
+					         (CASE WHEN CARD_TYPE = '7' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS BILL_NTS_MON,
+					         (CASE WHEN CARD_TYPE = '7' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS BILL_MON,
+					         (CASE WHEN CARD_TYPE = '9' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS MARKET_NTS_MON,
+					         (CASE WHEN CARD_TYPE = '9' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS MARKET_MON,
+					         (CASE WHEN CARD_TYPE = '10' AND NTS_YN='Y' THEN MAX(A.APPL_MON) ELSE 0 END) AS BUS_NTS_MON,
+					         (CASE WHEN CARD_TYPE = '10' AND NTS_YN='N' THEN MAX(A.APPL_MON) ELSE 0 END) AS BUS_MON
+			          FROM TCPN821 A
+	                  WHERE 1 = 1
+	                    AND ENTER_CD = #ssnEnterCd#
+	                    AND WORK_YY        = #searchWorkYy#
+	                    AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD), A.CARD_TYPE, A.NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, FAMRES
+			   ) B,
+			  (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(EDU_NTS_MON) AS EDU_NTS_MON --국세청_교육비
+			        , SUM(EDU_MON) AS EDU_MON --교육비
+			       FROM
+			       (
+			          SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+					         (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS EDU_NTS_MON,
+					         (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS EDU_MON
+			          FROM TCPN829 A
+	                  WHERE 1 = 1
+	                    AND ENTER_CD = #ssnEnterCd#
+	                    AND WORK_YY        = #searchWorkYy#
+	                    AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,SABUN, FAMRES
+			   ) C,
+			   (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN, FAMRES
+			        , SUM(MEDI_NTS_MON) AS MEDI_NTS_MON --국세청_의료비
+			        , SUM(MEDI_MON) AS MEDI_MON --의료비
+			       FROM
+			       (
+			          SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+					         (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS MEDI_NTS_MON,
+					         (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS MEDI_MON
+			          FROM TCPN825 A
+	                  WHERE 1 = 1
+	                    AND ENTER_CD = #ssnEnterCd#
+	                    AND WORK_YY        = #searchWorkYy#
+	                    AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,SABUN, FAMRES
+			   ) D,
+			   (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(INSU_NTS_MON) AS INSU_NTS_MON --국세청_보험료
+			        , SUM(INSU_MON) AS INSU_MON --보험료
+			       FROM
+			       (
+			          SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES_INSURED, A.ENTER_CD) AS FAMRES,
+					         (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS INSU_NTS_MON,
+					         (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS INSU_MON
+			          FROM TCPN828 A
+	                  WHERE 1 = 1
+	                    AND ENTER_CD = #ssnEnterCd#
+	                    AND WORK_YY        = #searchWorkYy#
+	                    AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			          GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES_INSURED, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, FAMRES
+			   ) E,
+			   (SELECT ENTER_CD
+			        , WORK_YY
+			        , ADJUST_TYPE
+			        , SABUN
+			        , FAMRES
+			        , SUM(DONA_NTS_MON) AS DONA_NTS_MON --국세청_기부금
+			        , SUM(DONA_MON) AS DONA_MON --기부금
+			       FROM
+			       (
+			       SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES,
+					      (CASE WHEN NTS_YN='Y' THEN SUM(A.APPL_MON) ELSE 0 END) AS DONA_NTS_MON,
+					      (CASE WHEN NTS_YN='N' THEN SUM(A.APPL_MON) ELSE 0 END) AS DONA_MON
+			       FROM TCPN827 A
+                  WHERE 1 = 1
+                    AND ENTER_CD = #ssnEnterCd#
+                    AND WORK_YY        = #searchWorkYy#
+                    AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			       GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,A.SABUN, F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD), NTS_YN
+			       ) GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE,SABUN, FAMRES
+			   ) F,
+			   (   SELECT ENTER_CD
+			            , WORK_YY
+			            , ADJUST_TYPE, SABUN
+			            , '0' AS FAM_CD
+			            , SUM(D0) AS SUM_D0 --신용카드등사용공제금액
+			            , SUM(D4) AS SUM_D4 --의료비공제금액
+			            , SUM(D5) AS SUM_D5 --교육비공제금액
+			            , SUM(D6) AS SUM_D6 --보험료공제금액
+			            , SUM(D7) AS SUM_D7 --기부금공제금액
+			         FROM (
+			            SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_23' THEN MAX(DATA_MON) ELSE 0 END) AS D0,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_15' THEN MAX(DATA_MON) ELSE 0 END) AS D1,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_22' THEN MAX(DATA_MON) ELSE 0 END) AS D2,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A100_13' THEN MAX(DATA_MON) ELSE 0 END) AS D3,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A050_01' THEN MAX(DATA_MON) ELSE 0 END) AS D4,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A060_01' THEN MAX(DATA_MON) ELSE 0 END) AS D5,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A040_01' THEN MAX(DATA_MON) ELSE 0 END) AS D6,
+			                  (CASE WHEN ADJ_ELEMENT_CD='A080_01' THEN MAX(DATA_MON) ELSE 0 END) AS D7
+			            FROM (
+			            SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, ADJ_ELEMENT_CD, DATA_MON
+			            FROM TCPN843
+			            WHERE ADJ_ELEMENT_CD IN ('A060_01', 'A050_01','A040_01','A100_13', 'A100_15', 'A100_22', 'A080_01', 'A100_23')
+			              AND ENTER_CD = #ssnEnterCd#
+			              AND WORK_YY        = #searchWorkYy#
+			              AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			            )   GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, ADJ_ELEMENT_CD
+			         )  GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			   ) G,
+			   (
+			       SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, SUM(DATA_MON) AS HEL_MON
+			         FROM (
+			                     SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN,  NVL(SUM(HEL_MON), 0) + NVL(SUM(EMP_MON), 0) AS DATA_MON
+			                       FROM TCPN813
+			                      WHERE 1 = 1
+			                        AND ENTER_CD = #ssnEnterCd#
+			                        AND WORK_YY        = #searchWorkYy#
+			                        AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			                     GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			                     UNION ALL
+			                     SELECT ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, NVL(SUM(HEL_MON), 0) + NVL(SUM(EMP_MON), 0) AS DATA_MON
+			                       FROM TCPN817
+			                      WHERE 1 = 1
+			                        AND ENTER_CD = #ssnEnterCd#
+			                        AND WORK_YY        = #searchWorkYy#
+			                        AND ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			                     GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			             )
+			       GROUP BY ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN
+			   ) H,
+			   TSYS005 X,
+			   THRM100 Y
+			WHERE A.ENTER_CD = X.ENTER_CD
+			   AND A.FAM_CD = X.CODE
+			   AND X.GRCODE_CD = 'C00309'
+			   AND A.ENTER_CD = B.ENTER_CD(+)
+			   AND A.WORK_YY = B.WORK_YY(+)
+			   AND A.ADJUST_TYPE = B.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = C.ENTER_CD(+)
+			   AND A.WORK_YY = C.WORK_YY(+)
+			   AND A.ADJUST_TYPE = C.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = D.ENTER_CD(+)
+			   AND A.WORK_YY = D.WORK_YY(+)
+			   AND A.ADJUST_TYPE = D.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = E.ENTER_CD(+)
+			   AND A.WORK_YY = E.WORK_YY(+)
+			   AND A.ADJUST_TYPE = E.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = F.ENTER_CD(+)
+			   AND A.WORK_YY = F.WORK_YY(+)
+			   AND A.ADJUST_TYPE = F.ADJUST_TYPE(+)
+			   AND A.ENTER_CD = G.ENTER_CD(+)
+			   AND A.WORK_YY = G.WORK_YY(+)
+			   AND A.ADJUST_TYPE = G.ADJUST_TYPE(+)
+			   AND A.SABUN = B.SABUN(+)
+			   AND A.FAMRES = B.FAMRES(+)
+			   AND A.SABUN = C.SABUN(+)
+			   AND A.FAMRES = C.FAMRES(+)
+			   AND A.SABUN = D.SABUN(+)
+			   AND A.FAMRES = D.FAMRES(+)
+			   AND A.SABUN = E.SABUN(+)
+			   AND A.FAMRES = E.FAMRES(+)
+			   AND A.SABUN = F.SABUN(+)
+			   AND A.FAMRES = F.FAMRES(+)
+			   AND A.SABUN = G.SABUN(+)
+			   AND A.FAM_CD = G.FAM_CD(+)
+			   AND A.ENTER_CD = H.ENTER_CD(+)
+			   AND A.ADJUST_TYPE = H.ADJUST_TYPE(+)
+			   AND A.WORK_YY = H.WORK_YY(+)
+			   AND A.SABUN = H.SABUN(+)
+			   AND A.ENTER_CD = Y.ENTER_CD
+			   AND A.SABUN = Y.SABUN
+			   AND A.ENTER_CD = #ssnEnterCd#
+			   AND A.WORK_YY        = #searchWorkYy#
+			   AND A.ADJUST_TYPE    LIKE '%'|| #searchAdjustType# ||'%'
+			   AND A.ADJUST_TYPE    IN (SELECT CODE
+					                     FROM TSYS005
+					                    WHERE ENTER_CD = #ssnEnterCd#
+					                      AND GRCODE_CD = 'C00303'
+					                      AND USE_YN = 'Y')
+			   AND (A.SABUN LIKE '%'||#searchSbNm#||'%' OR Y.NAME LIKE '%'||#searchSbNm#||'%')
+			 ORDER BY A.SABUN, A.FAM_CD
+		]]>
+	</query>
+
+</root>

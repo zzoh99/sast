@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.organization.orgPersonStaList">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getOrgPersonStaListList">
+
+				<![CDATA[
+					SELECT     '0' AS DETAIL
+							 , T2.ENTER_CD
+							 , F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'IM') AS MAIL_ID
+							 , F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'HP') AS HAND_PHONE
+							 , F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'OT') AS OFFICE_TEL
+							 , F_COM_GET_CONT_ADDRESS(T2.ENTER_CD,T2.SABUN,'SC1') AS CONNECT_TEL
+							 , T2.SABUN
+							 , F_COM_GET_NAMES(T2.ENTER_CD,T2.SABUN, #{ssnLocaleCd}) AS NAME
+							 , F_COM_GET_NAMES(T2.ENTER_CD,T2.SABUN,'ALIAS') AS ALIAS
+							 , F_COM_GET_ORG_NM(T2.ENTER_CD ,T3.ORG_CD,TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+							 , F_COM_GET_GRCODE_NAME(T2.ENTER_CD, 'H20030', T3.JIKWEE_CD, 'ko_KR') AS JIKWEE_NM
+							 , F_COM_GET_GRCODE_NAME(T2.ENTER_CD, 'H20010', T3.JIKGUB_CD, 'ko_KR') AS JIKGUB_NM
+							 , F_COM_GET_GRCODE_NAME(T2.ENTER_CD, 'H20020', T3.JIKCHAK_CD, 'ko_KR') AS JIKCHAK_NM
+							 --파일이 없으면 12003 시퀀스를 넘겨서 없는파일로 표시되도록 한다.
+							 , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || T2.ENTER_CD || chr(38) || 'searchKeyword=' || T2.SABUN ||  chr(38) || 'type=1' AS PHOTO
+					FROM       THRM100 T2
+					         , THRM151 T3
+					WHERE      T2.ENTER_CD = T3.ENTER_CD
+					AND        T2.SABUN    = T3.SABUN
+					AND        TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN T3.SDATE AND NVL(T3.EDATE, '99991231')
+					AND        T2.ENTER_CD = #{ssnEnterCd}
+					AND (T3.ENTER_CD, T3.SABUN, T3.SDATE)
+					        =
+					       (
+					         SELECT /*+ INDEX_DESC(THRM151 PK_HRM151)*/ ENTER_CD, SABUN, SDATE
+					           FROM THRM151
+					          WHERE ENTER_CD = T2.ENTER_CD
+					            AND SABUN = T2.SABUN
+					            AND SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD')
+					            AND STATUS_CD <> 'RAA'
+					            AND ROWNUM = 1
+					       )
+					        ]]>
+                  <if test='ssnSearchType.equals("O")'>
+                                  AND T3.ORG_CD IN (
+                                                    SELECT SCOPE_VALUE
+                                                      FROM TSYS319
+                                                     WHERE ENTER_CD =  T2.ENTER_CD
+                                                       AND SABUN = #{ssnSabun}
+                                                       AND GRP_CD = #{ssnGrpCd}
+                                                       AND AUTH_SCOPE_CD = 'W10'
+                                                  )
+				  </if>
+				  <if test='ssnSearchType.equals("P")'>
+                                AND T2.SABUN = #{ssnSabun}
+				  </if>
+				<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					AND 	   F_COM_GET_ORG_NM2(T3.ENTER_CD,T3.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) LIKE '%'|| TRIM( #{searchOrgNm} ) ||'%'
+				</if>
+				<if test='searchName != null and !searchName.equals("")'>
+					AND 	   T2.NAME LIKE '%'|| TRIM( #{searchName} ) ||'%'
+				</if>
+				<if test='searchJikchakYn  != null and searchJikchakYn.equals("Y")'>
+					AND T3.JIKCHAK_Cd IS NOT NULL
+					<![CDATA[ AND T3.JIKCHAK_Cd <> '40' ]]>
+				</if>
+				<if test='searchJikweeCd != null and !searchJikweeCd.equals("")'>
+                    AND        T3.JIKWEE_CD = TRIM( #{searchJikweeCd} )
+				</if>
+                <if test='searchJikchakCd != null and !searchJikchakCd.equals("")'>
+                    AND        T3.JIKCHAK_CD = TRIM( #{searchJikchakCd} )
+				</if>
+                <if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+                    AND        T3.JIKGUB_CD = TRIM( #{searchJikgubCd} )
+				</if>
+				<choose><when test='statusCd != null and !statusCd.equals("")'>
+					   AND T3.STATUS_CD != #{statusCd}
+				</when><otherwise>
+					   AND (T3.STATUS_CD != 'RA'
+					   			OR (T3.STATUS_CD = 'RA'
+					   					AND T2.RET_YMD BETWEEN REPLACE(TRIM( #{searchRetSYmd} ),'-','') AND REPLACE(TRIM( #{searchRetEYmd} ),'-','')
+					   				)
+					   		)
+				</otherwise>
+				</choose>
+				ORDER BY F_COM_JIKJE_SORT(T3.ENTER_CD, T3.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+		</select>
+
+</mapper>

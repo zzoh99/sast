@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.holWorkAppDet">
+		
+<!-- 	직군(사무직,생산직) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolWorkAppDetUserMap">
+
+				<![CDATA[
+				    -- F_COM_GET_WORKTYPE 함수로 취득하는 직군코드(H10050) 값이 A(사무직), B(생산직)의 형태로 셋팅되어 있지 않음. 따라서 직군코드(H10050)의 NOTE1 값이 'A'면 사무직, 'B'면 생산직으로 처리하도록 변경
+				    SELECT F_COM_GET_GRCODE_NOTE_VAL(#{ssnEnterCd}, 'H10050', F_COM_GET_WORKTYPE(#{ssnEnterCd}, #{searchApplSabun}, #{searchApplYmd}), 1) AS WORK_TYPE
+				         , CASE WHEN  F_COM_GET_JIKGUB_CD(#{ssnEnterCd}, #{searchApplSabun}, #{searchApplYmd}) IN ( 'D260', 'D270') THEN 'N'  -- 별정직(A1, A2)은 대체휴가 신청 불가
+				                ELSE 'Y'  END AS APP_YN 
+					  FROM DUAL
+				]]>
+
+
+		</select>
+		
+<!-- 근무시간 계산  -->
+		<select parameterType="map" resultType="cMap" id="getHolWorkAppDetTime">
+
+				<![CDATA[
+					SELECT SUM(NVL(F_TIM_WORK_INFO_TEMP_HOUR(#{ssnEnterCd}, #{searchSabun}, REPLACE(TRIM( #{searchYmd} ), '-', ''), TRIM( #{shm} ), TRIM( #{ehm} ), WORK_CD),0)) AS TIME
+					  FROM (    SELECT C.WORK_CD
+					              FROM TTIM120_v A, TTIM018 B, TTIM015 C
+					             WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					               AND A.SABUN    = TRIM(#{searchApplSabun})
+					               AND A.YMD      = REPLACE(TRIM( #{searchYmd} ), '-', '')
+					               AND A.ENTER_CD = B.ENTER_CD
+					               AND A.TIME_CD  = B.TIME_CD
+					               AND B.ENTER_CD = C.ENTER_CD
+					               AND B.WORK_CD  = C.WORK_CD
+					               AND C.WORK_CD <> '0010'
+					               AND C.WORK_CD  = TRIM(#{workCd})
+					             GROUP BY C.WORK_CD			  
+					       )
+				]]>
+
+
+		</select>
+		
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolWorkAppDetMap">
+
+				<![CDATA[
+						SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.SABUN
+						     , A.YMD
+						     , A.REQ_TIME_CD
+						     , A.ALTER_YMD
+						     , A.REQUEST_HOUR
+							 , SUBSTR(REQ_S_HM, 1, 2) AS REQ_SH
+							 , SUBSTR(REQ_S_HM, 3, 4) AS REQ_SM
+							 , SUBSTR(REQ_E_HM, 1, 2) AS REQ_EH
+							 , SUBSTR(REQ_E_HM, 3, 4) AS REQ_EM
+						     , A.REASON
+						     , A.NOTE
+						     , A.TIME_CD
+						     , A.WORK_ORG_CD
+						  FROM TTIM601 A 
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND A.SABUN    = TRIM(#{searchApplSabun})
+						   AND A.APPL_SEQ = TRIM(#{searchApplSeq})
+				]]>
+
+
+		</select>
+
+<!-- 휴일기본근무 근무시간 상세 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolWorkAppDetHolworkTimeList">
+
+				<![CDATA[
+				    SELECT A.WORK_CD
+				         , A.SEQ
+				         , A.SHM
+				         , A.EHM
+				         , SUBSTR(SHM, 1, 2) AS SH
+				         , SUBSTR(SHM, 3, 4) AS SM
+				         , SUBSTR(EHM, 1, 2) AS EH
+				         , SUBSTR(EHM, 3, 4) AS EM
+				      FROM TTIM018 A
+				     WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				       AND A.TIME_CD  = TRIM(#{timeCd})
+				       AND A.WORK_CD IN (SELECT WORK_CD FROM TTIM015 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) AND DAY_TYPE = '201')  -- T10017(근무코드구분) : 201(휴일근무)
+				  ORDER BY A.SEQ
+				]]>
+
+
+		</select>
+
+<!-- 기 신청 건 체크   -->
+		<select parameterType="map" resultType="cMap" id="getHolWorkAppDetDupCnt">
+
+				<![CDATA[
+					SELECT COUNT(1) AS DUP_CNT
+					  FROM TTIM601 A, THRI103 B
+					 WHERE A.ENTER_CD     = #{ssnEnterCd}
+					   AND A.SABUN        = #{searchApplSabun}
+					   AND A.APPL_SEQ    != #{searchApplSeq}
+					   AND A.YMD          = REPLACE( TRIM(#{searchYmd}) ,'-','')
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD  IN ( '21', '31', '99' )
+				]]>
+
+
+		</select>
+		
+		
+<!-- 휴일근무신청 세부내역 저장 -->		
+		<update parameterType="map" id="saveHolWorkAppDet">
+
+					 MERGE INTO TTIM601 T 
+					 USING 
+					( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					       SELECT TRIM(#{ssnEnterCd})  						AS ENTER_CD
+					            , TRIM(#{rm.searchApplSeq})  				AS APPL_SEQ
+					            , TRIM(#{rm.searchApplSabun})				AS SABUN
+					            , REPLACE(TRIM(#{rm.searchYmd}),'-','')		AS YMD
+					            , TRIM(#{rm.reqSh})||TRIM(#{rm.reqSm})		AS REQ_S_HM
+					            , TRIM(#{rm.reqEh})||TRIM(#{rm.reqEm})  	AS REQ_E_HM
+					            , TRIM(#{rm.reqTimeCd}) 					AS REQ_TIME_CD
+					            , REPLACE(TRIM(#{rm.alterYmd}),'-','')		AS ALTER_YMD
+					            , TRIM(#{rm.requestHour})  					AS REQUEST_HOUR
+					            , TRIM(#{rm.reason})  						AS REASON
+					            , TRIM( 'B' ) 								AS APPL_GUBUN    --사전(B), 사후(A) 구분
+					            , TRIM(#{rm.timeCd})  						AS TIME_CD
+					            , TRIM(#{rm.workOrgCd})  					AS WORK_ORG_CD
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+					     AND  T.SABUN 		= S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+						        , T.YMD				= S.YMD
+								, T.REQ_S_HM		= S.REQ_S_HM
+								, T.REQ_E_HM		= S.REQ_E_HM
+								, T.REQ_TIME_CD		= S.REQ_TIME_CD
+								, T.ALTER_YMD		= S.ALTER_YMD
+								, T.REQUEST_HOUR	= S.REQUEST_HOUR
+								, T.REASON			= S.REASON
+								, T.APPL_GUBUN		= S.APPL_GUBUN
+								, T.TIME_CD			= S.TIME_CD
+								, T.WORK_ORG_CD		= S.WORK_ORG_CD
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+								, T.YMD
+								, T.REQ_S_HM
+								, T.REQ_E_HM
+								, T.REQ_TIME_CD
+								, T.ALTER_YMD
+								, T.REQUEST_HOUR
+								, T.REASON
+								, T.APPL_GUBUN
+								, T.TIME_CD
+								, T.WORK_ORG_CD
+								, T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+								, S.YMD
+								, S.REQ_S_HM
+								, S.REQ_E_HM
+								, S.REQ_TIME_CD
+								, S.ALTER_YMD
+								, S.REQUEST_HOUR
+								, S.REASON
+								, S.APPL_GUBUN
+								, S.TIME_CD
+								, S.WORK_ORG_CD
+								, SYSDATE
+								, #{ssnSabun}
+						)
+		</update>
+
+</mapper>

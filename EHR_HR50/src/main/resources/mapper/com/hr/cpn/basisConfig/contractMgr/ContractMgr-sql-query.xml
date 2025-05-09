@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.contractMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getContractMgrList">
+				<![CDATA[
+			 SELECT CONT_TYPE, 
+					SDATE, 
+					EDATE, 
+					PATH, 
+					FILE_NM,
+					CONTENTS,
+					'0' AS DETAIL,
+					PAY_TYPE
+			  FROM TCPN410
+			 WHERE ENTER_CD = #{ssnEnterCd}
+			           ]]>
+		<if test='searchStdDate != null and !searchStdDate.equals("")'>
+			   AND REPLACE(TRIM( #{searchStdDate} ), '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+		</if>
+		 	ORDER BY CONT_TYPE, SDATE DESC
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveContractMgr">
+
+
+					MERGE INTO TCPN410 T
+					USING	(
+							SELECT     A.ENTER_CD
+                                    ,  A.CONT_TYPE
+                                    ,  A.SDATE
+									,  A.EDATE
+									,  A.PATH
+									,  A.FILE_NM
+									,  A.PAY_TYPE
+							FROM	(
+									SELECT	   NULL AS ENTER_CD
+                                            ,  NULL AS CONT_TYPE
+                                            ,  NULL AS SDATE
+											,  NULL AS EDATE
+											,  NULL AS PATH
+											,  NULL AS FILE_NM
+											,  NULL AS PAY_TYPE
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM(#{ssnEnterCd})     	AS ENTER_CD
+                                            , TRIM(#{rm.contType})    	AS CONT_TYPE
+                                            , TRIM(#{rm.sdate})    		AS SDATE
+											, TRIM(#{rm.edate}) 		AS EDATE
+											, TRIM(#{rm.path})  		AS PATH
+											, TRIM(#{rm.fileNm}) 		AS FILE_NM
+											, TRIM(#{rm.payType}) 		AS PAY_TYPE
+									FROM   DUAL
+</foreach>
+									) A WHERE A.CONT_TYPE IS NOT NULL
+							) S
+					ON (        T.ENTER_CD = #{ssnEnterCd}
+						    AND T.CONT_TYPE 	= S.CONT_TYPE
+						    AND T.SDATE 	= S.SDATE
+                    )
+					WHEN MATCHED THEN
+						UPDATE SET	 T.EDATE            = S.EDATE
+									,T.PATH             = S.PATH
+									,T.FILE_NM          = S.FILE_NM
+									,T.CHKDATE	  		= SYSDATE
+									,T.CHKID	  		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+						      T.ENTER_CD      
+							, T.CONT_TYPE      
+							, T.SDATE         
+							, T.EDATE         
+							, T.PATH          
+							, T.FILE_NM       
+							, T.PAY_TYPE       
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+							, S.CONT_TYPE               
+							, S.SDATE                  
+							, S.EDATE                  
+							, S.PATH                   
+							, S.FILE_NM                
+							, S.PAY_TYPE                
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteContractMgr">
+					DELETE FROM TCPN410
+					WHERE (ENTER_CD, CONT_TYPE, SDATE)  IN 	(  (NULL, NULL, NULL)  
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test='rm.contType != null and !rm.contType.equals("")'>
+										    (#{ssnEnterCd} , #{rm.contType} , REPLACE(#{rm.sdate}, '-', ''))
+											</if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<update parameterType="map" id="saveContractMgrContents">
+   					UPDATE TCPN410
+   					   SET CONTENTS = #{content}
+   				  	 WHERE ENTER_CD = #{ssnEnterCd}
+   				  	   AND CONT_TYPE = #{contType}
+   					   AND SDATE = #{sdate}
+		</update>
+		
+	</mapper>

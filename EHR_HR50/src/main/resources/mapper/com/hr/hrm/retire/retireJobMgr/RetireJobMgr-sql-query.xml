@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.retire.retireJobMgr">
+
+<!-- 퇴직처리담당자관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireJobMgrList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					     , SABUN
+					     , CHK_ITEM      
+					     , F_COM_GET_ORG_NM(ENTER_CD, F_COM_GET_ORG_CD(ENTER_CD, SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')), TO_CHAR (SYSDATE, 'YYYYMMDD')) AS ORG_NM
+					     , F_COM_GET_JIKWEE_NM(ENTER_CD,SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKWEE_NM
+					     , F_COM_GET_NAMES(ENTER_CD,SABUN) AS NAME
+					     , ORDER_SEQ      
+					     , SEQ
+					     , RMK
+					     , CHKDATE
+					     , CHKID
+					FROM THRM556
+					WHERE ENTER_CD = #{ssnEnterCd}
+					ORDER BY ORDER_SEQ ASC 
+				]]>
+
+
+		</select>
+
+<!-- 퇴직처리담당자관리 저장 -->
+		<update parameterType="map" id="saveRetireJobMgr">
+
+					MERGE INTO THRM556 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.SEQ
+								 , A.SABUN
+								 , A.CHK_ITEM
+								 , A.ORDER_SEQ
+								 , A.RMK
+								 , A.CHKDATE
+								 , A.CHKID
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS SEQ
+										 , NULL AS SABUN
+										 , NULL AS CHK_ITEM
+										 , NULL AS ORDER_SEQ
+										 , NULL AS RMK
+										 , NULL AS CHKDATE
+										 , NULL AS CHKID
+
+									FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 <choose><when test='rm.seq != null and !rm.seq.equals("")'>
+											, TRIM(#{rm.seq}) 			AS SEQ
+										 </when><otherwise>
+											, TO_CHAR( (
+															SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+															  FROM THRM556
+															 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+
+														) )	AS SEQ
+												<bind name="icnt" value="icnt + 1" />
+										 </otherwise>
+										 </choose>
+
+										 , TRIM( #{rm.sabun} )	AS  SABUN
+										 , TRIM( #{rm.chkItem})	AS  CHK_ITEM
+										 , TRIM( #{rm.orderSeq}) AS  ORDER_SEQ
+										 , TRIM( #{rm.rmk}) AS  RMK
+										 , SYSDATE	AS  CHKDATE
+										 , #{ssnSabun}		AS  CHKID
+									  FROM DUAL
+</foreach>
+
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	 
+						    T.CHK_ITEM        = S.CHK_ITEM       
+							,T.ORDER_SEQ       = S.ORDER_SEQ      
+							,T.RMK             = S.RMK            
+							,T.CHKDATE         = S.CHKDATE        
+						    ,T.CHKID           = S.CHKID          
+
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+								   T.ENTER_CD          
+						         , T.SEQ               
+								 , T.SABUN             
+								 , T.CHK_ITEM          
+								 , T.ORDER_SEQ         
+								 , T.RMK               
+								 , T.CHKDATE           
+								 , T.CHKID             
+
+						)
+						VALUES
+						(
+								   S.ENTER_CD          
+						         , S.SEQ               
+								 , S.SABUN             
+								 , S.CHK_ITEM          
+								 , S.ORDER_SEQ         
+								 , S.RMK               
+								 , S.CHKDATE           
+								 , S.CHKID             
+						)
+		</update>
+
+<!-- 퇴직처리담당자관리 삭제 -->
+		<delete parameterType="map" id="deleteRetireJobMgr">
+
+					DELETE FROM THRM556
+					 WHERE ENTER_CD||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")and rm.seq != null and !rm.seq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

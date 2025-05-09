@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appGradePointMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppGradePointMgrList">
+
+				<![CDATA[
+					SELECT   APP_TYPE_CD
+							,APP_CLASS_CD
+							,APP_CLASS_NM
+							,PERFORMANCE_POINT
+							,FROM_POINT
+							,TO_POINT
+							,NOTE
+							,SEQ
+					FROM     TPAP011
+					WHERE    ENTER_CD = #{ssnEnterCd}
+					             ]]>
+					<if test='searchAppTypeCd != null and !searchAppTypeCd.equals("")'>
+					AND      APP_TYPE_CD = #{searchAppTypeCd}
+					</if>
+					ORDER BY   APP_TYPE_CD, SEQ
+
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppGradePointMgrMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppGradePointMgr">
+
+					MERGE INTO TPAP011 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APP_TYPE_CD
+									, A.APP_CLASS_CD
+									, A.APP_CLASS_NM
+									, A.PERFORMANCE_POINT
+									, A.FROM_POINT
+									, A.TO_POINT
+									, A.NOTE
+									, A.SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS APP_TYPE_CD
+											, NULL		AS APP_CLASS_CD
+											, NULL		AS APP_CLASS_NM
+											, NULL		AS PERFORMANCE_POINT
+											, NULL		AS FROM_POINT
+											, NULL		AS TO_POINT
+											, NULL		AS NOTE
+											, NULL		AS SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}                         AS ENTER_CD
+											, TRIM( #{rm.appTypeCd})	        AS APP_TYPE_CD
+											, TRIM( #{rm.appClassCd})	        AS APP_CLASS_CD
+											, TRIM( #{rm.appClassNm})	        AS APP_CLASS_NM
+											, TRIM( #{rm.performancePoint})	AS PERFORMANCE_POINT
+											, TRIM( #{rm.fromPoint})	        AS FROM_POINT
+											, TRIM( #{rm.toPoint})	            AS TO_POINT
+											, TRIM( #{rm.note})	            AS NOTE
+											, TRIM( #{rm.seq} )	            	AS SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		    = S.ENTER_CD
+					AND  T.APP_TYPE_CD      = S.APP_TYPE_CD
+					AND  T.APP_CLASS_CD     = S.APP_CLASS_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APP_CLASS_NM	    = S.APP_CLASS_NM
+									, T.PERFORMANCE_POINT	= S.PERFORMANCE_POINT
+									, T.FROM_POINT       	= S.FROM_POINT
+									, T.TO_POINT         	= S.TO_POINT
+									, T.NOTE             	= S.NOTE
+									, T.SEQ             	= S.SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APP_TYPE_CD
+							, T.APP_CLASS_CD
+							, T.APP_CLASS_NM
+							, T.PERFORMANCE_POINT
+							, T.FROM_POINT
+							, T.TO_POINT
+							, T.NOTE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APP_TYPE_CD
+							, S.APP_CLASS_CD
+							, S.APP_CLASS_NM
+							, S.PERFORMANCE_POINT
+							, S.FROM_POINT
+							, S.TO_POINT
+							, S.NOTE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppGradePointMgr">
+
+					DELETE FROM TPAP011
+					WHERE 	(ENTER_CD,APP_TYPE_CD,APP_CLASS_CD) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appTypeCd != null and !rm.appTypeCd.equals("")'>
+										, TRIM( #{rm.appTypeCd})
+										</if>
+										<if test='rm.appClassCd != null and !rm.appClassCd.equals("")'>
+										, TRIM( #{rm.appClassCd})
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppGradePointMgr">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppGradePointMgr">
+
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+</mapper>

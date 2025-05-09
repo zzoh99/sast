@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.element.userDefFuncMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getUserDefFuncMgrFirstList">
+
+				<![CDATA[
+				  SELECT UDF_CD,
+				         UDF_NM,
+				         UDF_NAME,
+				         DATA_TYPE,
+				         DESCRIPTION,
+				         NULL_ALLOW_YN,
+				         USE_YN,
+				         BIZ_CD,
+				         SYS_YN,
+				         UDF_GUBUN_CD
+				    FROM TSYS801
+				   WHERE ENTER_CD = #{ssnEnterCd}
+				             ]]>
+				   <if test='searchUdfNm != null and !searchUdfNm.equals("")'>
+                       AND DESCRIPTION LIKE '%'|| #{searchUdfNm} || '%'
+                   </if>
+				ORDER BY UDF_CD
+
+
+
+		</select>
+
+        <!--        저장 -->  
+        <update parameterType="map" id="saveUserDefFuncMgrFirst">
+
+
+                    MERGE INTO TSYS801 T
+                    USING   (
+                            SELECT    A.UDF_CD
+                                    , A.UDF_NM        
+                                    , A.UDF_NAME      
+                                    , A.DATA_TYPE     
+                                    , A.DESCRIPTION   
+                                    , A.NULL_ALLOW_YN 
+                                    , A.USE_YN        
+                                    , A.BIZ_CD        
+                                    , A.SYS_YN        
+                                    , A.UDF_GUBUN_CD  
+                            FROM    (
+                                    SELECT    NULL      AS UDF_CD                 
+                                            , NULL      AS UDF_NM                 
+                                            , NULL      AS UDF_NAME               
+                                            , NULL      AS DATA_TYPE              
+                                            , NULL      AS DESCRIPTION            
+                                            , NULL      AS NULL_ALLOW_YN          
+                                            , NULL      AS USE_YN                 
+                                            , NULL      AS BIZ_CD                 
+                                            , NULL      AS SYS_YN                 
+                                            , NULL      AS UDF_GUBUN_CD           
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT TRIM(#{rm.udfCd})        AS UDF_CD        
+                                         , TRIM(#{rm.udfNm})        AS UDF_NM        
+                                         , TRIM(#{rm.udfName})      AS UDF_NAME      
+										 , TRIM(#{rm.dataType})     AS DATA_TYPE
+										 , TRIM(#{rm.description})  AS DESCRIPTION
+										 , TRIM(#{rm.nullAllowYn})  AS NULL_ALLOW_YN 
+										 , TRIM(#{rm.useYn})        AS USE_YN        
+										 , TRIM(#{rm.bizCd})        AS BIZ_CD        
+										 , TRIM(#{rm.sysYn})        AS SYS_YN        
+										 , TRIM(#{rm.udfGubunCd})   AS UDF_GUBUN_CD  
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.UDF_NAME IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD   = #{ssnEnterCd}
+                    AND  T.UDF_CD     = S.UDF_CD
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.UDF_NM          = S.UDF_NM       
+                                    , T.UDF_NAME        = S.UDF_NAME     
+                                    , T.DATA_TYPE       = S.DATA_TYPE    
+                                    , T.DESCRIPTION     = S.DESCRIPTION  
+                                    , T.NULL_ALLOW_YN   = S.NULL_ALLOW_YN
+                                    , T.USE_YN          = S.USE_YN       
+                                    , T.BIZ_CD          = S.BIZ_CD       
+                                    , T.SYS_YN          = S.SYS_YN       
+                                    , T.UDF_GUBUN_CD    = S.UDF_GUBUN_CD 
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                              T.ENTER_CD   -- key
+							, T.UDF_CD     -- key
+							, T.UDF_NM
+							, T.UDF_NAME
+							, T.DATA_TYPE
+							, T.DESCRIPTION
+							, T.NULL_ALLOW_YN
+							, T.USE_YN
+							, T.BIZ_CD
+							, T.SYS_YN
+							, T.UDF_GUBUN_CD
+                            , T.CHKDATE
+							, T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd}  -- key
+                            , S.UDF_CD     -- key
+                            , S.UDF_NM
+                            , S.UDF_NAME
+                            , S.DATA_TYPE
+                            , S.DESCRIPTION
+                            , S.NULL_ALLOW_YN
+                            , S.USE_YN
+                            , S.BIZ_CD
+                            , S.SYS_YN
+                            , S.UDF_GUBUN_CD
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+<!--        삭제 -->
+        <delete parameterType="map" id="deleteUserDefFuncMgrFirst">
+
+
+                    DELETE FROM TSYS801 
+                    WHERE   (ENTER_CD, UDF_CD) IN    (  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.udfCd != null and !rm.udfCd.equals("")'>
+                                             (#{ssnEnterCd}, TRIM( #{rm.udfCd} ))
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+
+
+
+        </delete>
+        
+<!--      조회 -->
+        <select parameterType="map" resultType="cMap" id="getUserDefFuncMgrSecondList">
+
+                <![CDATA[
+				  SELECT UDF_CD,
+				         SEQ,
+				         UDF_PARAM_CD,
+				         IN_OUT_TYPE,
+				         DATA_TYPE,
+				         DESCRIPTION
+				    FROM TSYS803   
+				   WHERE ENTER_CD = #{ssnEnterCd}
+				   AND UDF_CD = #{searchUdfCd}
+				ORDER BY SEQ ASC
+                ]]>
+
+
+        </select>
+        
+<!--        저장 -->  
+        <update parameterType="map" id="saveUserDefFuncMgrSecond">
+
+
+                    MERGE INTO TSYS803 T
+                    USING   (
+                            SELECT    A.UDF_CD
+                                    , A.SEQ
+                                    , A.UDF_PARAM_CD
+                                    , A.IN_OUT_TYPE
+                                    , A.DATA_TYPE
+                                    , A.DESCRIPTION
+                            FROM    (
+                                    SELECT    NULL  AS UDF_CD
+                                            , NULL  AS SEQ
+                                            , NULL  AS UDF_PARAM_CD
+                                            , NULL  AS IN_OUT_TYPE
+                                            , NULL  AS DATA_TYPE
+                                            , NULL  AS DESCRIPTION
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT   TRIM(#{rm.udfCd})          AS UDF_CD      
+											,TRIM(#{rm.seq})            AS SEQ
+											,TRIM(#{rm.udfParamCd})     AS UDF_PARAM_CD
+											,TRIM(#{rm.inOutType})      AS IN_OUT_TYPE 
+											,TRIM(#{rm.dataType})       AS DATA_TYPE
+											,TRIM(#{rm.description})    AS DESCRIPTION
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.UDF_CD IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD       = #{ssnEnterCd}
+                    AND  T.UDF_CD         = S.UDF_CD
+                    AND  T.SEQ            = S.SEQ
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.UDF_PARAM_CD  = S.UDF_PARAM_CD 
+                                    , T.IN_OUT_TYPE   = S.IN_OUT_TYPE  
+                                    , T.DATA_TYPE     = S.DATA_TYPE    
+                                    , T.DESCRIPTION   = S.DESCRIPTION  
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID   = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                              T.ENTER_CD
+                            , T.UDF_CD
+                            , T.SEQ
+                            , T.UDF_PARAM_CD
+                            , T.IN_OUT_TYPE
+                            , T.DATA_TYPE
+                            , T.DESCRIPTION
+                            , T.CHKDATE
+                            , T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd}
+                            , S.UDF_CD
+                            , S.SEQ
+                            , S.UDF_PARAM_CD
+                            , S.IN_OUT_TYPE
+                            , S.DATA_TYPE
+                            , S.DESCRIPTION
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+        </update>
+<!--        삭제 -->
+        <delete parameterType="map" id="deleteUserDefFuncMgrSecond">
+
+
+                  DELETE FROM TSYS803 
+                  WHERE   (ENTER_CD, UDF_CD, SEQ) IN    (  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.udfCd != null and !rm.udfCd.equals("")'>
+                                             <if test='rm.seq != null and !rm.seq.equals("")'>
+                                              (#{ssnEnterCd}, TRIM( #{rm.udfCd} ), TRIM( #{rm.seq} ))
+                                             </if>
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+
+
+
+        </delete>
+        <!--        삭제 -->
+        <delete parameterType="map" id="deleteUserDefFuncMgrSecond2">
+
+
+                  DELETE FROM TSYS803 
+                  WHERE   (ENTER_CD, UDF_CD) IN    (  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.udfCd != null and !rm.udfCd.equals("")'>
+                                              (#{ssnEnterCd}, TRIM( #{rm.udfCd} ))
+                                          </if>
+                                        </if>
+</foreach>
+                                        )
+
+
+
+        </delete>
+	</mapper>

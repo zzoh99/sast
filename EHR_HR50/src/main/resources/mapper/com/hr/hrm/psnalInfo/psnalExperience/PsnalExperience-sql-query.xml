@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalBasicInf">
+
+		<!-- 인사기본(사내경력) 경력 조회 -->
+		<select id="getPsnalExperienceList" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.SEQ
+					     , A.TF_ORG_NM
+					     , A.SDATE
+					     , A.EDATE
+					     , A.JIKWEE_NM
+					     , A.JIKCHAK_NM
+					     , A.JOB_NM
+					     , A.EVAL_TXT
+					     , A.NOTE
+					  FROM THRM116 A
+					WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+					   AND A.SABUN = TRIM( #{sabun} )
+					 ORDER BY A.SDATE DESC
+				]]>
+
+
+		</select>
+		
+		<!-- 인사기본(사내경력) 경력 저장 -->
+		<update id="savePsnalExperience" parameterType="map">
+
+			 MERGE INTO THRM116 T 	
+			 USING 	
+			( 	
+		<bind name="icnt" value="1" />
+		<foreach collection="mergeRows" item="rm" separator=" UNION ALL " >
+				SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD
+		            , TRIM(#{rm.sabun})  AS  SABUN
+		            , TRIM(#{rm.seq})  AS  SEQ
+		            , TRIM(#{rm.tfOrgNm})  AS  TF_ORG_NM
+		            , TRIM(#{rm.sdate})  AS  SDATE
+		            , TRIM(#{rm.edate})  AS  EDATE
+		            , TRIM(#{rm.jikweeNm})  AS  JIKWEE_NM
+		            , TRIM(#{rm.jikchakNm})  AS  JIKCHAK_NM
+		            , TRIM(#{rm.jobNm})  AS  JOB_NM
+		            , TRIM(#{rm.evalTxt})  AS  EVAL_TXT
+		            , TRIM(#{rm.note})  AS  NOTE
+		        FROM DUAL	
+		</foreach>
+			) S 	
+			ON ( 	
+			          T.ENTER_CD = S.ENTER_CD 	
+			     AND  T.SABUN = S.SABUN 	
+			     AND  T.SEQ = S.SEQ 	
+			) 	
+			WHEN MATCHED THEN 	
+			   UPDATE SET T.TF_ORG_NM = S.TF_ORG_NM 	
+			            , T.SDATE = S.SDATE 	
+			            , T.EDATE = S.EDATE 	
+			            , T.JIKWEE_NM = S.JIKWEE_NM 	
+			            , T.JIKCHAK_NM = S.JIKCHAK_NM 	
+			            , T.JOB_NM = S.JOB_NM 	
+			            , T.EVAL_TXT = S.EVAL_TXT
+			            , T.NOTE = S.NOTE 	
+			            , T.CHKDATE	= SYSDATE
+						, T.CHKID = #{ssnSabun}
+			WHEN NOT MATCHED THEN 	
+			   INSERT 	
+			   ( 	
+			              T.ENTER_CD	
+			            , T.SABUN	
+			            , T.SEQ	
+			            , T.TF_ORG_NM	
+			            , T.SDATE	
+			            , T.EDATE	
+			            , T.JIKWEE_NM	
+			            , T.JIKCHAK_NM	
+			            , T.JOB_NM	
+			            , T.EVAL_TXT
+			            , T.NOTE	
+			            , T.CHKDATE	
+			            , T.CHKID	
+			   ) 	
+			   VALUES 	
+			   ( 	
+			              S.ENTER_CD	
+			            , S.SABUN	
+			            , S_THRM116.NEXTVAL	
+			            , S.TF_ORG_NM	
+			            , S.SDATE	
+			            , S.EDATE	
+			            , S.JIKWEE_NM	
+			            , S.JIKCHAK_NM	
+			            , S.JOB_NM	
+			            , S.EVAL_TXT
+			            , S.NOTE	
+			            , sysdate	
+			            , #{ssnSabun}
+			   )
+
+
+		</update>
+
+	<!-- 인사기본(사내경력) 경력 삭제 -->
+		<delete id="deletePsnalExperience" parameterType="map">
+
+								
+			DELETE FROM THRM116
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND ( SABUN,SEQ ) IN ( ( NULL,NULL) 
+	<foreach collection="deleteRows" item="rm" >
+
+		<if test='rm.sabun != null and !rm.sabun.equals("") and rm.seq != null and !rm.seq.equals("")' >
+		, ( TRIM( #{rm.sabun} ),TRIM( #{rm.seq} ) )
+		</if>
+	</foreach>
+			       )
+
+
+		</delete>
+	</mapper>

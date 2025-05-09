@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.element.eleGroupMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEleGroupMgrListFirst">
+				SELECT ELEMENT_SET_CD,
+				       ELEMENT_SET_NM,
+				       DESCRIPTION,
+				       PROPERTY_TYPE,
+				       SEQ
+				  FROM TCPN071
+				 WHERE ENTER_CD = #{ssnEnterCd}
+				<if test='searchElementGroupNm != null and !searchElementGroupNm.equals("")'>
+				   AND ELEMENT_SET_NM LIKE '%'||TRIM(#{searchElementGroupNm})||'%'
+				</if>
+				 ORDER BY ELEMENT_SET_CD, SEQ
+		</select>
+
+<!--        조회 -->
+		<select parameterType="map" resultType="cMap" id="getEleGroupMgrListSecond">
+
+				<![CDATA[
+				SELECT DENSE_RANK () OVER (ORDER BY B.GRP_SORT, B.ELEMENT_CD, A.SDATE DESC) AS RNUM,
+				       A.ELEMENT_SET_CD,
+				       A.ELEMENT_CD
+				     , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}), B.ELEMENT_NM) AS ELEMENT_NM,
+				       A.INCLUDE_TYPE,
+				       A.RESULT_YN,
+				       A.BASE_SHOW_YN,
+				       A.SDATE,
+				       A.EDATE
+				  FROM TCPN072 A,
+				       (SELECT A.*
+				          FROM TCPN011 A
+				         WHERE A.SDATE =
+				                  (SELECT MAX (SDATE)
+				                     FROM TCPN011
+				                    WHERE ENTER_CD = A.ENTER_CD AND ELEMENT_CD = A.ELEMENT_CD
+				                      AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '29991231'))) B
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.ELEMENT_SET_CD = #{searchElementSetCd}
+				   AND A.ENTER_CD = B.ENTER_CD
+				   AND A.ELEMENT_CD = B.ELEMENT_CD
+				 ORDER BY RNUM
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveEleGroupMgrFirst">
+					MERGE INTO TCPN071 T
+					USING	(
+							SELECT	  ELEMENT_SET_CD    -- key
+									, PROPERTY_TYPE
+									, ELEMENT_SET_NM
+									, DESCRIPTION
+									, SEQ
+							FROM	(
+									SELECT	  NULL  AS ELEMENT_SET_CD    -- key
+                                            , NULL  AS PROPERTY_TYPE
+                                            , NULL	AS ELEMENT_SET_NM
+                                            , NULL  AS DESCRIPTION
+                                            , NULL  AS SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM(#{rm.elementSetCd})  AS ELEMENT_SET_CD    -- key
+											, TRIM(#{rm.propertyType})  AS PROPERTY_TYPE
+											, TRIM(#{rm.elementSetNm})  AS ELEMENT_SET_NM
+											, TRIM(#{rm.description})   AS DESCRIPTION
+											, TRIM(#{rm.seq})           AS SEQ
+											FROM   DUAL
+</foreach>
+									)  WHERE ELEMENT_SET_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD        = #{ssnEnterCd}
+					 AND T.ELEMENT_SET_CD  = S.ELEMENT_SET_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PROPERTY_TYPE   = S.PROPERTY_TYPE
+									, T.ELEMENT_SET_NM  = S.ELEMENT_SET_NM
+                                    , T.DESCRIPTION     = S.DESCRIPTION
+                                    , T.SEQ             = S.SEQ
+									, T.CHKDATE	    = SYSDATE
+									, T.CHKID    	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.ELEMENT_SET_CD
+							, T.PROPERTY_TYPE
+                            , T.ELEMENT_SET_NM
+                            , T.DESCRIPTION
+                            , T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+                            , S.ELEMENT_SET_CD
+                            , S.PROPERTY_TYPE
+                            , S.ELEMENT_SET_NM
+                            , S.DESCRIPTION
+                            , S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+
+<!--      저장 -->
+        <update parameterType="map" id="saveEleGroupMgrSecond">
+
+
+                    MERGE INTO TCPN072 T
+                    USING   (
+                            SELECT    ELEMENT_SET_CD      -- key
+									, ELEMENT_CD          -- key
+									, SDATE               -- key
+									, INCLUDE_TYPE
+									, RESULT_YN
+									, BASE_SHOW_YN
+									, EDATE
+                            FROM    (
+                                    SELECT    NULL AS ELEMENT_SET_CD      -- key
+                                            , NULL AS ELEMENT_CD          -- key
+                                            , NULL AS SDATE               -- key
+											, NULL AS INCLUDE_TYPE
+											, NULL AS RESULT_YN
+											, NULL AS BASE_SHOW_YN
+											, NULL AS EDATE
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT    TRIM(#{rm.elementSetCd})     AS ELEMENT_SET_CD
+											, TRIM(#{rm.elementCd})        AS ELEMENT_CD
+											, TRIM(#{rm.sdate})            AS SDATE
+											, TRIM(#{rm.includeType})      AS INCLUDE_TYPE
+											, TRIM(#{rm.resultYn})         AS RESULT_YN
+											, TRIM(#{rm.baseShowYn})       AS BASE_SHOW_YN
+											, TRIM(#{rm.edate})            AS EDATE
+
+                                            FROM   DUAL
+</foreach>
+                                    )  WHERE ELEMENT_SET_CD IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD       = #{ssnEnterCd}
+                     AND T.ELEMENT_SET_CD = S.ELEMENT_SET_CD
+                     AND T.ELEMENT_CD     = S.ELEMENT_CD
+                     AND T.SDATE          = S.SDATE
+                     )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.INCLUDE_TYPE = S.INCLUDE_TYPE
+                                    , T.RESULT_YN    = S.RESULT_YN
+                                    , T.BASE_SHOW_YN    = S.BASE_SHOW_YN
+                                    , T.EDATE        = S.EDATE
+                                    , T.CHKDATE         = SYSDATE
+                                    , T.CHKID           = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+							, T.ELEMENT_SET_CD
+							, T.ELEMENT_CD
+							, T.SDATE
+							, T.INCLUDE_TYPE
+							, T.RESULT_YN
+							, T.BASE_SHOW_YN
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+                        )
+                        VALUES
+                        (
+                              #{ssnEnterCd}
+                            , S.ELEMENT_SET_CD
+                            , S.ELEMENT_CD
+                            , S.SDATE
+                            , S.INCLUDE_TYPE
+                            , S.RESULT_YN
+                            , S.BASE_SHOW_YN
+                            , S.EDATE
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+		</update>
+		
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteEleGroupMgrFirst">
+					DELETE FROM TCPN071
+					WHERE 	(ENTER_CD, ELEMENT_SET_CD) IN 	(  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.elementSetCd != null and !rm.elementSetCd.equals("")'>
+
+											 (#{ssnEnterCd}, TRIM( #{rm.elementSetCd} ))
+
+										</if>
+
+</foreach>
+										)
+		</delete>
+		
+        <delete parameterType="map" id="deleteEleGroupMgrSecond">
+                    DELETE FROM TCPN072
+                    WHERE   (ENTER_CD, ELEMENT_SET_CD, ELEMENT_CD, SDATE) IN     (  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.elementSetCd != null and !rm.elementSetCd.equals("")'>
+                                            <if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+                                             <if test='rm.sdate != null and !rm.sdate.equals("")'>
+                                                (#{ssnEnterCd}, TRIM( #{rm.elementSetCd} ), TRIM( #{rm.elementCd} ), TRIM( #{rm.sdate} ))
+											 </if>
+											</if>
+										  </if>
+										</if>
+</foreach>
+                                        )
+
+
+
+
+
+		</delete>
+        <delete parameterType="map" id="deleteEleGroupMgrSecondCasCading">
+
+
+
+                    DELETE FROM TCPN072
+                    WHERE   (ENTER_CD, ELEMENT_SET_CD) IN     (  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+                                          <if test='rm.elementSetCd != null and !rm.elementSetCd.equals("")'>
+                                                (#{ssnEnterCd}, TRIM( #{rm.elementSetCd} ))
+										  </if>
+										</if>
+</foreach>
+                                        )
+
+
+
+
+
+        </delete>
+	</mapper>

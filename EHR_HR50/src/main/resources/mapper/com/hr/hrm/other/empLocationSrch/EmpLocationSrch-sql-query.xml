@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.other.empLocationSrch">
+
+<!--    Location code, 이름 조회-->
+    <select parameterType="map" resultType="cMap" id="getLocationCdNm">
+        <![CDATA[
+            SELECT '전체' AS CODE_NM, '0' AS CODE FROM DUAL
+            UNION ALL
+            SELECT MAP_NM AS CODE_NM, MAP_CD AS CODE
+            FROM TORG109
+            WHERE ENTER_CD = #{ssnEnterCd}
+              AND MAP_TYPE_CD = '600'
+        ]]>
+<if test='searchDate != null and !searchDate.equals("")'>
+        	  AND replace(#{searchDate}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+</if>
+            ORDER BY CODE
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getLocationEmpInfo">
+        <![CDATA[
+            SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')), '') AS ORG_NM,
+                   A.SABUN, A.NAME,
+                   B.JIKGUB_NM, B.JIKWEE_NM, B.JIKCHAK_NM, B.WORK_TYPE_NM, B.MANAGE_NM,
+                   TRUNC(MONTHS_BETWEEN(NVL(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), SYSDATE), TO_DATE(A.GEMP_YMD, 'YYYYMMDD')) / 12) || '년 '
+                       || TRUNC(MOD(MONTHS_BETWEEN(NVL(TO_DATE(REPLACE(#{searchDate}, '-', ''), 'YYYYMMDD'), SYSDATE), TO_DATE(A.GEMP_YMD, 'YYYYMMDD')) / 12, 1) * 12) || '개월' AS WORK_PERIOD,
+                   C.LOCATION_CD, C.LOCATION_NM, C.ADDR
+            FROM THRM100 A,
+                 THRM151 B,
+                 (
+                     SELECT A.ENTER_CD, A.ORG_CD, A.ORG_NM, B.LOCATION_CD, B.LOCATION_NM, B.ZIP, B.ADDR, B.DETAIL_ADDR
+                     FROM TORG101 A,
+                          (
+                              SELECT A.ENTER_CD, A.SDATE, A.EDATE, B.LOCATION_CD, B.LOCATION_NM, B.ZIP, B.ADDR, B.DETAIL_ADDR
+                              FROM TORG109 A
+                                       INNER JOIN TSYS015 B
+                                                  ON A.ENTER_CD = B.ENTER_CD
+                              WHERE A.ENTER_CD = #{ssnEnterCd}
+                                AND A.MAP_TYPE_CD = '600'
+                                AND A.MAP_CD = B.LOCATION_CD
+                                AND NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                          ) B
+                     WHERE A.ENTER_CD = B.ENTER_CD
+                       AND A.LOCATION_CD = B.LOCATION_CD
+                       AND NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                 ) C
+            WHERE A.ENTER_CD = #{ssnEnterCd}
+              AND B.ENTER_CD = A.ENTER_CD
+              AND C.ENTER_CD = A.ENTER_CD
+              AND A.SABUN = B.SABUN
+              AND B.SDATE = (SELECT MAX(SDATE)
+                             FROM THRM151 X
+                             WHERE X.ENTER_CD = A.ENTER_CD
+                               AND X.SABUN = A.SABUN
+                               AND NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+            )
+              AND B.STATUS_CD IN ('AA', 'CA')
+              AND B.ORG_CD = C.ORG_CD
+              ]]>
+<if test='searchLocCd != null and !searchLocCd.equals("") and searchLocCd != "0"'>
+              AND C.LOCATION_CD = #{searchLocCd}
+</if>
+            ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+
+    </select>
+
+    <select parameterType="map" resultType="cMap" id="getMapClusterData">
+        <![CDATA[
+            SELECT C.LOCATION_CD, C.LOCATION_NM, C.ADDR, COUNT(C.LOCATION_CD) AS CNT
+            FROM THRM100 A,
+                 THRM151 B,
+                 (
+                     SELECT A.ENTER_CD, A.ORG_CD, B.LOCATION_CD, B.LOCATION_NM, B.ADDR
+                     FROM TORG101 A,
+                          (
+                              SELECT A.ENTER_CD, A.SDATE, A.EDATE, B.LOCATION_CD, B.LOCATION_NM, B.ADDR
+                              FROM TORG109 A
+                                       INNER JOIN TSYS015 B
+                                                  ON A.ENTER_CD = B.ENTER_CD
+                              WHERE A.ENTER_CD = #{ssnEnterCd}
+                                AND A.MAP_TYPE_CD = '600'
+                                AND A.MAP_CD = B.LOCATION_CD
+                                AND NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                          ) B
+                     WHERE A.ENTER_CD = B.ENTER_CD
+                       AND A.LOCATION_CD = B.LOCATION_CD
+                       AND NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                 ) C
+            WHERE A.ENTER_CD = #{ssnEnterCd}
+              AND B.ENTER_CD = A.ENTER_CD
+              AND C.ENTER_CD = A.ENTER_CD
+              AND A.SABUN = B.SABUN
+              AND B.SDATE = (SELECT MAX(SDATE)
+                             FROM THRM151 X
+                             WHERE X.ENTER_CD = A.ENTER_CD
+                               AND X.SABUN = A.SABUN
+                               AND NVL(REPLACE(#{searchDate}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+            )
+              AND B.STATUS_CD IN ('AA', 'CA')
+              AND B.ORG_CD = C.ORG_CD
+            GROUP BY C.LOCATION_CD, C.LOCATION_NM, C.ADDR
+        ]]>
+    </select>
+
+</mapper>

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.applicationBasis.bizAppAuthor">
+		<select parameterType="map" resultType="cMap" id="getBizAppAuthorList">
+
+				<![CDATA[
+					SELECT    ENTER_CD        
+							, APPL_CD         
+							, APPL_NM
+							, #{locationCd} AS LOCATION_CD
+					FROM THRI101
+                	WHERE 1=1
+                	AND ENTER_CD          = #{ssnEnterCd}
+                	        ]]>
+                	<if test='appCd != null and !appCd.equals("")'>
+                  		AND APPL_CD = TRIM( #{appCd} )
+                  	</if>
+                  	<if test='appCdNm != null and !appCdNm.equals("")'>
+                  		AND APPL_NM LIKE '%'|| #{appCdNm}  ||'%'
+					</if>
+                  	AND USE_YN = 'Y'
+                  	AND RECEV_YN = 'Y' 
+                  	ORDER BY TO_NUMBER(APPL_CD)
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getBizAppAuthorList2">
+
+				<![CDATA[
+   					SELECT    A.LOCATION_CD
+							, A.APPL_CD
+							, B.APPL_NM
+							, A.AGREE_SEQ
+							, A.APPL_TYPE_CD
+							, A.AGREE_ENTER_CD 
+							, A.AGREE_SABUN
+							, F_COM_GET_NAMES(A.AGREE_ENTER_CD, A.AGREE_SABUN) AS NAME
+							, F_COM_GET_JIKWEE_NM(A.AGREE_ENTER_CD,A.AGREE_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+							, F_COM_GET_JIKGUB_NM(A.AGREE_ENTER_CD,A.AGREE_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+							, F_COM_GET_JIKCHAK_NM(A.AGREE_ENTER_CD,A.AGREE_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+  					FROM THRI112 A 
+  					   , THRI101 B                
+ 					WHERE A.ENTER_CD 		= #{ssnEnterCd}
+ 					AND A.APPL_CD 			= TRIM( #{applCd} )
+ 					AND A.LOCATION_CD	    = TRIM( #{locationCd} )
+ 					AND B.ENTER_CD 			= A.ENTER_CD
+ 					AND B.APPL_CD			= A.APPL_CD
+ 					AND B.USE_YN        	= 'Y'
+ 					ORDER BY A.AGREE_SEQ ASC
+				]]>
+
+
+		</select>
+		
+		<update parameterType="map" id="saveBizAppAuthor2">
+
+   					MERGE INTO THRI112 T
+                  	USING (
+               				SELECT    A.AGREE_ENTER_CD		AS AGREE_ENTER_CD
+               						, A.LOCATION_CD         AS LOCATION_CD
+               						, A.APPL_CD        		AS APPL_CD            
+                                	, A.AGREE_SABUN        	AS AGREE_SABUN              
+                                	, A.APPL_TYPE_CD    	AS APPL_TYPE_CD       
+                                	, A.AGREE_SEQ       	AS AGREE_SEQ          
+                     		FROM   (
+                               		SELECT    NULL			AS AGREE_ENTER_CD  
+                               		        , NULL			AS LOCATION_CD
+                               				, NULL			AS APPL_CD        
+                                			, NULL			AS AGREE_SABUN          
+                                			, NULL			AS APPL_TYPE_CD   
+                                			, NULL			AS AGREE_SEQ      
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT      #{ssnEnterCd}				AS AGREE_ENTER_CD
+											,  TRIM(#{rm.locationCd})			    AS LOCATION_CD
+                                      		,  TRIM(#{rm.applCd})					AS APPL_CD
+                                			,  TRIM(#{rm.agreeSabun})  				AS AGREE_SABUN
+                                			,  TRIM(#{rm.applTypeCd})				AS APPL_TYPE_CD
+                                			,  TO_NUMBER( TRIM(#{rm.agreeSeq}) )	AS AGREE_SEQ
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.AGREE_ENTER_CD IS NOT NULL 
+							  AND A.APPL_CD        IS NOT NULL
+							  AND A.LOCATION_CD    IS NOT NULL
+							  AND A.AGREE_SABUN    IS NOT NULL
+							  AND A.APPL_TYPE_CD   IS NOT NULL
+							  AND A.AGREE_SEQ      IS NOT NULL
+                           ) S
+                        ON (
+                               	   T.AGREE_ENTER_CD 	= S.AGREE_ENTER_CD
+                               AND T.LOCATION_CD	    = S.LOCATION_CD
+                               AND T.APPL_CD 			= S.APPL_CD
+                               AND T.AGREE_SABUN 		= S.AGREE_SABUN
+                           )
+           			WHEN MATCHED THEN
+						UPDATE SET	  T.AGREE_SEQ    	= S.AGREE_SEQ    
+						            , T.APPL_TYPE_CD	= S.APPL_TYPE_CD  
+                                  	, T.CHKDATE			= SYSDATE
+                                  	, T.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT 
+               			(
+               				  T.ENTER_CD
+               				, T.AGREE_ENTER_CD
+               				, T.LOCATION_CD
+               				, T.APPL_CD      
+							, T.AGREE_SABUN        
+							, T.APPL_TYPE_CD 
+							, T.AGREE_SEQ    
+                          	, T.CHKDATE
+                          	, T.CHKID
+               			) 
+               			VALUES 
+               			(
+							  #{ssnEnterCd}
+               				, S.AGREE_ENTER_CD
+							, S.LOCATION_CD
+	            			, S.APPL_CD        
+							, S.AGREE_SABUN          
+							, S.APPL_TYPE_CD   
+							, S.AGREE_SEQ      
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		
+		<delete parameterType="map" id="deleteBizAppAuthor2">
+
+   					DELETE FROM THRI112
+					 WHERE AGREE_ENTER_CD||'_'||LOCATION_CD||'_'||APPL_CD||'_'||AGREE_SABUN	 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.locationCd != null and !rm.locationCd.equals("")
+											and rm.applCd != null and !rm.applCd.equals("")
+											and rm.agreeSabun != null and !rm.agreeSabun.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM( #{rm.locationCd} )||'_'||TRIM( #{rm.applCd} )||'_'||TRIM( #{rm.agreeSabun} )
+										</if>
+</foreach>
+										)
+		</delete>
+	
+
+</mapper>
+

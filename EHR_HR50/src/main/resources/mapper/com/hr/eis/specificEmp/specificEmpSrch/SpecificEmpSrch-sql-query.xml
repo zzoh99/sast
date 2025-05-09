@@ -1,0 +1,1051 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 맞춤인재검색
+ * @author JSG
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.specificEmp.specificEmpSrch">
+		<select parameterType="map" resultType="cMap" id="getSpecificEmpList">
+			
+				<![CDATA[
+				SELECT R.SABUN,
+				       R.ORG_CD,
+				       R.JIKGUB_CD,JIKGUB_NM,
+				       R.JIKWEE_CD,JIKWEE_NM,JIKMOO_NM,
+                       R.WORK_TYPE,R.WORK_TYPE_NM,
+                       R.MANAGE_CD,R.MANAGE_NM,
+				       R.SAL_CLASS,
+				       R.JIKCHAK_CD,JIKCHAK_NM,
+				       R.SALE_AID_GB,
+				       R.STATUS_CD ,STATUS_NM ,
+				       R.NAME,
+				       R.GEMP_YMD,
+				       TO_CHAR(TO_DATE(R.EMP_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS EMP_YMD,
+				       TO_CHAR(TO_DATE(R.BIR_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS BIR_YMD,
+				       TO_CHAR(TO_DATE(R.RET_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS RET_YMD,
+				       SUBSTR(R.RES_NO, 1, 7) ||
+        					RPAD('*', LENGTH(R.RES_NO) - 7, '*') AS RES_NO,
+				       R.EMP_TYPE,
+				       R.ORG_NM ,
+				       R.OFFICE_TEL,
+				       R.HAND_PHONE,
+				       R.MAIL_ID,
+				       R.OUT_MAIL_ID,
+				       R.ADDR1,
+				       R.ADDR2 ,
+				       R.TOT_CNT,
+				       F_HRM_GET_WORK_PLACE(#{ssnEnterCd}, R.SABUN) AS WORK_PLACE,
+				       F_COM_GET_JIKJONG_NM(#{ssnEnterCd}, R.SABUN) AS JIKJONG_NM
+				  FROM
+				       (SELECT ROWNUM AS RNUM,
+				              SABUN,
+				              ORG_CD,
+				              JIKGUB_CD, JIKGUB_NM,
+				              JIKWEE_CD, JIKWEE_NM,JIKMOO_NM,
+				              WORK_TYPE,WORK_TYPE_NM,
+                              MANAGE_CD,MANAGE_NM,
+				              SAL_CLASS,
+				              JIKCHAK_CD,JIKCHAK_NM,
+				              SALE_AID_GB,
+				              STATUS_CD , STATUS_NM ,
+				              NAME,
+				              GEMP_YMD,
+				              EMP_YMD,
+				              BIR_YMD,
+				              RET_YMD,
+				              RES_NO,
+				              EMP_TYPE,
+				              ORG_NM ,
+				              OFFICE_TEL,
+				              HAND_PHONE,
+				              MAIL_ID,
+				              OUT_MAIL_ID,
+				              ADDR1,
+				              ADDR2 ,
+				              COUNT(*) OVER() AS TOT_CNT
+				         FROM
+				              (SELECT DISTINCT F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) NAME,
+				                     A.SABUN,
+				                     F.ORG_NM ,
+				                     A.ORG_CD ,
+				                     A.STATUS_CD ,A.STATUS_NM ,
+				                     A.JIKGUB_CD ,A.JIKGUB_NM,
+				                     A.SAL_CLASS ,
+				                     A.JIKCHAK_CD ,A.JIKCHAK_NM,
+				                     A.JIKWEE_CD ,A.JIKWEE_NM ,
+				                     A.WORK_TYPE,A.WORK_TYPE_NM,
+                                     A.MANAGE_CD,A.MANAGE_NM,
+                                     F_COM_GET_JOB_NM(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKMOO_NM,
+				                     '' AS SALE_AID_GB ,
+				                     B.GEMP_YMD ,
+				                     B.EMP_YMD ,
+				                     B.RET_YMD ,
+				                     B.BIR_YMD ,
+				                     CRYPTIT.DECRYPT (B.RES_NO, B.ENTER_CD) AS RES_NO ,
+				                     B.EMP_TYPE ,
+				                     D.ADDR1 ,
+				                     D.ADDR2
+				                    ,F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OT') AS OFFICE_TEL
+				                    ,F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE
+				                    ,F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OM') AS OUT_MAIL_ID
+				                    ,F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+				                FROM THRM151 A ,
+				                     THRM100 B ,
+				                     TORG101 F ,
+				                     THRM123 D 
+				               WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+				               <if test='searchOrgType != null and searchOrgType neq "" and searchOrgType eq "Y"'>
+			                        <if test='searchOrgCd != null and searchOrgCd neq ""'>
+					                     AND A.ORG_CD IN
+					                     (SELECT #{searchOrgCd} /*소속*/
+					                       FROM DUAL
+										  UNION
+					                     SELECT ORG_CD
+				                            FROM (
+												  SELECT *
+												   FROM TORG105
+												  WHERE ENTER_CD = #{ssnEnterCd}
+			                        	<choose>
+			                        		<when test="searchSdate != null and searchSdate neq ''">
+			                        				AND SDATE = #{searchSdate}
+			                        		</when>
+			                        		<otherwise>
+			                        				AND SDATE IN (
+			                        								SELECT MAX(SDATE)
+																	  FROM TORG105
+																 	 WHERE ENTER_CD = #{ssnEnterCd}
+																 )
+			                        		</otherwise>
+			                        	</choose>
+												 )
+					                       START
+					                     WITH PRIOR_ORG_CD = #{searchOrgCd} CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					                            AND PRIOR SDATE = SDATE
+					                            AND PRIOR ORG_CD = PRIOR_ORG_CD
+					                        )
+					                    <if test='searchStatusCd != null and searchStatusCd eq "RA"'>
+					                    	AND A.STATUS_CD NOT LIKE 'RA%'	
+					                    </if>
+					                 </if>
+				                 </if>
+				                 <if test="searchOrgType == null or searchOrgType eq ''">
+			                        <if test="searchOrgCd != null and searchOrgCd neq ''">
+					                     AND A.ORG_CD = #{searchOrgCd} /*소속*/
+					                </if>
+				                 </if>
+				                        <if test="jikmooCd != null and jikmooCd neq ''">
+				                          AND A.SABUN IN (
+				                          	SELECT SABUN FROM THRM141
+				                          	WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+				                          	AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231')
+											<if test="jikmooCd != null and jikmooCd neq '' and jikmooCd.getClass().isArray()">
+												AND JOB_CD IN
+												<foreach collection="jikmooCd" item="item" index="index" open="(" close=")" separator=",">
+													#{item}
+												</foreach>
+											</if>
+											<if test="jikmooCd != null and jikmooCd neq '' and !jikmooCd.getClass().isArray()">
+												AND JOB_CD = #{jikmooCd}
+											</if>
+				                          	) /*직무*/
+				                        </if>
+
+										<if test="jikgubCd != null and jikgubCd neq '' and jikgubCd.getClass().isArray()">
+											AND A.JIKGUB_CD IN
+											<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+												#{item}
+											</foreach>
+										</if>
+										<if test="jikgubCd != null and jikgubCd neq '' and !jikgubCd.getClass().isArray()">
+											AND A.JIKGUB_CD = #{jikgubCd}
+										</if>
+										<if test="jikchakCd != null and jikchakCd neq '' and jikchakCd.getClass().isArray()">
+											AND A.JIKCHAK_CD IN
+											<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+												#{item}
+											</foreach>
+										</if>
+										<if test="jikchakCd != null and jikchakCd neq '' and !jikchakCd.getClass().isArray()">
+											AND A.JIKCHAK_CD = #{jikchakCd}
+										</if>
+
+										<if test="jikweeCd != null and jikweeCd neq '' and jikweeCd.getClass().isArray()">
+											AND A.JIKWEE_CD IN
+											<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+												#{item}
+											</foreach>
+										</if>
+										<if test="jikweeCd != null and jikweeCd neq '' and !jikweeCd.getClass().isArray()">
+											AND A.JIKWEE_CD = #{jikweeCd}
+										</if>
+				                        <if test="searchSAge != null and searchSAge neq ''">
+				                          /*나이*/
+				                          AND '19'||SUBSTR(CRYPTIT.DECRYPT (B.RES_NO, B.ENTER_CD), 1, 6) BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE+1, (-12 * NVL(#{searchEAge}, 99))-12), 'YYYYMMDD') AND TO_CHAR(ADD_MONTHS(SYSDATE, -12 * #{searchSAge}), 'YYYYMMDD')
+				                        </if>
+				                        <if test="searchSex != null and searchSex neq ''">
+				                          AND B.SEX_TYPE = #{searchSex} /*남여구분*/
+				                        </if>
+				                        <if test="empSYmd != null and empSYmd neq ''">
+				                          AND B.EMP_YMD BETWEEN REPLACE(#{empSYmd},'-','') AND NVL(REPLACE(#{empEYmd},'-',''),'99991231') /*입사일*/
+				                        </if>
+				                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+				                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN F.SDATE AND NVL(F.EDATE,'99991231')
+				                        <if test="retSYmd != null and retSYmd neq ''">
+				                          AND B.RET_YMD BETWEEN REPLACE(#{retSYmd},'-','') AND NVL(REPLACE(#{retEYmd},'-',''),'99991231') /*퇴사일*/
+				                        </if>
+				                        <if test="statusCd != null and statusCd neq ''">
+				                          AND A.STATUS_CD IN 
+				                            <foreach collection="statusCd" item="item" index="index" open="(" close=")" separator=",">
+												#{item}
+											</foreach>
+				                            /*재직상태*/
+				                        </if>
+				                        <if test="searchBfCmp != null and searchBfCmp neq ''">
+				                          AND UPPER(F_HRM_GET_WORK_PLACE(#{ssnEnterCd}, A.SABUN)) LIKE '%'|| UPPER(#{searchBfCmp}) ||'%' /*출신회사 */
+				                        </if>
+				                        AND TRUNC(MONTHS_BETWEEN(DECODE(NVL(B.RET_YMD,'N'),'N',SYSDATE,TO_DATE(B.RET_YMD,'YYYYMMDD')), TO_DATE(NVL(B.EMP_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')),'YYYYMMDD'))/12) BETWEEN  NVL(#{searchSYear},0) AND NVL(#{searchEYear}, 100)
+				                        AND A.ENTER_CD = B.ENTER_CD
+				                        AND A.SABUN = B.SABUN
+				                        AND A.ENTER_CD = F.ENTER_CD(+)
+				                        AND A.ORG_CD = F.ORG_CD(+)
+				                        AND A.ENTER_CD = D.ENTER_CD(+)
+				                        AND A.SABUN = D.SABUN(+)
+				                        AND D.ADD_TYPE(+) = '2' /*AND D.DISPLAY_YN(+) = 'Y'*/
+				               ORDER BY B.RET_YMD DESC,
+				                        (SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20020' AND CODE = A.JIKCHAK_CD) ASC,
+				                        (SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20010' AND CODE = A.JIKGUB_CD) ASC,
+				                        A.SAL_CLASS ASC
+				                 )
+				          ) R
+						 WHERE 1=1
+						   <if test="(sltSch != null and sltSch neq '') or (searchMjrNm != null and searchMjrNm neq '')">
+	                        AND NVL(R.SABUN, '^') = NVL(
+	                  			 (SELECT MAX(AAA.SABUN)
+	                                  FROM THRM115 AAA
+	                                 WHERE AAA.ENTER_CD = #{ssnEnterCd}
+	                                 <if test="searchSchCode != null and searchSchCode neq ''">
+	                                   AND NVL(AAA.ACA_SCH_CD,'^') = TRIM(#{searchSchCode})
+	                                 </if>
+	                                 <if test="searchSch != null and searchSch neq ''">
+	                                   AND UPPER(NVL(AAA.ACA_SCH_NM,'^')) LIKE '%' || UPPER(#{searchSch}) || '%'
+	                                 </if>
+
+										-- IN 절 사용 시 1,000 초과로 OR 사용
+								     <if test="searchMjrNm != null and searchMjrNm neq '' and searchMjrNm.getClass().isArray()">
+								   	   AND
+								   	   <foreach collection="searchMjrNm" item="item" index="index" open="(" close=")" separator="OR">
+										   AAA.ACAMAJ_NM = #{item}
+								   	   </foreach>
+								     </if>
+								     <if test="searchMjrNm != null and searchMjrNm neq '' and !searchMjrNm.getClass().isArray()">
+								   	   AND AAA.ACAMAJ_NM = #{searchMjrNm}
+								     </if>
+
+	                                   AND AAA.SABUN = R.SABUN )
+	                            , '^')
+						   </if>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getSpecificEmpListPop">
+			
+				<if test="searchGrpCd != null and searchGrpCd neq 'H10060'">
+					--직무는 그룹코드가 아닌 테이블이 따로 있으므로 처리를 다르게 한다.
+					SELECT CODE, CODE_NM, '0' AS DUMMY_CHECK
+					  FROM TSYS005
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND GRCODE_CD = #{searchGrpCd}
+					   AND USE_YN = 'Y'
+					 ORDER BY SEQ
+				</if>
+				<if test="searchGrpCd != null and searchGrpCd eq 'H10060'">
+					SELECT 0 AS "_level",
+							'0' AS DUMMY_CHECK,
+							'0' AS CODE,
+							'직무분류표' AS CODE_NM
+					  FROM DUAL
+					UNION ALL
+					SELECT *
+						FROM (
+							SELECT LEVEL AS "_level",
+									'0' AS DUMMY_CHECK,
+									A.JOB_CD AS CODE,
+									B.JOB_NM AS CODE_NM
+							FROM	TORG204 A
+			              LEFT OUTER JOIN TORG201 B
+			                ON B.ENTER_CD = A.ENTER_CD
+			               AND B.JOB_CD = A.JOB_CD
+			               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+							WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+								AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+							START WITH A.PRIOR_JOB_CD = '0'
+							CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+								AND PRIOR A.JOB_CD = A.PRIOR_JOB_CD
+							ORDER SIBLINGS BY A.PRIOR_JOB_CD, A.SEQ
+						)
+				</if>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getSpecificEmpExcel">
+			
+				<![CDATA[
+				SELECT R.SABUN,
+				       R.ORG_CD,
+				       R.JIKGUB_CD,JIKGUB_NM,
+				       R.JIKWEE_CD,JIKWEE_NM,JIKMOO_NM,
+                       R.WORK_TYPE,R.WORK_TYPE_NM,
+                       R.MANAGE_CD,R.MANAGE_NM,
+				       R.SAL_CLASS,
+				       R.JIKCHAK_CD,JIKCHAK_NM,
+				       R.SALE_AID_GB,
+				       R.STATUS_CD ,STATUS_NM ,
+				       R.NAME,
+				       R.GEMP_YMD,
+				       TO_CHAR(TO_DATE(R.EMP_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS EMP_YMD,
+				       TO_CHAR(TO_DATE(R.BIR_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS BIR_YMD,
+				       TO_CHAR(TO_DATE(R.RET_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS RET_YMD,
+				       R.RES_NO,
+				       R.EMP_TYPE,
+				       R.ORG_NM ,
+				       R.OFFICE_TEL,
+				       R.HAND_PHONE,
+				       R.MAIL_ID,
+				       R.OUT_MAIL_ID,
+				       R.ADDR1,
+				       R.ADDR2 ,
+				       R.TOT_CNT,
+				       F_HRM_GET_WORK_PLACE(#{ssnEnterCd}, R.SABUN) AS WORK_PLACE
+				  FROM
+				       (SELECT ROWNUM AS RNUM,
+				              SABUN,
+				              ORG_CD,
+				              JIKGUB_CD, JIKGUB_NM,
+				              JIKWEE_CD, JIKWEE_NM,JIKMOO_NM,
+				              WORK_TYPE,WORK_TYPE_NM,
+                              MANAGE_CD,MANAGE_NM,
+				              SAL_CLASS,
+				              JIKCHAK_CD,JIKCHAK_NM,
+				              SALE_AID_GB,
+				              STATUS_CD , STATUS_NM ,
+				              NAME,
+				              GEMP_YMD,
+				              EMP_YMD,
+				              BIR_YMD,
+				              RET_YMD,
+				              RES_NO,
+				              EMP_TYPE,
+				              ORG_NM ,
+				              OFFICE_TEL,
+				              HAND_PHONE,
+				              MAIL_ID,
+				              OUT_MAIL_ID,
+				              ADDR1,
+				              ADDR2 ,
+				              COUNT(*) OVER() AS TOT_CNT
+				         FROM
+				              (SELECT DISTINCT F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) NAME ,
+				                     A.SABUN ,
+				                     F.ORG_NM ,
+				                     A.ORG_CD ,
+				                     A.STATUS_CD ,A.STATUS_NM ,
+				                     A.JIKGUB_CD ,A.JIKGUB_NM,
+				                     A.SAL_CLASS ,
+				                     A.JIKCHAK_CD ,A.JIKCHAK_NM,
+				                     A.JIKWEE_CD ,A.JIKWEE_NM ,
+				                     A.WORK_TYPE,A.WORK_TYPE_NM,
+                                     A.MANAGE_CD,A.MANAGE_NM,
+                                     F_COM_GET_JOB_NM(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKMOO_NM,
+				                     '' AS SALE_AID_GB ,
+				                     B.GEMP_YMD ,
+				                     B.EMP_YMD ,
+				                     B.RET_YMD ,
+				                     B.BIR_YMD ,
+				                     CRYPTIT.DECRYPT (B.RES_NO, B.ENTER_CD) AS RES_NO ,
+				                     B.EMP_TYPE ,
+				                     D.ADDR1 ,
+				                     D.ADDR2 ,
+				                     F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OT') AS OFFICE_TEL,
+				                     F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE,
+				                     F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OM') AS OUT_MAIL_ID,
+				                     F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+				                FROM THRM151 A ,
+				                     THRM100 B ,
+				                     TORG101 F ,
+				                     THRM123 D
+				               WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+								<if test='searchOrgType != null and searchOrgType neq "" and searchOrgType eq "Y"'>
+			                        <if test='searchOrgCd != null and searchOrgCd neq ""'>
+					                     AND A.ORG_CD IN
+					                     (SELECT #{searchOrgCd} /*소속*/
+					                       FROM DUAL
+					                         UNION
+					                     SELECT ORG_CD
+					                       FROM ( SELECT T.ENTER_CD, T.SDATE, T.ORG_CD, T.PRIOR_ORG_CD
+					                                FROM TORG105 T
+					                               WHERE T.ENTER_CD = #{ssnEnterCd}
+					                                 AND T.SDATE = ( SELECT MAX(SDATE)
+					                                                   FROM TORG105
+					                                                  WHERE ENTER_CD = #{ssnEnterCd} ) )
+					                      START WITH PRIOR_ORG_CD = #{searchOrgCd} CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					                            AND PRIOR SDATE = SDATE
+					                            AND PRIOR ORG_CD = PRIOR_ORG_CD
+					                        )
+					                 </if>
+				                 </if>
+				                 <if test="searchOrgType == null or searchOrgType eq ''">
+			                        <if test="searchOrgCd != null and searchOrgCd neq ''">
+					                     AND A.ORG_CD = #{searchOrgCd} /*소속*/
+					                </if>
+				                 </if>
+				                        <if test="jikmooCd != null and jikmooCd neq ''">
+				                          AND A.JOB_CD IN ( ${jikmooCd} ) /*직무*/
+				                        </if>
+				                        <if test="jikgubCd != null and jikgubCd neq ''">
+				                          AND A.JIKGUB_CD IN ( ${jikgubCd} ) /*직급*/
+				                        </if>
+   				                        <if test="jikchakCd != null and jikchakCd neq ''">
+				                          AND A.JIKCHAK_CD IN ( ${jikchakCd} ) /*직책*/
+				                        </if>
+				                        <if test="jikweeCd != null and jikweeCd neq ''">
+				                          AND A.JIKWEE_CD IN ( ${jikweeCd} ) /*직위*/
+				                        </if>
+				                        <if test="searchSAge != null and searchSAge neq ''">
+				                          /*나이*/
+				                          AND F_COM_GET_AGE(B.ENTER_CD, B.BIR_YMD, B.RES_NO, TO_CHAR(SYSDATE,'YYYYMMDD')) BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE+1, (-12 * NVL(#{searchEAge}, 99))-12), 'YYYYMMDD') AND TO_CHAR(ADD_MONTHS(SYSDATE, -12 * #{searchSAge}), 'YYYYMMDD')
+				                        </if>
+				                        <if test="searchSex != null and searchSex neq ''">
+				                          AND B.SEX_TYPE = #{searchSex} /*남여구분*/
+				                        </if>
+				                        <if test="empSYmd != null and empSYmd neq ''">
+				                          AND B.EMP_YMD BETWEEN REPLACE(#{empSYmd},'-','') AND NVL(REPLACE(#{empEYmd},'-',''),'99991231') /*입사일*/
+				                        </if>
+				                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+				                        AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN F.SDATE AND NVL(F.EDATE,'99991231')
+				                        <if test="retSYmd != null and retSYmd neq ''">
+				                          AND B.RET_YMD BETWEEN REPLACE(#{retSYmd},'-','') AND NVL(REPLACE(#{retEYmd},'-',''),'99991231') /*퇴사일*/
+				                        </if>
+				                        <if test="statusCd != null and statusCd neq ''">
+				                          AND A.STATUS_CD IN
+				                            <foreach collection="statusCd" item="item" index="index" open="(" close=")" separator=",">
+												#{item}
+											</foreach>
+				                            /*재직상태*/
+				                        </if>
+				                        <if test="searchBfCmp != null and searchBfCmp neq ''">
+				                          AND F_HRM_GET_WORK_PLACE(#{ssnEnterCd}, A.SABUN) LIKE '%'|| #{searchBfCmp} ||'%' /*출신회사 */
+				                        </if>
+				                        AND ( TO_NUMBER(TO_CHAR(SYSDATE, 'YYYY')) - SUBSTR(NVL(B.EMP_YMD, B.GEMP_YMD),0,4) )+1 BETWEEN  NVL(#{searchSYear},0) AND NVL(#{searchEYear}, 100)
+				                        AND A.ENTER_CD = B.ENTER_CD
+				                        AND A.SABUN = B.SABUN
+				                        AND A.ENTER_CD = F.ENTER_CD(+)
+				                        AND A.ORG_CD = F.ORG_CD(+)
+				                        AND A.ENTER_CD = D.ENTER_CD(+)
+				                        AND A.SABUN = D.SABUN(+)
+				                        AND D.ADD_TYPE(+) = '2' /*AND D.DISPLAY_YN(+) = 'Y'*/
+				               ORDER BY B.RET_YMD DESC,
+				                        (SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20020' AND CODE = A.JIKCHAK_CD) ASC,
+				                        (SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20010' AND CODE = A.JIKGUB_CD) ASC,
+				                        A.SAL_CLASS ASC
+				                 )
+				          ) R
+						 WHERE 1=1
+						   <if test="sltSch != null and sltSch neq ''">
+	                        AND NVL(R.SABUN, '^') = NVL(
+	                  			 (SELECT MAX(AAA.SABUN)
+	                                  FROM THRM115 AAA
+	                                 WHERE AAA.ENTER_CD = #{ssnEnterCd}
+	                                 <if test="searchSch != null and searchSch neq ''">
+	                                   AND NVL(AAA.ACA_SCH_NM,'^') LIKE '%' || #{searchSch} || '%'
+	                                 </if>
+	                                   AND NVL(AAA.ACA_CD,'^') LIKE '%' || #{sltSch} || '%'
+	                                   AND AAA.SABUN = R.SABUN )
+	                            , '^')
+						   </if>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getSpecificEmpSrchNewList">
+
+			<if test="searchKeyword != null and searchKeyword neq ''">
+				/*키워드*/
+				WITH KEYWORD AS (SELECT SABUN FROM THRM_KEYWORD WHERE KEYWORD LIKE '%' ||  TRIM(#{searchKeyword})  || '%')
+			</if>
+
+			<![CDATA[
+					SELECT R.ENTER_CD,
+					       R.AUTH_ENTER_CD, R.AUTH_ENTER_NM,
+					       R.SABUN,
+						   R.ORG_CD,
+						   R.JIKGUB_CD,JIKGUB_NM,
+						   R.JIKWEE_CD,JIKWEE_NM,JIKMOO_NM,
+						   R.WORK_TYPE,R.WORK_TYPE_NM,
+						   R.MANAGE_CD,R.MANAGE_NM,
+						   R.SAL_CLASS,
+						   R.JIKCHAK_CD,JIKCHAK_NM,
+						   R.SALE_AID_GB,
+						   R.STATUS_CD ,STATUS_NM ,
+						   R.NAME,
+						   R.GEMP_YMD,
+						   TO_CHAR(TO_DATE(R.EMP_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS EMP_YMD,
+						   TO_CHAR(TO_DATE(R.BIR_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS BIR_YMD,
+						   TO_CHAR(TO_DATE(R.RET_YMD,'YYYY-MM-DD'),'YYYY-MM-DD') AS RET_YMD,
+						   R.RES_NO,
+						   R.EMP_TYPE,
+						   R.ORG_NM ,
+						   R.OFFICE_TEL,
+						   R.HAND_PHONE,
+						   R.MAIL_ID,
+						   R.OUT_MAIL_ID,
+						   R.ADDR1,
+						   R.ADDR2 ,
+						   R.TOT_CNT,
+						   F_HRM_GET_WORK_PLACE(#{ssnEnterCd}, R.SABUN) AS WORK_PLACE,
+						   '/EmpPhotoOut.do'||chr(63)||'enterCd=' || R.ENTER_CD || chr(38) || 'searchKeyword=' || R.SABUN || chr(38) || 'type=1' AS PHOTO,
+						   0 AS DETAIL,
+					       '<a class="button">출력</a>' AS BTN_PRT
+					  FROM
+						   (SELECT ROWNUM AS RNUM,
+						          ENTER_CD,
+						          AUTH_ENTER_CD, AUTH_ENTER_NM,
+								  SABUN,
+								  ORG_CD,
+								  JIKGUB_CD, JIKGUB_NM,
+								  JIKWEE_CD, JIKWEE_NM,JIKMOO_NM,
+								  WORK_TYPE,WORK_TYPE_NM,
+								  MANAGE_CD,MANAGE_NM,
+								  SAL_CLASS,
+								  JIKCHAK_CD,JIKCHAK_NM,
+								  SALE_AID_GB,
+								  STATUS_CD , STATUS_NM ,
+								  NAME,
+								  GEMP_YMD,
+								  EMP_YMD,
+								  BIR_YMD,
+								  RET_YMD,
+								  RES_NO,
+								  EMP_TYPE,
+								  ORG_NM ,
+								  OFFICE_TEL,
+								  HAND_PHONE,
+								  MAIL_ID,
+								  OUT_MAIL_ID,
+								  ADDR1,
+								  ADDR2 ,
+								  COUNT(*) OVER() AS TOT_CNT
+							 FROM
+								  (SELECT DISTINCT F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) NAME ,
+								         A.ENTER_CD,
+								         E.ENTER_CD AS AUTH_ENTER_CD,
+								         F_COM_GET_ENTER_ALIAS(E.ENTER_CD) AS AUTH_ENTER_NM,
+										 A.SABUN ,
+										 F.ORG_NM ,
+										 A.ORG_CD ,
+										 A.STATUS_CD ,A.STATUS_NM ,
+										 A.JIKGUB_CD ,A.JIKGUB_NM,
+										 A.SAL_CLASS ,
+										 A.JIKCHAK_CD ,A.JIKCHAK_NM,
+										 A.JIKWEE_CD ,A.JIKWEE_NM ,
+										 A.WORK_TYPE,A.WORK_TYPE_NM,
+										 A.MANAGE_CD,A.MANAGE_NM,
+										 F_COM_GET_JOB_NM(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKMOO_NM,
+										 '' AS SALE_AID_GB ,
+										 B.GEMP_YMD ,
+										 B.EMP_YMD ,
+										 B.RET_YMD ,
+										 B.BIR_YMD ,
+										 CRYPTIT.DECRYPT (B.RES_NO, B.ENTER_CD) AS RES_NO ,
+										 B.EMP_TYPE ,
+										 D.ADDR1 ,
+										 D.ADDR2 ,
+										 F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OT') AS OFFICE_TEL,
+										 F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE,
+										 F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OM') AS OUT_MAIL_ID,
+										 F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+									FROM THRM151 A ,
+										 THRM100 B ,
+										 TORG101 F ,
+										 THRM123 D ,
+										 TORG900 E
+				         		   WHERE 1=1
+				         		   ]]>
+				         		     AND E.ENTER_CD IN (
+															SELECT #{ssnEnterCd} FROM DUAL
+															UNION
+															SELECT A.AUTH_ENTER_CD
+															FROM TSYS318 A, TSYS307 B
+															WHERE A.ENTER_CD = B.ENTER_CD
+																AND A.GRP_CD = B.GRP_CD
+																AND B.ENTER_ALL_YN = 'Y'
+																AND A.ENTER_CD = #{ssnEnterCd}
+														)
+
+			<if test='authEnterCd != null and !authEnterCd.equals("")'>
+				AND E.ENTER_CD IN
+				<foreach collection="authEnterCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+			</if>
+			<if test='searchOrgType != null and searchOrgType neq "" and searchOrgType eq "Y"'>
+				<if test='searchOrgCd != null and searchOrgCd neq ""'>
+					AND A.ORG_CD IN
+					    (
+					        SELECT #{searchOrgCd} /*소속*/
+					          FROM DUAL
+					        UNION
+					        SELECT ORG_CD
+					          FROM ( SELECT T.ENTER_CD, T.SDATE, T.ORG_CD, T.PRIOR_ORG_CD
+					                   FROM TORG105 T
+					                  WHERE T.ENTER_CD = #{ssnEnterCd}
+					                    AND T.SDATE = ( SELECT MAX(SDATE)
+					                                      FROM TORG105
+					                                     WHERE ENTER_CD = T.ENTER_CD ) )
+					         START WITH PRIOR_ORG_CD = #{searchOrgCd}
+					       CONNECT BY PRIOR ENTER_CD = ENTER_CD
+					              AND PRIOR SDATE = SDATE
+					              AND PRIOR ORG_CD = PRIOR_ORG_CD
+					)
+				</if>
+			</if>
+			<if test="searchOrgType == null or searchOrgType eq ''">
+				<if test="searchOrgCd != null and searchOrgCd neq ''">
+					AND A.ORG_CD = #{searchOrgCd} /*소속*/
+				</if>
+			</if>
+			<if test="jikmooCd != null and jikmooCd neq '' and jikmooCd.getClass().isArray()">
+				AND A.JOB_CD IN
+				<foreach collection="jikmooCd" item="item" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+			<if test="jikmooCd != null and jikmooCd neq '' and !jikmooCd.getClass().isArray()">
+				AND A.JOB_CD = #{jikmooCd}
+			</if>
+
+			<if test="jikgubCd != null and jikgubCd neq '' and jikgubCd.getClass().isArray()">
+				AND A.JIKGUB_CD IN
+				<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+			</if>
+			<if test="jikgubCd != null and jikgubCd neq '' and !jikgubCd.getClass().isArray()">
+				AND A.JIKGUB_CD = #{jikgubCd}
+			</if>
+
+			<if test="jikchakCd != null and jikchakCd neq '' and jikchakCd.getClass().isArray()">
+				AND A.JIKCHAK_CD IN
+				<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+			</if>
+			<if test="jikchakCd != null and jikchakCd neq '' and !jikchakCd.getClass().isArray()">
+				AND A.JIKCHAK_CD = #{jikchakCd}
+			</if>
+
+			<if test="jikweeCd != null and jikweeCd neq '' and jikweeCd.getClass().isArray()">
+				AND A.JIKWEE_CD IN
+				<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+			</if>
+			<if test="jikweeCd != null and jikweeCd neq '' and !jikweeCd.getClass().isArray()">
+				AND A.JIKWEE_CD = #{jikweeCd}
+			</if>
+			<if test='searchLicenseCd != null and !searchLicenseCd.equals("")'>
+				/*자격증*/
+				AND A.SABUN IN (SELECT SABUN FROM THRM113 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.SABUN AND LICENSE_CD IN
+				<foreach collection="searchLicenseCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+				)
+			</if>
+			<if test="searchSAge != null and searchSAge neq ''">
+				/*나이*/
+				AND F_COM_GET_AGE(B.ENTER_CD, B.BIR_YMD, B.RES_NO, TO_CHAR(SYSDATE,'YYYYMMDD')) BETWEEN TO_CHAR(ADD_MONTHS(SYSDATE+1, (-12 * NVL(#{searchEAge}, 99))-12), 'YYYYMMDD') AND TO_CHAR(ADD_MONTHS(SYSDATE, -12 * #{searchSAge}), 'YYYYMMDD')
+			</if>
+			<if test="searchSex != null and searchSex neq ''">
+				AND B.SEX_TYPE = #{searchSex} /*남여구분*/
+			</if>
+			<if test="empSYmd != null and empSYmd neq ''">
+				AND B.EMP_YMD BETWEEN REPLACE(#{empSYmd},'-','') AND NVL(REPLACE(#{empEYmd},'-',''),'99991231') /*입사일*/
+			</if>
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN F.SDATE AND NVL(F.EDATE,'99991231')
+			<if test="retSYmd != null and retSYmd neq ''">
+				AND B.RET_YMD BETWEEN REPLACE(#{retSYmd},'-','') AND NVL(REPLACE(#{retEYmd},'-',''),'99991231') /*퇴사일*/
+			</if>
+			<if test="statusCd != null and statusCd neq ''">
+				AND A.STATUS_CD IN
+				<foreach collection="statusCd" item="item" index="index" open="(" close=")" separator=",">
+					#{item}
+				</foreach>
+				/*재직상태*/
+			</if>
+			<if test="searchBfCmp != null and searchBfCmp neq ''">
+				AND F_HRM_GET_WORK_PLACE(#{ssnEnterCd}, A.SABUN) LIKE '%'|| #{searchBfCmp} ||'%' /*출신회사 */
+			</if>
+			AND ( TO_NUMBER(TO_CHAR(SYSDATE, 'YYYY')) - SUBSTR(NVL(B.EMP_YMD, B.GEMP_YMD),0,4) )+1 BETWEEN  NVL(#{searchSYear},0) AND NVL(#{searchEYear}, 100)
+			AND A.ENTER_CD = B.ENTER_CD
+			AND A.SABUN = B.SABUN
+			AND A.ENTER_CD = F.ENTER_CD(+)
+			AND A.ORG_CD = F.ORG_CD(+)
+			AND A.ENTER_CD = D.ENTER_CD(+)
+			AND A.SABUN = D.SABUN(+)
+			AND D.ADD_TYPE(+) = '2' /*AND D.DISPLAY_YN(+) = 'Y'*/
+			AND A.ENTER_CD = E.ENTER_CD
+			ORDER BY A.ENTER_CD, B.RET_YMD DESC,
+			(SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20020' AND CODE = A.JIKCHAK_CD) ASC,
+			(SELECT SEQ FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20010' AND CODE = A.JIKGUB_CD) ASC,
+			A.SAL_CLASS ASC
+			)
+			) R
+			WHERE 1=1
+			<if test="searchKeyword != null and searchKeyword neq ''">
+				AND R.SABUN IN (SELECT SABUN FROM KEYWORD)
+			</if>
+			<if test="sltSch != null and sltSch neq ''">
+				AND NVL(R.SABUN, '^') = NVL(
+				(SELECT MAX(AAA.SABUN)
+				FROM THRM115 AAA
+				WHERE AAA.ENTER_CD = #{ssnEnterCd}
+				<if test="searchSch != null and searchSch neq ''">
+					AND NVL(AAA.ACA_SCH_NM,'^') LIKE '%' || #{searchSch} || '%'
+				</if>
+				AND NVL(AAA.ACA_CD,'^') LIKE '%' || #{sltSch} || '%'
+				AND AAA.SABUN = R.SABUN )
+				, '^')
+			</if>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getSpecificEmpSrchKeywordList">
+			<![CDATA[
+				SELECT SEARCH_DESC, CONDITION_DESC
+				  FROM THRI201 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.INDIVIDUAL_YN = 'K'
+			]]>
+		</select>
+
+		<delete parameterType="map" id="deleteSpecificEmpSrchNewChgOrdExec">
+
+			DELETE FROM THRM221 WHERE
+			(ENTER_CD, ORD_TYPE_CD, ORD_DETAIL_CD, SABUN, ORD_YMD, APPLY_SEQ)
+			IN
+			( (NULL, NULL, NULL, NULL, NULL, NULL)
+			<foreach item="rm" collection="deleteRows" >
+				,(#{ssnEnterCd}, #{rm.ordTypeCd}, #{rm.ordDetailCd}, #{rm.sabun}, #{rm.ordYmd}, #{rm.applySeq})
+			</foreach>
+			)
+
+		</delete>
+
+		<delete parameterType="map" id="deleteSpecificEmpSrchNewChgOrdExec2">
+			DELETE FROM THRM223 WHERE
+			(ENTER_CD, ORD_TYPE_CD, ORD_DETAIL_CD, SABUN, ORD_YMD, APPLY_SEQ)
+			IN
+			( (NULL, NULL, NULL, NULL, NULL, NULL)
+			<foreach item="rm" collection="deleteRows" >
+				,(#{ssnEnterCd}, #{rm.ordTypeCd}, #{rm.ordDetailCd}, #{rm.sabun}, #{rm.ordYmd}, #{rm.applySeq})
+			</foreach>
+			)
+		</delete>
+
+		<update parameterType="map" id="updateSpecificEmpSrchNewChgOrd">
+
+			<![CDATA[
+			UPDATE THRM221 T
+			SET T.ORD_REASON_CD         = #{ordReasonCd}
+			  , T.VISUAL_YN           = #{visualYn}
+			  , T.MEMO                = #{memo}
+			  , T.CHKDATE             = SYSDATE
+			  , T.CHKID               = #{ssnSabun}
+
+			WHERE T.ENTER_CD = #{ssnEnterCd}
+			  AND T.ORD_TYPE_CD = TRIM( #{ordTypeCd} )
+			  AND T.ORD_DETAIL_CD = TRIM( #{ordDetailCd} )
+			  AND T.SABUN = TRIM( #{sabun} )
+			  AND T.ORD_YMD = TRIM( #{ordYmd} )
+			  AND T.APPLY_SEQ = TRIM( #{applySeq} )
+			]]>
+		</update>
+
+		<update parameterType="map" id="updateSpecificEmpSrchNewChgOrd2">
+
+			MERGE INTO THRM223 T
+			USING (SELECT * FROM (
+			SELECT NULL AS ENTER_CD
+			,NULL AS ORD_TYPE_CD
+			,NULL AS ORD_DETAIL_CD
+			,NULL AS SABUN
+			,NULL AS ORD_YMD
+			,NULL AS APPLY_SEQ
+			,NULL AS POST_ITEM
+			,NULL AS POST_ITEM_VALUE
+			FROM DUAL
+			<foreach item="rm" collection="postItemList" >
+
+				UNION ALL
+				SELECT #{ssnEnterCd} AS ENTER_CD
+				,TRIM( #{ordTypeCd} ) AS ORD_TYPE_CD
+				,TRIM( #{ordDetailCd} ) AS ORD_DETAIL_CD
+				,TRIM( #{sabun} ) AS SABUN
+				,TRIM( #{ordYmd} ) AS ORD_YMD
+				,TRIM( #{applySeq} ) AS APPLY_SEQ
+				,#{rm.postItem} AS POST_ITEM
+				,#{rm.value} AS POST_ITEM_VALUE
+				FROM DUAL
+
+				<if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+					UNION ALL
+					SELECT #{ssnEnterCd} AS ENTER_CD
+					,TRIM( #{ordTypeCd} ) AS ORD_TYPE_CD
+					,TRIM( #{ordDetailCd} ) AS ORD_DETAIL_CD
+					,TRIM( #{sabun} ) AS SABUN
+					,TRIM( #{ordYmd} ) AS ORD_YMD
+					,TRIM( #{applySeq} ) AS APPLY_SEQ
+					,#{rm.postItem}||'_NM' AS POST_ITEM
+					,
+					<choose><when test='rm.popupType != null and rm.popupType.equals("ORG")'>
+						F_COM_GET_ORG_NM( #{ssnEnterCd} , #{rm.value} , #{ordYmd})
+					</when><when test='rm.popupType != null and rm.popupType.equals("JOB")'>
+						F_COM_GET_JOB_NM_201( #{ssnEnterCd} , #{rm.value} , #{ordYmd})
+					</when><when test='rm.popupType != null and rm.popupType.equals("LOCATION")'>
+						F_COM_GET_LOCATION_NM( #{ssnEnterCd} , #{rm.value}    )
+					</when><otherwise>
+						F_COM_GET_GRCODE_NAME( #{ssnEnterCd} , #{rm.popupType}, #{rm.value})
+					</otherwise>
+					</choose>
+					FROM DUAL
+				</if>
+			</foreach>
+			)WHERE ENTER_CD IS NOT NULL
+			) S
+			ON (T.ENTER_CD = S.ENTER_CD
+			AND T.ORD_TYPE_CD = S.ORD_TYPE_CD
+			AND T.ORD_DETAIL_CD = S.ORD_DETAIL_CD
+			AND T.SABUN = S.SABUN
+			AND T.ORD_YMD = S.ORD_YMD
+			AND T.APPLY_SEQ = S.APPLY_SEQ
+			AND T.POST_ITEM = S.POST_ITEM
+			)
+			WHEN MATCHED THEN
+			UPDATE
+			SET T.POST_ITEM_VALUE = S.POST_ITEM_VALUE
+			,T.CHKDATE         = SYSDATE
+			,T.CHKID           = #{ssnSabun}
+
+		</update>
+
+		<select parameterType="map" resultType="cMap" id="getSpecificEmpSrchNewChgOrdMaxApplySeq">
+
+			<![CDATA[
+				SELECT A.*
+					 , B.ORD_YMD AS MAX_ORD_YMD_211
+					 , B.APPLY_SEQ AS MAX_APPLY_SEQ_211
+					 , C.ORD_YMD AS MAX_ORD_YMD_191
+					 , C.APPLY_SEQ AS MAX_APPLY_SEQ_191
+					 , (SELECT NVL(MAX(APPLY_SEQ), 0) + 1
+						  FROM THRM221
+						 WHERE ENTER_CD = A.ENTER_CD
+						   AND SABUN = A.SABUN
+						   AND ORD_YMD = A.ORD_YMD) AS NEW_APPLY_SEQ
+					 , DECODE(D.SABUN,NULL,0,1) AS DUP_CNT
+					 , D.PROCESS_NO AS DUP_PROCESS_NO
+					 , (SELECT PROCESS_TITLE FROM THRM220 WHERE ENTER_CD = D.ENTER_CD AND PROCESS_NO = D.PROCESS_NO) AS DUP_PROCESS_TITLE
+			 ]]>
+			<foreach item="rm" collection="postItemList" >
+				<if test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+					 , C.${rm.columnCd}
+					<if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+					 , C.${rm.nmColumnCd}
+					</if>
+				</if>
+			</foreach>
+				  FROM (SELECT #{ssnEnterCd} AS ENTER_CD
+							 , #{ordDetailCd} AS ORD_DETAIL_CD
+							 , #{sabun} AS SABUN
+							 , #{name} AS NAME
+							 , #{ordYmd} AS ORD_YMD
+							 , #{ordTypeCd} AS ORD_TYPE_CD
+							 , #{ordReasonCd} AS ORD_REASON_CD
+							 , 'N' AS ORD_YN
+							 , #{visualYn} AS VISUAL_YN
+							 , #{ssnSabun} AS SSN_SABUN
+							 , #{sNo} AS S_NO
+						  FROM DUAL
+					   ) A
+					 , (SELECT ENTER_CD
+							 , SABUN
+							 , ORD_YMD
+							 , MAX(APPLY_SEQ) AS APPLY_SEQ
+						  FROM THRM221
+						 WHERE (ENTER_CD, SABUN, ORD_YMD) IN (SELECT ENTER_CD
+																   , SABUN
+																   , MAX(ORD_YMD) AS ORD_YMD
+																FROM THRM221
+															   WHERE ENTER_CD = #{ssnEnterCd}
+																 AND SABUN = #{sabun}
+																GROUP BY ENTER_CD, SABUN)
+			 			 GROUP BY ENTER_CD, SABUN, ORD_YMD
+			 		   ) B
+					 , (SELECT ENTER_CD, SABUN, ORD_YMD, APPLY_SEQ
+			<foreach item="rm" collection="postItemList" >
+				<if test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+							 , ${rm.columnCd}
+					<if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+							 , ${rm.nmColumnCd}
+					</if>
+				</if>
+			</foreach>
+						  FROM THRM191 WHERE (ENTER_CD, SABUN, ORD_YMD, APPLY_SEQ) IN
+																					(SELECT ENTER_CD
+																						  , SABUN
+																						  , ORD_YMD
+																						  , MAX(APPLY_SEQ) AS APPLY_SEQ
+																					   FROM THRM191
+																					  WHERE (ENTER_CD, SABUN, ORD_YMD) IN
+																															(SELECT ENTER_CD
+																																  , SABUN
+																																  , MAX(ORD_YMD)
+																															   FROM THRM191
+																															  WHERE ENTER_CD = #{ssnEnterCd}
+																																AND SABUN IN (#{sabun})
+																															  GROUP BY ENTER_CD, SABUN)
+					     															  GROUP BY ENTER_CD, SABUN ,ORD_YMD)
+					   ) C
+					 , THRM221 D
+				 WHERE A.ENTER_CD = B.ENTER_CD(+)
+				   AND A.ENTER_CD = C.ENTER_CD(+)
+				   AND A.SABUN = C.SABUN(+)
+				   AND A.ENTER_CD = D.ENTER_CD(+)
+				   AND A.ORD_DETAIL_CD = D.ORD_DETAIL_CD(+)
+				   AND A.SABUN = D.SABUN(+)
+				   AND A.ORD_YMD = D.ORD_YMD(+)
+				   AND ROWNUM = 1
+		</select>
+
+		<!-- 대량발령 저장 -->
+		<insert parameterType="map" id="insertSpecificEmpSrchNewChgOrd1">
+			<![CDATA[
+				INSERT INTO THRM221
+						  ( ENTER_CD
+						  , ORD_DETAIL_CD
+						  , SABUN
+						  , NAME
+						  , ORD_YMD
+						  , APPLY_SEQ
+						  , ORD_TYPE_CD
+						  , ORD_REASON_CD
+						  , ORD_YN
+						  , VISUAL_YN
+						  , MEMO
+						  , CHKDATE
+						  , CHKID)
+					 SELECT #{enterCd}
+				 		  , #{ordDetailCd}
+					      , #{sabun}
+					      , DECODE(#{name},NULL,(SELECT NAME FROM THRM100 WHERE ENTER_CD = #{enterCd} AND SABUN = #{sabun} ),#{name} )
+					      , #{ordYmd}
+					      , #{newApplySeq}
+					      , #{ordTypeCd}
+					      , #{ordReasonCd}
+					      , 'N'
+					      , #{visualYn}
+					      , NULL
+					      , SYSDATE
+					      , #{ssnSabun}
+					   FROM DUAL
+			]]>
+		</insert>
+
+		<insert parameterType="map" id="insertSpecificEmpSrchNewChgOrd2">
+			<![CDATA[
+				INSERT INTO THRM223
+						  (ENTER_CD
+						  ,ORD_DETAIL_CD
+						  ,SABUN
+						  ,ORD_YMD
+						  ,APPLY_SEQ
+						  ,POST_ITEM
+						  ,ORD_TYPE_CD
+						  ,CHKDATE
+						  ,CHKID
+						  ,POST_ITEM_VALUE)
+							]]>
+			<bind name="icnt" value="0" />
+			<foreach item="rm" collection="postItemList" >
+				<choose><when test='icnt > 0'>
+					UNION ALL
+				</when><otherwise>
+					<bind name="icnt" value="1" />
+				</otherwise>
+				</choose>
+				SELECT #{enterCd} AS ENTER_CD
+				,#{ordDetailCd} AS ORD_DETAIL_CD
+				,#{sabun} AS SABUN
+				,#{ordYmd} AS ORD_YMD
+				,#{newApplySeq} AS APPLY_SEQ
+				,#{rm.postItem} AS POST_ITEM
+				,#{ordTypeCd} AS ORD_TYPE_CD
+				,SYSDATE AS CHKDATE
+				,#{ssnSabun} AS CHKID
+				,NVL(#{rm.value}
+				<choose><when test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+					,CASE
+					WHEN #{maxOrdYmd211} IS NULL OR #{maxApplySeq211} IS NULL THEN
+					#{rm.value191}
+					ELSE
+					(SELECT POST_ITEM_VALUE
+					FROM THRM223
+					WHERE ENTER_CD = #{enterCd}
+					AND SABUN = #{sabun}
+					AND ORD_YMD = #{maxOrdYmd211}
+					AND APPLY_SEQ = #{maxApplySeq211}
+					AND POST_ITEM = #{rm.postItem})
+					END
+				</when><otherwise>
+					,#{rm.value}
+				</otherwise>
+				</choose>
+				) POST_ITEM_VALUE
+				FROM DUAL
+				<if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+					UNION ALL
+					SELECT #{enterCd} AS ENTER_CD
+					,#{ordDetailCd} AS ORD_DETAIL_CD
+					,#{sabun} AS SABUN
+					,#{ordYmd} AS ORD_YMD
+					,#{newApplySeq} AS APPLY_SEQ
+					,#{rm.postItem}||'_NM' AS POST_ITEM
+					,#{ordTypeCd} AS ORD_TYPE_CD
+					,SYSDATE AS CHKDATE
+					,#{ssnSabun} AS CHKID
+					,DECODE(#{rm.value},NULL
+					,CASE
+					WHEN #{maxOrdYmd211} IS NULL OR #{maxApplySeq211} IS NULL THEN
+					#{rm.nmValue191}
+					ELSE
+					(SELECT POST_ITEM_VALUE
+					FROM THRM223
+					WHERE ENTER_CD = #{enterCd}
+					AND SABUN = #{sabun}
+					AND ORD_YMD = #{maxOrdYmd211}
+					AND APPLY_SEQ = #{maxApplySeq211}
+					AND POST_ITEM = #{rm.postItem})
+					END
+					,
+					<choose><when test='rm.popupType != null and rm.popupType.equals("ORG")'>
+						F_COM_GET_ORG_NM( #{enterCd} , #{rm.value}    , #{ordYmd})
+					</when><when test='rm.popupType != null and rm.popupType.equals("JOB")'>
+						F_COM_GET_JOB_NM_201( #{enterCd} , #{rm.value}    , #{ordYmd})
+					</when><when test='rm.popupType != null and rm.popupType.equals("LOCATION")'>
+						F_COM_GET_LOCATION_NM( #{enterCd}, #{rm.value}    )
+					</when><otherwise>
+						F_COM_GET_GRCODE_NAME( TRIM( #{enterCd} ) , #{rm.popupType}, #{rm.value})
+					</otherwise>
+					</choose>
+					) AS  POST_ITEM_VALUE
+					FROM DUAL
+				</if>
+			</foreach>
+		</insert>
+</mapper>

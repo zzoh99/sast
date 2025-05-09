@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.orgCapaEmpPopup">
+	<select id="getOrgCapaEmpList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT D.ENTER_NM ,
+			   D.ENTER_CD,
+			   A.SABUN AS EMP_SABUN, 								--사번
+			   A.NAME AS EMP_NAME, 									--성명
+			   C.ORG_CD AS ORG_CD,								--조직코드
+			   F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM,								--조직명
+			   C.JOB_CD AS JOB_CD,								--직무코드
+			   F_COM_GET_JOB_NM(C.ENTER_CD, C.JOB_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JOB_NM,								--직무명
+			   C.JIKWEE_CD AS JIKWEE_CD,						--직위코드(H20030)
+			   F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20030', C.JIKWEE_CD)  AS JIKWEE_NM,  --직위코드명(H20030)
+			   C.JIKGUB_CD AS JIKGUB_CD,						--직급코드(H20010)
+			   F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20010', C.JIKGUB_CD) AS JIKGUB_NM,   --직급코드명(H20010)
+			   C.JIKCHAK_CD AS JIKCHAK_CD,						--직책코드(H20020)
+			   F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20020', C.JIKCHAK_CD) AS JIKCHAK_NM, --직책코드명(H20020)
+			   C.STATUS_CD AS STATUS_CD,						--재직상태코드(H10010)
+			   F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10010', C.STATUS_CD) AS STATUS_NM,   --재직상태명코드(H10010)
+			   -- 주소연락처 --
+			   F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'OT') AS OFFICE_TEL,						--사내전화
+			   F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HT') AS HOME_TEL,							--집전화
+			   F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'FT') AS FAX_NO,								--팩스
+			   F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'HP') AS HAND_PHONE,						--핸드폰
+			   F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'SC1') AS CONNECT_TEL,					--비상연락처
+			   F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID,							--메일	
+			   '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO,
+			   '1' AS DETAIL0
+			   , F_SYS_GET_ENDOW_AUTH_YN( A.ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  A.SABUN ) AS AUTH_YN
+		  FROM THRM100 A,
+		  	   (	SELECT Y.*
+					  FROM THRM100 X, THRM151 Y ]]>
+					<if test='searchOrdTypeCd != null and searchOrdTypeCd neq "" and searchOrdTypeCd neq "C"'>
+						 , THRM191 Z
+					</if>
+					 WHERE X.ENTER_CD = Y.ENTER_CD
+					   AND X.SABUN = Y.SABUN
+					   AND Y.ENTER_CD = NVL(TRIM(#{groupEnterCd}),  TRIM(#{ssnEnterCd}))
+					   AND Y.ORG_CD = #{searchOrgCd}
+					<if test = 'baseUrl != null and baseUrl == "orgCapaInfoSta2"'>
+					   AND X.EMP_YMD = Y.SDATE
+					</if>
+					<choose>
+					<when test='searchOrdTypeCd != null and searchOrdTypeCd neq "" and searchOrdTypeCd neq "C"'>
+					   AND X.ENTER_CD = Z.ENTER_CD
+					   AND X.SABUN = Z.SABUN
+					   AND Y.SDATE = DECODE(Y.STATUS_CD, 'RA', TO_CHAR(TO_DATE(Z.ORD_YMD, 'YYYYMMDD')+1, 'YYYYMMDD'), Z.ORD_YMD)
+					   AND Z.ORD_TYPE_CD = #{searchOrdTypeCd}
+					   <choose>
+					   	<when test='searchOrdTypeCd != null and searchOrdTypeCd eq "E"'>
+					   AND TO_CHAR(TO_DATE(Z.ORD_YMD, 'YYYYMMDD')+1, 'YYYYMMDD') BETWEEN #{searchMonth} AND NVL(REPLACE(#{searchMonthEnd},'-',''), TO_CHAR(LAST_DAY(#{searchMonth}), 'YYYYMMDD'))
+					   	</when>
+					   	<otherwise>
+					   AND Z.ORD_YMD BETWEEN #{searchMonth} AND NVL(REPLACE(#{searchMonthEnd},'-',''), TO_CHAR(LAST_DAY(#{searchMonth}), 'YYYYMMDD'))
+					   	</otherwise>
+					   </choose>
+					</when>
+					<when test='searchOrdTypeCd eq "C"'>
+					   AND Y.STATUS_CD ='CA'
+                       AND  NVL(REPLACE(#{searchMonthEnd},'-',''), TO_CHAR(LAST_DAY(#{searchMonth}), 'YYYYMMDD')) BETWEEN Y.SDATE AND Y.EDATE
+					</when>
+					<otherwise>
+					   AND TO_CHAR(LAST_DAY(#{searchMonth}), 'YYYYMMDD') BETWEEN Y.SDATE AND Y.EDATE
+					</otherwise>
+					</choose>
+				) C,
+				TORG900 D
+		  WHERE	A.ENTER_CD = NVL(TRIM(#{groupEnterCd}),  TRIM(#{ssnEnterCd}))
+		  <if test='searchOrdTypeCd != null and searchOrdTypeCd neq "E"'>
+		    AND C.STATUS_CD NOT LIKE 'RA%'
+		  </if>
+		    -- 인사마스터 HISTORY -------------------------------------------------------------------
+		    AND A.ENTER_CD = C.ENTER_CD
+		    AND A.SABUN = C.SABUN
+		    -----------------------------------------------------------------------------------------
+		    -- 회사정보 ----------------------------------------------------------------------------
+		    AND A.ENTER_CD = D.ENTER_CD
+		    -----------------------------------------------------------------------------------------
+		    AND A.EMP_YMD BETWEEN REPLACE(#{searchMonth},'-','') AND TO_CHAR(LAST_DAY(#{searchMonth}), 'YYYYMMDD')
+		  <if test='except1 != null and except1 eq "Y"'>
+		  <![CDATA[
+		  	AND C.STATUS_CD <> 'CA'
+		  ]]>
+		  </if>
+		  <if test='except2 != null and except2 eq "Y"'>
+		  <![CDATA[
+		  	AND NVL((SELECT X.CNT_TYPE_CD 
+			          FROM TCPN403 X 
+			         WHERE X.ENTER_CD = C.ENTER_CD 
+			           AND X.SABUN = C.SABUN 
+					   AND (X.ENTER_CD, X.SABUN, X.SDATE) IN ( SELECT Y.ENTER_CD, Y.SABUN, MAX(Y.SDATE)
+			           	                                         FROM TCPN403 Y
+			            	                                    WHERE Y.ENTER_CD = X.ENTER_CD
+			                                                      AND Y.SABUN = X.SABUN
+			                                                      AND REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', '') BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231') 
+			                                                    GROUP BY Y.ENTER_CD, Y.SABUN ) ), '^' ) <> '070'		
+		  ]]>
+		  </if>
+		  <if test='except3 != null and except3 eq "Y"'>
+		  <![CDATA[
+		  	AND C.JIKWEE_CD <> '177'
+		  ]]>
+		  </if>
+		<![CDATA[							    
+		ORDER BY F_COM_JIKJE_SORT(C.ENTER_CD, C.SABUN, DECODE(#{searchMonth}, NULL, TRIM(REPLACE(#{searchBaseDate}, '-', '')), TO_CHAR(LAST_DAY(#{searchMonth}), 'YYYYMMDD')))
+		]]>
+	</select>
+</mapper>

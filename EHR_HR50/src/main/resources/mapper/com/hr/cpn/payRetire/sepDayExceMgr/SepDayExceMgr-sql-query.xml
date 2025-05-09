@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepDayExceMgr">
+<!-- 		 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSepDayExceMgrList">
+
+
+				SELECT A.ENTER_CD
+					, A.SABUN
+					, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					, F_COM_GET_STATUS_CD(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_CD
+					, A.EX_SEP_SYMD
+					, TO_CHAR(A.CHKDATE, 'YYYYMMDD') AS CHKDATE
+					, A.CHKID
+				FROM TCPN762 A
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+			<if test='searchSabunName != null and !searchSabunName.equals("")'>
+				AND (UPPER(A.SABUN) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%' OR UPPER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})) LIKE '%' || UPPER(TRIM(#{searchSabunName})) || '%')
+			</if>
+		  	<if test='searchStatusCdHidden != null and !searchStatusCdHidden.equals("")'>
+				AND F_COM_GET_STATUS_CD(ENTER_CD,SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) IN
+		<foreach collection="searchStatusCdHidden" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			</if>
+				ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+
+		</select>
+
+<!-- 		 저장 -->
+		<update parameterType="map" id="saveSepDayExceMgr">
+
+
+					MERGE INTO TCPN762 T
+					USING (
+					    SELECT #{ssnEnterCd} AS ENTER_CD
+					         , A.SABUN
+					         , A.EX_SEP_SYMD
+							 , #{ssnSabun} AS CHKID
+					     FROM (
+							SELECT NULL AS SABUN
+								 , NULL AS EX_SEP_SYMD
+							FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+					        UNION ALL
+					        SELECT TRIM(#{rm.sabun}) AS SABUN
+					             , TRIM(#{rm.exSepSymd}) AS EX_SEP_SYMD
+					        FROM DUAL
+</foreach>
+						) A WHERE A.SABUN IS NOT NULL
+							AND A.EX_SEP_SYMD IS NOT NULL
+					) S     ON ( T.ENTER_CD = S.ENTER_CD
+					AND T.SABUN = S.SABUN
+							)
+					WHEN MATCHED THEN
+					    UPDATE SET
+						   T.EX_SEP_SYMD = S.EX_SEP_SYMD
+						  , T.CHKDATE = SYSDATE
+						  , T.CHKID = S.CHKID
+					WHEN NOT MATCHED THEN
+						INSERT ( T.ENTER_CD
+							, T.SABUN
+							, T.EX_SEP_SYMD
+							, T.CHKDATE
+							, T.CHKID
+					    ) VALUES (
+							  S.ENTER_CD
+							, S.SABUN
+							, S.EX_SEP_SYMD
+							, SYSDATE
+							, S.CHKID
+					    )
+
+
+
+
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteSepDayExceMgr">
+
+
+					DELETE FROM TCPN762
+					WHERE 	(ENTER_CD,SABUN,EX_SEP_SYMD) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+										, TRIM( #{rm.sabun} )
+										</if>
+										<if test='rm.exSepSymd != null and !rm.exSepSymd.equals("")'>
+										, TRIM( #{rm.exSepSymd} )
+										</if>
+										)
+</foreach>
+										)
+
+
+
+		</delete>
+
+	</mapper>

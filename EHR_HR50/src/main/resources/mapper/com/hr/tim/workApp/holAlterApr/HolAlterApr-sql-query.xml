@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.holAlterApr">
+
+<!-- 대체휴가승인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHolAlterAprList">
+
+				<![CDATA[
+
+					   SELECT A.ENTER_CD
+							, A.APPL_SEQ
+							, A.SABUN
+							, (SELECT F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME -- 성명
+							, (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							, F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							, F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+
+							, A.S_YMD
+					 	    , ( SELECT X.GNT_NM
+					 	          FROM TTIM014 X
+					 	         WHERE X.ENTER_CD = A.ENTER_CD
+					 	           AND X.GNT_CD   = A.GNT_CD ) AS GNT_NM
+					 	    
+					 	    , C.YMD AS HOL_YMD
+					 	    , C.REQ_TIME_CD AS HOL_REQ_TIME_CD
+						    , C.REQUEST_HOUR AS WORK_TIME  -- [벽산]신청시간이 인정시간임
+						    , C.REQ_S_HM AS HOL_SHM
+						    , C.REQ_E_HM AS HOL_EHM
+							, B.APPL_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+							, B.APPL_STATUS_CD
+							, '0' AS DETAIL
+							
+							, CASE WHEN B.APPL_STATUS_CD = '99' THEN '1' ELSE '0' END AS SHTCOL_EDIT
+							
+					     FROM TTIM301 A, THRI103 B, TTIM601 C
+					    WHERE A.ENTER_CD    = #{ssnEnterCd}
+					      AND A.ENTER_CD    = B.ENTER_CD 
+					      AND A.APPL_SEQ    = B.APPL_SEQ
+					      AND A.GNT_CD  IN ('90', '91', '92')
+					      AND B.APPL_STATUS_CD NOT IN ('11')
+					      AND A.ENTER_CD    = C.ENTER_CD
+					      AND A.BF_APPL_SEQ = C.APPL_SEQ
+					       ]]>
+<if test='searchFrom != null and !searchFrom.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD >= REPLACE(#{searchFrom}, '-','')
+	]]>
+</if>
+<if test='searchTo != null and !searchTo.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD <= REPLACE(#{searchTo}, '-','')
+	]]>
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR (SELECT F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					      AND (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+<if test='searchSYmd != null and !searchSYmd.equals("")'>
+	<![CDATA[
+					      AND A.S_YMD >= REPLACE(#{searchSYmd}, '-','')
+	]]>
+</if>
+<if test='searchEYmd != null and !searchEYmd.equals("")'>
+	<![CDATA[
+					      AND A.S_YMD <= REPLACE(#{searchEYmd}, '-','')
+	]]>
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC 
+
+
+		</select>
+
+</mapper>

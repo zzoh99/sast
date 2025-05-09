@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 퇴직금기준사항관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepBasicStd">
+		<select parameterType="map" resultType="cMap" id="getSepBasicStdIncomeDeductionStdList">
+
+				<![CDATA[
+					SELECT SEQ
+					     , SDATE
+					     , EDATE
+						 , WKP_F_CNT
+						 , WKP_T_CNT
+						 , RET_CUMULATIVE_MON
+						 , RET_DED_MON
+						 , WKP_CNT
+					  FROM TCPN701
+					 WHERE ENTER_CD	= #{ssnEnterCd}
+					ORDER BY SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getSepBasicStdProgressiveServiceStdList">
+
+				<![CDATA[
+					SELECT SDATE
+					     , EDATE
+					     , GUBUN
+						 , CUMULATIVE_TYPE
+						 , WKP_F_CNT
+						 , WKP_T_CNT
+						 , CUMULATIVE_CNT
+					  FROM TCPN702
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					ORDER BY GUBUN, CUMULATIVE_TYPE
+				]]>
+
+
+		</select>
+		<update parameterType="map" id="saveSepBasicStdIncomeDeductionStd">
+
+
+					MERGE INTO TCPN701 T
+					USING	(
+							SELECT A.SEQ
+							     , A.SDATE
+							     , A.EDATE
+								 , A.WKP_F_CNT
+								 , A.WKP_T_CNT
+								 , A.RET_CUMULATIVE_MON
+								 , A.RET_DED_MON
+								 , A.WKP_CNT
+							  FROM (
+									SELECT NULL	AS SEQ
+									     , NULL AS SDATE
+									     , NULL AS EDATE
+										 , NULL	AS WKP_F_CNT
+										 , NULL	AS WKP_T_CNT
+										 , NULL	AS RET_CUMULATIVE_MON
+										 , NULL	AS RET_DED_MON
+										 , NULL	AS WKP_CNT
+									  FROM DUAL
+<bind name="cnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT CASE WHEN TRIM(#{rm.seq}) IS NULL OR TRIM(#{rm.seq}) = '0' THEN
+													(SELECT (NVL(MAX(SEQ),0) + #{cnt}) FROM TCPN701 WHERE ENTER_CD = #{ssnEnterCd})
+												ELSE TO_NUMBER(#{rm.seq}) END SEQ
+									     , TRIM(#{rm.sdate})                        AS SDATE
+									     , TRIM(#{rm.edate})                        AS EDATE
+										 , TO_NUMBER(TRIM(#{rm.wkpFCnt}))			AS WKP_F_CNT
+										 , TO_NUMBER(TRIM(#{rm.wkpTCnt}))			AS WKP_T_CNT
+										 , TO_NUMBER(TRIM(#{rm.retCumulativeMon}))	AS RET_CUMULATIVE_MON
+										 , TO_NUMBER(TRIM(#{rm.retDedMon}))			AS RET_DED_MON
+										 , TO_NUMBER(TRIM(#{rm.wkpCnt}))			AS WKP_CNT
+									  FROM DUAL
+<bind name="cnt" value="cnt+1" />
+</foreach>
+									) A
+							WHERE A.SEQ IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD	= #{ssnEnterCd}
+						AND	T.SEQ		= S.SEQ
+						AND T.SDATE     = S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE              = S.EDATE
+						         , T.WKP_F_CNT			= S.WKP_F_CNT
+								 , T.WKP_T_CNT			= S.WKP_T_CNT
+								 , T.RET_CUMULATIVE_MON	= S.RET_CUMULATIVE_MON
+								 , T.RET_DED_MON		= S.RET_DED_MON
+								 , T.WKP_CNT			= S.WKP_CNT
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.SEQ
+						  , T.SDATE
+						  , T.EDATE
+						  , T.WKP_F_CNT
+						  , T.WKP_T_CNT
+						  , T.RET_CUMULATIVE_MON
+						  , T.RET_DED_MON
+						  , T.WKP_CNT
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.SEQ
+						  , S.SDATE
+						  , S.EDATE
+						  , S.WKP_F_CNT
+						  , S.WKP_T_CNT
+						  , S.RET_CUMULATIVE_MON
+						  , S.RET_DED_MON
+						  , S.WKP_CNT
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+		</update>
+		<update parameterType="map" id="saveSepBasicStdProgressiveServiceStd">
+
+
+					MERGE INTO TCPN702 T
+					USING	(
+							SELECT A.SDATE
+							     , A.EDATE
+							     , A.GUBUN
+								 , A.CUMULATIVE_TYPE
+								 , A.WKP_F_CNT
+								 , A.WKP_T_CNT
+								 , A.CUMULATIVE_CNT
+							  FROM (
+									SELECT NULL AS SDATE
+									     , NULL AS EDATE
+									     , NULL	AS GUBUN
+										 , NULL	AS CUMULATIVE_TYPE
+										 , NULL	AS WKP_F_CNT
+										 , NULL	AS WKP_T_CNT
+										 , NULL	AS CUMULATIVE_CNT
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.sdate})                    AS SDATE
+									     , TRIM(#{rm.edate})                    AS EDATE
+									     , TRIM(#{rm.gubun})					AS GUBUN
+										 , TRIM(#{rm.cumulativeType})			AS CUMULATIVE_TYPE
+										 , TO_NUMBER(TRIM(#{rm.wkpFCnt}))		AS WKP_F_CNT
+										 , TO_NUMBER(TRIM(#{rm.wkpTCnt}))		AS WKP_T_CNT
+										 , TO_NUMBER(TRIM(#{rm.cumulativeCnt}))	AS CUMULATIVE_CNT
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.GUBUN			IS NOT NULL
+							  AND A.CUMULATIVE_TYPE	IS NOT NULL
+							  AND A.WKP_F_CNT		IS NOT NULL
+							  AND A.SDATE           IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD				= #{ssnEnterCd}
+						AND	T.GUBUN					= S.GUBUN
+						AND	T.CUMULATIVE_TYPE		= S.CUMULATIVE_TYPE
+						AND	T.WKP_F_CNT				= S.WKP_F_CNT
+						AND T.SDATE                 = S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE          = S.EDATE
+						         , T.WKP_T_CNT		= S.WKP_T_CNT
+								 , T.CUMULATIVE_CNT	= S.CUMULATIVE_CNT
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.GUBUN
+						  , T.CUMULATIVE_TYPE
+						  , T.WKP_F_CNT
+						  , T.SDATE
+						  , T.EDATE
+						  , T.WKP_T_CNT
+						  , T.CUMULATIVE_CNT
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.GUBUN
+						  , S.CUMULATIVE_TYPE
+						  , S.WKP_F_CNT
+						  , S.SDATE
+						  , S.EDATE
+						  , S.WKP_T_CNT
+						  , S.CUMULATIVE_CNT
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepBasicStdIncomeDeductionStd">
+
+
+					DELETE FROM TCPN701
+					 WHERE ENTER_CD||'_'||TO_CHAR(SEQ)||'_'||TO_CHAR(SDATE) IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.seq != null and !rm.seq.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.seq})||'_'||TRIM(#{rm.sdate})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteSepBasicStdProgressiveServiceStd">
+
+
+					DELETE FROM TCPN702
+					 WHERE ENTER_CD||'_'||GUBUN||'_'||CUMULATIVE_TYPE||'_'||TO_CHAR(WKP_F_CNT)||'_'||SDATE IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.gubun != null and !rm.gubun.equals("") and rm.cumulativeType != null and !rm.cumulativeType.equals("") and rm.wkpFCnt != null and !rm.wkpFCnt.equals("") and rm.sdate != null and !rm.sdate.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.gubun})||'_'||TRIM(#{rm.cumulativeType})||'_'||TRIM(#{rm.wkpFCnt})||'_'||TRIM(#{rm.sdate})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

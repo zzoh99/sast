@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanAppDet">
+
+<!-- 연차휴가계획신청팝업 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAppDetList">
+
+				<![CDATA[
+					SELECT 
+						 ENTER_CD
+						,SDATE
+						,EDATE
+						,DAYS
+						,NOTE
+						,SEQ
+						,SABUN
+						,APPL_SEQ 
+						,TRUNC(TO_DATE(EDATE,'yyyymmdd')) - TRUNC(TO_DATE(SDATE,'yyyymmdd')) + 1  TOTAL_DAYS
+					FROM 
+						TTIM542 
+					WHERE     
+						ENTER_CD = #{ssnEnterCd}
+					AND SABUN = #{searchApplsabun}
+					AND APPL_SEQ = #{applSeq}
+				]]>
+
+
+		</select>
+		
+		
+				<select parameterType="map" resultType="cMap" id="getAnnualPlanAppDetMap">
+
+				<![CDATA[
+					SELECT 
+						 ENTER_CD
+						,SDATE
+						,EDATE
+						,DAYS
+						,NOTE
+						,SEQ
+						,SABUN
+						,APPL_SEQ 
+						,TRUNC(TO_DATE(EDATE,'yyyymmdd')) - TRUNC(TO_DATE(SDATE,'yyyymmdd')) + 1  TOTAL_DAYS
+					FROM 
+						TTIM542 
+					WHERE     
+						ENTER_CD = #{ssnEnterCd}
+					AND SABUN = #{searchApplSabun}
+					AND APPL_SEQ = #{applSeq}
+				]]>
+
+
+		</select>
+		
+<!-- 연차휴가계획신청팝업 조회(상단 연차일수 정보) -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAppDetInfo">
+
+				<![CDATA[
+					SELECT USE_CNT     -- 사용가능일수
+				      	 , USED_CNT    -- 사용일수
+				      	 , REST_CNT    -- 잔여일수
+					  FROM TTIM511 A 
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+				  	  AND SABUN = #{searchApplSabun}
+				  	  AND GNT_CD = F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'TIM_YY_GNT_CD')  --고정값
+				  	  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+				]]>
+
+
+		</select>
+		
+		<!-- 연차계획기준에 따른 연차일수정보 조회(상단 연차일수 정보) -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanInfo">
+
+				<![CDATA[
+					SELECT A.USE_CNT  AS USECNT   -- 사용가능일수
+				      	 , A.USED_CNT AS USEDCNT   -- 사용일수
+				      	 , A.REST_CNT AS RESTCNT   -- 잔여일수
+						 , A.GNT_CD AS GNTCD		-- 근태코드
+						 , A.CRE_CNT AS CRECNT	  -- 발생일수
+					  FROM TTIM511 A, TTIM541 B
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+				  	   AND A.SABUN    = #{searchApplSabun}
+				  	   AND B.SEQ      = #{seq}
+				  	   AND A.GNT_CD   = F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'TIM_YY_GNT_CD')
+                       AND A.ENTER_CD = B.ENTER_CD
+                       AND (    B.VAC_STD_SYMD BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+                             OR B.VAC_STD_EYMD BETWEEN A.USE_S_YMD AND A.USE_E_YMD )
+					   AND 'A' = DECODE(#{gubunCd}, 'A', 'A', 'B')
+					 UNION ALL
+					SELECT A.USE_CNT  AS USECNT   -- 사용가능일수
+						 , A.USED_CNT AS USEDCNT   -- 사용일수
+						 , A.REST_CNT AS RESTCNT   -- 잔여일수
+						 , A.GNT_CD AS GNTCD		-- 근태코드
+						 , A.CRE_CNT AS CRECNT	  -- 발생일수
+					  FROM TTIM543 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN    = #{searchApplSabun}
+					   AND A.APPL_SEQ = #{applSeq}
+					   AND 'B' = DECODE(#{gubunCd}, 'A', 'A', 'B')
+				]]>
+
+
+		</select>
+		
+		<!-- 연차계획기준 중복체크 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAppDetPreAppliedPlan">
+
+				<![CDATA[
+				SELECT COUNT(*) AS CNT 
+  				  FROM TTIM542 A, THRI103 B
+ 				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.APPL_SEQ = B.APPL_SEQ
+				   AND B.APPL_STATUS_CD NOT IN ('11','23','33') /*결재반려,승인반려*/
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = #{searchApplSabun}
+				   AND A.SEQ = #{seq}
+				]]>
+
+
+		</select>
+		
+		<!-- 연차계획기준 SEQ  -->
+		<select parameterType="map" resultType="cMap" id="annualPlanSeqDupCheck2">
+
+				<![CDATA[
+				SELECT NVL(MAX(SEQ),0) AS SEQ
+  				  FROM TTIM542 A, THRI103 B
+ 				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.APPL_SEQ = B.APPL_SEQ
+				   AND A.ENTER_CD = #{ssnEnterCd}
+				   AND A.SABUN = #{searchApplSabun}
+				]]>
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanInfo2">
+
+				<![CDATA[
+					SELECT 
+						 USE_CNT  AS USECNT   -- 사용가능일수
+				      	,USED_CNT AS USEDCNT   -- 사용일수
+				      	,REST_CNT AS RESTCNT   -- 잔여일수
+					FROM 
+						TTIM511 A 
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+				  	AND YY = (SELECT SUBSTR(VAC_STD_SYMD,1,4) FROM TTIM541 WHERE SEQ = #{seq} AND ENTER_CD = #{ssnEnterCd})
+				  	AND SABUN = #{searchApplSabun}
+				  	AND GNT_CD = F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'TIM_YY_GNT_CD')  --고정값
+				  	AND (SELECT VAC_STD_SYMD FROM TTIM541 WHERE SEQ = #{seq} AND ENTER_CD = #{ssnEnterCd}) BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+				]]>
+
+
+		</select>
+		
+<!-- 연차휴가계획신청팝업 중복 체크조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAppDetDupCheck">
+
+				<![CDATA[ 
+				SELECT 
+					COUNT(1) CNT
+				FROM 
+					TTIM542 A, THRI103 B
+					
+				WHERE A.ENTER_CD = B.ENTER_CD
+				  AND A.APPL_SEQ = B.APPL_SEQ
+				  AND B.APPL_STATUS_CD NOT IN ('11','23','33') /*결재반려,승인반려*/
+				  AND A.APPL_SEQ!=#{applSeq}
+				  AND A.SABUN=#{sabun}
+				  AND A.ENTER_CD=#{ssnEnterCd}
+				  AND A.SEQ=#{seq}
+				  AND (#{sYmd} < A.SDATE AND #{eYmd} > A.EDATE
+				   OR #{sYmd} BETWEEN A.SDATE AND A.EDATE
+				   OR #{eYmd} BETWEEN A.SDATE AND A.EDATE)
+				]]>
+
+
+		</select>
+		
+		<!-- 신청한 휴가일자가 휴가계획기준관리의 휴가기간 안에 있는지 확인 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAppDetAbleCheck">
+
+				<![CDATA[
+					SELECT COUNT(*) AS CNT
+					  FROM TTIM541 
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND SEQ = #{seq}
+					   AND #{sYmd} >= VAC_STD_SYMD
+					   AND #{eYmd} <= VAC_STD_EYMD
+				]]>
+
+
+		</select>
+		
+		<!-- 휴가계획기준 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanStandardLast">
+			SELECT T.SEQ, T.VAC_RECEIVE_SYMD, T.VAC_RECEIVE_EYMD, T.VAC_PLAN_NM, TO_CHAR(TO_DATE(T.VAC_STD_SYMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS VAC_STD_SYMD
+			     , TO_CHAR(TO_DATE(T.VAC_STD_EYMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS VAC_STD_EYMD, T.CLOSE_YN, T.BIGO
+			  FROM TTIM541 T
+			 WHERE T.ENTER_CD = #{ssnEnterCd}
+			<choose>
+				<when test='authPg != null and authPg eq "A"'>
+			   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN TO_DATE(T.VAC_RECEIVE_SYMD,'yyyymmdd') AND TO_DATE(T.VAC_RECEIVE_EYMD,'yyyymmdd')
+			   AND T.CLOSE_YN = 'N'
+			   AND DECODE( T.SEARCH_SEQ, NULL, 'Y', F_COM_GET_SEARCH_SEQ_YN( TRIM(#{ssnEnterCd}), TRIM(#{searchApplSabun}), T.SEARCH_SEQ, TO_CHAR(SYSDATE,'YYYYMMDD') ) ) = 'Y'
+				</when>
+				<otherwise>
+			   AND EXISTS
+			       (
+			           SELECT 1
+			             FROM TTIM542 A
+			                , THRI103 B
+			            WHERE A.ENTER_CD = B.ENTER_CD
+			              AND A.APPL_SEQ = B.APPL_SEQ
+			              AND A.ENTER_CD = T.ENTER_CD
+			              AND A.SEQ = T.SEQ
+			              AND A.APPL_SEQ = #{searchApplSeq}
+			       )
+				</otherwise>
+			</choose>
+		</select>
+		
+		<update parameterType="map" id="saveAnnualPlanAppDet">
+
+					MERGE INTO TTIM542 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SEQ
+									, A.SDATE
+									, A.EDATE
+									, A.DAYS
+									, A.NOTE
+									, A.APPL_SEQ
+									, A.CHKDATE
+									, A.CHKID
+									
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD        
+											, NULL		AS SABUN           
+											, NULL		AS SEQ
+											, NULL		AS SDATE           
+											, NULL		AS EDATE           
+											, NULL		AS DAYS            
+											, NULL		AS NOTE            
+											, NULL		AS APPL_SEQ
+											, NULL		AS CHKDATE         
+											, NULL		AS CHKID           
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	  TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.seq})              AS SEQ
+											, TRIM( #{rm.sdate} )			AS SDATE
+											, TRIM( #{rm.edate} )			AS EDATE
+											, TRIM( #{rm.days} )			AS DAYS
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.applSeq} )			AS APPL_SEQ
+											, SYSDATE						AS CHKDATE         
+											, TRIM( #{ssnSabun} )			AS CHKID
+											FROM   DUAL
+</foreach>
+									) A 
+									WHERE
+										A.ENTER_CD IS NOT NULL										  
+									AND	A.SABUN IS NOT NULL										  
+									AND	A.SEQ IS NOT NULL										  
+									AND	A.SDATE IS NOT NULL	
+									AND	A.APPL_SEQ IS NOT NULL			  
+							) S
+					ON ( 	T.ENTER_CD	= S.ENTER_CD 
+						AND T.SABUN = S.SABUN					 
+						AND T.SEQ = S.SEQ
+						AND T.SDATE = S.SDATE
+						AND T.APPL_SEQ = S.APPL_SEQ)
+					WHEN MATCHED THEN 
+						UPDATE SET	  
+								 T.EDATE	= S.EDATE
+								,T.DAYS 	= S.DAYS 
+								,T.NOTE 	= S.NOTE 
+								,T.CHKDATE	= S.CHKDATE
+								,T.CHKID	= S.CHKID
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD        
+							, T.SABUN           
+							, T.SEQ
+							, T.SDATE           
+							, T.EDATE           
+							, T.DAYS            
+							, T.NOTE            
+							, T.APPL_SEQ        
+							, T.CHKDATE         
+							, T.CHKID           
+						)
+						VALUES
+						(
+							  S.ENTER_CD        
+							, S.SABUN           
+							, S.SEQ
+							, S.SDATE           
+							, S.EDATE           
+							, S.DAYS            
+							, S.NOTE            
+							, S.APPL_SEQ        
+							, S.CHKDATE         
+							, S.CHKID           
+						)
+		</update>
+		
+		<delete parameterType="map" id="deleteAnnualPlanAppDet">
+
+					DELETE FROM TTIM542
+					 WHERE ENTER_CD||'_'||SABUN||'_'||SEQ||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.seq != null and !rm.seq.equals("")
+												and rm.sdate != null and !rm.sdate.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.seq} )||'_'||TRIM( #{rm.sdate} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<update id="saveAnnualPlanCnt">
+			<![CDATA[
+				MERGE INTO TTIM543 T
+				USING	(
+						SELECT	  A.ENTER_CD
+								, A.SABUN
+								, A.APPL_SEQ
+								, A.GNT_CD
+								, A.CRE_CNT
+								, A.USE_CNT
+								, A.USED_CNT
+								, A.REST_CNT
+								, A.CHKDATE
+								, A.CHKID
+						FROM	(
+								SELECT NULL AS ENTER_CD
+									 , NULL AS SABUN
+									 , NULL AS APPL_SEQ
+									 , NULL AS GNT_CD
+									 , NULL AS CRE_CNT
+									 , NULL AS USE_CNT
+									 , NULL AS USED_CNT
+									 , NULL AS REST_CNT
+									 , NULL AS CHKDATE
+									 , NULL AS CHKID
+								FROM	DUAL
+								UNION
+								SELECT	  TRIM( #{ssnEnterCd} )			AS ENTER_CD
+										, TRIM( #{searchApplsabun} )    AS SABUN
+										, TRIM( #{applSeq} )		    AS APPL_SEQ
+										, TRIM( #{gntCd} )			AS GNT_CD
+										, TRIM( #{creCnt} )			AS CRE_CNT
+										, TRIM( #{useCnt} )			AS USE_CNT
+										, TRIM( #{usedCnt} )			AS USED_CNT
+										, TRIM( #{restCnt} )			AS REST_CNT
+										, SYSDATE						AS CHKDATE
+										, TRIM( #{ssnSabun} )			AS CHKID
+										FROM   DUAL
+
+								) A
+								WHERE A.ENTER_CD IS NOT NULL
+								  AND A.SABUN IS NOT NULL
+								  AND A.APPL_SEQ IS NOT NULL
+								  AND A.GNT_CD IS NOT NULL
+						) S
+				ON ( 	T.ENTER_CD	= S.ENTER_CD
+					AND T.SABUN     = S.SABUN
+					AND T.GNT_CD    = S.GNT_CD
+					AND T.APPL_SEQ = S.APPL_SEQ)
+				WHEN MATCHED THEN
+					UPDATE SET
+							T.CRE_CNT	= S.CRE_CNT
+							,T.USE_CNT 	= S.USE_CNT
+							,T.USED_CNT	= S.USED_CNT
+							,T.REST_CNT	= S.REST_CNT
+				WHEN NOT MATCHED THEN
+					INSERT
+					(
+						  T.ENTER_CD
+						, T.SABUN
+						, T.APPL_SEQ
+						, T.GNT_CD
+						, T.CRE_CNT
+						, T.USE_CNT
+						, T.USED_CNT
+						, T.REST_CNT
+						, T.CHKDATE
+						, T.CHKID
+					)
+					VALUES
+					(
+						  S.ENTER_CD
+						, S.SABUN
+						, S.APPL_SEQ
+						, S.GNT_CD
+						, S.CRE_CNT
+						, S.USE_CNT
+						, S.USED_CNT
+						, S.REST_CNT
+						, S.CHKDATE
+						, S.CHKID
+					)
+			]]>
+		</update>
+
+		<delete parameterType="map" id="deleteAnnualPlanCnt">
+			DELETE FROM TTIM543
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND ( SABUN, APPL_SEQ ) IN ( ( NULL, NULL)
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.sabun != null and !rm.sabun neq '' and rm.applSeq != null and !rm.applSeq neq '' ">
+					 , ( TRIM( #{rm.sabun} ), TRIM( #{rm.applSeq} ) )
+			</if>
+		</foreach>
+				   )
+
+		</delete>
+
+
+</mapper>

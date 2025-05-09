@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ 
+<mapper namespace="common.pdfReader">
+	
+	<select id="getPDFReaderList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	T1.ENTER_CD																		/*	회사구분(TORG900)	*/
+			,	T1.SABUN																		/*	사원번호			*/
+			,	T1.NAME																			/*	성명				*/
+			,	T1.EMP_YMD																		/*	입사일			*/
+			,	T1.GEMP_YMD																		/*	그룹입사일			*/
+			,	T1.RET_YMD																		/*	퇴직일자			*/
+			,	T3.WORK_YY
+			,	T3.SEQ_NO
+			,	T3.PAGE_START
+			,	T3.PAGE_END
+			,	T3.FILE_NM_BEFORE
+			,	T3.FILE_NM
+			,	T3.FILE_PATH
+			,	T3.ADJUST_TYPE
+			,	DECODE ( T1.SABUN, NULL, '확인요망' )	AS	CONT 
+		FROM	THRM100		T1
+			,	TCPN576	T3
+		WHERE	T1.ENTER_CD(+)	=	T3.ENTER_CD
+		AND		T1.SABUN(+)		=	T3.SABUN
+		AND		T3.WORK_YY		=	#{searchWorkYy}
+		AND		T1.ENTER_CD(+)	=	#{ssnEnterCd} ]]>
+	<if test="searchAdjustType != null and searchAdjustType neq ''">
+		AND		T3.ADJUST_TYPE	=	#{searchAdjustType}
+	</if>
+	<if test='searchSabunNull != null and searchSabunNull eq "Y"'>
+		AND		T3.SABUN	IS NOT NULL
+	</if>
+	<if test='searchSabunNull != null and searchSabunNull eq "N"'>
+		AND		T3.SABUN	IS NULL
+	</if>
+	<if test="searchNm != null and searchNm neq ''">
+		AND		(
+						T1.SABUN	=	#{searchNm}
+					OR	T1.NAME		LIKE	'%'||TRIM(#{searchNm})||'%'
+				)
+	</if>
+	<![CDATA[
+		ORDER	BY
+				T3.PAGE_START
+	]]>
+	</select>
+	
+	<select id="getPDFReaderCopyList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	T3.FILE_NM
+			,	T3.FILE_PATH
+		FROM	TCPN576	T3
+		WHERE	T3.WORK_YY		=	#{yyyy}
+		AND		T3.ENTER_CD		=	#{ssnEnterCd}
+		AND		T3.ADJUST_TYPE	=	#{adjustType}
+		AND		T3.SABUN IS NOT NULL
+	]]>
+	</select>
+	
+	<update id="savePDFReader" parameterType="map">
+	<![CDATA[
+		MERGE INTO TCPN576	T
+		USING	
+		(
+					SELECT	ENTER_CD
+						,	WORK_YY
+						,	ADJUST_TYPE
+						,	SABUN
+						,	SEQ_NO
+						,	FILE_NM_BEFORE
+						,	FILE_NM
+						,	FILE_PATH
+						,	PAGE_START
+						,	PAGE_END
+						,	CHKDATE
+						,	CHKID
+			FROM	(
+					SELECT	NULL		AS	ENTER_CD
+						,	NULL		AS	WORK_YY
+						,	NULL		AS	ADJUST_TYPE
+						,	NULL		AS	SABUN
+						,	NULL		AS	SEQ_NO
+						,	NULL		AS	FILE_NM_BEFORE
+						,	NULL		AS	FILE_NM
+						,	NULL		AS	FILE_PATH
+						,	NULL		AS	PAGE_START
+						,	NULL		AS	PAGE_END
+						,	NULL		AS	CHKDATE
+						,	NULL		AS	CHKID
+					FROM	DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+			UNION ALL
+			SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+				,	TRIM(#{rm.workYy})			AS	WORK_YY
+				,	TRIM(#{rm.adjustType})		AS	ADJUST_TYPE
+				,	TRIM(#{rm.sabun})			AS	SABUN
+				,	TRIM(#{rm.seqNo}) 			AS	SEQ_NO
+				,	TRIM(#{rm.fileNmBefore})	AS	FILE_NM_BEFORE
+				,	DECODE ( TRIM(#{rm.sabun}), NULL, TRIM(#{rm.fileNm}), TRIM(#{rm.sabun})||'_'||TRIM(#{rm.workYy})||'_'||TRIM(#{rm.pageStart})||'.pdf')	AS	FILE_NM
+				,	TRIM(#{rm.filePath})		AS	FILE_PATH
+				,	TRIM(#{rm.pageStart})		AS	PAGE_START
+				,	TRIM(#{rm.pageEnd})			AS	PAGE_END
+				,	SYSDATE						AS	CHKDATE
+				,	#{ssnSabun}					AS	CHKID
+			FROM DUAL
+		</foreach>
+		<![CDATA[
+						)	WHERE	ENTER_CD IS NOT NULL
+							AND	WORK_YY IS NOT NULL
+							AND	ADJUST_TYPE IS NOT NULL
+							AND	SEQ_NO IS NOT NULL
+			) S
+		ON	(
+					T.ENTER_CD				=		S.ENTER_CD
+				AND	T.WORK_YY				=		S.WORK_YY
+				AND	T.ADJUST_TYPE			=		S.ADJUST_TYPE
+				AND	T.SEQ_NO				=		S.SEQ_NO
+			)
+		WHEN MATCHED THEN 
+		UPDATE SET	
+				T.SABUN				=	S.SABUN
+			,	T.FILE_NM_BEFORE	=	S.FILE_NM_BEFORE
+			,	T.FILE_NM			=	S.FILE_NM
+			,	T.FILE_PATH			=	S.FILE_PATH
+			,	T.PAGE_START		=	S.PAGE_START
+			,	T.PAGE_END			=	S.PAGE_END
+			,	T.CHKDATE			=	S.CHKDATE
+			,	T.CHKID				=	S.CHKID
+	]]>
+	</update>
+	
+	<insert id="createPDFReader" parameterType="map">
+	<![CDATA[
+		MERGE INTO TCPN576	T
+		USING
+		(
+					SELECT	ENTER_CD
+						,	WORK_YY
+						,	ADJUST_TYPE
+						,	SABUN
+						,	SEQ_NO
+						,	FILE_NM_BEFORE
+						,	FILE_NM
+						,	FILE_PATH
+						,	PAGE_START
+						,	PAGE_END
+						,	CREATE_YN
+						,	CHKDATE
+						,	CHKID
+			FROM	(
+					SELECT	NULL		AS	ENTER_CD
+						,	NULL		AS	WORK_YY
+						,	NULL		AS	ADJUST_TYPE
+						,	NULL		AS	SABUN
+						,	NULL		AS	SEQ_NO
+						,	NULL		AS	FILE_NM_BEFORE
+						,	NULL		AS	FILE_NM
+						,	NULL		AS	FILE_PATH
+						,	NULL		AS	PAGE_START
+						,	NULL		AS	PAGE_END
+						,	NULL		AS	CREATE_YN
+						,	NULL		AS	CHKDATE
+						,	NULL		AS	CHKID
+					FROM	DUAL ]]>
+		<foreach item="rm" collection="mergeRows" index="idx">
+					UNION ALL
+					SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+						,	TRIM(#{yyyy})				AS	WORK_YY
+						,	TRIM(#{adjustType})			AS	ADJUST_TYPE
+						,	TRIM(#{rm.sabun})			AS	SABUN
+		<choose>
+			<when test="rm.seqNo != null and rm.seqNo neq ''">
+						,   TRIM(#{rm.seqNo}) 			AS SEQ_NO
+			</when>
+			<when test="rm.seqNo != null and rm.seqNo eq ''">
+						,	TO_CHAR	(
+										(
+											SELECT	(NVL(MAX(TO_NUMBER(SEQ_NO)),0) + (#{idx} + 1))
+											FROM	TCPN576
+											WHERE	ENTER_CD	=	TRIM(#{ssnEnterCd})
+											AND		WORK_YY		=	TRIM(#{yyyy})
+											AND		ADJUST_TYPE	=	TRIM(#{adjustType})
+										)
+									)	AS SEQ_NO
+			</when>
+		</choose>
+						,	TRIM(#{rm.fileNmBefore})		AS	FILE_NM_BEFORE
+						,	TRIM(#{rm.fileNm})				AS	FILE_NM
+						,	TRIM(#{rm.filePath})			AS	FILE_PATH
+						,	TRIM(#{rm.pageStart})			AS	PAGE_START
+						,	TRIM(#{rm.pageEnd})				AS	PAGE_END
+						,	TRIM(#{rm.createYn})			AS	CREATE_YN
+						,	SYSDATE							AS	CHKDATE
+						,	#{ssnSabun}						AS	CHKID
+					FROM	DUAL
+		</foreach>
+		<![CDATA[
+						)	WHERE	ENTER_CD IS NOT NULL
+							AND	WORK_YY IS NOT NULL
+							AND	ADJUST_TYPE IS NOT NULL
+							AND	SEQ_NO IS NOT NULL
+			) S
+		ON	(
+					T.ENTER_CD				=		S.ENTER_CD
+				AND	T.WORK_YY				=		S.WORK_YY
+				AND	T.ADJUST_TYPE			=		S.ADJUST_TYPE
+				AND	T.SEQ_NO				=		S.SEQ_NO
+			)
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				T.ENTER_CD
+			,	T.WORK_YY
+			,	T.ADJUST_TYPE
+			,	T.SABUN
+			,	T.SEQ_NO
+			,	T.FILE_NM_BEFORE
+			,	T.FILE_NM
+			,	T.FILE_PATH
+			,	T.PAGE_START
+			,	T.PAGE_END
+			,	T.CREATE_YN
+			,	T.CHKDATE
+			,	T.CHKID
+		)
+		VALUES
+		(
+				S.ENTER_CD
+			,	S.WORK_YY
+			,	S.ADJUST_TYPE
+			,	S.SABUN
+			,	S.SEQ_NO
+			,	S.FILE_NM_BEFORE
+			,	S.FILE_NM
+			,	S.FILE_PATH
+			,	S.PAGE_START
+			,	S.PAGE_END
+			,	S.CREATE_YN
+			,	S.CHKDATE
+			,	S.CHKID
+		)
+	]]>
+	</insert>
+	
+	<delete id="deletePDFReader" parameterType="map" >
+	<![CDATA[
+		DELETE	FROM TCPN576
+		WHERE	(ENTER_CD, WORK_YY, ADJUST_TYPE, SEQ_NO) IN ((NULL, NULL, NULL, NULL) ]]>
+	<foreach item="rm" collection="deleteRows">
+		,
+		<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.workYy != null and rm.workYy neq '' and 
+				  rm.adjustType != null and rm.adjustType neq '' and rm.seqNo != null and rm.seqNo neq ''">
+		<![CDATA[
+			( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.workYy} ) , TRIM( #{rm.adjustType} ) , TRIM( #{rm.seqNo} ) )
+		]]>
+		</if>
+	</foreach>
+	<![CDATA[
+		)
+	]]>
+	</delete>
+	
+	<delete id="deletePDFReaderAll" parameterType="map">
+	<![CDATA[
+		DELETE	FROM TCPN576
+		WHERE	ENTER_CD	=	#{ssnEnterCd}
+		AND		WORK_YY		=	#{yyyy}
+		AND		ADJUST_TYPE	=	#{adjustType}
+	]]>
+	</delete>
+	
+	<delete id="deletePDFReaderTCPN574" parameterType="map">
+	<![CDATA[
+		DELETE	FROM TCPN574
+		WHERE	ENTER_CD	=	#{ssnEnterCd}
+		AND		WORK_YY		=	#{yyyy}
+		AND		ADJUST_TYPE	=	#{adjustType}
+	]]>
+	</delete>
+	
+	<insert id="insertPDFReaderTCPN574" parameterType="map">
+	<![CDATA[
+		INSERT	INTO TCPN574
+		( ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, SEQ_NO, FILE_NM, FILE_PATH, CHKDATE, CHKID )
+		SELECT	ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN, SEQ_NO, FILE_NM, FILE_PATH, SYSDATE, #{ssnSabun}
+		FROM	TCPN576
+		WHERE	ENTER_CD	=	#{ssnEnterCd}
+		AND		WORK_YY		=	#{yyyy}
+		AND		ADJUST_TYPE	=	#{adjustType}
+		AND		SABUN IS NOT NULL
+	]]>
+	</insert>
+	
+	<select id="getTHRM100Sabun" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	SABUN
+		FROM	THRM100	A
+		WHERE	A.ENTER_CD	= #{ssnEnterCd}
+		AND		CRYPTIT.DECRYPT(A.RES_NO, #{ssnEnterCd})	=	REPLACE( TRIM(#{resNo}),'-','' )
+		AND		ROWNUM	<	2
+		ORDER	BY
+				EMP_YMD	DESC
+	]]>
+	</select>
+	
+</mapper>

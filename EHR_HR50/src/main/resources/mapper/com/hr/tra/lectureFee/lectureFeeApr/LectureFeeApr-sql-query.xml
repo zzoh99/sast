@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.lectureFee.lectureFeeApr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getLectureFeeAprList">
+			
+				<![CDATA[
+					    SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.SABUN
+							 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+							 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+							 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+							 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS WORKTYPE_NM
+						     , A.EDU_SEQ
+						     , A.EDU_EVENT_SEQ
+						     , A.LECTURE_FEE
+						     , A.NOTE
+						     , A.PAY_MON
+						     , A.PAY_YM
+						     , A.PAY_NOTE
+						     , A.CLOSE_YN
+							 , (
+							 		SELECT LISTAGG(Z.SUBJECT_LECTURE, ', ') WITHIN GROUP (ORDER BY Z.SEQ)
+									 FROM TTRA122 Z, TTRA002 Y
+									WHERE Z.ENTER_CD 	= #{ssnEnterCd}
+									  AND Z.ENTER_CD	= Y.ENTER_CD
+									  AND Z.TEACHER_SEQ = Y.TEACHER_SEQ
+									  AND Z.EDU_SEQ	     = A.EDU_SEQ
+								 	  AND Z.EDU_EVENT_SEQ = A.EDU_EVENT_SEQ
+									  AND Y.TEACHER_GB 	= 'IN'
+									  AND Y.TEACHER_NO 	= A.SABUN
+									GROUP BY Z.EDU_SEQ, Z.EDU_EVENT_SEQ
+							   ) AS SUBJECT_LECTURE
+						     , C.EDU_COURSE_NM
+							 , C.EDU_BRANCH_CD
+							 , C.EDU_M_BRANCH_CD
+							 , D.EDU_S_YMD
+							 , D.EDU_E_YMD
+							 , B.APPL_YMD
+							 , B.APPL_STATUS_CD
+							 , B.AGREE_YMD
+							 , B.APPL_SABUN
+							 , B.APPL_IN_SABUN
+							 , '0' AS DETAIL
+							 , CASE WHEN A.CLOSE_YN = 'Y' THEN '0' ELSE '1' END AS SHTCOL_EDIT
+						  FROM TTRA521 A, THRI103 B, TTRA101 C, TTRA121 D  
+					 	 WHERE A.ENTER_CD       = #{ssnEnterCd}
+			 			   AND A.ENTER_CD       = B.ENTER_CD
+						   AND A.APPL_SEQ       = B.APPL_SEQ
+						   -- 교육과정
+			 			   AND A.ENTER_CD       = C.ENTER_CD
+			 			   AND A.EDU_SEQ        = C.EDU_SEQ
+			 			   -- 교육회차
+			 			   AND A.ENTER_CD       = D.ENTER_CD
+			 			   AND A.EDU_SEQ        = D.EDU_SEQ
+			 			   AND A.EDU_EVENT_SEQ  = D.EDU_EVENT_SEQ
+					       AND B.APPL_STATUS_CD NOT IN ('11') ]]>
+<if test="searchFrom != null and searchFrom neq '' and searchTo != null and searchTo neq ''">
+					      AND B.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+</if>
+<if test="searchApplStatusCd != null and searchApplStatusCd neq ''">
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test="searchSabunName != null and searchSabunName neq ''">
+					      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test="searchOrgNm != null and searchOrgNm neq ''">
+					     AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+<if test="searchPayYm != null and searchPayYm neq ''">
+				         AND A.PAY_YM = REPLACE(#{searchPayYm}, '-','')
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC			 			   
+		</select>
+		
+<!-- 	마감여부 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLectureFeeAprPayClose">
+				<![CDATA[
+				SELECT NVL(( SELECT NVL(CLOSE_YN,'N') AS 
+					           FROM TCPN981 X
+					          WHERE X.ENTER_CD	    = TRIM(#{ssnEnterCd})
+					            AND X.PAY_ACTION_CD = TRIM(#{searchPayActionCd})
+					    ), 'N') AS PAY_CLOSE_YN
+					  ,NVL(( SELECT MAX(CLOSE_ST) AS CLOSE_ST 
+							   FROM TBEN991 A
+							  WHERE ENTER_CD       = TRIM(#{ssnEnterCd})
+							    AND PAY_ACTION_CD  = TRIM(#{searchPayActionCd})
+							    AND BENEFIT_BIZ_CD = '300' 
+							  GROUP BY ENTER_CD, PAY_ACTION_CD, BENEFIT_BIZ_CD
+						), '10001') AS CLOSE_ST
+				  FROM DUAL			  
+							 			   
+				]]>
+		</select>
+		
+<!--  세부내역 저장(관리자) -->
+		<update parameterType="map" id="saveLectureFeeApr">
+					MERGE INTO TTRA521 T
+					USING  (
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">								
+							 SELECT   TRIM( #{ssnEnterCd} )					AS ENTER_CD
+							   	 	, TRIM( #{rm.applSeq} )					AS APPL_SEQ
+									, TRIM( #{rm.sabun} )					AS SABUN
+									, REPLACE(TRIM(#{rm.payYm}),'-','') 	AS PAY_YM
+									, REPLACE(TRIM(#{rm.payMon}),',','')	AS PAY_MON
+									, TRIM( #{rm.payNote} ) 				AS PAY_NOTE
+								FROM DUAL
+</foreach>										
+							) S
+					ON (      T.ENTER_CD = S.ENTER_CD
+					      AND T.APPL_SEQ = S.APPL_SEQ
+					   )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAY_YM 	    	= S.PAY_YM
+									, T.PAY_MON     	= S.PAY_MON
+									, T.PAY_NOTE     	= S.PAY_NOTE
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+		</update>
+
+</mapper>

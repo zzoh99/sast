@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.outcome.eduHistoryLst">
+<!-- 		교육이력관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduHistoryLstList">
+				<![CDATA[
+				SELECT A.*
+					 , DECODE(APPL_SEQ, null, '', '0') AS DETAIL1
+					 , DECODE(APPL_SEQ2, null, '', '0') AS DETAIL2
+				  FROM (
+					    SELECT A.ENTER_CD
+						     , A.SABUN
+							 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+							 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+							 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+							 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+							 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+							 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+						     , A.EDU_SEQ
+						     , A.EDU_EVENT_SEQ
+						     , A.EDU_CONFIRM_TYPE
+						     , A.UNCONFIRM_REASON
+						     , A.NOTE
+						     , B.EDU_COURSE_NM
+				     		 , B.IN_OUT_TYPE
+							 , B.EDU_BRANCH_CD
+							 , B.EDU_M_BRANCH_CD
+							 , B.EDU_METHOD_CD
+							 , B.EDU_ORG_CD 
+						     , B.EDU_LEVEL  --필수교육과정 강의난이도 
+						     , (SELECT X.EDU_ORG_NM
+						          FROM TTRA001 X
+						         WHERE X.ENTER_CD   = B.ENTER_CD
+						           AND X.EDU_ORG_CD = B.EDU_ORG_CD ) AS EDU_ORG_NM
+							 , C.EDU_S_YMD
+							 , C.EDU_E_YMD
+						     , C.REAL_EXPENSE_MON
+						     , C.LABOR_APPLY_YN
+							 , E.APPL_SEQ
+							 , B.JOB_CD
+						     , (SELECT X.JOB_NM
+						          FROM TORG201 X
+						         WHERE X.ENTER_CD = #{ssnEnterCd}
+						           AND X.JOB_CD   = B.JOB_CD
+						           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL( X.EDATE, '99991231' ) ) AS JOB_NM 
+						     , ( SELECT X.APPL_SEQ
+						           FROM TTRA203 X, THRI103 Y
+						          WHERE X.ENTER_CD       = E.ENTER_CD
+						            AND X.AP_APPL_SEQ    = E.APPL_SEQ
+						            AND X.ENTER_CD       = Y.ENTER_CD
+						            AND X.APPL_SEQ       = Y.APPL_SEQ
+						            AND Y.APPL_STATUS_CD = '99'
+						       ) AS APPL_SEQ2
+						  FROM TTRA301 A, TTRA101 B, TTRA121 C
+						     , ( SELECT X.ENTER_CD, X.SABUN, X.EDU_SEQ, X.EDU_EVENT_SEQ
+						              , MAX(X.APPL_SEQ) KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS APPL_SEQ
+						              , MAX(X.JOB_CD)   KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS JOB_CD
+						           FROM TTRA201 X, THRI103 Y
+						          WHERE X.ENTER_CD = #{ssnEnterCd}
+						            AND X.ENTER_CD = Y.ENTER_CD
+						            AND X.APPL_SEQ = Y.APPL_SEQ
+						            AND Y.APPL_STATUS_CD = '99' 
+						          GROUP BY X.ENTER_CD, X.SABUN, X.EDU_SEQ, X.EDU_EVENT_SEQ
+						       ) E   -- 교육신청정보 ( 교육회차 여러 번 신청했을 경우을 대비 해 MAX로 가져옴 ) 
+					 	 WHERE A.ENTER_CD       = #{ssnEnterCd}
+						   -- 교육과정
+			 			   AND A.ENTER_CD       = B.ENTER_CD
+			 			   AND A.EDU_SEQ        = B.EDU_SEQ
+			 			   -- 교육회차
+			 			   AND A.ENTER_CD       = C.ENTER_CD
+			 			   AND A.EDU_SEQ        = C.EDU_SEQ
+			 			   AND A.EDU_EVENT_SEQ  = C.EDU_EVENT_SEQ
+			 			   -- 교육신청
+			 			   AND A.ENTER_CD       = E.ENTER_CD(+)
+			 			   AND A.SABUN          = E.SABUN(+)
+			 			   AND A.EDU_SEQ        = E.EDU_SEQ(+)
+			 			   AND A.EDU_EVENT_SEQ  = E.EDU_EVENT_SEQ(+) ]]>
+<if test="searchSabunName != null and searchSabunName neq ''">
+					      AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test="searchOrgNm != null and searchOrgNm neq ''">
+					      AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+<if test="searchEduMethodCd != null and searchEduMethodCd neq ''">
+ 				          AND B.EDU_METHOD_CD = TRIM(#{searchEduMethodCd})
+</if>
+<if test="searchEduBranchCd != null and searchEduBranchCd neq ''">
+ 				          AND B.EDU_BRANCH_CD = TRIM(#{searchEduBranchCd})
+</if>
+<if test="searchEduMBranchCd != null and searchEduMBranchCd neq ''">
+ 				          AND B.EDU_M_BRANCH_CD = TRIM(#{searchEduMBranchCd})
+</if>
+<if test="searchEduSYmd != null and searchEduSYmd neq ''">
+				          AND C.EDU_E_YMD BETWEEN REPLACE(#{searchEduSYmd}, '-', '') AND REPLACE(#{searchEduEYmd}, '-', '')
+</if>
+<if test="searchEduCourseNm != null and searchEduCourseNm neq ''">
+				          AND NVL(B.EDU_COURSE_NM,'^') LIKE '%' || TRIM(#{searchEduCourseNm}) || '%'
+</if>
+<if test="searchEduConfirmType != null and searchEduConfirmType neq ''">
+				          AND A.EDU_CONFIRM_TYPE = TRIM(#{searchEduConfirmType})
+</if>
+<if test="searchInOutType != null and searchInOutType neq ''">
+						  AND B.IN_OUT_TYPE = TRIM(#{searchInOutType})
+</if>
+
+					) A
+				ORDER BY EDU_E_YMD DESC  	
+		</select>
+
+
+<!-- 		엑셀업로드 데이터 검증 -->
+		<select parameterType="map" resultType="cMap" id="getEduHistoryLstChk">
+			
+				<![CDATA[
+				       SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD 
+				            , TRIM(#{sabun})  		AS  SABUN
+						    , F_COM_GET_NAMES(TRIM(#{ssnEnterCd}), TRIM(#{sabun}) ) AS NAME
+						    , A.EDU_SEQ
+						    , B.EDU_EVENT_SEQ
+						    , A.EDU_COURSE_NM
+						    , B.EDU_S_YMD
+						    , B.EDU_E_YMD
+							, TRIM(#{eduConfirmType})		AS	EDU_CONFIRM_TYPE
+							, TRIM(#{unconfirmReason})	AS	UNCONFIRM_REASON
+							, TRIM(#{note})				AS	NOTE
+							, 'I' AS S_STATUS
+				        FROM  TTRA101 A, TTRA121 B
+				       WHERE A.ENTER_CD  = TRIM(#{ssnEnterCd})
+				         AND A.ENTER_CD  = B.ENTER_CD
+				         AND A.EDU_SEQ   = B.EDU_SEQ
+				         AND A.EDU_SEQ   = TRIM(#{eduSeq})
+				         AND B.EDU_S_YMD = TRIM(#{eduSYmd})
+				         AND B.EDU_E_YMD = TRIM(#{eduEYmd})
+				]]>
+			
+		</select>
+
+<!-- 		교육이력관리 저장 -->
+		<update parameterType="map" id="saveEduHistoryLst">
+			
+				<![CDATA[
+					MERGE INTO TTRA301 T
+					USING	(
+							SELECT A.ENTER_CD			AS	ENTER_CD
+								 , A.EDU_SEQ			AS	EDU_SEQ
+								 , A.EDU_EVENT_SEQ		AS	EDU_EVENT_SEQ
+								 , A.SABUN				AS	SABUN
+								 , A.JOB_CD				AS	JOB_CD
+								 , A.EDU_CONFIRM_TYPE	AS	EDU_CONFIRM_TYPE
+								 , A.UNCONFIRM_REASON	AS	UNCONFIRM_REASON
+								 , A.NOTE				AS	NOTE 
+							  FROM (
+									  SELECT NULL	AS	ENTER_CD
+										   , NULL	AS	EDU_SEQ
+										   , NULL	AS	EDU_EVENT_SEQ
+										   , NULL	AS	SABUN
+										   , NULL	AS	JOB_CD
+										   , NULL	AS	EDU_CONFIRM_TYPE
+										   , NULL	AS	UNCONFIRM_REASON
+										   , NULL	AS	NOTE
+										FROM DUAL ]]>
+								  <foreach item="rm" collection="mergeRows">
+									  UNION ALL
+									 SELECT TRIM(#{ssnEnterCd})			AS	ENTER_CD
+										  , TRIM(#{rm.eduSeq})				AS	EDU_SEQ
+										  , TRIM(#{rm.eduEventSeq})		AS	EDU_EVENT_SEQ
+										  , TRIM(#{rm.sabun})				AS	SABUN
+										  , TRIM(#{rm.jobCd})				AS	JOB_CD
+										  , TRIM(#{rm.eduConfirmType})		AS	EDU_CONFIRM_TYPE
+										  , TRIM(#{rm.unconfirmReason})	AS	UNCONFIRM_REASON
+										  , TRIM(#{rm.note})				AS	NOTE
+									   FROM DUAL
+								  </foreach>
+							  	   ) A WHERE ENTER_CD IS NOT NULL 
+							  	         AND EDU_SEQ IS NOT NULL
+							  	         AND EDU_EVENT_SEQ IS NOT NULL
+							  	         AND SABUN IS NOT NULL
+							) S
+					ON (
+								T.ENTER_CD		= S.ENTER_CD
+							AND T.EDU_SEQ		= S.EDU_SEQ
+							AND T.EDU_EVENT_SEQ	= S.EDU_EVENT_SEQ
+							AND T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+                         UPDATE SET	T.EDU_CONFIRM_TYPE	= S.EDU_CONFIRM_TYPE
+								  , T.UNCONFIRM_REASON	= S.UNCONFIRM_REASON
+								  , T.JOB_CD            = S.JOB_CD
+								  , T.NOTE 				= S.NOTE
+								  , T.CHKDATE			= SYSDATE
+								  , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.EDU_SEQ
+							, T.EDU_EVENT_SEQ
+							, T.SABUN
+							, T.EDU_CONFIRM_TYPE
+							, T.UNCONFIRM_REASON
+							, T.JOB_CD
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.EDU_SEQ
+							, S.EDU_EVENT_SEQ
+							, S.SABUN
+							, S.EDU_CONFIRM_TYPE
+							, S.UNCONFIRM_REASON
+							, S.JOB_CD
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+			
+		</update>
+
+<!-- 		교육이력관리 삭제 -->
+		<delete parameterType="map" id="deleteEduHistoryLst">
+			<![CDATA[
+				DELETE  TTRA301
+				WHERE 	(ENTER_CD,EDU_SEQ,EDU_EVENT_SEQ,SABUN) IN 	(  (NULL,NULL,NULL,NULL) ]]>
+			<foreach item="rm" collection="deleteRows">
+				,
+				<if test="ssnEnterCd != null and ssnEnterCd neq ''
+				          and rm.eduSeq != null and rm.eduSeq neq ''
+				          and rm.eduEventSeq != null and rm.eduEventSeq neq ''
+				          and rm.sabun != null and rm.sabun neq ''">
+					(#{ssnEnterCd}, TRIM(#{rm.eduSeq}), TRIM(#{rm.eduEventSeq}), TRIM(#{rm.sabun}))
+				</if>
+			</foreach>
+			)
+		</delete>
+
+</mapper>

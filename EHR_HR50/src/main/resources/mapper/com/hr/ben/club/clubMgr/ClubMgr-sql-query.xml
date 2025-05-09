@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubMgr">
+
+	<select id="getClubMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.CLUB_SEQ
+		     , A.CLUB_NM
+		     , A.SDATE
+		     , A.EDATE
+		     , A.CLUB_FEE
+		     , A.SABUN_A
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_NAME -- 성명
+		     , A.SABUN_B
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_NAME -- 성명
+		     , A.SABUN_C
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_NAME -- 성명
+		     , A.BANK_CD
+		     , A.ACC_HOLDER
+		     , CRYPTIT.DECRYPT(A.ACC_NO, A.ENTER_CD) AS ACC_NO
+		     , A.TEMP_YN
+		     , A.APPL_SEQ
+		     , (SELECT Z.SABUN FROM TBEN505 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.APPL_SEQ = A.APPL_SEQ) AS SABUN
+		     , (SELECT Z.APPL_YMD FROM THRI103 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.APPL_SEQ = A.APPL_SEQ) AS APPL_YMD
+		     , (SELECT Z.APPL_IN_SABUN FROM THRI103 Z WHERE Z.ENTER_CD = A.ENTER_CD AND Z.APPL_SEQ = A.APPL_SEQ) AS APPL_IN_SABUN
+		     , A.NOTE
+		     , (SELECT COUNT(1) AS CNT
+				  FROM TBEN502 Z
+				 WHERE Z.ENTER_CD 	 = A.ENTER_CD
+				   AND Z.CLUB_SEQ 	 = A.CLUB_SEQ
+				   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Z.SDATE AND Z.EDATE
+				   AND NVL(Z.AGREE_YN,'N') = 'Y'
+			   ) AS CLUB_MEM_CNT
+		     , (SELECT COUNT(1) AS CNT
+				  FROM TBEN501 Z, THRI103 X
+				 WHERE Z.ENTER_CD  = A.ENTER_CD
+				   AND Z.CLUB_SEQ  = A.CLUB_SEQ
+				   AND Z.ENTER_CD  = X.ENTER_CD
+				   AND Z.APPL_SEQ  = X.APPL_SEQ
+				   AND Z.JOIN_TYPE = 'A' ]]>
+		<if test="searchDateYear != null and searchDateYear neq ''">
+				   AND SUBSTR(Z.SDATE,1,4) = REPLACE(#{searchDateYear}, '-','')
+		</if>
+				   AND X.APPL_STATUS_CD = '99'
+			   ) AS CLUB_MEM_IN_CNT
+		    , (SELECT COUNT(1) AS CNT
+				  FROM TBEN501 Z, THRI103 X
+				 WHERE Z.ENTER_CD  = A.ENTER_CD
+				   AND Z.CLUB_SEQ  = A.CLUB_SEQ
+				   AND Z.ENTER_CD  = X.ENTER_CD
+				   AND Z.APPL_SEQ  = X.APPL_SEQ
+				   AND Z.JOIN_TYPE = 'D'
+		<if test="searchDateYear != null and searchDateYear neq ''">
+				   AND SUBSTR(Z.EDATE,1,4) = REPLACE(#{searchDateYear}, '-','')
+		</if>
+				   AND X.APPL_STATUS_CD = '99'
+			   ) AS CLUB_MEM_OUT_CNT
+		     , DECODE(A.APPL_SEQ, NULL, '1', '0') AS DETAIL
+			 , ELEMENT_CD
+			 , ( SELECT MAX(X.ELEMENT_NM) KEEP(DENSE_RANK FIRST ORDER BY X.SDATE DESC)
+			       FROM TCPN011 X
+			      WHERE X.ENTER_CD   = A.ENTER_CD
+				    AND X.ELEMENT_CD = A.ELEMENT_CD
+		<choose>
+			<when test="searchYmd != null and searchYmd neq ''">
+					AND REPLACE(#{searchYmd}, '-', '') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+			</when>
+			<otherwise>
+					AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL(X.EDATE,'99991231')
+			</otherwise>
+		</choose>
+			  ) AS ELEMENT_NM
+		  FROM TBEN500 A 
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		<if test="searchYmd != null and searchYmd neq ''">
+		   AND REPLACE(#{searchYmd}, '-','') BETWEEN A.SDATE AND NVL( A.EDATE, '99991231' )
+		</if>
+		<if test="searchClubNm != null and searchClubNm neq ''">
+		   AND UPPER( A.CLUB_NM )  LIKE '%'||UPPER( TRIM( #{searchClubNm} ) )||'%' 
+		</if>
+		<if test="searchTempYn != null and searchTempYn neq ''">
+		   AND UPPER(A.TEMP_YN) = 'Y'
+		</if>
+		<if test='searchTempYn != null and searchTempYn eq "N"'>
+		   AND (UPPER(A.TEMP_YN) != 'Y' OR A.TEMP_YN IS NULL)
+		</if>
+		ORDER BY CLUB_SEQ
+	</select>
+		
+	<update id="saveClubMgr" parameterType="map">
+	<![CDATA[					
+			MERGE INTO TBEN500 T 
+			 USING ( ]]> 
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			   SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD 
+	                , TRIM(#{rm.clubSeq})   AS  CLUB_SEQ
+		            , TRIM(#{rm.clubNm})    AS  CLUB_NM
+		            , TRIM(#{rm.sdate})  	AS  SDATE
+		            , TRIM(#{rm.edate})  	AS  EDATE
+		            , TRIM(#{rm.clubFee})   AS  CLUB_FEE
+		            , TRIM(#{rm.sabunA})  	AS  SABUN_A
+		            , TRIM(#{rm.sabunB})  	AS  SABUN_B
+		            , TRIM(#{rm.sabunC})  	AS  SABUN_C
+		            , TRIM(#{rm.bankCd})  	AS  BANK_CD
+		            , TRIM(#{rm.accHolder}) AS  ACC_HOLDER
+		            , CRYPTIT.ENCRYPT(TRIM(#{rm.accNo}), TRIM(#{ssnEnterCd}))   	AS  ACC_NO
+		            , TRIM(#{rm.tempYn}) 	AS  TEMP_YN
+		            , TRIM(#{rm.note})  	AS  NOTE
+		            , TRIM(#{rm.elementCd}) AS  ELEMENT_CD
+		        FROM DUAL
+		</foreach>
+		<![CDATA[
+			) S 
+			ON ( 
+			          T.ENTER_CD = S.ENTER_CD 
+			     AND  T.CLUB_SEQ = S.CLUB_SEQ 
+			) 
+			WHEN MATCHED THEN 
+			   UPDATE SET T.CHKDATE	= sysdate 
+			            , T.CHKID	= #{ssnSabun} 
+			            , T.CLUB_NM = S.CLUB_NM 
+			            , T.SDATE = S.SDATE 
+			            , T.EDATE = S.EDATE 
+			            , T.CLUB_FEE = S.CLUB_FEE 
+			            , T.SABUN_A = S.SABUN_A 
+			            , T.SABUN_B = S.SABUN_B 
+			            , T.SABUN_C = S.SABUN_C 
+			            , T.BANK_CD = S.BANK_CD 
+			            , T.ACC_HOLDER = S.ACC_HOLDER 
+			            , T.ACC_NO = S.ACC_NO 
+			            , T.TEMP_YN = S.TEMP_YN 
+			            , T.NOTE = S.NOTE 
+			            , T.ELEMENT_CD = S.ELEMENT_CD
+			WHEN NOT MATCHED THEN 
+			   INSERT 
+			   ( 
+			              T.ENTER_CD
+			            , T.CLUB_SEQ
+			            , T.CLUB_NM
+			            , T.SDATE
+			            , T.EDATE
+			            , T.CLUB_FEE
+			            , T.SABUN_A
+			            , T.SABUN_B
+			            , T.SABUN_C
+			            , T.BANK_CD
+			            , T.ACC_HOLDER
+			            , T.ACC_NO
+			            , T.TEMP_YN
+			            , T.NOTE
+			            , T.ELEMENT_CD
+			            , T.CHKDATE
+			            , T.CHKID
+			   ) 
+			   VALUES 
+			   ( 
+			              S.ENTER_CD
+			            , S_TBEN500.NEXTVAL
+			            , S.CLUB_NM
+			            , S.SDATE
+			            , S.EDATE
+			            , S.CLUB_FEE
+			            , S.SABUN_A
+			            , S.SABUN_B
+			            , S.SABUN_C
+			            , S.BANK_CD
+			            , S.ACC_HOLDER
+			            , S.ACC_NO
+			            , S.TEMP_YN
+			            , S.NOTE
+			            , S.ELEMENT_CD
+			            , sysdate
+			            , #{ssnSabun}
+			   ) 
+	]]>
+	</update>
+		
+	<delete id="deleteClubMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM	 TBEN500
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND (CLUB_SEQ ) IN (  NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.clubSeq != null and rm.clubSeq neq ''">
+					, TRIM( #{rm.clubSeq} )
+			</if>
+		</foreach>
+			)
+	</delete>
+		
+	<select id="getClubMgrPerList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT CODE
+		     , CODE_NM
+		     , NOTE1
+		     , NOTE2
+		     , NOTE3
+		  FROM TSYS005
+		 WHERE ENTER_CD  = #{ssnEnterCd}
+		   AND GRCODE_CD = 'B50000'
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+		 ORDER BY SEQ
+	]]>
+	</select>
+		
+	<update id="saveClubMgrPer" parameterType="map">
+	<![CDATA[
+		MERGE INTO TSYS005 T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">			
+			SELECT TRIM(#{ssnEnterCd})			AS	ENTER_CD
+		         , 'B50000'						AS	GRCODE_CD
+		         , TRIM(#{rm.code})				AS	CODE
+                 , TRIM(#{rm.codeNm})			AS	CODE_NM
+                 , TRIM(#{rm.note1})			AS	NOTE1
+                 , TRIM(#{rm.note2})			AS	NOTE2
+                 , TRIM(#{rm.note3})			AS	NOTE3
+		      FROM DUAL
+		</foreach>
+    	<![CDATA[
+			) S
+			ON (
+					T.ENTER_CD	= S.ENTER_CD
+				AND	T.GRCODE_CD	= S.GRCODE_CD
+				AND	T.CODE		= S.CODE
+			)
+			WHEN MATCHED THEN
+				UPDATE SET T.NOTE1			= S.NOTE1
+					     , T.NOTE2			= S.NOTE2
+					     , T.NOTE3			= S.NOTE3
+					     , T.CHKDATE		= sysdate
+					     , T.CHKID			= #{ssnSabun}
+	]]>
+	</update>
+</mapper>

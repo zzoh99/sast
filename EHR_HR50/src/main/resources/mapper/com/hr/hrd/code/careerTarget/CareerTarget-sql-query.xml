@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.code.careerTarget">
+		<select parameterType="map" resultType="cMap" id="getCareerTargetList">
+
+
+				<![CDATA[
+					SELECT A.CAREER_TARGET_CD, A.CAREER_TARGET_NM, A.CAREER_TARGET_TYPE,
+					       0 AS CAREER_TARGET_DETAIL,
+						   --( CASE WHEN ( SELECT COUNT(*) FROM TCDPV290 WHERE ENTER_CD = A.ENTER_CD AND CAREER_TARGET_CD = A.CAREER_TARGET_CD ) > 0 THEN 1
+						   --	  ELSE 0
+						   --  END
+						   -- ) AS CAREER_PATH_DETAIL,
+						   0 AS CAREER_PATH_DETAIL,
+						   A.CAREER_TARGET_DESC, A.START_YMD, A.END_YMD,
+						   A.REG_YMD, A.USE_YN,
+						   A.G1_STEP_DESC, A.G1_NEED_DESC,
+						   A.G2_STEP_DESC, A.G2_NEED_DESC,
+						   A.G3_STEP_DESC, A.G3_NEED_DESC,
+						   A.LIMIT_CNT,
+					       A.CAREER_MAP,
+					      '0' AS CAREER_MAP_DETAIL
+					  FROM TCDPV200 A
+					 WHERE A.ENTER_CD           = #{ssnEnterCd}
+					           ]]>
+<if test='searchCareerTargetType != null and !searchCareerTargetType.equals("")'>
+					   AND LOWER(A.CAREER_TARGET_TYPE)   LIKE LOWER(#{searchCareerTargetType})
+</if>
+<if test='searchCareerTargetNm != null and !searchCareerTargetNm.equals("")'>
+					   AND LOWER(A.CAREER_TARGET_NM)   LIKE '%' || LOWER(#{searchCareerTargetNm}) || '%'
+</if>
+					 ORDER BY A.CAREER_TARGET_TYPE DESC, A.CAREER_TARGET_CD ASC
+
+
+		</select>
+
+		<update parameterType="map" id="saveCareerTarget">
+
+					MERGE INTO TCDPV200 T
+						USING (
+					SELECT A.ENTER_CD
+						 , A.CAREER_TARGET_CD
+						 , A.CAREER_TARGET_NM
+						 , A.CAREER_TARGET_TYPE
+						 , A.CAREER_TARGET_DESC
+						 , A.START_YMD
+						 , A.END_YMD
+						 , A.REG_YMD
+						 , A.USE_YN
+						 , A.G1_STEP_DESC
+						 , A.G1_NEED_DESC
+						 , A.G2_STEP_DESC
+						 , A.G2_NEED_DESC
+						 , A.G3_STEP_DESC
+						 , A.G3_NEED_DESC
+						 , A.LIMIT_CNT
+						 , A.CHKDATE
+						 , A.CHKID
+					  FROM (
+					SELECT NULL AS ENTER_CD
+						 , NULL AS CAREER_TARGET_CD
+						 , NULL AS CAREER_TARGET_NM
+						 , NULL AS CAREER_TARGET_TYPE
+						 , NULL AS CAREER_TARGET_DESC
+						 , NULL AS START_YMD
+						 , NULL AS END_YMD
+						 , NULL AS REG_YMD
+						 , NULL AS USE_YN
+						 , NULL AS G1_STEP_DESC
+						 , NULL AS G1_NEED_DESC
+						 , NULL AS G2_STEP_DESC
+						 , NULL AS G2_NEED_DESC
+						 , NULL AS G3_STEP_DESC
+						 , NULL AS G3_NEED_DESC
+						 , NULL AS LIMIT_CNT
+						 , NULL AS CHKDATE
+						 , NULL AS CHKID
+					  FROM DUAL
+			<bind name="icnt" value="1" />
+			<foreach item="rm" collection="mergeRows" >
+								  UNION ALL
+					SELECT TRIM( #{ssnEnterCd} )   AS ENTER_CD
+					
+					<choose><when test='rm.careerTargetCd != null and !rm.careerTargetCd.equals("")'>
+					 	 , TRIM( #{rm.careerTargetCd}) AS CAREER_TARGET_CD
+					</when><otherwise>
+						 , TO_CHAR( (
+					  			 SELECT (NVL(MAX(TO_NUMBER(CAREER_TARGET_CD)),0) + ${icnt})
+								   FROM TCDPV200
+								  WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+									) )	AS CAREER_TARGET_CD
+							 <bind name="icnt" value="icnt + 1" />
+					</otherwise>
+					</choose>
+					
+						 , TRIM( #{rm.careerTargetNm}) AS CAREER_TARGET_NM
+						 , TRIM( #{rm.careerTargetType}) AS CAREER_TARGET_TYPE
+						 , TRIM( #{rm.careerTargetDesc}) AS CAREER_TARGET_DESC
+						 , TRIM( #{rm.startYmd}) AS START_YMD
+						 , TRIM( #{rm.endYmd}) AS END_YMD
+						 , TRIM( #{rm.regYmd}) AS REG_YMD
+						 , TRIM( #{rm.useYn}) AS USE_YN
+						 , TRIM( #{rm.g1StepDesc}) AS G1_STEP_DESC
+						 , TRIM( #{rm.g1NeedDesc}) AS G1_NEED_DESC
+						 , TRIM( #{rm.g2StepDesc}) AS G2_STEP_DESC
+						 , TRIM( #{rm.g2NeedDesc}) AS G2_NEED_DESC
+						 , TRIM( #{rm.g3StepDesc}) AS G3_STEP_DESC
+						 , TRIM( #{rm.g3NeedDesc}) AS G3_NEED_DESC
+						 , TRIM( #{rm.limitCnt}) AS LIMIT_CNT
+						 , SYSDATE AS CHKDATE
+						 , #{ssnSabun} AS CHKID
+					  FROM DUAL
+			</foreach>
+									  ) A WHERE A.ENTER_CD IS NOT NULL
+								  ) S
+						   ON ( T.ENTER_CD = S.ENTER_CD AND T.CAREER_TARGET_CD = S.CAREER_TARGET_CD )
+							  WHEN MATCHED THEN
+					UPDATE SET T.CAREER_TARGET_NM = S.CAREER_TARGET_NM
+						 , T.CAREER_TARGET_TYPE = S.CAREER_TARGET_TYPE
+						 , T.CAREER_TARGET_DESC = S.CAREER_TARGET_DESC
+						 , T.START_YMD = S.START_YMD
+						 , T.END_YMD = S.END_YMD
+						 , T.REG_YMD = S.REG_YMD
+						 , T.USE_YN = S.USE_YN
+						 , T.G1_STEP_DESC = S.G1_STEP_DESC
+						 , T.G1_NEED_DESC = S.G1_NEED_DESC
+						 , T.G2_STEP_DESC = S.G2_STEP_DESC
+						 , T.G2_NEED_DESC = S.G2_NEED_DESC
+						 , T.G3_STEP_DESC = S.G3_STEP_DESC
+						 , T.G3_NEED_DESC = S.G3_NEED_DESC
+						 , T.LIMIT_CNT = S.LIMIT_CNT
+						 , T.CHKDATE = S.CHKDATE
+						 , T.CHKID = S.CHKID
+
+							  WHEN NOT MATCHED THEN
+					INSERT ( T.ENTER_CD     , T.CAREER_TARGET_CD     , T.CAREER_TARGET_NM     , T.CAREER_TARGET_TYPE     , T.CAREER_TARGET_DESC     , T.START_YMD     , T.END_YMD     , T.REG_YMD     , T.USE_YN     , T.G1_STEP_DESC     , T.G1_NEED_DESC     , T.G2_STEP_DESC     , T.G2_NEED_DESC     , T.G3_STEP_DESC     , T.G3_NEED_DESC     , T.LIMIT_CNT     , T.CHKDATE     , T.CHKID)
+						 VALUES ( S.ENTER_CD     , S.CAREER_TARGET_CD     , S.CAREER_TARGET_NM     , S.CAREER_TARGET_TYPE     , S.CAREER_TARGET_DESC     , S.START_YMD     , S.END_YMD     , S.REG_YMD     , S.USE_YN     , S.G1_STEP_DESC     , S.G1_NEED_DESC     , S.G2_STEP_DESC     , S.G2_NEED_DESC     , S.G3_STEP_DESC     , S.G3_NEED_DESC     , S.LIMIT_CNT     , S.CHKDATE     , S.CHKID)
+
+
+
+
+
+		</update>
+
+
+
+
+		<delete parameterType="map" id="deleteCareerTarget">
+
+
+
+					DELETE FROM TCDPV200
+					 WHERE ENTER_CD||'_'||CAREER_TARGET_CD IN ( NULL
+					<foreach item="rm" collection="deleteRows" >  ,
+					   <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.careerTargetCd != null and !rm.careerTargetCd.equals("")'>
+						  TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.careerTargetCd})
+					   </if>
+					</foreach>
+					)
+
+
+
+
+		</delete>
+
+
+		<select parameterType="map" resultType="cMap" id="getCareerPathDetailSHT1">
+
+				<![CDATA[
+					 SELECT A.JOB_CD
+					      , A.JOB_NM
+					  FROM  TORG201 A
+				 	 WHERE 1=1
+					   AND A.ENTER_CD = #{ssnEnterCd}
+                       AND A.JOB_TYPE = '10030'
+                       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                     ORDER BY A.SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getCareerPathJobCd">
+			<![CDATA[
+			SELECT A.JOB_CD AS CODE
+				 , A.JOB_NM AS CODE_NM
+			  FROM TORG201 A
+			 WHERE 1=1
+			   AND A.ENTER_CD = #{ssnEnterCd}
+			   AND A.JOB_TYPE = '10030'
+			   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+			 ORDER BY A.SEQ
+			]]>
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getCareerPathDetailSHT2">
+
+
+				<![CDATA[
+					SELECT A.CAREER_TARGET_CD,
+						   A.CAREER_PATH_CD,
+						   DECODE(A.CAREER_PATH_CD, 'G1', '1','G2', '2','G3', '3','') AS CAREER_PATH_NM,
+						   A.JOB_CD,
+						   B.JOB_NM,
+						   A.EXE_TERM,
+						   A.BF_JOB_CD,
+						   (SELECT S.JOB_NM
+							   FROM TORG201 S
+							   WHERE 1 = 1
+								 AND S.ENTER_CD = A.ENTER_CD
+								 AND S.JOB_CD   = A.BF_JOB_CD
+								 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S.SDATE AND NVL(S.EDATE, '99991231')
+						   )
+					  FROM TCDPV290 A,TORG201 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.JOB_CD = B.JOB_CD
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					   AND A.ENTER_CD           = #{ssnEnterCd}
+					   AND A.CAREER_TARGET_CD   = #{searchCareerTargetCd}
+					   AND A.CAREER_PATH_CD     = #{searchCareerPathCd}
+					 ORDER BY A.JOB_CD, JOB_NM
+				]]>
+
+
+		</select>
+
+
+		<update parameterType="map" id="saveCareerPathDetailSHT2">
+
+				MERGE INTO TCDPV290 T
+					USING (
+							SELECT A.ENTER_CD
+								 , A.CAREER_TARGET_CD
+								 , A.CAREER_PATH_CD
+								 , A.JOB_CD
+			                     , A.BF_JOB_CD
+								 , A.EXE_TERM
+								 , A.CHKDATE
+								 , A.CHKID
+							  FROM (
+									SELECT NULL AS ENTER_CD
+										 , NULL AS CAREER_TARGET_CD
+										 , NULL AS CAREER_PATH_CD
+										 , NULL AS JOB_CD
+			                             , NULL AS BF_JOB_CD
+										 , NULL AS EXE_TERM
+										 , NULL AS CHKDATE
+										 , NULL AS CHKID
+									  FROM DUAL
+									<foreach item="rm" collection="mergeRows" >
+												  UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )   AS ENTER_CD
+										 , TRIM( #{rm.careerTargetCd}) AS CAREER_TARGET_CD
+										 , TRIM( #{rm.careerPathCd}) AS CAREER_PATH_CD
+										 , TRIM( #{rm.jobCd}) AS JOB_CD
+										 , TRIM( #{rm.bfJobCd}) AS BF_JOB_CD
+										 , TRIM( #{rm.exeTerm}) AS EXE_TERM
+										 , SYSDATE AS CHKDATE
+										 , #{ssnSabun} AS CHKID
+									  FROM DUAL
+									</foreach>
+								   ) A WHERE A.ENTER_CD IS NOT NULL
+						  ) S
+					   ON ( T.ENTER_CD = S.ENTER_CD AND T.CAREER_TARGET_CD = S.CAREER_TARGET_CD AND T.CAREER_PATH_CD = S.CAREER_PATH_CD AND T.JOB_CD = S.JOB_CD )
+				  	 WHEN MATCHED THEN
+						UPDATE SET T.EXE_TERM = S.EXE_TERM
+			                     , T.BF_JOB_CD = S.BF_JOB_CD
+								 , T.CHKDATE = S.CHKDATE
+								 , T.CHKID = S.CHKID
+
+					 WHEN NOT MATCHED THEN
+						INSERT ( T.ENTER_CD , T.CAREER_TARGET_CD , T.CAREER_PATH_CD , T.JOB_CD, T.BF_JOB_CD, T.EXE_TERM     , T.CHKDATE     , T.CHKID)
+						VALUES ( S.ENTER_CD , S.CAREER_TARGET_CD , S.CAREER_PATH_CD , S.JOB_CD, S.BF_JOB_CD, S.EXE_TERM     , S.CHKDATE     , S.CHKID)
+
+
+
+
+		</update>
+
+		<delete parameterType="map" id="deleteCareerPathDetailSHT2">
+
+
+DELETE FROM TCDPV290
+ WHERE ENTER_CD||'_'||CAREER_TARGET_CD||'_'||CAREER_PATH_CD||'_'||JOB_CD IN ( NULL
+<foreach item="rm" collection="deleteRows" >  ,
+   <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.careerTargetCd != null and !rm.careerTargetCd.equals("") and rm.careerPathCd != null and !rm.careerPathCd.equals("") and rm.jobCd != null and !rm.jobCd.equals("")'>
+      TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.careerTargetCd})||'_'||TRIM(#{rm.careerPathCd})||'_'||TRIM(#{rm.jobCd})
+   </if>
+</foreach>
+)
+
+
+		</delete>
+
+	<update parameterType="map" id="saveCareerMapEmpty">
+		<![CDATA[
+			UPDATE TCDPV200
+			SET CAREER_MAP = EMPTY_CLOB()
+			  , CHKDATE = SYSDATE
+			  , CHKID = #{ssnSabun}
+			WHERE ENTER_CD = #{ssnEnterCd}
+			  AND CAREER_TARGET_CD = #{careerTargetCd}
+		]]>
+	</update>
+
+	<update parameterType="map" id="saveCareerMapContents">
+           <![CDATA[
+		UPDATE TCDPV200
+		   SET CAREER_MAP = #{content}
+			 , CHKDATE = SYSDATE
+			 , CHKID = #{ssnSabun}
+		 WHERE ENTER_CD = #{ssnEnterCd}
+		   AND CAREER_TARGET_CD = #{careerTargetCd}
+		]]>
+	</update>
+</mapper>

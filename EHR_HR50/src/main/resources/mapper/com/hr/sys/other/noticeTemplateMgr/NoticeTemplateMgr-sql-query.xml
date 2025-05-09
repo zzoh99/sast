@@ -1,0 +1,606 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.noticeTemplateMgr">
+	
+<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getNoticeTemplateBizCdList">
+
+				<![CDATA[
+					SELECT A.BIZ_CD
+					     , A.BIZ_NM
+					     , B.BIZ_CD_DESC
+					     , B.USE_MAIL_YN
+					     , B.USE_SMS_YN
+					     , B.USE_LMS_YN
+					     , B.USE_MESSENGER_YN
+					     , CASE WHEN C.MAIL_CNT      > 0 THEN 'Y' ELSE 'N' END AS REG_MAIL_YN
+					     , CASE WHEN C.SMS_CNT       > 0 THEN 'Y' ELSE 'N' END AS REG_SMS_YN
+					     , CASE WHEN C.LMS_CNT       > 0 THEN 'Y' ELSE 'N' END AS REG_LMS_YN
+					     , CASE WHEN C.MESSENGER_CNT > 0 THEN 'Y' ELSE 'N' END AS REG_MESSENGER_YN
+					     , 0 AS DETAIL_MAIL
+					     , 0 AS DETAIL_SMS
+					     , 0 AS DETAIL_LMS
+					     , 0 AS DETAIL_MESSENGER
+					     , B.CHKDATE
+					  FROM TSYS967 A
+					     , TSYS968 B
+					     , (
+					            SELECT C1.ENTER_CD
+					                 , C1.BIZ_CD
+					                 , SUM(C1.MAIL_CNT) AS MAIL_CNT
+					                 , SUM(C1.SMS_CNT) AS SMS_CNT
+					                 , SUM(C1.LMS_CNT) AS LMS_CNT
+					                 , SUM(C1.MESSENGER_CNT) AS MESSENGER_CNT
+					              FROM (
+					                        SELECT ENTER_CD
+					                             , BIZ_CD
+					                             , CASE WHEN NOTICE_TYPE_CD = 'MAIL' THEN 1 ELSE 0 END AS MAIL_CNT
+					                             , CASE WHEN NOTICE_TYPE_CD = 'SMS' THEN 1 ELSE 0 END AS SMS_CNT
+					                             , CASE WHEN NOTICE_TYPE_CD = 'LMS' THEN 1 ELSE 0 END AS LMS_CNT
+					                             , CASE WHEN NOTICE_TYPE_CD = 'MESSENGER' THEN 1 ELSE 0 END AS MESSENGER_CNT
+					                          FROM TSYS969
+					                         WHERE ENTER_CD = #{ssnEnterCd}
+					                   ) C1
+					             GROUP BY C1.ENTER_CD, C1.BIZ_CD
+					       ) C
+					 WHERE A.BIZ_CD = B.BIZ_CD(+)
+					   AND B.ENTER_CD = C.ENTER_CD(+)
+					   AND B.BIZ_CD   = C.BIZ_CD(+)
+					   AND B.ENTER_CD(+) = #{ssnEnterCd}
+					           ]]>
+					<if test='bizCd != null and !bizCd.equals("")'>
+					   AND A.BIZ_CD LIKE '%' || #{bizCd} || '%'
+					</if>
+					<if test='bizNm != null and !bizNm.equals("")'>
+					   AND A.BIZ_NM LIKE '%' || #{bizNm} || '%'
+					</if>
+					<if test='srchUseYn != null and !srchUseYn.equals("")'>
+					   AND (
+					           B.USE_MAIL_YN = #{srchUseYn}
+					           OR B.USE_SMS_YN = #{srchUseYn}
+					           OR B.USE_LMS_YN = #{srchUseYn}
+					           OR B.USE_MESSENGER_YN = #{srchUseYn}
+					       )
+					</if>
+					 ORDER BY A.BIZ_CD
+
+
+
+		</select>
+	
+<!-- 알림서식코드 저장 -->
+		<update parameterType="map" id="saveNoticeTemplateMgrTSYS967">
+
+
+					MERGE INTO TSYS967 T
+					USING (
+					        SELECT S1.BIZ_CD
+					             , S1.BIZ_NM
+					             , S1.CHKID
+					          FROM (
+					                   SELECT NULL AS BIZ_CD
+					                        , NULL AS BIZ_NM
+					                        , NULL AS CHKID
+					                     FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					                    UNION ALL
+					                   SELECT TRIM( #{rm.bizCd} ) AS BIZ_CD
+					                        , TRIM( #{rm.bizNm} ) AS BIZ_NM
+					                        , #{ssnSabun} AS CHKID
+					                     FROM DUAL
+</foreach>
+					               ) S1
+					         WHERE S1.BIZ_CD IS NOT NULL
+					           AND S1.BIZ_NM IS NOT NULL
+					      ) S
+					   ON (
+					               T.BIZ_CD = S.BIZ_CD
+					           AND T.BIZ_NM = S.BIZ_NM
+					      )
+					 WHEN NOT MATCHED THEN
+					      INSERT (
+					             T.BIZ_CD
+					           , T.BIZ_NM
+					           , T.CHKID
+					           , T.CHKDATE
+					      ) VALUES (
+					             S.BIZ_CD
+					           , S.BIZ_NM
+					           , S.CHKID
+					           , SYSDATE
+					      )
+
+
+
+		</update>
+	
+<!-- 알림서식 저장 -->
+		<update parameterType="map" id="saveNoticeTemplateMgrTSYS968">
+
+
+					MERGE INTO TSYS968 T
+					USING (
+					        SELECT S1.ENTER_CD
+					             , S1.BIZ_CD
+					             , S1.BIZ_CD_DESC
+					             , S1.USE_MAIL_YN
+					             , S1.USE_SMS_YN
+					             , S1.USE_LMS_YN
+					             , S1.USE_MESSENGER_YN
+					             , S1.CHKID
+					          FROM (
+					                   SELECT NULL AS ENTER_CD
+					                        , NULL AS BIZ_CD
+					                        , NULL AS BIZ_CD_DESC
+					                        , NULL AS USE_MAIL_YN
+					                        , NULL AS USE_SMS_YN
+					                        , NULL AS USE_LMS_YN
+					                        , NULL AS USE_MESSENGER_YN
+					                        , NULL AS CHKID
+					                     FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					                    UNION ALL
+					                   SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+					                        , TRIM( #{rm.bizCd} ) AS BIZ_CD
+					                        , TRIM( #{rm.bizCdDesc} ) AS BIZ_CD_DESC
+					                        , TRIM( #{rm.useMailYn} ) AS USE_MAIL_YN
+					                        , TRIM( #{rm.useSmsYn} ) AS USE_SMS_YN
+					                        , TRIM( #{rm.useLmsYn} ) AS USE_LMS_YN
+					                        , TRIM( #{rm.useMessengerYn} ) AS USE_MESSENGER_YN
+					                        , #{ssnSabun} AS CHKID
+					                     FROM DUAL
+</foreach>
+					               ) S1
+					         WHERE S1.ENTER_CD IS NOT NULL
+					           AND S1.BIZ_CD IS NOT NULL
+					      ) S
+					   ON (
+					               T.ENTER_CD = S.ENTER_CD
+					           AND T.BIZ_CD   = S.BIZ_CD
+					      )
+					 WHEN MATCHED THEN
+					      UPDATE SET
+					             T.CHKDATE          = SYSDATE
+					           , T.CHKID            = S.CHKID
+					           , T.BIZ_CD_DESC      = S.BIZ_CD_DESC
+					           , T.USE_MAIL_YN      = S.USE_MAIL_YN
+					           , T.USE_SMS_YN       = S.USE_SMS_YN
+					           , T.USE_LMS_YN       = S.USE_LMS_YN
+					           , T.USE_MESSENGER_YN = S.USE_MESSENGER_YN
+					 WHEN NOT MATCHED THEN
+					      INSERT (
+					             T.ENTER_CD
+					           , T.BIZ_CD
+					           , T.BIZ_CD_DESC
+					           , T.USE_MAIL_YN
+					           , T.USE_SMS_YN
+					           , T.USE_LMS_YN
+					           , T.USE_MESSENGER_YN
+					           , T.CHKID
+					           , T.CHKDATE
+					      ) VALUES (
+					             S.ENTER_CD
+					           , S.BIZ_CD
+					           , S.BIZ_CD_DESC
+					           , S.USE_MAIL_YN
+					           , S.USE_SMS_YN
+					           , S.USE_LMS_YN
+					           , S.USE_MESSENGER_YN
+					           , S.CHKID
+					           , SYSDATE
+					      )
+		</update>
+		
+<!-- 알림서식코드삭제 -->
+		<delete parameterType="map" id="deleteNoticeTemplateMgrTSYS967">
+
+
+					DELETE FROM TSYS967
+					 WHERE BIZ_CD IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+					           , TRIM( #{rm.bizCd} )
+</foreach>
+					       )
+		</delete>
+		
+<!-- 알림서식삭제 -->
+		<delete parameterType="map" id="deleteNoticeTemplateMgrTSYS968">
+
+
+					DELETE FROM TSYS968
+					 WHERE BIZ_CD IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+					           , TRIM( #{rm.bizCd} )
+</foreach>
+					       )
+		</delete>
+		
+<!-- 알림서식내용삭제 -->
+		<delete parameterType="map" id="deleteNoticeTemplateMgrTSYS969">
+
+
+					DELETE FROM TSYS969
+					 WHERE BIZ_CD IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+					           , TRIM( #{rm.bizCd} )
+</foreach>
+					       )
+		</delete>
+		
+<!-- 서식 데이터 조회 -->
+		<select parameterType="map" resultType="cMap" id="getNoticeTemplateData">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					     , BIZ_CD
+					     , NOTICE_TYPE_CD
+					     , LANGUAGE_CD
+					     , SEND_MAIL
+					     , SEND_PHONE
+					     , SENDER_NM
+					     , TEMPLATE_TITLE
+					     , TEMPLATE_CONTENT
+					  FROM TSYS969
+					 WHERE ENTER_CD       = #{ssnEnterCd}
+					   AND BIZ_CD         = #{bizCd}
+					   AND NOTICE_TYPE_CD = #{noticeTypeCd}
+					   AND LANGUAGE_CD    = #{languageCd}
+				]]>
+
+
+		</select>
+	
+<!-- 서식 데이타 저장 -->
+		<update parameterType="map" id="saveNoticeTemplateData">
+
+<![CDATA[
+					MERGE INTO TSYS969 T
+					USING (
+					        SELECT S1.ENTER_CD
+					             , S1.BIZ_CD
+					             , S1.NOTICE_TYPE_CD
+					             , S1.LANGUAGE_CD
+					             , S1.SEND_MAIL
+					             , S1.SEND_PHONE
+					             , S1.SENDER_NM
+					             , S1.TEMPLATE_TITLE
+					             , S1.CHKID
+					          FROM (
+					                   SELECT #{ssnEnterCd} AS ENTER_CD
+					                        , #{bizCd} AS BIZ_CD
+					                        , #{noticeTypeCd} AS NOTICE_TYPE_CD
+					                        , #{languageCd} AS LANGUAGE_CD
+					                        , #{sendMail} AS SEND_MAIL
+					                        , #{sendPhone} AS SEND_PHONE
+					                        , #{senderNm} AS SENDER_NM
+					                        , #{templateTitle} AS TEMPLATE_TITLE
+					                        , #{ssnSabun} AS CHKID
+					                     FROM DUAL
+					               ) S1
+					         WHERE S1.BIZ_CD IS NOT NULL
+					           AND S1.NOTICE_TYPE_CD IS NOT NULL
+					           AND S1.LANGUAGE_CD IS NOT NULL
+					      ) S
+					   ON (
+					               T.ENTER_CD       = S.ENTER_CD
+					           AND T.BIZ_CD         = S.BIZ_CD
+					           AND T.NOTICE_TYPE_CD = S.NOTICE_TYPE_CD
+					           AND T.LANGUAGE_CD    = S.LANGUAGE_CD
+					      )
+					 WHEN MATCHED THEN
+					      UPDATE SET
+					             T.CHKDATE          = SYSDATE
+					           , T.CHKID            = S.CHKID
+					           , T.SEND_MAIL        = S.SEND_MAIL
+					           , T.SEND_PHONE       = S.SEND_PHONE
+					           , T.SENDER_NM        = S.SENDER_NM
+					           , T.TEMPLATE_TITLE   = S.TEMPLATE_TITLE
+					 WHEN NOT MATCHED THEN
+					      INSERT (
+					             T.ENTER_CD
+					           , T.BIZ_CD
+					           , T.NOTICE_TYPE_CD
+					           , T.LANGUAGE_CD
+					           , T.SEND_MAIL
+					           , T.SEND_PHONE
+					           , T.SENDER_NM
+					           , T.TEMPLATE_TITLE
+					           , T.CHKID
+					           , T.CHKDATE
+					      ) VALUES (
+					             S.ENTER_CD
+					           , S.BIZ_CD
+					           , S.NOTICE_TYPE_CD
+					           , S.LANGUAGE_CD
+					           , S.SEND_MAIL
+					           , S.SEND_PHONE
+					           , S.SENDER_NM
+					           , S.TEMPLATE_TITLE
+					           , S.CHKID
+					           , SYSDATE
+					      )
+				]]>
+
+
+		</update>
+
+		<!-- 서식 내용 저장 CLOB -->
+		<update parameterType="map" id="saveNoticeTemplateDataContent">
+		<![CDATA[
+			UPDATE TSYS969 
+			   SET TEMPLATE_CONTENT = #{templateContent}
+			 WHERE ENTER_CD         = #{ssnEnterCd}
+			   AND BIZ_CD           = #{bizCd}
+			   AND NOTICE_TYPE_CD   = #{noticeTypeCd}
+			   AND LANGUAGE_CD      = #{languageCd}
+		]]>
+		</update>
+	
+<!-- 서식 전사 배포 -->
+		<update parameterType="map" id="saveNoticeTemplateDeployAllTSYS968">
+
+
+					MERGE INTO TSYS968 T
+					USING (
+					        SELECT O.ENTER_CD
+					             , D.BIZ_CD
+					             , D.BIZ_CD_DESC
+					<if test='noticeTypeCd == null or noticeTypeCd.equals("")'>
+					             , D.USE_MAIL_YN
+					             , D.USE_SMS_YN
+					             , D.USE_LMS_YN
+					             , D.USE_MESSENGER_YN
+					</if>
+					          FROM (
+					                    SELECT ENTER_CD
+					                         , BIZ_CD
+					                         , BIZ_CD_DESC
+					<if test='noticeTypeCd == null or noticeTypeCd.equals("")'>
+					                         , USE_MAIL_YN
+					                         , USE_SMS_YN
+					                         , USE_LMS_YN
+					                         , USE_MESSENGER_YN
+					</if>
+					                     FROM TSYS968
+					                    WHERE ENTER_CD = #{ssnEnterCd}
+					                      AND BIZ_CD   = #{bizCd}
+					               ) D
+					             , TORG900 O
+					         WHERE O.USE_YN = 'Y'
+					           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN NVL(O.S_YMD, '19000101') AND NVL(O.E_YMD, '99991231')
+					           <![CDATA[ AND O.ENTER_CD <> #{ssnEnterCd} ]]>
+					      ) S
+					   ON (
+					               T.ENTER_CD = S.ENTER_CD
+					           AND T.BIZ_CD   = S.BIZ_CD
+					      )
+					WHEN MATCHED THEN
+					     UPDATE SET
+					            T.CHKID            = #{ssnSabun}
+					          , T.CHKDATE          = SYSDATE
+					          , T.BIZ_CD_DESC      = S.BIZ_CD_DESC
+					<if test='noticeTypeCd == null or noticeTypeCd.equals("")'>
+					          , T.USE_MAIL_YN      = S.USE_MAIL_YN
+					          , T.USE_SMS_YN       = S.USE_SMS_YN
+					          , T.USE_LMS_YN       = S.USE_LMS_YN
+					          , T.USE_MESSENGER_YN = S.USE_MESSENGER_YN
+					</if>
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					            T.ENTER_CD
+					          , T.BIZ_CD
+					          , T.BIZ_CD_DESC
+					<if test='noticeTypeCd == null or noticeTypeCd.equals("")'>
+					          , T.USE_MAIL_YN
+					          , T.USE_SMS_YN
+					          , T.USE_LMS_YN
+					          , T.USE_MESSENGER_YN
+					</if>
+					          , T.CHKID
+					          , T.CHKDATE
+					     ) VALUES (
+					            S.ENTER_CD
+					          , S.BIZ_CD
+					          , S.BIZ_CD_DESC
+					<if test='noticeTypeCd == null or noticeTypeCd.equals("")'>
+					          , S.USE_MAIL_YN
+					          , S.USE_SMS_YN
+					          , S.USE_LMS_YN
+					          , S.USE_MESSENGER_YN
+					</if>
+					          , #{ssnSabun}
+					          , SYSDATE
+					     )
+		</update>
+	
+<!-- 서식 내용 전사 배포 -->
+		<update parameterType="map" id="saveNoticeTemplateDeployAllTSYS969">
+
+
+					MERGE INTO TSYS969 T
+					USING (
+					        SELECT O.ENTER_CD
+					             , D.BIZ_CD
+					             , D.NOTICE_TYPE_CD
+					             , D.LANGUAGE_CD
+					             , D.SEND_MAIL
+					             , D.SEND_PHONE
+					             , D.SENDER_NM
+					             , D.TEMPLATE_TITLE
+					             , D.TEMPLATE_CONTENT
+					          FROM (
+					                    SELECT ENTER_CD
+					                         , BIZ_CD
+					                         , NOTICE_TYPE_CD
+					                         , LANGUAGE_CD
+					                         , SEND_MAIL
+					                         , SEND_PHONE
+					                         , SENDER_NM
+					                         , TEMPLATE_TITLE
+					                         , TEMPLATE_CONTENT
+					                     FROM TSYS969
+					                    WHERE ENTER_CD = #{ssnEnterCd}
+					                      AND BIZ_CD   = #{bizCd}
+					<if test='noticeTypeCd != null and !noticeTypeCd.equals("")'>
+					                      AND NOTICE_TYPE_CD = #{noticeTypeCd}
+					</if>
+					<if test='languageCd != null and !languageCd.equals("")'>
+					                      AND LANGUAGE_CD    = #{languageCd}
+					</if>
+					               ) D
+					             , TORG900 O
+					         WHERE O.USE_YN = 'Y'
+					           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN NVL(O.S_YMD, '19000101') AND NVL(O.E_YMD, '99991231')
+					           <![CDATA[ AND O.ENTER_CD <> #{ssnEnterCd} ]]>
+					      ) S
+					   ON (
+					               T.ENTER_CD       = S.ENTER_CD
+					           AND T.BIZ_CD         = S.BIZ_CD
+					           AND T.NOTICE_TYPE_CD = S.NOTICE_TYPE_CD
+					           AND T.LANGUAGE_CD    = S.LANGUAGE_CD
+					      )
+					WHEN MATCHED THEN
+					     UPDATE SET
+					            T.CHKID            = #{ssnSabun}
+					          , T.CHKDATE          = SYSDATE
+					          , T.SEND_MAIL        = S.SEND_MAIL
+					          , T.SEND_PHONE       = S.SEND_PHONE
+					          , T.SENDER_NM        = S.SENDER_NM
+					          , T.TEMPLATE_TITLE   = S.TEMPLATE_TITLE
+					          , T.TEMPLATE_CONTENT = S.TEMPLATE_CONTENT
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					            T.ENTER_CD
+					          , T.BIZ_CD
+					          , T.NOTICE_TYPE_CD
+					          , T.LANGUAGE_CD
+					          , T.SEND_MAIL
+					          , T.SEND_PHONE
+					          , T.SENDER_NM
+					          , T.TEMPLATE_TITLE
+					          , T.TEMPLATE_CONTENT
+					          , T.CHKID
+					          , T.CHKDATE
+					     ) VALUES (
+					            S.ENTER_CD
+					          , S.BIZ_CD
+					          , S.NOTICE_TYPE_CD
+					          , S.LANGUAGE_CD
+					          , S.SEND_MAIL
+					          , S.SEND_PHONE
+					          , S.SENDER_NM
+					          , S.TEMPLATE_TITLE
+					          , S.TEMPLATE_CONTENT
+					          , #{ssnSabun}
+					          , SYSDATE
+					     )
+		</update>
+		
+<!-- 지정 업무코드의 일림 유형 사용 여부 목록으로 조회 -->
+		<select parameterType="map" resultType="cMap" id="getNoticeTemplateUseInfoByBizCd">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.BIZ_CD
+					     , A.USE_YN
+					     , A.NOTICE_TYPE_CD
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'S96001', A.NOTICE_TYPE_CD) AS NOTICE_TYPE_NM
+					  FROM (
+					            SELECT ENTER_CD
+					                 , BIZ_CD
+					                 , USE_MAIL_YN AS USE_YN
+					                 , 'MAIL' AS NOTICE_TYPE_CD
+					              FROM TSYS968
+					             WHERE ENTER_CD = #{ssnEnterCd}
+					               AND BIZ_CD   = #{bizCd}
+					             UNION ALL
+					            SELECT ENTER_CD
+					                 , BIZ_CD
+					                 , USE_SMS_YN AS USE_YN
+					                 , 'SMS' AS NOTICE_TYPE_CD
+					              FROM TSYS968
+					             WHERE ENTER_CD = #{ssnEnterCd}
+					               AND BIZ_CD   = #{bizCd}
+					             UNION ALL
+					            SELECT ENTER_CD
+					                 , BIZ_CD
+					                 , USE_LMS_YN AS USE_YN
+					                 , 'LMS' AS NOTICE_TYPE_CD
+					              FROM TSYS968
+					             WHERE ENTER_CD = #{ssnEnterCd}
+					               AND BIZ_CD   = #{bizCd}
+					             UNION ALL
+					            SELECT ENTER_CD
+					                 , BIZ_CD
+					                 , USE_MESSENGER_YN AS USE_YN
+					                 , 'MESSENGER' AS NOTICE_TYPE_CD
+					              FROM TSYS968
+					             WHERE ENTER_CD = #{ssnEnterCd}
+					               AND BIZ_CD   = #{bizCd}
+					       ) A
+					 WHERE 1 = 1
+					   AND A.USE_YN = 'Y'
+				]]>
+
+
+		</select>
+		
+<!-- 업무코드에 해당하는 서식 데이터 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getNoticeTemplateDataListByBizCd">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , (SELECT ALIAS FROM TORG900 WHERE ENTER_CD = A.ENTER_CD) AS ENTER_ALIAS
+					     , A.BIZ_CD
+					     , A.NOTICE_TYPE_CD
+					     , A.LANGUAGE_CD
+					     , A.SEND_MAIL
+					     , A.SEND_PHONE
+					     , A.SENDER_NM
+					     , A.TEMPLATE_TITLE
+					     , A.TEMPLATE_CONTENT
+						 , NVL(CASE
+								WHEN A.NOTICE_TYPE_CD = 'LMS' THEN B.USE_LMS_YN
+								WHEN A.NOTICE_TYPE_CD = 'MAIL' THEN B.USE_MAIL_YN
+								WHEN A.NOTICE_TYPE_CD = 'MESSENGER' THEN B.USE_MESSENGER_YN
+								WHEN A.NOTICE_TYPE_CD = 'SMS' THEN B.USE_SMS_YN
+						       END, 'N') AS USE_YN
+					  FROM TSYS969 A
+					  JOIN TSYS968 B
+						ON A.ENTER_CD = B.ENTER_CD
+					   AND A.BIZ_CD = B.BIZ_CD
+					 WHERE A.ENTER_CD       = #{enterCd}
+					   AND A.BIZ_CD         = #{bizCd}
+					   AND A.LANGUAGE_CD    = #{languageCd}
+				]]>
+
+
+		</select>
+		
+<!-- 업무코드 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getNoticeTemplateBizCdListForCombo">
+
+				<![CDATA[
+					SELECT A.BIZ_CD AS CODE
+					     , A.BIZ_NM AS CODE_NM
+					  FROM TSYS967 A
+					     , TSYS968 B
+					 WHERE A.BIZ_CD   = B.BIZ_CD
+					   AND B.ENTER_CD = #{ssnEnterCd}
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getNoticeTemplateBizCdMap">
+			SELECT A.BIZ_CD
+				 , A.BIZ_NM AS BIZ_CD_DESC
+			  FROM TSYS967 A
+			 WHERE A.BIZ_CD = #{bizCd}
+		</select>
+
+</mapper>

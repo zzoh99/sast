@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perlAccChgApp">
+<!--        조회 -->
+        <select parameterType="map" resultType="cMap" id="getPerlAccChgAppList">
+            
+                <![CDATA[
+                SELECT  A.ENTER_CD
+                       ,A.SABUN
+                       ,A.REQ_SEQ
+                       ,A.REQ_DATE
+                       ,A.STATUS
+                       ,A.AGREE_DATE
+                       ,A.ACCOUNT_TYPE
+                       ,A.NATIONAL_CD
+                       ,A.BANK_CD
+--                        ,A.ACCOUNT_NO
+                       ,CRYPTIT.DECRYPT(A.ACCOUNT_NO,A.ENTER_CD) AS ACCOUNT_NO
+                       ,A.ACC_NAME
+                       ,A.BIGO
+                FROM    TCPN183 A
+                WHERE   A.ENTER_CD = #{ssnEnterCd}
+                AND     A.SABUN    = #{searchSabun}
+                ORDER BY ACCOUNT_TYPE, REQ_DATE DESC, REQ_SEQ DESC , STATUS
+                ]]>
+        </select>
+
+<!--        저장 -->
+        <update parameterType="map" id="savePerlAccChgApp">
+                    MERGE INTO TCPN183 T
+                    USING   (
+                            SELECT    ENTER_CD
+                                    , SABUN
+                                    , REQ_SEQ
+                                    , REQ_DATE
+                                    , STATUS
+                                    , AGREE_DATE
+                                    , ACCOUNT_TYPE
+                                    , BANK_CD
+                                    , ACCOUNT_NO
+                                    , ACC_NAME
+                                    , BIGO
+                            FROM    (
+                                    SELECT    NULL      AS ENTER_CD
+                                            , NULL      AS SABUN
+                                            , NULL      AS REQ_SEQ
+                                            , NULL      AS REQ_DATE
+                                            , NULL      AS STATUS
+                                            , NULL      AS AGREE_DATE
+                                            , NULL      AS ACCOUNT_TYPE
+                                            , NULL      AS BANK_CD
+                                            , NULL      AS ACCOUNT_NO
+                                            , NULL      AS ACC_NAME
+                                            , NULL      AS BIGO
+                                    FROM    DUAL
+<bind name="idx" value="1" />
+<foreach item="rm" collection="mergeRows">
+                            UNION ALL
+                                    SELECT   #{ssnEnterCd}                   AS ENTER_CD
+                                            ,#{searchSabun}                  AS SABUN
+                                            --증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+                                            <choose><when test="rm.reqSeq != null and rm.reqSeq != ''">
+                                            ,   TRIM(#{rm.reqSeq})            AS REQ_SEQ
+                                            --증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+                                            </when><otherwise>
+                                            ,   TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(REQ_SEQ)),0) + #{idx}) FROM TCPN183 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = #{searchSabun} ))  AS REQ_SEQ
+                                            <bind name="idx" value="1 + idx" />
+                                            </otherwise></choose>
+                                            ,TRIM(#{rm.reqDate})           AS REQ_DATE
+                                            ,NVL(TRIM(#{rm.status}),'N')   AS STATUS
+                                            ,TRIM(#{rm.agreeDate})         AS AGREE_DATE
+                                            ,TRIM(#{rm.accountType})       AS ACCOUNT_TYPE
+                                            ,TRIM(#{rm.bankCd})            AS BANK_CD
+                                            ,CRYPTIT.ENCRYPT(TRIM(#{rm.accountNo}),#{ssnEnterCd}) AS ACCOUNT_NO
+                                            ,TRIM(#{rm.accName})           AS ACC_NAME
+                                            ,TRIM(#{rm.bigo})              AS BIGO
+                                            FROM   DUAL
+</foreach>
+                                    )  WHERE SABUN IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD      = #{ssnEnterCd}
+                    AND  T.SABUN         = S.SABUN
+                    AND  T.REQ_SEQ       = S.REQ_SEQ
+                    )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.ACCOUNT_TYPE   = S.ACCOUNT_TYPE
+                                    , T.BANK_CD        = S.BANK_CD
+                                    , T.ACCOUNT_NO     = S.ACCOUNT_NO
+                                    , T.ACC_NAME       = S.ACC_NAME
+                                    , T.CHKDATE        = SYSDATE
+                                    , T.CHKID          = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.SABUN
+                            , T.REQ_SEQ
+                            , T.REQ_DATE
+                            , T.STATUS
+                            , T.AGREE_DATE
+                            , T.ACCOUNT_TYPE
+                            , T.BANK_CD
+                            , T.ACCOUNT_NO
+                            , T.ACC_NAME
+                            , T.BIGO
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.SABUN
+                            , S.REQ_SEQ
+                            , S.REQ_DATE
+                            , S.STATUS
+                            , S.AGREE_DATE
+                            , S.ACCOUNT_TYPE
+                            , S.BANK_CD
+                            , S.ACCOUNT_NO
+                            , S.ACC_NAME
+                            , S.BIGO
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+        </update>
+        
+<!--        삭제 -->
+        <delete parameterType="map" id="deletePerlAccChgApp">
+                    DELETE FROM TCPN183
+                    WHERE   (ENTER_CD, SABUN, REQ_SEQ) IN   (  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows">
+                        ,
+                                <if test="rm.reqSeq != null and rm.reqSeq neq ''">
+                                    (#{ssnEnterCd}, #{searchSabun}, TRIM(#{rm.reqSeq}))
+                                </if>
+</foreach>
+                            )
+            
+        </delete>
+
+    <!-- 현재 유효한 급여계좌 다건 조회 -->
+    <select parameterType="map" resultType="cMap" id="getPerlAccChgAppDetCurrAccountList">
+        <![CDATA[
+            SELECT A.SABUN
+                 , A.ACCOUNT_TYPE
+                 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'C00180', A.ACCOUNT_TYPE, #{ssnLocaleCd}) AS ACCOUNT_TYPE_NM
+                 , CASE WHEN F_COM_IS_DATE_YN(A.SDATE) = 'Y'
+                        THEN TO_CHAR(TO_DATE(A.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+                        ELSE A.SDATE END AS SDATE
+                 , CASE WHEN F_COM_IS_DATE_YN(A.EDATE) = 'Y'
+                        THEN TO_CHAR(TO_DATE(A.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+                        ELSE A.EDATE END AS EDATE
+                 , A.BANK_CD
+                 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H30001', A.BANK_CD, #{ssnLocaleCd}) AS BANK_NM
+                 , CRYPTIT.DECRYPT(A.ACCOUNT_NO, A.ENTER_CD) AS ACCOUNT_NO
+                 , A.ACC_NAME
+              FROM TCPN180 A
+             WHERE A.ENTER_CD = #{ssnEnterCd}
+               AND A.SABUN    = #{searchSabun}
+               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+             ORDER BY A.ACCOUNT_TYPE, A.SDATE DESC
+        ]]>
+    </select>
+
+    <!-- 신청 데이터 저장 -->
+    <select parameterType="map" resultType="cMap" id="savePerlAccChgAppDet">
+            INSERT INTO TCPN184
+            <foreach collection="list" item="rm" separator=" UNION ALL ">
+                SELECT #{rm.enterCd} AS ENTER_CD
+                     , #{rm.applSeq} AS APPL_SEQ
+                     , #{rm.sabun} AS SABUN
+                     , #{rm.seq} AS SEQ
+                     , #{rm.appType} AS APP_TYPE
+                     , REPLACE(#{rm.reqDate}, '-', '') AS REQ_DATE
+                     , #{rm.accountType} AS ACCOUNT_TYPE
+                     , #{rm.bankCd} AS BANK_CD
+                     , CRYPTIT.ENCRYPT(#{rm.accountNo}, #{rm.enterCd}) AS ACCOUNT_NO
+                     , #{rm.accName} AS ACC_NAME
+                     , '' AS NOTE
+                     , SYSDATE AS INSDATE
+                     , #{ssnSabun} AS INSID
+                     , SYSDATE AS CHKDATE
+                     , #{ssnSabun} AS CHKID
+                  FROM DUAL
+            </foreach>
+    </select>
+</mapper>

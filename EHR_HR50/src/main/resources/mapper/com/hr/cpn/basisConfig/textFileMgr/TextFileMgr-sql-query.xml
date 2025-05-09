@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.textFileMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getTextFileMgrListFirst">
+				<![CDATA[
+					SELECT FILE_SEQ
+					     , FILE_NM
+					     , FILE_DESC
+					     , FILE_LENGTH
+	                FROM TSYS965
+	                WHERE ENTER_CD = #{ssnEnterCd}
+	                          ]]>
+	                <if test='searchFileNm != null and !searchFileNm.equals("")'>
+	                    AND FILE_NM LIKE '%'||TRIM(#{searchFileNm})||'%'
+					</if>
+	                <if test='searchFileDesc != null and !searchFileDesc.equals("")'>
+	                    AND FILE_DESC LIKE '%'||TRIM(#{searchFileDesc})||'%'
+					</if>
+	                ORDER BY FILE_SEQ
+		</select>
+		
+<!--        조회 -->
+        <select parameterType="map" resultType="cMap" id="getTextFileMgrListSecond">
+
+                <![CDATA[
+	                SELECT FILE_SEQ
+					     , FILE_ELEMENT_SEQ
+					     , ELEMENT_NM
+					     , ELEMENT_DESC
+					     , ELEMENT_LENGTH
+					     , ELEMENT_ALIGN
+					     , ALIGN_SEQ
+					     , EMPTY_CHARACTOR
+					FROM TSYS966
+					WHERE  ENTER_CD = #{ssnEnterCd}
+					           ]]>
+					<if test='searchFileSeq != null and !searchFileSeq.equals("")'>
+	                    AND FILE_SEQ = TRIM(#{searchFileSeq})
+	                </if>
+	                <if test='searchFileSeq == null or searchFileSeq.equals("")'>
+                        AND FILE_SEQ IS NULL -- 상위 그리드의 신규행 입력일 경우 선택되면 해당 문장 실행
+					</if>
+					ORDER BY ALIGN_SEQ
+					       , FILE_ELEMENT_SEQ
+        </select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveTextFileMgrFirst">
+
+
+					MERGE INTO TSYS965 T
+					USING	(
+							SELECT	  A.FILE_SEQ
+                                    , A.FILE_NM
+									, A.FILE_DESC
+									, A.FILE_LENGTH
+							FROM	(
+									SELECT	  NULL  AS FILE_SEQ
+                                            , NULL  AS FILE_NM
+                                            , NULL	AS FILE_DESC
+											, NULL	AS FILE_LENGTH
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											<if test="rm.fileSeq != null">
+												<choose>
+													<when test='!rm.fileSeq.equals("")'>
+														TRIM(#{rm.fileSeq})	AS FILE_SEQ
+													</when>
+													<otherwise>
+														TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(FILE_SEQ)),0) + ${icnt})
+														FROM TSYS965
+														WHERE ENTER_CD = #{ssnEnterCd}) )	AS FILE_SEQ
+														--icnt 증가
+														<bind name="icnt" value="icnt + 1" />
+													</otherwise>
+												</choose>
+											</if>
+
+											, TRIM( #{rm.fileNm} )	    AS FILE_NM
+											, TRIM( #{rm.fileDesc} )	AS FILE_DESC
+											, TRIM( #{rm.fileLength} )	AS FILE_LENGTH
+											FROM   DUAL
+</foreach>
+									) A WHERE A.FILE_SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD  = #{ssnEnterCd}
+					 AND T.FILE_SEQ  = S.FILE_SEQ
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.FILE_NM	    = S.FILE_NM
+									, T.FILE_DESC	= S.FILE_DESC
+									, T.FILE_LENGTH	= S.FILE_LENGTH
+									, T.CHKDATE	    = SYSDATE
+									, T.CHKID    	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.FILE_SEQ
+							, T.FILE_NM
+							, T.FILE_DESC
+							, T.FILE_LENGTH
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+							, S.FILE_SEQ
+							, S.FILE_NM
+							, S.FILE_DESC
+							, S.FILE_LENGTH
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!--      저장 -->  
+        <update parameterType="map" id="saveTextFileMgrSecond">
+                    MERGE INTO TSYS966 T
+                    USING   (
+                            SELECT    A.FILE_ELEMENT_SEQ
+                                    , A.FILE_SEQ
+                                    , A.ELEMENT_NM
+									, A.ELEMENT_DESC
+									, A.ELEMENT_LENGTH
+									, A.ELEMENT_ALIGN
+									, A.ALIGN_SEQ
+									, A.EMPTY_CHARACTOR
+                            FROM    (
+                                    SELECT    NULL AS FILE_ELEMENT_SEQ
+                                            , NULL AS FILE_SEQ
+                                            , NULL AS ELEMENT_NM
+											, NULL AS ELEMENT_DESC
+											, NULL AS ELEMENT_LENGTH
+											, NULL AS ELEMENT_ALIGN
+											, NULL AS ALIGN_SEQ
+											, NULL AS EMPTY_CHARACTOR
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT
+
+                                    		<if test= 'rm.fileElementSeq != null'>
+                                        		<choose>
+													<when test='!rm.fileElementSeq.equals("")'>
+														TRIM(#{rm.fileElementSeq}) AS FILE_ELEMENT_SEQ
+														--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+													</when>
+													<otherwise>
+														TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(FILE_ELEMENT_SEQ)),0) + ${icnt})
+														FROM TSYS966
+														WHERE ENTER_CD = #{ssnEnterCd}
+														AND FILE_SEQ = #{rm.fileSeq}) )  AS FILE_ELEMENT_SEQ
+														--icnt 증가
+														<bind name="icnt" value="icnt + 1" />
+													</otherwise>
+												</choose>
+											</if>
+                                            --증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+
+                                            , TRIM( #{rm.fileSeq} )        AS FILE_SEQ
+                                            , TRIM( #{rm.elementNm} )      AS ELEMENT_NM
+                                            , TRIM( #{rm.elementDesc} )    AS ELEMENT_DESC
+                                            , TRIM( #{rm.elementLength} )  AS ELEMENT_LENGTH
+                                            , TRIM( #{rm.elementAlign} )   AS ELEMENT_ALIGN
+                                            , TRIM( #{rm.alignSeq} )       AS ALIGN_SEQ
+                                            , TRIM( #{rm.emptyCharactor} ) AS EMPTY_CHARACTOR
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.FILE_ELEMENT_SEQ IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD          = #{ssnEnterCd}
+                     AND T.FILE_SEQ          = #{rm.fileSeq}
+                     AND T.FILE_ELEMENT_SEQ  = #{rm.fileElementSeq}
+                     )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.ELEMENT_NM      = S.ELEMENT_NM
+                                    , T.ELEMENT_DESC    = S.ELEMENT_DESC
+                                    , T.ELEMENT_LENGTH  = S.ELEMENT_LENGTH
+                                    , T.ELEMENT_ALIGN   = S.ELEMENT_ALIGN
+                                    , T.ALIGN_SEQ       = S.ALIGN_SEQ
+                                    , T.EMPTY_CHARACTOR = S.EMPTY_CHARACTOR
+                                    , T.CHKDATE         = SYSDATE
+                                    , T.CHKID           = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT 
+                        (
+                              T.ENTER_CD
+							, T.FILE_SEQ
+							, T.FILE_ELEMENT_SEQ
+							, T.ELEMENT_NM
+							, T.ELEMENT_DESC
+							, T.ELEMENT_LENGTH
+							, T.ELEMENT_ALIGN
+							, T.ALIGN_SEQ
+							, T.EMPTY_CHARACTOR
+							, T.CHKDATE
+							, T.CHKID
+                        ) 
+                        VALUES 
+                        (
+                              #{ssnEnterCd}
+                            , S.FILE_SEQ
+							, S.FILE_ELEMENT_SEQ
+							, S.ELEMENT_NM
+							, S.ELEMENT_DESC
+							, S.ELEMENT_LENGTH
+							, S.ELEMENT_ALIGN
+							, S.ALIGN_SEQ
+							, S.EMPTY_CHARACTOR
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+		</update>
+        
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteTextFileMgrFirst">
+
+
+					DELETE FROM TSYS965 
+					WHERE 	(ENTER_CD, FILE_SEQ) IN 	(  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.fileSeq != null and !rm.fileSeq.equals("")'>
+											 (#{ssnEnterCd}, TRIM( #{rm.fileSeq} ))
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+        <delete parameterType="map" id="deleteTextFileMgrSecond">
+			<choose>
+				<when test='flag != null and flag.equals("ALL")'>
+					DELETE FROM TSYS966
+					WHERE   (ENTER_CD, FILE_SEQ) IN     (  (NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+						,
+						<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.fileSeq != null and !rm.fileSeq.equals("")'>
+
+							(#{ssnEnterCd}, TRIM( #{rm.fileSeq} ))
+						</if>
+						)
+					</foreach>
+				</when>
+				<otherwise>
+					DELETE FROM TSYS966
+					WHERE   (ENTER_CD, FILE_SEQ, FILE_ELEMENT_SEQ) IN     (  (NULL, NULL, NULL)
+					<foreach item="rm" collection="deleteRows" >
+						,
+						<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.fileSeq != null and !rm.fileSeq.equals("") and rm.fileElementSeq != null and !rm.fileElementSeq.equals("")'>
+
+							(#{ssnEnterCd}, TRIM( #{rm.fileSeq} ), TRIM( #{rm.fileElementSeq} ))
+						</if>
+					</foreach>
+					)
+				</otherwise>
+			</choose>
+        </delete>
+	</mapper>

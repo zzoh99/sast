@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appSabunMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppSabunMgrList">
+
+				<![CDATA[
+				    SELECT ROWNUM AS RNUM, SABUN, NAME, ALIAS, ORG_NM, JIKGUB_NM, JIKWEE_NM, JIKCHAK_NM, JOB_NM, NOTE
+				      FROM (
+				        SELECT  SABUN,
+				            F_PAP_GETNAME(ENTER_CD,SABUN) AS NAME,
+				            F_COM_GET_NAMES(ENTER_CD, SABUN, 'ALIAS') AS ALIAS,
+				            F_PAP_GETORGNAME(ENTER_CD, F_PAP_GETORGCD(ENTER_CD, SABUN)) AS ORG_NM,
+				            F_PAP_GETJIKGUBNAME(ENTER_CD, SABUN) AS JIKGUB_NM,
+				            F_PAP_GETJIKWEENAME(ENTER_CD, SABUN) AS JIKWEE_NM,
+				            F_PAP_GETJIKCHAKNAME(ENTER_CD,SABUN) AS JIKCHAK_NM,
+				            F_PAP_GETJOBNAME(ENTER_CD, F_PAP_GETJOBCD(ENTER_CD, SABUN)) AS JOB_NM,
+				            NOTE
+				          FROM TPAP993
+				         WHERE ENTER_CD=TRIM( #{ssnEnterCd} )
+				        ORDER BY CHKDATE DESC
+				        )
+				]]>
+
+
+		</select>
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppSabunMgr">
+
+				<![CDATA[
+					MERGE INTO TPAP993 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.NOTE
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD
+											, NULL	AS SABUN
+											, NULL	AS NOTE
+									FROM	DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	            AS ENTER_CD
+											, TRIM( #{rm.sabun} )	    AS SABUN
+											, TRIM( #{rm.note})	    AS NOTE
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.SABUN        = S.SABUN
+					)
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.NOTE        	= S.NOTE
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+   							, T.SABUN
+   							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+ 							  S.ENTER_CD
+ 							, S.SABUN
+ 							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppSabunMgr">
+
+					DELETE FROM TPAP993
+					WHERE 	(ENTER_CD,SABUN) IN 	(  (NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										  #{ssnEnterCd}
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+										, TRIM( #{rm.sabun} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppSabunMgr">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  PRG_CD
+							, PRG_NM
+							, PRG_ENG_NM
+							, PRG_PATH
+							, USE
+							, VERSION
+							, MEMO
+							, DATE_TRACK_YN
+							, LOG_SAVE_YN
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.PRG_CD
+								, S.PRG_NM
+								, S.PRG_ENG_NM
+								, S.PRG_PATH
+								, S.USE
+								, S.VERSION
+								, S.MEMO
+								, S.DATE_TRACK_YN
+								, S.LOG_SAVE_YN
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS PRG_CD
+										, NULL 	AS PRG_NM
+										, NULL 	AS PRG_ENG_NM
+										, NULL 	AS PRG_PATH
+										, NULL 	AS USE
+										, NULL 	AS VERSION
+										, NULL 	AS MEMO
+										, NULL 	AS DATE_TRACK_YN
+										, NULL 	AS LOG_SAVE_YN
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TRIM( #{rm.prgCd})	AS PRG_CD
+										, TRIM( #{rm.prgNm})	AS PRG_NM
+										, TRIM( #{rm.prgEngNm})	AS PRG_ENG_NM
+										, TRIM( #{rm.prgPath})	AS PRG_PATH
+										, TRIM( #{rm.use})	AS USE
+										, TRIM( #{rm.version})	AS VERSION
+										, TRIM( #{rm.memo})	AS MEMO
+										, TRIM( #{rm.dateTrackYn})	AS DATE_TRACK_Y
+										, TRIM( #{rm.logSaveYn})	AS LOG_SAVE_YN
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.PRG_CD IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppSabunMgr">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET
+					( COL1, COL2, COL3, COL4, CHKDATE, CHKID )
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+	<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+
+</mapper>

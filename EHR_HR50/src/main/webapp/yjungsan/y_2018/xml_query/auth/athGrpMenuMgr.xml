@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	권한그룹프로그램관리 쿼리
+ -->
+<root>
+
+	<!-- 권한그룹 코드 조회 -->
+	<query id="selectGrpCdList">
+		<![CDATA[
+			SELECT GRP_CD AS CODE, GRP_NM AS CODE_NM
+			  FROM TSYS307 
+			 WHERE ENTER_CD = #ssnEnterCd#
+			 ORDER BY SEQ
+		]]> 
+	</query>
+
+	<!-- 권한그룹프로그램 조회 -->
+	<query id="selectAthGrpMenuMgrList">
+		<![CDATA[
+			SELECT '0' AS DETAIL
+				 , A.MAIN_MENU_CD
+				 , B.MAIN_MENU_NM
+				 , B.SEQ
+			  FROM TSYS311 A, TSYS309 B
+		 	 WHERE A.ENTER_CD 		= #ssnEnterCd#
+			   AND A.GRP_CD 		= #srchAthGrpCd#
+		   	   AND A.MAIN_MENU_CD 	= B.MAIN_MENU_CD
+		   	   AND B.MAIN_MENU_CD  <> '20'
+		 	 GROUP BY A.MAIN_MENU_CD, B.MAIN_MENU_NM, B.SEQ  
+		 	 ORDER BY B.SEQ
+		]]> 
+	</query>
+	
+	<!-- 권한그룹프로그램 팝업 조회 -->
+	<query id="selectAthGrpMenuMgrRegPopList">
+		<![CDATA[
+			SELECT LVL AS "_level"
+				 , A.MAIN_MENU_CD
+				 , A.PRIOR_MENU_CD
+				 , A.MENU_CD
+				 , A.MENU_SEQ
+				 , A.GRP_CD
+				 , A.TYPE
+				 , A.MENU_NM
+				 , A.PRG_CD
+				 , A.SEARCH_SEQ
+				 , B.SEARCH_DESC
+				 , A.DATA_RW_TYPE
+				 , A.DATA_PRG_TYPE
+				 , A.USE_YN
+				 , A.INQ_S_YMD
+				 , A.INQ_E_YMD
+				 , A.SEQ
+				 , A.CNT
+				 , POPUP_USE_YN
+				 , LAST_SESSION_USE_YN
+				 , SEARCH_USE_YN
+			FROM ( 
+				SELECT 	'0' AS LEVEL_SEQ,
+		    						 0 AS LVL, #ssnEnterCd# AS ENTER_CD, MAIN_MENU_CD, '' AS PRIOR_MENU_CD, '0' AS MENU_CD, 0 AS MENU_SEQ, '' AS GRP_CD, '' AS TYPE, MAIN_MENU_NM AS MENU_NM, '' AS PRG_CD, 0 AS SEARCH_SEQ, '' AS DATA_RW_TYPE, '' AS DATA_PRG_TYPE, '' AS USE_YN, '' AS INQ_S_YMD, '' AS INQ_E_YMD, 0 AS SEQ, 0 AS CNT , '' AS POPUP_USE_YN , '' AS LAST_SESSION_USE_YN, '' AS SEARCH_USE_YN
+		        		FROM TSYS309
+		 		WHERE MAIN_MENU_CD = #mainMenuCd#		          
+		      		UNION ALL 	  					
+				SELECT 	TRIM(F_SYS_MENU_LEVEL_SEQ(ENTER_CD, MAIN_MENU_CD, GRP_CD, PRIOR_MENU_CD, MENU_CD)) AS LEVEL_SEQ,
+		    						LEVEL AS LVL, ENTER_CD, MAIN_MENU_CD, PRIOR_MENU_CD, MENU_CD, MENU_SEQ, GRP_CD, TYPE, MENU_NM, PRG_CD, SEARCH_SEQ, DATA_RW_TYPE, DATA_PRG_TYPE, USE_YN, INQ_S_YMD, INQ_E_YMD, SEQ, CNT , POPUP_USE_YN , LAST_SESSION_USE_YN, SEARCH_USE_YN
+						FROM TSYS311
+					WHERE ENTER_CD = #ssnEnterCd#
+							AND MAIN_MENU_CD = #mainMenuCd#
+							AND GRP_CD = #athGrpCd#
+					START WITH PRIOR_MENU_CD = '0' 
+					CONNECT BY PRIOR ENTER_CD = ENTER_CD
+				AND PRIOR MAIN_MENU_CD = MAIN_MENU_CD
+				AND PRIOR GRP_CD = GRP_CD
+				AND PRIOR MENU_CD = PRIOR_MENU_CD 
+			) A, THRI201 B 	
+			WHERE A.ENTER_CD = B.ENTER_CD(+)
+			  AND A.SEARCH_SEQ = B.SEARCH_SEQ(+)
+			ORDER BY A.LEVEL_SEQ 
+		]]> 
+	</query>
+	
+	<!-- 권한그룹프로그램 팝업 입력 -->
+	<query id="insertAthGrpMenuMgrRegPop">
+		<![CDATA[
+			INSERT INTO TSYS311
+			(	
+				ENTER_CD						
+				, MAIN_MENU_CD				
+				, PRIOR_MENU_CD				
+				, MENU_CD							
+				, MENU_SEQ						
+				, GRP_CD							
+				, TYPE								
+				, MENU_NM							
+				, PRG_CD							
+				, SEARCH_SEQ					
+				, DATA_RW_TYPE				
+				, DATA_PRG_TYPE				
+				, USE_YN							
+				, INQ_S_YMD						
+				, INQ_E_YMD						
+				, CNT									
+				, SEQ									
+				, POPUP_USE_YN				
+				, LAST_SESSION_USE_YN	
+				, SEARCH_USE_YN				
+				, CHKDATE							
+				, CHKID 	
+			) 
+			VALUES 
+			(
+				#ssnEnterCd#
+				, #main_menu_cd#
+				, #prior_menu_cd#
+				, #menu_cd#
+				, (SELECT (NVL(MAX(TO_NUMBER(MENU_SEQ)),0)+1) FROM TSYS311)
+				, #grp_cd#
+				, #type#
+				, #menu_nm#
+				, #prg_cd#
+				, #search_seq#
+				, #data_rw_type#
+				, #data_prg_type#
+				, #use_yn#
+				, #inq_s_ymd#
+				, #inq_e_ymd#
+				, #cnt#
+				, #seq#
+				, #popup_use_yn#
+				, #last_session_use_yn#
+				, #search_use_yn#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]> 
+	</query>
+	
+	<!-- 권한그룹프로그램 팝업 수정 -->
+	<query id="updateAthGrpMenuMgrRegPop">
+		<![CDATA[
+			UPDATE TSYS311
+			SET TYPE 					= #type#				          
+				, MENU_NM				= #menu_nm#
+				, PRG_CD				= #prg_cd#
+				, SEARCH_SEQ	       	= #search_seq#
+				, DATA_RW_TYPE			= #data_rw_type#
+				, DATA_PRG_TYPE			= #data_prg_type#		      
+				, USE_YN				= #use_yn#			        
+				, INQ_S_YMD				= #inq_s_ymd#			        
+				, INQ_E_YMD				= #inq_e_ymd#			        
+				, CNT                	= #cnt#
+				, SEQ                	= #seq#
+				, POPUP_USE_YN       	= #popup_use_yn#
+				, LAST_SESSION_USE_YN	= #last_session_use_yn#
+				, SEARCH_USE_YN      	= #search_use_yn#
+				, CHKDATE				= SYSDATE
+				, CHKID					= #ssnSabun#         
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND MAIN_MENU_CD		= #main_menu_cd# 
+			   AND PRIOR_MENU_CD	= #prior_menu_cd#
+			   AND MENU_CD			= #menu_cd#
+			   AND MENU_SEQ 		= #menu_seq# 
+			   AND GRP_CD 			= #grp_cd#
+		]]> 
+	</query>
+	
+	<!-- 권한그룹프로그램 팝업 삭제 -->
+	<query id="deleteAthGrpMenuMgrRegPop">
+		<![CDATA[
+			DELETE FROM TSYS311
+			 WHERE ENTER_CD = #ssnEnterCd# 
+			   AND MAIN_MENU_CD = #main_menu_cd# 
+			   AND PRIOR_MENU_CD = #prior_menu_cd#
+			   AND MENU_CD = #menu_cd#
+			   AND MENU_SEQ = #menu_seq#
+			   AND GRP_CD = #grp_cd# 
+		]]> 
+	</query>
+	
+	<!-- 프로그램 팝업 조회 -->
+	<query id="selectPrgMgrPopList">
+		<![CDATA[
+			SELECT PRG_CD
+				 , PRG_NM
+				 , PRG_ENG_NM
+				 , PRG_PATH
+				 , USE
+				 , VERSION
+				 , MEMO
+				 , DATE_TRACK_YN
+			  FROM TSYS301 
+			 WHERE PRG_CD LIKE '%'|| TRIM(#srchPrgCd#) ||'%'
+			   AND PRG_NM LIKE '%'|| TRIM(#srchPrgNm#) ||'%'
+			 ORDER BY PRG_PATH, PRG_CD, PRG_NM 
+ 
+		]]> 
+	</query>	
+</root>

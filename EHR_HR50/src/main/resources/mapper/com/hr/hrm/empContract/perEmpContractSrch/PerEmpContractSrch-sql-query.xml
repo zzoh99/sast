@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.empContract.perEmpContractSrch">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerEmpContractSrchList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , 0 AS DETAIL
+					     , A.SABUN
+					     , A.STD_DATE
+					     , A.CONT_TYPE
+					     , NVL(A.AGREE_YN, 'N') AS AGREE_YN
+					     , B.PATH||B.FILE_NM AS RD_MRD
+					     , DECODE(A.AGREE_DATE,NULL,NULL,TO_CHAR(A.AGREE_DATE,'YYYY-MM-DD  HH24:MI:SS')) AS AGREE_DATE
+					     , B.SIGN_USE_YN
+					     , A.FILE_SEQ
+					     , CASE WHEN NVL(B.SIGN_USE_YN,'N') = 'N' THEN '1' ELSE '0' END AS SHTCOL_EDIT
+						 , CRYPTIT.ENCRYPT(A.SABUN || '#' || A.CONT_TYPE ,'DEMO','A') AS rk
+						 , B.SDATE
+						 , B.EDATE
+					  FROM THRM412 A
+					     , THRM410 B
+					WHERE 1=1
+					  AND B.ENTER_CD  = A.ENTER_CD
+					  AND B.CONT_TYPE = A.CONT_TYPE
+					  AND A.STD_DATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					  AND A.ENTER_CD  = #{ssnEnterCd}
+					  AND A.SABUN     = #{searchSabun}
+					  AND NVL(A.DISTRIBUTE_YN, 'N') = 'Y'
+					ORDER BY A.STD_DATE DESC
+				]]>
+
+
+		</select>
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePerEmpContractSrch">
+
+					MERGE INTO THRM412 T
+					USING (
+					    SELECT A.ENTER_CD
+					         , A.SABUN
+					         , A.STD_DATE
+					         , A.CONT_TYPE
+					         , A.AGREE_YN
+					         , A.AGREE_YMD
+					         , A.AGREE_DATE
+					         , A.FILE_SEQ
+					    FROM (
+					             SELECT NULL AS ENTER_CD
+					                  , NULL AS SABUN
+					                  , NULL AS STD_DATE
+					                  , NULL AS CONT_TYPE
+					                  , NULL AS AGREE_YN
+					                  , NULL AS AGREE_YMD
+					                  , NULL AS AGREE_DATE
+					                  , NULL AS FILE_SEQ
+					               FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					            UNION ALL
+					           SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+					                , TRIM(#{rm.sabun}) AS SABUN
+					                , TRIM(#{rm.stdDate}) AS STD_DATE
+					                , TRIM(#{rm.contType}) AS CONT_TYPE
+					                , TRIM(#{rm.agreeYn}) AS AGREE_YN
+<choose><when test='rm.agreeYn != null and rm.agreeYn.equals("Y") and rm.agreeYmd != null and rm.agreeYmd.equals("")'>
+					                , TO_CHAR(SYSDATE,'YYYYMMDD') AS AGREE_YMD
+</when>
+<when test='rm.agreeYn != null and rm.agreeYn.equals("Y") and rm.agreeYmd != null and !rm.agreeYmd.equals("")'>
+					                , REPLACE(TRIM( #{rm.agreeYmd} ),'-','') AS AGREE_YMD
+</when><otherwise>
+					                , NULL AS AGREE_YMD
+	</otherwise>
+</choose>
+<choose><when test='rm.agreeYn != null and rm.agreeYn.equals("Y") and rm.agreeDate != null and rm.agreeDate.equals("")'>
+					                , SYSDATE AS AGREE_DATE
+</when>
+	<when test='rm.agreeYn != null and rm.agreeYn.equals("Y") and rm.agreeDate != null and !rm.agreeDate.equals("")'>
+					                , TO_DATE(#{rm.agreeDate} ,'YYYY-MM-DD HH24:MI:SS') AS AGREE_DATE
+	</when>
+	<otherwise>
+					                , NULL AS AGREE_DATE
+	</otherwise>
+</choose>
+					                , TRIM(#{rm.fileSeq}) AS FILE_SEQ
+					             FROM DUAL
+</foreach>
+					         ) A WHERE A.SABUN IS NOT NULL
+					    ) S
+					ON (        T.ENTER_CD = #{ssnEnterCd}
+					        AND T.SABUN      = S.SABUN
+					        AND T.STD_DATE   = S.STD_DATE
+					        AND T.CONT_TYPE  = S.CONT_TYPE
+					   )
+					WHEN MATCHED THEN
+					      UPDATE SET
+					            T.AGREE_YN   = S.AGREE_YN
+					          , T.AGREE_YMD  = S.AGREE_YMD
+					          , T.AGREE_DATE = S.AGREE_DATE
+					          , T.FILE_SEQ   = S.FILE_SEQ
+					          , T.CHKDATE    = SYSDATE
+					          , T.CHKID      = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					            T.ENTER_CD
+					          , T.SABUN
+					          , T.STD_DATE
+					          , T.CONT_TYPE
+					          , T.AGREE_YN
+					          , T.CHKDATE
+					          , T.CHKID
+					     ) VALUES (
+					            #{ssnEnterCd}
+					          , S.SABUN
+					          , S.STD_DATE
+					          , S.CONT_TYPE
+					          , S.AGREE_YN
+					          , SYSDATE
+					          , #{ssnSabun}
+					     )
+		</update>
+
+</mapper>

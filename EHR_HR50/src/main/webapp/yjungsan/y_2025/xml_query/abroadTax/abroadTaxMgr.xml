@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	외납세명세관리
+ -->
+<root>
+<!-- 외납세 이월 내역 조회  -->
+	<query id="selectAbroadTaxMgrList">
+		<![CDATA[
+			SELECT *
+			  FROM (
+			         SELECT 
+			              /*B.TOT_MON
+			              , B.CST_MON
+			              , B.REDUCE_TRG
+			              , B.REDUCE_RATE */
+                            A.ENTER_CD
+                          , A.WORK_YY
+                          , A.ADJUST_TYPE
+                          , A.SABUN
+			              , NVL(D.FAM_NM, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)) AS NAME
+                          , A.PAY_YY
+                          , A.NATIONAL_CD
+                          , B.GUBUN
+			              , A.PAY_MON    -- (= B.PAY_MON)
+                          , A.REDUCE_MON -- (= B.REDUCE_MON)
+                          , A.TRG_MON
+                          , A.BASE_MON
+                          , A.CLCLTE_TAX_MON
+                          , A.INCOME_MON
+                          , A.PAY_TAX_MON -- (= B.PAY_TAX_MON)
+                          , A.LIMIT_MON
+                          , A.LIMIT_OV_MON
+                          , A.EXC_TAX_MON -- (= B.EXC_TAX_MON)
+                          , A.NO_CARRIED_MON
+                          , A.PREV_CARRIED_MON
+                          , A.PREV_DED_MON
+                          , A.CUR_DED_MON
+                          , A.DED_MON
+                          , A.CARRIED_MON
+                          , A.CARRIED_MON_841
+                          , A.EXTINCTION_MON
+                          , CASE WHEN A.PAY_YY BETWEEN A.WORK_YY AND TO_CHAR(TO_NUMBER(A.WORK_YY)+10) 
+                                 THEN ( CASE WHEN A.CARRIED_MON > 0 OR A.CARRIED_MON_841 > 0 THEN 1 ELSE 0 END )
+                                 ELSE 0
+                            END AS C_CNT_CARRIED                            
+			              , A.MEMO
+			           FROM TCPN886 A
+			      LEFT JOIN TCPN885 B
+			             ON B.ENTER_CD    = A.ENTER_CD	 
+			            AND B.SABUN       = A.SABUN	     
+			            AND B.PAY_YY      = A.PAY_YY	   
+			            AND B.NATIONAL_CD = A.NATIONAL_CD
+			      LEFT JOIN TCPN823 D
+			             ON D.ENTER_CD	  = A.ENTER_CD   
+			            AND D.SABUN	      = A.SABUN      
+			            AND D.WORK_YY     = A.WORK_YY     
+			            AND D.ADJUST_TYPE = A.ADJUST_TYPE
+			            AND D.FAM_CD      = '0'
+			          WHERE A.ENTER_CD	  = #ssnEnterCd#
+			          --AND A.NATIONAL_CD = 조회조건국가코드
+			        )
+			  WHERE C_CNT_CARRIED >= #searchMon#
+			    AND WORK_YY     LIKE #searchYear# || '%'
+			    AND (#searchAdjustType# IS NULL OR ADJUST_TYPE = #searchAdjustType#)
+			    AND (#searchSbNm# IS NULL OR SABUN LIKE '%' || #searchSbNm# || '%' OR NAME LIKE '%' || #searchSbNm# || '%')
+			    AND (#searchBizPlaceCd# IS NULL OR #searchBizPlaceCd# = F_CPN_YEA_BP_CD(ENTER_CD, WORK_YY, ADJUST_TYPE, SABUN))
+	            AND REGEXP_LIKE(NVL(ADJUST_TYPE, '1'), '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+			  ORDER BY SABUN, 
+			       WORK_YY DESC,
+			       ADJUST_TYPE,
+			       PAY_YY DESC,  -- 이월기간이 많이 남아 있는 최신 자료부터 미공제액을 이월분으로 반영
+                   CUR_DED_MON,
+                   CARRIED_MON_841 DESC, -- 공제액이 큰 것부터 미공제액 이월됨
+                   DED_MON DESC,                   
+                   NATIONAL_CD
+	   ]]>
+	</query>
+	
+</root>

@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.pubc.pubcMgr">
+<!-- 		사내공모관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPubcMgrList">
+
+				<![CDATA[
+				SELECT   '0' AS DETAIL
+						, A.PUBC_ID
+						, A.PUBC_NM
+						, A.PUBC_DIV_CD
+						, A.PUBC_CONTENT
+						, A.JOB_CD
+						, F_PAP_GETJOBNAME(A.ENTER_CD, A.JOB_CD) AS JOB_NM 
+						, A.PUBC_STAT_CD
+						, A.APPL_STA_YMD
+						, A.APPL_END_YMD
+				        , A.PUBC_ORG_CD
+				        , F_COM_GET_ORG_NM(A.ENTER_CD, A.PUBC_ORG_CD , NVL(APPL_STA_YMD, TO_CHAR(SYSDATE, 'YYYYMMDD'))) AS PUBC_ORG_NM
+				        , A.PUBC_CHIEF_SABUN
+				        , F_COM_GET_NAMES(A.ENTER_CD, A.PUBC_CHIEF_SABUN) AS PUBC_CHIEF_NAME
+						, A.NOTE
+						, A.CHKDATE
+						, A.CHKID
+						, A.FILE_SEQ
+						, (SELECT COUNT(1)
+			                 FROM TCDP701 T1
+		                        , THRI103 T2
+						 	WHERE T1.ENTER_CD = A.ENTER_CD
+			               	  AND T1.ENTER_CD = T2.ENTER_CD
+			                  AND T1.APPL_SEQ = T2.APPL_SEQ
+			                  AND T1.PUBC_ID = A.PUBC_ID
+			                  AND T2.APPL_STATUS_CD <> '11') AS CNT
+		  		  FROM TCDP700 A
+	  		  	 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+	  		  	           ]]>
+<if test='searchPubcNm != null and !searchPubcNm.equals("")' >
+		 		   AND LOWER(A.PUBC_NM) LIKE '%' || TRIM(LOWER(#{searchPubcNm})) || '%'
+</if>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")' >
+		 		   AND A.PUBC_ORG_CD = TRIM(#{searchOrgCd})
+</if>
+		 		 ORDER BY A.PUBC_NM
+
+		</select>
+
+<!-- 		사내공모관리 저장 -->
+		<update parameterType="map" id="savePubcMgr">
+
+				<![CDATA[
+					MERGE INTO TCDP700 T
+					USING	(
+							SELECT	  A.ENTER_CD        
+									, A.PUBC_ID        
+									, A.PUBC_NM        
+									, A.PUBC_DIV_CD    
+									, A.PUBC_CONTENT   
+									, A.JOB_CD         
+									, A.PUBC_STAT_CD   
+									, A.APPL_STA_YMD
+									, A.APPL_END_YMD   
+									, A.NOTE           
+									, A.PUBC_ORG_CD
+									, A.PUBC_CHIEF_SABUN
+									, A.FILE_SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD         
+											, NULL		AS PUBC_ID         
+											, NULL		AS PUBC_NM         
+											, NULL		AS PUBC_DIV_CD     
+											, NULL		AS PUBC_CONTENT    
+											, NULL		AS JOB_CD          
+											, NULL		AS PUBC_STAT_CD    
+											, NULL      AS APPL_STA_YMD    
+											, NULL		AS APPL_END_YMD    
+											, NULL		AS NOTE            
+											, NULL		AS PUBC_ORG_CD
+											, NULL		AS PUBC_CHIEF_SABUN
+											, NULL		AS FILE_SEQ
+									FROM	DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+	<choose>
+	<when test='rm.pubcId != null and !rm.pubcId.equals("")' >
+											, TRIM( #{rm.pubcId} )		AS PUBC_ID
+	</when>
+		<otherwise>
+											, TO_CHAR((
+					                            SELECT
+					                                NVL(MAX(TO_NUMBER(X.PUBC_ID)), 0) + ${icnt}
+					                            FROM TCDP700 X
+					                            WHERE 1=1
+					                              AND X.ENTER_CD = TRIM( #{ssnEnterCd} )
+					                        )) AS PUBC_ID
+	<bind name="icnt" value="icnt+1"/>
+		</otherwise>
+	</choose>
+											, TRIM( #{rm.pubcNm} )			AS PUBC_NM
+											, TRIM( #{rm.pubcDivCd} )		AS PUBC_DIV_CD
+											, TRIM( #{rm.pubcContent} )		AS PUBC_CONTENT
+											, TRIM( #{rm.jobCd} )			AS JOB_CD
+											, TRIM( #{rm.pubcStatCd} )		AS PUBC_STAT_CD
+											, REPLACE(TRIM( #{rm.applStaYmd} ), '-', '')		AS APPL_STA_YMD
+											, REPLACE(TRIM( #{rm.applEndYmd} ), '-', '')		AS APPL_END_YMD
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.pubcOrgCd} )		AS PUBC_ORG_CD
+											, TRIM( #{rm.pubcChiefSabun} )	AS PUBC_CHIEF_SABUN
+											, TRIM( #{rm.fileSeq} )			AS FILE_SEQ
+										FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+									      AND A.PUBC_ID IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.PUBC_ID = S.PUBC_ID )
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.PUBC_NM         	= S.PUBC_NM     
+									, T.PUBC_DIV_CD     	= S.PUBC_DIV_CD 
+									, T.PUBC_CONTENT    	= S.PUBC_CONTENT
+									, T.JOB_CD          	= S.JOB_CD      
+									, T.PUBC_STAT_CD    	= S.PUBC_STAT_CD
+									, T.APPL_STA_YMD    	= S.APPL_STA_YMD
+									, T.APPL_END_YMD    	= S.APPL_END_YMD
+									, T.NOTE            	= S.NOTE        
+									, T.PUBC_ORG_CD        	= S.PUBC_ORG_CD
+									, T.PUBC_CHIEF_SABUN    = S.PUBC_CHIEF_SABUN
+									, T.FILE_SEQ        	= S.FILE_SEQ
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.PUBC_ID     
+							, T.PUBC_NM     
+							, T.PUBC_DIV_CD 
+							, T.PUBC_CONTENT
+							, T.JOB_CD      
+							, T.PUBC_STAT_CD
+							, T.APPL_STA_YMD
+							, T.APPL_END_YMD
+							, T.NOTE        
+							, T.PUBC_ORG_CD
+							, T.PUBC_CHIEF_SABUN
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.PUBC_ID     
+							, S.PUBC_NM     
+							, S.PUBC_DIV_CD 
+							, S.PUBC_CONTENT
+							, S.JOB_CD      
+							, S.PUBC_STAT_CD
+							, S.APPL_STA_YMD
+							, S.APPL_END_YMD
+							, S.NOTE
+							, S.PUBC_ORG_CD
+							, S.PUBC_CHIEF_SABUN
+							, S.FILE_SEQ    
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		사내공모관리 삭제 -->
+		<delete parameterType="map" id="deletePubcMgr">
+
+				<![CDATA[
+					DELETE FROM TCDP700
+					 	  WHERE (ENTER_CD, PUBC_ID) IN 	( (NULL,NULL)
+					 	                                      ]]>
+					<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+									and rm.pubcId != null and !rm.pubcId.equals("")' >
+								(TRIM( #{ssnEnterCd} ), TRIM( #{rm.pubcId} ))
+							</if>
+					</foreach>
+										)
+		</delete>
+
+
+<!-- 		삭제된 사내공모에 해당하는 신청서 THRI107삭제 -->
+		<delete parameterType="map" id="deletePubcMgrAppTHRI107">
+
+				<![CDATA[
+					DELETE 
+					FROM THRI107
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND APPL_SEQ IN (
+									SELECT APPL_SEQ 
+									FROM TCDP701 A
+									WHERE A.ENTER_CD = #{ssnEnterCd}
+									AND NOT EXISTS (SELECT 1 
+													  FROM TCDP700 
+												  	 WHERE ENTER_CD = A.ENTER_CD 
+												  	   AND PUBC_ID = A.PUBC_ID)
+						  	   		)
+				]]>
+
+
+		</delete>
+		
+<!-- 		삭제된 사내공모에 해당하는 신청서 THRI103삭제 -->
+		<delete parameterType="map" id="deletePubcMgrAppTHRI103">
+
+				<![CDATA[
+					DELETE 
+					FROM THRI103
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND APPL_SEQ IN (
+									SELECT APPL_SEQ 
+									FROM TCDP701 A
+									WHERE A.ENTER_CD = #{ssnEnterCd}
+									AND NOT EXISTS (SELECT 1 
+													  FROM TCDP700 
+												  	 WHERE ENTER_CD = A.ENTER_CD 
+												  	   AND PUBC_ID = A.PUBC_ID)
+						  	   		)
+				]]>
+
+
+		</delete>
+		
+<!-- 		삭제된 사내공모에 해당하는 신청서 삭제 -->
+		<delete parameterType="map" id="deletePubcMgrApp">
+
+				<![CDATA[
+					DELETE 
+					FROM TCDP701 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND NOT EXISTS (SELECT 1 
+									  FROM TCDP700 
+								  	 WHERE ENTER_CD = A.ENTER_CD 
+								  	   AND PUBC_ID = A.PUBC_ID)
+				]]>
+
+
+		</delete>
+		
+
+</mapper>

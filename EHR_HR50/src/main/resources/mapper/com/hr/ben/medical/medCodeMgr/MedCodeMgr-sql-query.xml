@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.medical.medCodeMgr">
+
+	<select id="getMedCodeMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.CODE
+		     , A.CODE_NM
+		     , A.REG_DATE
+		     , A.NOTE
+		  FROM TBEN700 A 
+         WHERE A.ENTER_CD =	#{ssnEnterCd} ]]>
+        <if test="searchCode != null and searchCode neq ''">
+           AND A.CODE LIKE '%' || #{searchCode} || '%'
+        </if>
+        <if test="searchCodeNm != null and searchCodeNm neq ''">
+           AND A.CODE_NM LIKE '%' || #{searchCodeNm} || '%'
+        </if>
+	     ORDER BY A.CODE
+	</select>
+
+	<update id="saveMedCodeMgr" parameterType="map">
+	<![CDATA[			
+        MERGE INTO TBEN700 T 
+		USING ( ]]>
+        <foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD 
+			     , TRIM(#{rm.code})  AS  CODE
+			     , TRIM(#{rm.codeNm})  AS  CODE_NM
+			     , TRIM(#{rm.note})  AS  NOTE
+			  FROM DUAL
+		</foreach>
+    <![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD = S.ENTER_CD 
+		     AND  T.CODE = S.CODE 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE	= sysdate 
+		            , T.CHKID	= #{ssnSabun} 
+		            , T.CODE_NM = S.CODE_NM 
+		            , T.NOTE = S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.CODE
+		            , T.CODE_NM
+		            , T.REG_DATE
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.CODE
+		            , S.CODE_NM
+		            , sysdate
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+		
+	<delete id="deleteMedCodeMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN700
+		  WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		    AND ( CODE ) IN ( ( NULL) ]]>
+     <foreach item="rm" collection="deleteRows">
+        <if test="rm.code != null and rm.code neq ''">
+		      , ( TRIM( #{rm.code} ) )
+		 </if>
+	</foreach>
+	     )
+	</delete>
+	
+</mapper>

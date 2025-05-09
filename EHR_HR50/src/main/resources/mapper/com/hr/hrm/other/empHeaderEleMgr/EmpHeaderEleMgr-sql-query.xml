@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.empHeaderEleMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpHeaderEleMgrList">
+
+				<![CDATA[
+						SELECT A.ELE_ID, B.COLUMN_ID AS ELE_CD, B.COLUMN_NAME AS COLUMN_NAME, A.ELE_NM, A.ELE_TYPE, A.SORT, A.ADD_TEXT, A.LANGUAGE_CD
+						     , F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'thrm501', A.LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM
+						  FROM THRM501 A
+						  LEFT OUTER JOIN USER_TAB_COLUMNS B
+						    ON B.COLUMN_NAME = A.COLUMN_NAME
+						   AND B.COLUMN_ID = A.ELE_CD
+						   AND B.TABLE_NAME	= TRIM( '인사_인사기본_기준일' )
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						 ORDER BY A.SORT
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveEmpHeaderEleMgr">
+
+
+					MERGE INTO THRM501 T
+					USING	(
+							SELECT	  A.ELE_ID, A.ELE_CD, A.COLUMN_NAME, A.ELE_NM, A.ELE_TYPE, A.SORT, A.ADD_TEXT, LANGUAGE_CD
+							FROM	(
+									SELECT	  NULL AS ELE_ID
+											, NULL AS ELE_CD
+											, NULL AS COLUMN_NAME
+											, NULL AS ELE_NM
+											, NULL AS ELE_TYPE
+											, NULL AS SORT
+											, NULL AS ADD_TEXT
+											, NULL AS LANGUAGE_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{rm.eleId} ) AS ELE_ID
+											, TRIM( #{rm.eleCd} ) AS ELE_CD
+											, TRIM( #{rm.columnName} ) AS COLUMN_NAME
+											, TRIM( #{rm.eleNm} ) AS ELE_NM
+											, TRIM( #{rm.eleType} ) AS ELE_TYPE
+											, TRIM( #{rm.sort} ) AS SORT
+											, TRIM( #{rm.addText} ) AS ADD_TEXT
+											, TRIM( #{rm.languageCd} ) AS LANGUAGE_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ELE_ID IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = #{ssnEnterCd} AND T.ELE_ID		= S.ELE_ID )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ELE_CD	= S.ELE_CD
+									, T.COLUMN_NAME	= S.COLUMN_NAME
+									, T.ELE_NM	= S.ELE_NM
+									, T.ELE_TYPE	= S.ELE_TYPE
+									, T.SORT	= S.SORT
+									, T.ADD_TEXT	= S.ADD_TEXT
+									, T.LANGUAGE_CD	= S.LANGUAGE_CD
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.ELE_ID
+							, T.ELE_CD
+							, T.COLUMN_NAME
+							, T.ELE_NM
+							, T.ELE_TYPE
+							, T.SORT
+							, T.ADD_TEXT
+							, T.LANGUAGE_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.ELE_ID
+							, S.ELE_CD
+							, S.COLUMN_NAME
+							, S.ELE_NM
+							, S.ELE_TYPE
+							, S.SORT
+							, S.ADD_TEXT
+							, S.LANGUAGE_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteEmpHeaderEleMgr">
+
+					DELETE FROM THRM501
+					WHERE  ENTER_CD||'_'||ELE_ID IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.eleId != null and !rm.eleId.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.eleId} )
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+
+</mapper>

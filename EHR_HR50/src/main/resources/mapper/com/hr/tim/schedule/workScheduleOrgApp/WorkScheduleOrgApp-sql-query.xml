@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.workScheduleOrgApp">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkScheduleOrgAppList">
+
+				<![CDATA[
+
+					    SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.SDATE
+						     , A.EDATE
+						     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM
+							 , (SELECT MAP_NM
+							      FROM TORG109 X
+							     WHERE X.ENTER_CD = A.ENTER_CD
+							       AND X.MAP_TYPE_CD = '500'
+							       AND X.MAP_CD      = A.WORK_ORG_CD
+							       AND A.YMD BETWEEN X.SDATE AND NVL( X.EDATE, '29991231' ) ) AS WORK_ORG_NM
+							 , A.INTERVAL_CD
+							 , F_COM_GET_GRCODE_NAME( A.ENTER_CD 
+					                                , F_COM_GET_GRCODE_NOTE_VAL( A.ENTER_CD, 'T90200', A.INTERVAL_CD, 1 )
+					                                , A.DAY_GUBUN_CD )
+					           AS DAY_GUBUN_NM 
+							 , A.YMD
+							 , A.EMP_CNT
+							 , DECODE(A.ORG_AUTH, '0', '개인', '부서' ) AS ORG_AUTH
+							 
+							 , B.APPL_YMD
+							 , B.APPL_STATUS_CD
+							 , B.AGREE_YMD
+							 , B.APPL_SABUN
+							 , B.APPL_IN_SABUN
+						 	
+						 	 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+					 		 , 0 AS DETAIL
+						  FROM (
+						  		  SELECT ENTER_CD,APPL_SEQ,WORK_ORG_CD,WORK_GRP_CD,ORG_CD,INTERVAL_CD,DAY_GUBUN_CD,YMD,SDATE,EDATE,ORG_AUTH, COUNT(SABUN) AS EMP_CNT
+						  		    FROM TTIM811
+						  		   WHERE ENTER_CD = #{ssnEnterCd}
+						  		   GROUP BY ENTER_CD,APPL_SEQ,WORK_ORG_CD,WORK_GRP_CD,ORG_CD,INTERVAL_CD,DAY_GUBUN_CD,YMD,SDATE,EDATE,ORG_AUTH
+						        )  A, THRI103 B
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND B.APPL_SABUN = #{searchSabun}
+						   AND A.ENTER_CD = B.ENTER_CD
+						   AND A.APPL_SEQ = B.APPL_SEQ
+						   AND B.APPL_CD  = '302'
+				]]>
+<if test='searchAppSYmd != null and searchAppSYmd neq ""'>
+	<![CDATA[
+						   AND A.YMD >= REPLACE(#{searchAppSYmd}, '-', '')
+	]]>
+</if>
+<if test='searchAppEYmd != null and searchAppEYmd neq ""'>
+	<![CDATA[
+						   AND A.YMD <= REPLACE(#{searchAppEYmd}, '-', '')
+	]]>
+</if>
+				<![CDATA[
+						 ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+				]]>
+
+
+		</select>
+
+<!-- 	근무스케쥴 헤더 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkScheduleOrgAppWorkHeaderList">
+
+				<![CDATA[
+					SELECT TO_CHAR(TO_DATE(A.YMD, 'YYYYMMDD'), 'MM/DD') || ' (' || to_char(TO_DATE(A.YMD, 'YYYYMMDD'), 'dy') || ')' AS TITLE
+					     , 't' || A.YMD AS SAVE_NAME
+					     , CASE WHEN WORK_YN = 'Y' THEN 'red' ELSE '' END AS FONT_COLOR
+					  FROM TTIM120_V A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN    = #{searchSabun}
+					   AND A.YMD BETWEEN TRIM(#{searchSYmd}) AND TRIM(#{searchEYmd})
+					 ORDER BY A.YMD 
+				]]>
+
+
+		</select>
+
+<!-- 	근무스케쥴 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkScheduleOrgAppWorkList">
+
+				<![CDATA[
+					WITH WORK_LIST AS (
+										SELECT 't' || A.YMD AS YMD
+											 , B.SHORT_TERM
+											 , DECODE(A.WORK_YN, 'Y','', TO_CHAR(TO_DATE(B.WORK_SHM,'HH24mi'),'HH24:mi')) AS WORK_SHM
+											 , DECODE(A.WORK_YN, 'Y','', TO_CHAR(TO_DATE(B.WORK_EHM,'HH24mi'),'HH24:mi')) AS WORK_EHM
+										  FROM TTIM120_V A, TTIM017 B
+										 WHERE A.ENTER_CD = #{ssnEnterCd}
+										   AND A.SABUN    = #{searchSabun}
+										   AND A.WORK_GRP_CD = TRIM(#{workGrpCd})
+										   AND A.YMD BETWEEN TRIM(#{searchSYmd}) AND TRIM(#{searchEYmd})
+										   AND A.ENTER_CD = B.ENTER_CD
+										   AND A.TIME_CD  = B.TIME_CD
+					)
+					SELECT *
+					  FROM (  
+						     SELECT 1 SEQ, '근무시간' AS GUBUN, YMD, SHORT_TERM AS TXT
+						       FROM WORK_LIST 
+						      UNION ALL
+						     SELECT 2 SEQ, '시업' AS GUBUN, YMD, WORK_SHM AS TXT
+						       FROM WORK_LIST
+						      UNION ALL
+						     SELECT 3 SEQ, '종업' AS GUBUN, YMD, WORK_EHM AS TXT
+						       FROM WORK_LIST
+					       ) PIVOT ( MAX(TXT) FOR YMD IN (
+					           ]]>
+<foreach item="tit" collection="titles" separator=" , " >
+					        								${tit.saveName} AS "${tit.saveName}"
+</foreach>
+												         )
+					                ) 
+					 ORDER BY SEQ
+		</select>
+
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteWorkScheduleOrgApp1">
+
+					DELETE FROM TTIM811
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test=' rm.applSeq != null and !rm.applSeq.equals("")'>
+									     , TRIM(#{rm.applSeq})
+	</if>
+</foreach>
+									   )				
+		</delete>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteWorkScheduleOrgApp2">
+
+					DELETE FROM TTIM812
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test=' rm.applSeq != null and !rm.applSeq.equals("")'>
+									     , TRIM(#{rm.applSeq})
+	</if>
+</foreach>
+									   )				
+		</delete>
+
+		
+
+</mapper>

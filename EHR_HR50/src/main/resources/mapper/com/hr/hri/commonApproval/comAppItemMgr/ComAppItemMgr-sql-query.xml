@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.commonApproval.comAppItemMgr">
+
+<!-- 공통 항목 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppItemMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SEQ
+					     , A.ITEM_NM
+					     , A.ITEM_DESC
+					     , A.SQL
+					  FROM THRI802 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					 ORDER BY A.ITEM_NM
+				]]>
+
+
+		</select>
+
+<!-- 공통 항목 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getComAppItemMgrComboList">
+
+				<![CDATA[
+					SELECT A.SEQ     AS CODE
+					     , A.ITEM_NM AS CODE_NM
+					  FROM THRI802 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					 ORDER BY A.ITEM_NM
+				]]>
+
+
+		</select>
+<!-- 공통 항목 저장 -->
+		<update parameterType="map" id="saveComAppItemMgr">
+
+					 MERGE INTO THRI802 T 
+					 USING 
+					( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+					       SELECT TRIM(#{ssnEnterCd}) 	AS  ENTER_CD
+<choose><when test='rm.seq != null and !rm.seq.equals("") '>
+			               		, TRIM(#{rm.seq})     	AS SEQ
+</when><otherwise>
+			               		, '0'  	AS SEQ
+<bind name="icnt" value="icnt + 1" />
+</otherwise>
+</choose>
+					            , TRIM(#{rm.itemNm})  	AS  ITEM_NM
+					            , TRIM(#{rm.itemDesc})  AS  ITEM_DESC
+					            , TRIM(#{rm.sql})  		AS  SQL
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.SEQ 	 = S.SEQ 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE		= sysdate 
+					            , T.CHKID		= #{ssnSabun}
+					            , T.ITEM_NM 	= S.ITEM_NM 
+					            , T.ITEM_DESC 	= S.ITEM_DESC 
+					            , T.SQL 		= S.SQL 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.SEQ
+					            , T.ITEM_NM
+					            , T.ITEM_DESC
+					            , T.SQL
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S_THRI802.NEXTVAL
+					            , S.ITEM_NM
+					            , S.ITEM_DESC
+					            , S.SQL
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+
+		</update>
+
+
+<!-- 공통 항목 삭제 -->
+		<delete parameterType="map" id="deleteComAppItemMgr">
+
+					DELETE FROM THRI802
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND ( SEQ ) IN ( ( NULL) 
+<foreach item="rm" collection="deleteRows" >
+    <if test='rm.seq != null and !rm.seq.equals("") '>
+		     							, ( TRIM( #{rm.seq} ) )
+	</if>
+</foreach>
+		       						  )
+
+		</delete>
+
+</mapper>

@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="sys.system.sabunChange">
+<!--        조회 -->
+        <select parameterType="map" resultType="cMap" id="getSabunChangeList">
+
+                <![CDATA[
+                    SELECT ENTER_CD
+                         , PRE_SABUN
+                         , NEW_SABUN
+                         , SEQ
+                         , WORK_DATE
+                         , COMPLETE_YN
+                         , TO_CHAR(WORK_ST_TIME,'YYYYMMDDHH24MISS') AS WORK_ST_TIME 
+                         , TO_CHAR(WORK_ED_TIME,'YYYYMMDDHH24MISS') AS WORK_ED_TIME
+                         , BIGO
+                         , ERR_MSG
+                    FROM   TSYS931
+                    WHERE  1 = 1
+                    AND    ENTER_CD  = #{ssnEnterCd} ]]>
+                <if test='searchWorkDate != null and !searchWorkDate.equals("")'>
+                    AND    WORK_DATE = REPLACE(TRIM(#{searchWorkDate}), '-', '')
+                </if>
+                <if test='searchSabun != null and !searchSabun.equals("")'>
+                    AND    (UPPER(PRE_SABUN) LIKE '%'||UPPER(TRIM(#{searchSabun}))||'%' OR UPPER(NEW_SABUN) LIKE '%'||UPPER(TRIM(#{searchSabun}))||'%' )
+                </if>
+                <if test='searchCompleteYn != null and !searchCompleteYn.equals("")'>
+                    AND    COMPLETE_YN = TRIM(#{searchCompleteYn})
+                </if>
+                
+                
+                    ORDER BY  WORK_DATE DESC, COMPLETE_YN
+
+
+
+        </select>
+        
+        <select parameterType="map" resultType="cMap" id="getSabunDupCheckPopupMap">
+
+                <![CDATA[
+                        SELECT DECODE(COUNT(1), 0, 'Y', 'N') AS DUP_YN
+                        FROM   (
+                               SELECT SABUN 
+                               FROM   THRM100
+                               WHERE  ENTER_CD = #{ssnEnterCd}
+                               UNION ALL
+                               SELECT SABUN 
+                               FROM   TSTF901 A
+                                    , TSTF903 B
+                               WHERE  A.ENTER_CD   = B.ENTER_CD
+                               AND    A.RECEIVE_NO = B.RECEIVE_NO
+                               AND    A.ENTER_CD   = #{ssnEnterCd}
+                               )
+                        WHERE  SABUN = #{searchSabun}
+                ]]>
+
+
+        </select>
+        
+        
+
+<!--        저장 -->
+        <update parameterType="map" id="saveSabunChange">
+
+
+                    MERGE INTO TSYS931 T
+                    USING   (
+                            SELECT    A.ENTER_CD
+                                    , A.PRE_SABUN
+                                    , A.NEW_SABUN
+                                    , A.SEQ
+                                    , A.BIGO
+                            FROM    (
+                                    SELECT    NULL      AS ENTER_CD
+                                            , NULL      AS PRE_SABUN
+                                            , NULL      AS NEW_SABUN
+                                            , NULL      AS SEQ
+                                            , NULL      AS BIGO
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                    SELECT   #{ssnEnterCd}                 AS ENTER_CD
+                                            , TRIM( #{rm.preSabun} )     AS PRE_SABUN
+                                            , TRIM( #{rm.newSabun} )     AS NEW_SABUN
+                                            <choose><when test='rm.seq != null and !rm.seq.equals("")'>
+                                            ,   TRIM(#{rm.seq})          AS SEQ
+                                            --증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+                                            </when><otherwise>
+                                            ,   TO_CHAR( 
+                                                         (
+                                                          SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+                                                          FROM    TSYS931 WHERE ENTER_CD = #{ssnEnterCd}
+                                                          AND     PRE_SABUN =  TRIM( #{rm.preSabun} )
+                                                          AND     NEW_SABUN =  TRIM( #{rm.newSabun} )
+                                                         ) 
+                                                        )  AS SEQ
+                                                --icnt 증가
+                                                <bind name="icnt" value="icnt + 1" />
+                                            </otherwise>
+                                            </choose>
+                                            , TRIM( #{rm.bigo} )         AS BIGO
+                                            FROM   DUAL
+</foreach>
+                                    ) A WHERE A.ENTER_CD IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD      = S.ENTER_CD
+                    AND  T.PRE_SABUN     = S.PRE_SABUN
+                    AND  T.SEQ           = S.SEQ
+                     )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.BIGO            = S.BIGO
+                                    , T.CHKDATE         = SYSDATE
+                                    , T.CHKID           = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.PRE_SABUN
+                            , T.NEW_SABUN
+                            , T.SEQ
+                            , T.COMPLETE_YN
+                            , T.BIGO
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.PRE_SABUN
+                            , S.NEW_SABUN
+                            , S.SEQ
+                            , 'N'
+                            , S.BIGO
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+        </update>
+<!--        삭제 -->
+        <delete parameterType="map" id="deleteSabunChange">
+
+
+                    DELETE FROM TSYS931
+                    WHERE   (ENTER_CD,PRE_SABUN,SEQ) IN     (  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='rm.preSabun != null and !rm.preSabun.equals("")'>
+                                          ( #{ssnEnterCd} , TRIM( #{rm.preSabun} ) , TRIM( #{rm.seq} ))
+                                        </if>
+</foreach>
+                                        )
+        </delete>
+        
+        <update parameterType="map" id="prcP_SYS_SABUN_DATA_MODIFY" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_SYS_SABUN_DATA_MODIFY(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{preSabun,mode=IN,jdbcType=VARCHAR},
+				#{newSabun,mode=IN,jdbcType=VARCHAR},
+				#{pSeq,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+        </update>
+        
+
+</mapper>

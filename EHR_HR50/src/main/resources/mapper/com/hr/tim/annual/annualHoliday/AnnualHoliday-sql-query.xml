@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualHoliday">
+
+<!-- 연월차내역관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualHolidayList">
+
+				<![CDATA[
+				SELECT E.GNT_CD
+				     , NVL(E.CRE_CNT, 0) AS CRE_CNT
+				     , NVL(E.STACK_CNT, 0) AS STACK_CNT
+				     , NVL(E.USE_CNT, 0) AS USE_CNT
+				     , NVL(E.USED_CNT, 0) AS USED_CNT
+				     , NVL(E.REST_CNT,0) AS  REST_CNT
+				     , NVL(E.FRD_CNT, 0) AS FRD_CNT
+				     , NVL(E.COM_CNT, 0) AS COM_CNT
+				     , NVL(E.MOD_CNT, 0) AS MOD_CNT
+				     , E.USE_S_YMD
+				     , E.USE_E_YMD
+				     , E.YY
+				     , E.NOTE
+				     , E.ONEYEAR_UNDER_YN
+				     , A.ENTER_CD
+				     , (SELECT F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME
+				     , A.SABUN
+				     , (SELECT F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, LEAST(NVL(E.USE_E_YMD, '99991231'), TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+				     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010', B.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+				     , A.YEAR_YMD
+				     , CASE WHEN F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'HRM_WKP_TYPE') = 'A' THEN NVL(A.EMP_YMD, A.GEMP_YMD)
+                            ELSE NVL(A.GEMP_YMD, A.EMP_YMD) END AS EMP_YMD
+				     , A.RET_YMD
+				     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10030' , B.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+				     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10050' , B.WORK_TYPE, #{ssnLocaleCd}) AS WORK_TYPE_NM
+				     
+				  FROM THRM100 A, TTIM511 E
+				     , ( SELECT  *
+					       FROM THRM151 A
+					      WHERE ENTER_CD = #{ssnEnterCd}
+				            AND A.SDATE = (SELECT MAX(C.SDATE) FROM THRM151 C
+				                            WHERE C.ENTER_CD = A.ENTER_CD
+				                              AND C.SABUN    = A.SABUN
+				                              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE,'99991231'))
+				       ) B
+				]]>
+<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+			         , BP_V F
+</if>
+				 WHERE E.ENTER_CD = #{ssnEnterCd}
+				   AND E.SABUN    = A.SABUN
+				   and E.ENTER_CD = A.ENTER_CD
+				   AND E.ENTER_CD = B.ENTER_CD
+				   AND E.SABUN    = B.SABUN
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+				   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR (SELECT F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+				   AND (SELECT F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, LEAST(NVL(E.USE_E_YMD, '99991231'), TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+<if test='searchYear != null and !searchYear.equals("") '>
+				   AND ( SUBSTR(E.USE_S_YMD,1,4) = TRIM(#{searchYear})
+				      OR SUBSTR(E.USE_E_YMD,1,4) = TRIM(#{searchYear}) )
+</if>
+<if test='searchYmd != null and !searchYmd.equals("") '>
+				   AND REPLACE(TRIM(#{searchYmd}), '-','') BETWEEN E.USE_S_YMD AND E.USE_E_YMD
+</if>
+<if test='searchEmpYm != null and !searchEmpYm.equals("") '>
+				   AND SUBSTR(NVL( A.YEAR_YMD,  ( CASE WHEN F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'HRM_WKP_TYPE') = 'A' THEN NVL(A.EMP_YMD, A.GEMP_YMD) ELSE NVL(A.GEMP_YMD, A.EMP_YMD) END )), 5, 2)
+				       = TRIM(#{searchEmpYm})
+</if>
+<if test='searchGntCd != null and !searchGntCd.equals("")'>
+				   AND E.GNT_CD	  = #{searchGntCd}
+</if>
+<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+                   AND E.ENTER_CD = F.ENTER_CD (+)
+                   AND E.SABUN    = F.SABUN    (+)
+                   AND E.USE_E_YMD BETWEEN  F.SDATE(+) AND NVL(F.EDATE(+), '99991231')
+                   AND F.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+</if>
+<if test='searchManageCd != null and !searchManageCd.equals("")'>
+				   AND B.MANAGE_CD	  = #{searchManageCd}
+</if>
+<if test='searchWorkType != null and !searchWorkType.equals("")'>
+				   AND B.WORK_TYPE	  = #{searchWorkType}
+</if>
+
+<if test='searchOneyearYn != null and !searchOneyearYn.equals("")'>
+				   AND E.ONEYEAR_UNDER_YN	  = #{searchOneyearYn}
+</if>
+
+				ORDER BY 
+<if test='searchSort != null and !searchSort.equals("")'>
+					SUBSTR(NVL( A.YEAR_YMD,  ( CASE WHEN F_COM_GET_STD_CD_VALUE(A.ENTER_CD, 'HRM_WKP_TYPE') = 'A' THEN NVL(A.EMP_YMD, A.GEMP_YMD) ELSE NVL(A.GEMP_YMD, A.EMP_YMD) END )), 5, 4), 
+</if>
+				F_COM_JIKJE_SORT(B.ENTER_CD, B.SABUN, B.SDATE), E.GNT_CD
+		</select>
+
+<!-- 연월차내역관리 저장 -->
+		<update parameterType="map" id="saveAnnualHoliday">
+
+					MERGE INTO TTIM511 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.YY
+							     , A.SABUN
+							     , A.GNT_CD
+							     , A.USE_S_YMD
+							     , A.USE_E_YMD
+							     , A.CRE_CNT
+							     , A.FRD_CNT
+							     , A.USE_CNT
+							     , A.USED_CNT
+							     , A.REST_CNT
+							     , A.COM_CNT
+							     , A.NOTE
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS YY
+										 , NULL AS SABUN
+										 , NULL AS GNT_CD
+										 , NULL AS USE_S_YMD
+										 , NULL AS USE_E_YMD
+									     , NULL AS CRE_CNT
+									     , NULL AS FRD_CNT
+									     , NULL AS USE_CNT
+									     , NULL AS USED_CNT
+									     , NULL AS REST_CNT
+							   			 , NULL AS COM_CNT
+							   			 , NULL AS NOTE
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 , NVL(TRIM( #{rm.yy}), SUBSTR(TRIM( #{rm.useSYmd}), 1, 4))			AS  YY
+										 , TRIM( #{rm.sabun} )		AS  SABUN
+										 , TRIM( #{rm.gntCd})		AS  GNT_CD
+										 , TRIM( #{rm.useSYmd})	AS  USE_S_YMD
+										 , TRIM( #{rm.useEYmd})	AS  USE_E_YMD
+										 , TRIM( #{rm.creCnt})		AS  CRE_CNT
+										 , TRIM( #{rm.frdCnt})		AS  FRD_CNT
+										 , TRIM( #{rm.useCnt})		AS  USE_CNT
+										 , TRIM( #{rm.usedCnt})	AS  USED_CNT
+										 , TRIM( #{rm.restCnt})	AS  REST_CNT
+										 , TRIM( #{rm.comCnt})		AS  COM_CNT
+										 , TRIM( #{rm.note})		AS  NOTE
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+										  AND A.USE_S_YMD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.GNT_CD = S.GNT_CD AND T.USE_S_YMD = S.USE_S_YMD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.USE_E_YMD	= S.USE_E_YMD
+									, T.CRE_CNT		= S.CRE_CNT
+                                    , T.FRD_CNT		= S.FRD_CNT
+                                    , T.USE_CNT		= S.USE_CNT
+                                    , T.USED_CNT	= S.USED_CNT
+                                    , T.REST_CNT	= S.REST_CNT
+                                    , T.COM_CNT		= S.COM_CNT
+                                    , T.NOTE		= S.NOTE
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YY
+							, T.SABUN
+							, T.GNT_CD
+							, T.USE_S_YMD
+							, T.USE_E_YMD
+							, T.CRE_CNT
+							, T.FRD_CNT
+							, T.USE_CNT
+							, T.USED_CNT
+							, T.REST_CNT
+					        , T.COM_CNT
+					        , T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YY
+							, S.SABUN
+							, S.GNT_CD
+							, S.USE_S_YMD
+							, S.USE_E_YMD
+							, S.CRE_CNT
+							, S.FRD_CNT
+							, S.USE_CNT
+							, S.USED_CNT
+							, S.REST_CNT
+					        , S.COM_CNT
+					        , S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 연월차내역관리 저장 -->
+		<update parameterType="map" id="saveAnnualHolidayBatch">
+
+					MERGE INTO TTIM511 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.YY
+							     , A.SABUN
+							     , A.GNT_CD
+							     , A.USE_S_YMD
+							     , A.USE_E_YMD
+							     , A.CRE_CNT
+							     , A.FRD_CNT
+							     , A.USE_CNT
+							     , A.USED_CNT
+							     , A.REST_CNT
+							     , A.COM_CNT
+							     , A.NOTE
+							FROM	(
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 , NVL(TRIM( #{yy} ), SUBSTR(TRIM( #{useSYmd} ), 1, 4))			AS  YY
+										 , TRIM( #{sabun} )		AS  SABUN
+										 , TRIM( #{gntCd} )		AS  GNT_CD
+										 , TRIM( #{useSYmd} )	AS  USE_S_YMD
+										 , TRIM( #{useEYmd} )	AS  USE_E_YMD
+										 , TRIM( #{creCnt} )		AS  CRE_CNT
+										 , TRIM( #{frdCnt} )		AS  FRD_CNT
+										 , TRIM( #{useCnt} )		AS  USE_CNT
+										 , TRIM( #{usedCnt} )	AS  USED_CNT
+										 , TRIM( #{restCnt} )	AS  REST_CNT
+										 , TRIM( #{comCnt} )		AS  COM_CNT
+										 , TRIM( #{note} )		AS  NOTE
+									  FROM DUAL
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.YY IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+										  AND A.USE_S_YMD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.YY = S.YY AND T.SABUN = S.SABUN AND T.GNT_CD = S.GNT_CD AND T.USE_S_YMD = S.USE_S_YMD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.USE_E_YMD	= S.USE_E_YMD
+									, T.CRE_CNT		= S.CRE_CNT
+                                    , T.FRD_CNT		= S.FRD_CNT
+                                    , T.USE_CNT		= S.USE_CNT
+                                    , T.USED_CNT	= S.USED_CNT
+                                    , T.REST_CNT	= S.REST_CNT
+                                    , T.COM_CNT		= S.COM_CNT
+                                    , T.NOTE		= S.NOTE
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YY
+							, T.SABUN
+							, T.GNT_CD
+							, T.USE_S_YMD
+							, T.USE_E_YMD
+							, T.CRE_CNT
+							, T.FRD_CNT
+							, T.USE_CNT
+							, T.USED_CNT
+							, T.REST_CNT
+					        , T.COM_CNT
+					        , T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YY
+							, S.SABUN
+							, S.GNT_CD
+							, S.USE_S_YMD
+							, S.USE_E_YMD
+							, S.CRE_CNT
+							, S.FRD_CNT
+							, S.USE_CNT
+							, S.USED_CNT
+							, S.REST_CNT
+					        , S.COM_CNT
+					        , S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 연월차내역관리 삭제 -->
+		<delete parameterType="map" id="deleteAnnualHoliday">
+
+					DELETE FROM TTIM511
+					 WHERE ENTER_CD||'_'||YY||'_'||SABUN||'_'||GNT_CD||'_'||USE_S_YMD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.yy != null and !rm.yy.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")
+												and rm.useSYmd != null and !rm.useSYmd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.yy})||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.gntCd})||'_'||TRIM( #{rm.useSYmd})
+										</if>
+</foreach>
+										)
+
+</delete>
+		
+<!-- 연월차내역관리 삭제 -->
+		<delete parameterType="map" id="deleteAnnualHolidayBatch">
+
+				<![CDATA[
+					DELETE FROM TTIM511
+					 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+					   AND YY = TRIM( #{yy} )
+					   AND SABUN = TRIM( #{sabun} )
+					   AND GNT_CD = TRIM( #{gntCd} )
+					   AND USE_S_YMD = TRIM( #{useSYmd} )
+				]]>
+
+
+		</delete>
+		
+<!-- 하계휴가차감 프로시저 -->	
+         <update parameterType="map" id="annualHolidayPrc">
+
+                <![CDATA[
+                    CALL P_TIM_ANNUAL_SUMMER_CNT(#{sqlCode},#{sqlErrm},#{ssnEnterCd},#{searchYear},#{searchWorkType},#{ssnSabun})
+                ]]>
+		 </update>
+
+</mapper>

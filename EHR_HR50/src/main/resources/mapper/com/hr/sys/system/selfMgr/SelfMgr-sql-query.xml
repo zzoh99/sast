@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.system.selfMgr">
+<!-- 		시스템사용기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSelfMgrList">
+			<![CDATA[
+				SELECT
+					   STD_CD
+					 , STD_NM
+					 , STD_CD_CLOB
+				  FROM SELF001
+				 WHERE UPPER(NVL(STD_CD, '%')) LIKE '%'||UPPER(TRIM(#{searchStdCd}))||'%'
+				   AND UPPER(NVL(STD_NM, '%')) LIKE '%'||UPPER(TRIM(#{searchStdNm}))||'%'
+				ORDER BY STD_CD, STD_NM
+			]]>
+		</select>
+
+	<!-- 		시스템사용기준관리 저장 -->
+	<update parameterType="map" id="saveSelfMgr">
+		MERGE INTO SELF001 T
+		USING	(
+		SELECT	  A.STD_CD
+		, A.STD_NM
+		FROM	(
+		SELECT	  NULL		AS STD_CD
+		, NULL		AS STD_NM
+		FROM	DUAL
+		<bind name="icnt" value="1" />
+		<foreach item="rm" collection="mergeRows" >
+			UNION ALL
+			SELECT
+			TRIM( #{rm.stdCd} )	AS STD_CD
+			, TRIM( #{rm.stdNm} )	AS STD_NM
+			FROM   DUAL
+		</foreach>
+		) A WHERE A.STD_CD IS NOT NULL
+		) S
+		ON ( T.STD_CD = S.STD_CD )
+		WHEN MATCHED THEN
+		UPDATE SET	  T.STD_NM	= S.STD_NM
+		, T.STD_CD_CLOB	= EMPTY_CLOB()
+		, T.CHKDATE	= SYSDATE
+		, T.CHKID	= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+		T.STD_CD
+		, T.STD_NM
+		, T.STD_CD_CLOB
+		, T.CHKDATE
+		, T.CHKID
+		)
+		VALUES
+		(
+		S.STD_CD
+		, S.STD_NM
+		, EMPTY_CLOB()
+		, SYSDATE
+		, #{ssnSabun}
+		)
+	</update>
+
+	<!-- 		시스템사용기준관리 저장 -->
+	<update parameterType="map" id="updateSelfMgrClob">
+		UPDATE SELF001
+		    SET STD_CD_CLOB = #{stdCdClob}
+			, CHKDATE = SYSDATE
+			, CHKID	= #{ssnSabun}
+		WHERE STD_CD = #{stdCd}
+	</update>
+
+<!-- 		시스템사용기준관리 삭제 -->
+		<delete parameterType="map" id="deleteSelfMgr">
+
+					DELETE FROM SELF001
+					WHERE STD_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.stdCd != null and !rm.stdCd.equals("")'>
+											TRIM(#{rm.stdCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

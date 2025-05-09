@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubpayApp">
+
+<!-- 동호회 지원금신청 내역 조회 -->	
+	<select id="getClubpayAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+		     , A.CLUB_SEQ
+		     , A.YEAR
+		     , A.DIV_CD
+		     , C.CLUB_NM
+		     , C.SABUN_A
+		     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_VIEW -- 회장 성명
+		     , F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN_A, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_A_NM
+		     , C.SABUN_B
+		     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_VIEW -- 고문 성명
+		     , F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN_B, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_B_NM
+		     , C.SABUN_C
+		     , F_COM_GET_NAMES(C.ENTER_CD, C.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_VIEW -- 총무 성명
+		     , F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN_C, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_C_NM
+		     , A.APP_MON
+		     , (
+			       SELECT COUNT(1) AS CNT
+					 FROM TBEN502 Z
+					WHERE Z.ENTER_CD 	 = C.ENTER_CD
+					  AND Z.CLUB_SEQ 	 = C.CLUB_SEQ
+					  AND B.APPL_YMD BETWEEN Z.SDATE AND Z.EDATE
+					  AND NVL(Z.AGREE_YN,'N') = 'Y'
+		     	)||'명' AS CLUB_MEM_CNT
+		     , B.APPL_CD
+			 , B.APPL_SEQ
+			 , B.APPL_YMD
+			 , B.APPL_SABUN
+			 , B.APPL_IN_SABUN
+			 , B.APPL_STATUS_CD
+			 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+			 , '0' AS DETAIL
+		  FROM THRI103 B, TBEN507 A, TBEN500 C
+		 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+                       AND A.ENTER_CD   = B.ENTER_CD
+                       AND A.APPL_SEQ   = B.APPL_SEQ
+                       AND A.ENTER_CD   = C.ENTER_CD(+)
+                       AND A.CLUB_SEQ   = C.CLUB_SEQ(+)
+                       AND A.SABUN      = TRIM( #{searchSabun} )
+                     ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+	]]>
+	</select>
+		
+	<!-- 동호회 지원금신청기간 조회 -->	
+	<select id="getClubpayAppDateChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT
+		  	( SELECT DECODE(COUNT(1),0,'N',MAX(Z.CODE ) )
+				FROM TSYS005 Z
+			   WHERE Z.ENTER_CD  = TRIM(#{ssnEnterCd})
+				 AND Z.GRCODE_CD = 'B50710'
+				 AND Z.USE_YN = 'Y'
+				 AND Z.NOTE1 = TO_NUMBER(TO_CHAR(SYSDATE,'MM'))
+				 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN Z.S_YMD AND Z.E_YMD
+			) AS APP_DATE_YN FROM DUAL
+	]]>
+	</select>
+		
+	<delete id="deleteClubpayApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN507
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( APPL_SEQ ) IN ( ( NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.applSeq != null and rm.applSeq neq ''">
+				, ( TRIM( #{rm.applSeq} ) )
+			</if>
+		</foreach>
+		   )
+	</delete>
+</mapper>

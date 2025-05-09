@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appRate">
+<!-- 	Tab1	조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppRateTab1">
+
+				<![CDATA[
+				SELECT APPRAISAL_CD,
+					   APP_TYPE_CD,
+					   APP_SELF_RATE,
+					   APP_1ST_RATE,
+					   APP_2ND_RATE,
+					   APP_3RD_RATE,
+					   NOTE
+				  FROM TPAP125 A
+				 WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+				   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+			  	ORDER BY 1,2,3,4
+				]]>
+
+
+		</select>
+<!-- 	Tab1	저장 -->
+		<update parameterType="map" id="saveAppRateTab1">
+
+				<![CDATA[
+					MERGE INTO TPAP125 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.APP_TYPE_CD
+									, A.APP_SELF_RATE
+									, A.APP_1ST_RATE
+									, A.APP_2ND_RATE
+									, A.APP_3RD_RATE
+									, A.NOTE
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD
+											, NULL	AS APPRAISAL_CD
+											, NULL	AS APP_TYPE_CD
+											, NULL	AS APP_SELF_RATE
+											, NULL	AS APP_1ST_RATE
+											, NULL	AS APP_2ND_RATE
+											, NULL	AS APP_3RD_RATE
+											, NULL  AS NOTE
+									FROM	DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	                AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	    AS APPRAISAL_CD
+											, TRIM( #{rm.appTypeCd} )	    AS APP_TYPE_CD
+											, TRIM( #{rm.appSelfRate})	    AS APP_SELF_RATE
+											, TRIM( #{rm.app1stRate})	    AS APP_1ST_RATE
+											, TRIM( #{rm.app2ndRate})		AS APP_2ND_RATE
+											, TRIM( #{rm.app3rdRate})		AS APP_3RD_RATE
+											, TRIM( #{rm.note})			AS NOTE
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		    = S.ENTER_CD
+					AND  T.APPRAISAL_CD		= S.APPRAISAL_CD
+					AND  T.APP_TYPE_CD		= S.APP_TYPE_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.APP_SELF_RATE		= S.APP_SELF_RATE
+									, T.APP_1ST_RATE        = S.APP_1ST_RATE
+									, T.APP_2ND_RATE        = S.APP_2ND_RATE
+									, T.APP_3RD_RATE        = S.APP_3RD_RATE
+									, T.CHKDATE			    = SYSDATE
+									, T.CHKID			    = #{ssnSabun}
+									, T.NOTE				= S.NOTE
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+   							, T.APPRAISAL_CD
+   							, T.APP_TYPE_CD
+   							, T.APP_SELF_RATE
+   							, T.APP_1ST_RATE
+   							, T.APP_2ND_RATE
+   							, T.APP_3RD_RATE
+							, T.CHKDATE
+							, T.CHKID
+							, T.NOTE
+						)
+						VALUES
+						(
+ 							  S.ENTER_CD
+ 							, S.APPRAISAL_CD
+ 							, S.APP_TYPE_CD
+ 							, S.APP_SELF_RATE
+ 							, S.APP_1ST_RATE
+ 							, S.APP_2ND_RATE
+ 							, S.APP_3RD_RATE
+							, SYSDATE
+							, #{ssnSabun}
+							, S.NOTE
+						)
+		</update>
+
+<!-- 	Tab1	삭제 -->
+		<delete parameterType="map" id="deleteAppRateTab1">
+
+					DELETE FROM TPAP125
+					WHERE 	(ENTER_CD,APPRAISAL_CD,APP_TYPE_CD ) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+										,	TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.appTypeCd  != null and !rm.appTypeCd.equals("")'>
+										,	TRIM( #{rm.appTypeCd} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+<!-- 	Tab2	조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppRateTab2">
+
+				<![CDATA[
+				SELECT APPRAISAL_CD
+					 , APP_T_RATE_SEQ
+					 , APP_T_RATE_NM
+					 , SCOPE_GUBUN
+					 , '0' AS SCOPE
+					 , '0' AS BTN_SET
+					 , MBO_RATE
+					 , COMPETENCY_RATE
+					 , ETC_RATE
+					 , (SELECT LISTAGG(B. AUTH_SCOPE_NM, ', ') WITHIN GROUP (ORDER BY B.AUTH_SCOPE_NM)
+				          FROM (
+				                SELECT ENTER_CD, SCOPE_CD, ITEM_VALUE1, ITEM_VALUE2
+				                FROM  TSYS991
+				                WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+				                AND USE_GUBUN = 'TR'
+				                AND ITEM_VALUE3 = '0'
+				                GROUP BY ENTER_CD,SCOPE_CD, ITEM_VALUE1, ITEM_VALUE2
+				                ) A, TSYS315 B
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+				           AND ITEM_VALUE1 =  T.APPRAISAL_CD
+				           AND ITEM_VALUE2 =  T.APP_T_RATE_SEQ) AS NOTE
+				     , SEQ
+				  FROM TPAP124 T
+				 WHERE T.ENTER_CD     = TRIM(#{ssnEnterCd})
+				   AND T.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+			  	ORDER BY SEQ, 1,2,3,4
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAppRateTab2TblNm">
+
+				<![CDATA[
+				SELECT A.SCOPE_CD, B. AUTH_SCOPE_NM, B.TABLE_NM
+				  FROM (
+						SELECT ENTER_CD, SCOPE_CD
+						FROM  TSYS991
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND USE_GUBUN = 'TR'
+						AND ITEM_VALUE1 =  TRIM(#{searchAppraisalCd})
+						AND ITEM_VALUE2 =  TRIM(#{appTRateSeq})
+						AND ITEM_VALUE3 = '0'
+						GROUP BY ENTER_CD,SCOPE_CD
+						) A, TSYS315 B
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAppRateTab2ScopeCd">
+
+				<![CDATA[
+
+				SELECT A.SCOPE_CD, A.SCOPE_VALUE, A.SCOPE_VALUE_NM
+				  FROM TSYS991 A
+				 WHERE ENTER_CD =TRIM(#{ssnEnterCd})
+				   AND USE_GUBUN = 'TR'
+				   AND ITEM_VALUE1 = TRIM(#{searchAppraisalCd})
+				   AND ITEM_VALUE2 = TRIM(#{appTRateSeq})
+				   AND ITEM_VALUE3 = '0'
+				   AND SCOPE_CD = TRIM(#{scopeCd})
+				ORDER BY 1,2,3
+				]]>
+
+
+		</select>
+<!-- 	Tab2	저장 -->
+		<update parameterType="map" id="saveAppRateTab2">
+
+				<![CDATA[
+					MERGE INTO TPAP124 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.APP_T_RATE_SEQ
+									, A.APP_T_RATE_NM
+									, A.SCOPE_GUBUN
+									, A.MBO_RATE
+									, A.COMPETENCY_RATE
+									, A.ETC_RATE
+									, A.NOTE
+									, A.SEQ
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD
+											, NULL AS APPRAISAL_CD
+											, NULL AS APP_T_RATE_SEQ
+											, NULL AS APP_T_RATE_NM
+											, NULL AS SCOPE_GUBUN
+											, NULL AS MBO_RATE
+											, NULL AS COMPETENCY_RATE
+											, NULL AS ETC_RATE
+											, NULL AS NOTE
+											, NULL AS SEQ
+									FROM	DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	                AS ENTER_CD
+											, TRIM(#{rm.appraisalCd}) AS APPRAISAL_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.appTRateSeq != null and !rm.appTRateSeq.equals("")'>
+											, TRIM(#{rm.appTRateSeq}) AS APP_T_RATE_SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+											, ((SELECT NVL(MAX(APP_T_RATE_SEQ),0) + ${icnt} FROM TPAP124 WHERE ENTER_CD = #{ssnEnterCd} AND APPRAISAL_CD = #{rm.appraisalCd}))	AS APP_T_RATE_SEQ
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM(#{rm.appTRateNm}) AS APP_T_RATE_NM
+											, TRIM(#{rm.scopeGubun}) AS SCOPE_GUBUN
+											, TRIM(#{rm.mboRate}) AS MBO_RATE
+											, TRIM(#{rm.competencyRate}) AS COMPETENCY_RATE
+											, TRIM(#{rm.etcRate}) AS ETC_RATE
+											, TRIM(#{rm.note}) AS NOTE
+											, TRIM(#{rm.seq}) AS SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		    = S.ENTER_CD
+						AND T.APPRAISAL_CD = S.APPRAISAL_CD
+						AND T.APP_T_RATE_SEQ = S.APP_T_RATE_SEQ
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.APP_T_RATE_NM = S.APP_T_RATE_NM
+									, T.SCOPE_GUBUN = S.SCOPE_GUBUN
+									, T.MBO_RATE = S.MBO_RATE
+									, T.COMPETENCY_RATE = S.COMPETENCY_RATE
+									, T.ETC_RATE = S.ETC_RATE
+									, T.NOTE = S.NOTE
+									, T.SEQ = S.SEQ
+									, T.CHKDATE			    = SYSDATE
+									, T.CHKID			    = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+   							, T.APPRAISAL_CD
+   							, T.APP_T_RATE_SEQ
+							, T.APP_T_RATE_NM
+							, T.SCOPE_GUBUN
+							, T.MBO_RATE
+							, T.COMPETENCY_RATE
+							, T.ETC_RATE
+							, T.NOTE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+ 							  S.ENTER_CD
+ 							, S.APPRAISAL_CD
+ 							, S.APP_T_RATE_SEQ
+							, S.APP_T_RATE_NM
+							, S.SCOPE_GUBUN
+							, S.MBO_RATE
+							, S.COMPETENCY_RATE
+							, S.ETC_RATE
+							, S.NOTE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 	Tab2	삭제 -->
+		<delete parameterType="map" id="deleteAppRateTab2">
+
+					DELETE FROM TPAP124
+					WHERE 	(ENTER_CD,APPRAISAL_CD,APP_T_RATE_SEQ ) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+										,	TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.appTRateSeq  != null and !rm.appTRateSeq.equals("")'>
+										,	TRIM( #{rm.appTRateSeq})
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+
+</mapper>

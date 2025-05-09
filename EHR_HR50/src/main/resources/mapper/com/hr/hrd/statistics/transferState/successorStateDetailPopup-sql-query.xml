@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.statistics.transferState.successorStateDetailPopup">
+		<select parameterType="map" resultType="cMap" id="getsuccessorStateDetailPopupList">
+
+
+				<![CDATA[
+					SELECT A.SABUN
+						  , B.NAME
+						  , A.SUCCESSOR_EMP_NO_1
+						  , A.SUCCESSOR_EMP_NO_2
+						  , A.SUCCESSOR_EMP_NO_3
+						  , DECODE(A.SUCCESSOR_EMP_NO_1, #{searchSabun},'1순위',DECODE(A.SUCCESSOR_EMP_NO_2, #{searchSabun},'2순위',DECODE(A.SUCCESSOR_EMP_NO_3,#{searchSabun},'3순위',''))) AS RANK
+						  , MAIN_ORG_NM , ORG_NM, JOB_NM, PRIOR_ORG_NM
+					FROM TCDPV201 A ,
+							  ( SELECT A.ENTER_CD, A.MAIN_ORG_CD, C.MAIN_ORG_NM, B.ORG_CD, NVL(D.ORG_NM, '파트미발령') AS ORG_NM, A.SABUN, A.NAME, E.JOB_NM
+								     , F_COM_GET_PRIOR_ORG_NM(A.ENTER_CD, B.ORG_CD,  TO_CHAR(SYSDATE, 'YYYYMMDD')) AS PRIOR_ORG_NM
+								  FROM  THRM100 A,  THRM151 B,  TCDPW909 C,  TORG101 D , TORG201 E  -- TCDPW909(본부부점정보)를 관리하지 않아 OUTER JOIN 하도록 변경 (추후 사용하게 될 수도 있으니 쿼리에서 테이블을 걷어내진 않음)
+							     WHERE A.ENTER_CD = #{ssnEnterCd}
+								   AND A.ENTER_CD = B.ENTER_CD
+								   AND A.SABUN = B.SABUN
+								   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+								   AND A.ENTER_CD = C.ENTER_CD(+)
+								   AND A.MAIN_ORG_CD = C.MAIN_ORG_CD(+)
+								   AND B.ENTER_CD = D.ENTER_CD(+)
+								   AND B.ORG_CD = D.ORG_CD(+)
+								   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE(+) AND NVL(D.EDATE(+), '99991231')
+								   AND B.ENTER_CD = E.ENTER_CD(+)
+								   AND B.JOB_CD = E.JOB_CD(+)
+								   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN E.SDATE(+) AND NVL(E.EDATE(+), '99991231')
+								   AND B.STATUS_CD <> 'RA'
+								   AND SUBSTR(A.SABUN, 1, 1) <> '0'
+								   AND C.IT_YN(+) = 'Y'
+								   AND (A.IT_MOVE_OUT_YMD IS NULL OR A.IT_MOVE_OUT_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+								   --AND INST1.FTHRM_ORG_DIRECT_YN(A.ENTER_CD, B.ORG_CD) NOT IN ('B', 'T')
+								   AND B.JIKWEE_CD <> 'B02'
+							     --ORDER BY C.SEQ, INST1.FTHRM_ORG_SEQ(A.ENTER_CD, B.ORG_CD), A.NAME
+							     --ORDER BY C.SEQ, B.ORG_CD, A.NAME
+							     ORDER BY F_COM_GET_ORG_SEQ(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')), A.NAME
+							      ) B
+					WHERE A.ENTER_CD        = B.ENTER_CD
+					  AND A.SABUN           = B.SABUN
+					  AND A.ENTER_CD        = #{ssnEnterCd}
+					  AND A.ACTIVE_YYYY     = #{searchActiveYyyy}
+					  AND A.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+					  AND (A.SUCCESSOR_EMP_NO_1 = #{searchSabun} OR A.SUCCESSOR_EMP_NO_2 = #{searchSabun} OR A.SUCCESSOR_EMP_NO_3 = #{searchSabun} ) ]]>
+					  <if test='searchName and !searchName.equals("")'>
+					  AND B.NAME LIKE '%' || #{searchName} || '%'
+					  </if>
+		</select>
+
+</mapper>

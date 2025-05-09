@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	연말정산결과 급여반영
+ -->
+<root>
+
+	<!-- 연말정산결과 급여반영 조회 -->
+	<query id="selectYeaResultPayCreList">
+		<![CDATA[
+		    SELECT ENTER_CD
+		    	 , ROWNUM AS RNUM
+		    	 , WORK_YY
+		    	 , PAY_ACTION_CD
+			     , PAY_ACTION_NM
+			     , BUSINESS_PLACE_CD
+			     , ELEMENT_CD
+			     , MTH_MON
+			     , MTH_MON2
+			     , MTH_MON3
+			     , APPLY_YN
+			     , APPLY_YN2
+			     , APPLY_YN3
+			     , PRINCIPAL_MON
+			     , ELEMENT_NM
+			     , NAME
+			     , SABUN
+			     , JIKGUB_NM
+			     , JIKWEE_NM
+			     , ORG_NM
+			  FROM 
+			  (
+				SELECT A.ENTER_CD
+				     , A.WORK_YY
+					 , A.PAY_ACTION_CD
+					 , A.BUSINESS_PLACE_CD
+					 , A.ELEMENT_CD
+					 , A.MTH_MON
+					 , A.MTH_MON2
+					 , A.MTH_MON3
+					 , DECODE(A.APPLY_YN, 'Y', '반영 완료', 'N', '미반영', '미반영') APPLY_YN
+					 , DECODE(A.APPLY_YN2, 'Y', '반영 완료', 'N', '미반영', '미반영') APPLY_YN2
+					 , DECODE(A.APPLY_YN3, 'Y', '반영 완료', 'N', '미반영', '미반영') APPLY_YN3
+					 , '' AS PRINCIPAL_MON
+					 , (SELECT B.ELEMENT_NM FROM TCPN011 B WHERE B.ENTER_CD = A.ENTER_CD AND B.ELEMENT_CD = A.ELEMENT_CD) AS ELEMENT_NM
+					 , C.NAME
+					 , C.SABUN
+					 , D.JIKGUB_NM
+					 , D.JIKWEE_NM
+					 , F_COM_GET_ORG_NM(D.ENTER_CD, D.ORG_CD, D.SDATE) AS ORG_NM
+					 , (SELECT F.PAY_ACTION_NM FROM TCPN201 F WHERE F.ENTER_CD = A.ENTER_CD AND F.PAY_ACTION_CD = A.PAY_ACTION_CD) AS PAY_ACTION_NM
+		        FROM TCPN845 A,
+		             THRM100 C,
+		             (   SELECT SUB1.* 
+			               FROM THRM151 SUB1 
+			              WHERE SUB1.ENTER_CD    = #ssnEnterCd# 
+			                AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231') ) D
+		        WHERE A.ENTER_CD 		= #ssnEnterCd#
+				  AND A.WORK_YY			= #searchWorkYy#
+				  AND A.PAY_ACTION_CD	LIKE #searchPayApplyCd# ||'%'
+				  AND A.BUSINESS_PLACE_CD 	LIKE '%'||#searchBizPlaceCd#
+		          AND A.ENTER_CD = C.ENTER_CD
+		          AND A.SABUN = C.SABUN
+				  AND ( C.NAME	LIKE '%' || #searchSbNm# || '%' OR C.SABUN	LIKE '%' || #searchSbNm# || '%')
+		          AND C.ENTER_CD = D.ENTER_CD
+		          AND C.SABUN = D.SABUN
+		      )
+			ORDER BY PAY_ACTION_CD, ORG_NM, SABUN, ELEMENT_CD DESC	
+		]]>
+	</query>
+	
+	<!-- 급여반영일자 조회  -->
+	<query id="selectYeaResultPayCrePayDayPopupList">
+		<![CDATA[
+			SELECT PAY_ACTION_CD
+			     , PAY_ACTION_NM
+			     , PAY_YM
+			     , PAY_CD
+			     , RUN_TYPE
+			     , PAYMENT_YMD
+			     , TO_CHAR(TO_DATE(PAYMENT_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS PAYMENT_YMD_HYPHEN
+			     , ORD_SYMD
+			     , ORD_EYMD
+			     , PAY_NM
+			FROM (                
+			        SELECT DISTINCT A.ENTER_CD
+	                      , A.PAY_ACTION_CD
+	                      , A.PAY_ACTION_NM
+	                      , A.PAY_YM
+	                      , A.PAY_CD
+	                      , B.RUN_TYPE
+	                      , A.PAYMENT_YMD
+	                      , A.ORD_SYMD
+	                      , A.ORD_EYMD
+						  , B.PAY_NM
+			          FROM TCPN201 A, TCPN051 B, TCPN981 C
+			         WHERE A.ENTER_CD		= #ssnEnterCd#       
+			           AND B.ENTER_CD		= A.ENTER_CD
+			           AND B.PAY_CD        	= A.PAY_CD
+			           AND A.ENTER_CD      	= C.ENTER_CD      (+)
+			           AND A.PAY_ACTION_CD 	= C.PAY_ACTION_CD (+)
+			           AND A.PAY_CD LIKE '%'|| #searchPayCd# ||'%'
+			           AND A.PAY_YM BETWEEN NVL(REPLACE(#searchMonthFrom#, '-', ''),'000000') AND NVL(REPLACE(#searchMonthTo#, '-', ''),'999999')
+			           AND B.RUN_TYPE NOT IN ('Y0001', '00004') --연말정산, 퇴직금 제외
+			         ORDER BY A.PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+			    )  
+		]]>
+	</query>	
+	
+	<!-- 연말정산결과 급여반영 중복 체크 -->
+	<query id="selectYeaResultPayCreCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT 
+			  FROM TCPN845
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND WORK_YY = #work_yy#
+			   AND SABUN = #sabun#
+			   AND PAY_ACTION_CD = #pay_action_cd# 
+			   AND ELEMENT_CD = #element_cd#
+		]]>
+	</query>	
+	
+	<!-- 연말정산결과 급여반영 입력 -->
+	<query id="insertYeaResultPayCre">
+		<![CDATA[
+			INSERT INTO TCPN845
+			(
+				ENTER_CD
+				, WORK_YY
+				, SABUN
+				, PAY_ACTION_CD
+				, ELEMENT_CD
+				, BUSINESS_PLACE_CD
+				, MTH_MON
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				#ssnEnterCd#
+				, #work_yy#
+				, #sabun#
+				, #pay_action_cd#
+				, #element_cd#
+				, #business_place_cd#
+				, #mth_mon#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+	
+	<!-- 연말정산결과 급여반영 수정 -->
+	<query id="updateYeaResultPayCre">
+		<![CDATA[
+			UPDATE TCPN845
+			SET MTH_MON = #mth_mon#
+				, CHKDATE = SYSDATE
+				, CHKID = #ssnSabun#
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND SABUN = #sabun#
+			  AND PAY_ACTION_CD = #pay_action_cd# 
+			  AND ELEMENT_CD = #element_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산결과 급여반영 삭제 -->
+	<query id="deleteYeaResultPayCre">
+		<![CDATA[
+			DELETE FROM TCPN845
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND WORK_YY = #work_yy#
+			  AND SABUN = #sabun#
+			  AND PAY_ACTION_CD = #pay_action_cd# 
+			  AND ELEMENT_CD = #element_cd#
+		]]>
+	</query>
+	<query id="deleteYeaResultPayCre109">
+		<![CDATA[
+			DELETE FROM TCPN109
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND PAY_ACTION_CD = #pay_action_cd# 
+			  AND ELEMENT_CD = #element_cd#
+		]]>
+	</query>
+	<query id="deleteYeaResultPayCre110">
+		<![CDATA[
+			DELETE FROM TCPN110
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND SABUN = #sabun#
+			  AND PAY_ACTION_CD = #pay_action_cd# 
+			  AND ELEMENT_CD = #element_cd#
+		]]>
+	</query>
+	
+</root>

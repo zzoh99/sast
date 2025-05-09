@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanAgrMgr">
+
+<!--  조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAgrMgrList">
+
+				<![CDATA[
+				SELECT A.*
+				     , REST_CNT - NVL(APP_CNT,0) AS APP_REST_CNT
+				     , CASE WHEN APPL_SEQ1 IS NOT NULL THEN '' 
+				            WHEN DOC_YN1 = '2'         THEN '<a class="sbutton">생성</a>'  
+				            ELSE '<a class="sbasic">삭제</a>' END AS DOC_BTN1
+				     , CASE WHEN DOC_YN2 = '2'         THEN '<a class="sbutton">생성</a>'  
+				            ELSE '<a class="sbasic">삭제</a>' END AS DOC_BTN2
+				     , DECODE( DOC_YN1, '2', '','<a class="sbasic">재전송</a>') AS MAIL_BTN1
+				     , DECODE( DOC_YN2, '2', '','<a class="sbasic">재전송</a>') AS MAIL_BTN2
+				     
+				     , B.YEAR_YMD
+				     , CASE WHEN F_COM_GET_STD_CD_VALUE(B.ENTER_CD, 'HRM_WKP_TYPE') = 'A' THEN NVL(B.EMP_YMD, B.GEMP_YMD)
+                            ELSE NVL(B.GEMP_YMD, B.EMP_YMD) END AS EMP_YMD
+                            
+				  FROM (
+	                      SELECT A.ENTER_CD
+	                           , A.SABUN
+	                           , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN ) AS NAME -- 성명
+	                           , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR( SYSDATE, 'YYYYMMDD' ) ) AS ORG_NM
+	                           , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR( SYSDATE, 'YYYYMMDD' )) AS JIKGUB_NM
+	                           , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR( SYSDATE, 'YYYYMMDD' )) AS JIKCHAK_NM
+	                           , A.USE_S_YMD
+	                           , A.USE_E_YMD
+	                           , A.USE_CNT
+	                           , A.USED_CNT
+	                           , A.REST_CNT
+	                           , A.ONEYEAR_UNDER_YN
+	                           , F_COM_GET_STATUS_CD( A.ENTER_CD, A.SABUN, TO_CHAR( SYSDATE, 'YYYYMMDD' )) AS STATUS_CD
+	                           , F_COM_GET_CONT_ADDRESS( A.ENTER_CD, A.SABUN , 'IM') AS MAIL_ID
+	                           , A.PLAN_CD
+	                           , ( SELECT SUM(X.APP_DAY)
+	                                 FROM TTIM405 X, THRI103 Y
+	                                WHERE X.ENTER_CD = A.ENTER_CD
+	                                  AND X.SABUN    = A.SABUN
+	                                  AND X.GNT_CD   = '22'
+	                                  AND X.YMD BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+	                                  AND X.ENTER_CD = Y.ENTER_CD
+	                                  AND X.APPL_SEQ = Y.APPL_SEQ
+	                                  AND Y.APPL_STATUS_CD IN ( '21','31')
+	                              ) AS APP_CNT
+	                                   
+	                           , CASE WHEN C1.SABUN IS NULL THEN '2' ELSE '1' END AS DOC_YN1 
+	                           , CASE WHEN C2.SABUN IS NULL THEN '2' ELSE '1' END AS DOC_YN2
+	                            
+	                           -- 1차촉진신청내역
+	                           , DECODE( C1.APPL_SEQ, NULL, NULL, 0 ) AS DETAIL1
+	                           , C1.APPL_SEQ       AS APPL_SEQ1
+	                           , C1.APPL_YMD       AS APPL_YMD1
+	                           , C1.APPl_STATUS_CD AS APPl_STATUS_CD1
+	                           , C1.APPL_IN_SABUN  AS APPL_IN_SABUN1
+	                           , TO_CHAR(C1.AGREE_TIME, 'YYYY-MM-DD HH24:mi:ss') AS AGREE_TIME1
+	                           , DECODE( C1.MAIL_SEQ, NULL, NULL, '1' ) AS MAIL_YN1
+	                            
+	                           -- 2차촉진
+	                           , TO_CHAR(C2.AGREE_TIME, 'YYYY-MM-DD HH24:mi:ss') AS AGREE_TIME2
+	                           , DECODE( C2.MAIL_SEQ, NULL, NULL, '1' ) AS MAIL_YN2
+	                           
+	                           , CASE WHEN A.ALARM_GUBUN_CD1 = 'M' THEN TO_CHAR( ADD_MONTHS(TO_DATE(A.USE_E_YMD,'YYYYMMDD'), A.ALARM_BF_DAY1 * (-1) ) , 'YYYYMMDD') 
+	                                  ELSE  TO_CHAR( TO_DATE(A.USE_E_YMD,'YYYYMMDD') - A.ALARM_BF_DAY1 , 'YYYYMMDD') END  AS STD_YMD1
+	                           , CASE WHEN A.ALARM_GUBUN_CD2 = 'M' THEN TO_CHAR( ADD_MONTHS(TO_DATE(A.USE_E_YMD,'YYYYMMDD'), A.ALARM_BF_DAY2 * (-1) ) , 'YYYYMMDD') 
+	                                  ELSE  TO_CHAR( TO_DATE(A.USE_E_YMD,'YYYYMMDD') - A.ALARM_BF_DAY2 , 'YYYYMMDD') END  AS STD_YMD2
+	                           , A.PLAN_SEQ  
+	                       FROM (
+                                    SELECT A.*
+                                         , B.PLAN_CD
+                                         , B.ALARM_GUBUN_CD1
+                                         , B.ALARM_BF_DAY1
+                                         , B.PLAN_DAY1
+                                         , B.ALARM_GUBUN_CD2
+                                         , B.ALARM_BF_DAY2
+                                         , B.PLAN_DAY2
+                                         , B.PLAN_SEQ
+                                      FROM TTIM511 A
+                                          , (
+                                                  SELECT PLAN_CD
+                                                       , MAX(DECODE(PLAN_SEQ, 1, ALARM_GUBUN_CD, NULL)) ALARM_GUBUN_CD1 
+                                                       , MAX(DECODE(PLAN_SEQ, 1, ALARM_BF_DAY, NULL)) ALARM_BF_DAY1 
+                                                       , MAX(DECODE(PLAN_SEQ, 1, PLAN_DAY, NULL)) PLAN_DAY1 
+                                                       , MAX(DECODE(PLAN_SEQ, 2, ALARM_GUBUN_CD, NULL)) ALARM_GUBUN_CD2
+                                                       , MAX(DECODE(PLAN_SEQ, 2, ALARM_BF_DAY, NULL)) ALARM_BF_DAY2
+                                                       , MAX(DECODE(PLAN_SEQ, 2, PLAN_DAY, NULL)) PLAN_DAY2
+                                                       , MAX(DECODE( PLAN_CD, '0', 'N','Y')) AS ONEYEAR_UNDER_YN
+                                                       , F_COM_GET_GRCODE_SEQ( ENTER_CD, 'T56120', PLAN_CD) AS  PLAN_SEQ    
+                                                   FROM TTIM560
+                                                  WHERE ENTER_CD = #{ssnEnterCd}
+                                                  GROUP BY ENTER_CD, PLAN_CD
+                                            ) B
+                                      WHERE A.ENTER_CD =  #{ssnEnterCd}
+                                        AND A.GNT_CD   = '14'
+	                                    AND TO_CHAR( SYSDATE, 'YYYYMMDD' ) BETWEEN A.USE_S_YMD AND A.USE_E_YMD
+                                        AND A.ONEYEAR_UNDER_YN = B.ONEYEAR_UNDER_YN
+                                ) A    
+	                          , ( SELECT X.SABUN, X.PLAN_CD, X.MAIL_SEQ, X.AGREE_TIME, Y.*
+	                                FROM TTIM561 X, THRI103 Y
+	                               WHERE X.ENTER_CD = #{ssnEnterCd}
+	                                 AND X.ENTER_CD = Y.ENTER_CD(+)
+	                                 AND X.APPL_SEQ = Y.APPL_SEQ(+)
+	                                 AND X.PLAN_SEQ = '1'
+	                            ) C1      
+	                          , ( SELECT X.*
+	                                FROM TTIM561 X
+	                               WHERE X.ENTER_CD = #{ssnEnterCd}
+	                                 AND X.PLAN_SEQ = '2'
+	                            ) C2     
+	                      WHERE 1 = 1
+	                        ]]>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					        AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					        AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR( SYSDATE, 'YYYYMMDD' ), #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+
+<if test='searchPlanCd != null and !searchPlanCd.equals("")'>
+                      	    AND A.PLAN_CD  = TRIM(#{searchPlanCd})
+</if>
+	                        AND A.SABUN    = C1.SABUN(+)
+	                        AND A.PLAN_CD  = C1.PLAN_CD(+)
+	                        AND A.SABUN    = C2.SABUN(+)
+	                        AND A.PLAN_CD  = C2.PLAN_CD(+)
+	                        
+<if test='searchMailYn1 != null and searchMailYn1.equals("Y")'>
+                      	    AND C1.MAIL_SEQ IS NOT NULL
+</if>
+<if test='searchMailYn1 != null and searchMailYn1.equals("N")'>
+                      	    AND C1.MAIL_SEQ IS NULL
+</if>
+<if test='searchMailYn2 != null and searchMailYn2.equals("Y")'>
+                      	    AND C2.MAIL_SEQ IS NOT NULL
+</if>
+<if test='searchMailYn2 != null and searchMailYn2.equals("N")'>
+                      	    AND C2.MAIL_SEQ IS NULL
+</if>
+<if test='searchAppYn1 != null and searchAppYn1.equals("Y")'>
+                      	    AND C1.APPL_SEQ IS NOT NULL
+</if>
+<if test='searchAppYn1 != null and searchAppYn1.equals("N")'>
+                      	    AND C1.APPL_SEQ IS NULL
+</if>
+	             	  ) A, THRM100 B
+	             WHERE A.ENTER_CD = B.ENTER_CD
+	               AND A.SABUN    = B.SABUN 	     
+	               AND A.STATUS_CD NOT LIKE 'RA%'    
+<if test='searchSYmd != null and !searchSYmd.equals("") and searchEYmd != null and !searchEYmd.equals("")'>
+                   AND (    A.STD_YMD1 BETWEEN REPLACE(TRIM(#{searchSYmd}), '-', '') AND REPLACE(TRIM(#{searchEYmd}), '-', '')
+         	             OR A.STD_YMD2 BETWEEN REPLACE(TRIM(#{searchSYmd}), '-', '') AND REPLACE(TRIM(#{searchEYmd}), '-', '')
+                       )              
+</if>
+<if test='searchTargetYn != null and searchTargetYn.equals("Y")'>
+	 <![CDATA[              AND ( A.REST_CNT - NVL(A.APP_CNT,0) ) > 0 ]]>
+</if>
+<if test='searchDocYn != null and !searchDocYn.equals("")'>
+				   AND A.DOC_YN = TRIM( #{searchDocYn} )
+</if>
+                 ORDER BY 1
+<choose><when test='searchSort and searchSort.equals("A")'>
+                      	, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR( SYSDATE, 'YYYYMMDD' )), A.PLAN_SEQ
+</when><otherwise>
+						, A.STD_YMD1, A.STD_YMD2, A.PLAN_SEQ
+</otherwise>
+</choose>
+		</select>
+
+
+<!--  생성 -->
+		<insert parameterType="map" id="saveAnnualPlanAgrMgr">
+
+						INSERT INTO TTIM561 T 
+						   ( 
+						              T.ENTER_CD
+						            , T.APPL_SEQ
+						            , T.SABUN
+						            , T.PLAN_CD
+						            , T.PLAN_SEQ
+						            , T.PLAN_STD_YMD
+						            , T.USE_S_YMD
+						            , T.USE_E_YMD
+						            , T.USE_CNT
+						            , T.USED_CNT
+						            , T.REST_CNT
+						            , T.AGREE_YN
+						            , T.AGREE_TIME
+						            , T.MAIL_SEQ
+						            , T.CHKDATE
+						            , T.CHKID
+						   ) 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+						       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD
+						            , F_COM_GET_SEQ('APPL')  	AS  APPL_SEQ
+						            , TRIM(#{rm.sabun})  		AS  SABUN
+						            , TRIM(#{rm.planCd})  		AS  PLAN_CD
+<choose><when test='planSeq and planSeq.equals("1")'>
+						            , 1							AS  PLAN_SEQ
+						            , TRIM(#{rm.stdYmd1})  		AS  PLAN_STD_YMD
+</when><otherwise>
+						            , 2							AS  PLAN_SEQ
+						            , TRIM(#{rm.stdYmd1})  		AS  PLAN_STD_YMD
+</otherwise>
+</choose>
+						            , TRIM(#{rm.useSYmd})  		AS  USE_S_YMD
+						            , TRIM(#{rm.useEYmd})  		AS  USE_E_YMD
+						            , TRIM(#{rm.useCnt})  		AS  USE_CNT
+						            , TRIM(#{rm.usedCnt})  		AS  USED_CNT
+						            , TRIM(#{rm.restCnt})  		AS  REST_CNT
+						            , NULL 						AS  AGREE_YN
+						            , NULL  					AS  AGREE_TIME
+						            , NULL  					AS  MAIL_SEQ
+						            , sysdate
+						            , #{ssnSabun}
+						        FROM DUAL
+</foreach>
+		</insert>
+				
+<!--  생성 -->
+		<delete parameterType="map" id="deleteAnnualPlanAgrMgr">
+
+					DELETE FROM TTIM561
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND (SABUN, PLAN_CD, PLAN_SEQ)  IN ( ( NULL , NULL, NULL )
+<foreach item="rm" collection="deleteRows" >
+	<if test='rm.sabun != null and !rm.sabun.equals("") and rm.planCd != null and !rm.planCd.equals("") and planSeq != null and !planSeq.equals("") '>
+							,  ( TRIM( #{rm.sabun} ),  TRIM( #{rm.planCd} ),  TRIM( :planSeq ) )
+	</if>
+</foreach>
+							)				
+		</delete>
+				
+<!-- 메일전송 프로시저 -->
+		<update parameterType="map" id="prcAnnualPlanAgrMgrMail">
+
+			<![CDATA[
+					CALL P_TIM_ANNUAL_PLAN_MAIL(#{sqlCode},#{sqlErrm}, #{ssnEnterCd},#{sabun},#{planCd},#{planSeq},#{ssnSabun})
+			]]>
+		</update>
+</mapper>

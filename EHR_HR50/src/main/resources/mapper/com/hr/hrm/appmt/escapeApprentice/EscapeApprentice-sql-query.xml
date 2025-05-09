@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmt.escapeApprentice">
+
+		<select parameterType="map" resultType="cMap" id="getEscapeApprenticeList">
+
+				<![CDATA[
+
+					SELECT NAME
+					     , SABUN
+					     , ORG_NM
+					     , STATUS_NM
+					     , TRA_YMD
+					     , TRA_YMD AS ORD_YMD
+					     , ORD_TYPE_CD
+					     , ORD_DETAIL_CD
+					  FROM (
+							SELECT X.NAME
+							     , X.SABUN
+							     , X.ORG_NM
+							     , X.STATUS_NM
+							     , X.TRA_YMD
+							     , NVL(Y.ORD_TYPE_CD, '190') AS ORD_TYPE_CD
+							     , NVL(Y.ORD_DETAIL_CD, '1031') AS ORD_DETAIL_CD
+							  FROM (
+									SELECT A.ENTER_CD
+									     , A.NAME
+									     , A.SABUN
+									     , C.ORG_NM
+									     , B.STATUS_NM
+									     , A.TRA_YMD
+									  FROM THRM100 A
+									  	, (   SELECT 	SUB1.*
+	        				                    FROM 	THRM151 SUB1,
+	        											(  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+	        				   								  FROM 	THRM151
+	        			 	   								 WHERE 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	        			 	   								 GROUP BY ENTER_CD, SABUN
+	        			 	   						    ) SUB2
+	        			    				   WHERE 	SUB1.ENTER_CD	= SUB2.ENTER_CD
+	          									 AND 	SUB1.SABUN	    = SUB2.SABUN
+	        									 AND 	SUB1.SDATE      = SUB2.SDATE		 ) B
+	        						    , (   SELECT 	SUB1.*
+	       										FROM 	TORG101 SUB1
+	       											  , (  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, ORG_CD
+	       				   									  FROM 	TORG101
+	       			 	   									 WHERE 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	       			 	   								     GROUP BY ENTER_CD, ORG_CD) SUB2
+	       			    					   WHERE 	SUB1.ENTER_CD = SUB2.ENTER_CD
+				      							 AND 	SUB1.ORG_CD     = SUB2.ORG_CD
+	       			      						 AND 	SUB1.SDATE    = SUB2.SDATE
+	       			      				  ) C
+									 WHERE A.ENTER_CD = #{ssnEnterCd}
+									   AND A.TRA_YMD BETWEEN REPLACE(#{ordYmdFrom},'-','') AND REPLACE(#{ordYmdTo},'-','')
+									   AND A.ENTER_CD = B.ENTER_CD
+									   AND A.SABUN = B.SABUN
+									   AND B.ENTER_CD = C.ENTER_CD
+									   AND B.ORG_CD = C.ORG_CD
+									MINUS
+									SELECT A.ENTER_CD
+									     , A.NAME
+									     , A.SABUN
+									     , C.ORG_NM
+									     , B.STATUS_NM
+									     , A.TRA_YMD
+									  FROM THRM100 A
+									     , (   SELECT 	SUB1.*
+	        									 FROM 	THRM151 SUB1
+	        									      , (  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+	        				   								  FROM 	THRM151
+	        			 	   								 WHERE 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	        			 	   								 GROUP BY ENTER_CD, SABUN
+	        			 	   						    ) SUB2
+	        			    					WHERE 	SUB1.ENTER_CD	= SUB2.ENTER_CD
+	          									  AND 	SUB1.SABUN	    = SUB2.SABUN
+	        									  AND 	SUB1.SDATE      = SUB2.SDATE		 ) B
+	        							 , (   SELECT 	SUB1.*
+	       										 FROM 	TORG101 SUB1
+	       										      , (  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, ORG_CD
+	       				   									  FROM 	TORG101
+	       			 	   									 WHERE 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	       			 	   									 GROUP BY ENTER_CD, ORG_CD
+	       			 	   							    ) SUB2
+	       			    						WHERE 	SUB1.ENTER_CD = SUB2.ENTER_CD
+				      							  AND 	SUB1.ORG_CD     = SUB2.ORG_CD
+	       			      						  AND 	SUB1.SDATE    = SUB2.SDATE		 ) C
+	       			      				 ,  THRM221 D
+									 WHERE A.ENTER_CD = #{ssnEnterCd}
+									   AND A.TRA_YMD BETWEEN REPLACE(#{ordYmdFrom},'-','') AND REPLACE(#{ordYmdTo},'-','')
+									   AND A.ENTER_CD = B.ENTER_CD
+									   AND A.SABUN = B.SABUN
+									   AND B.ENTER_CD = C.ENTER_CD
+									   AND B.ORG_CD = C.ORG_CD
+									   AND A.ENTER_CD = D.ENTER_CD
+									   AND A.SABUN = D.SABUN
+									   AND D.ORD_TYPE_CD IN ('190', '330')
+									   AND D.ORD_DETAIL_CD IN ('1031', '1201')
+								) X,
+								(
+									SELECT A.ENTER_CD, A.NAME, A.SABUN, C.ORG_NM, B.STATUS_NM, A.TRA_YMD, DECODE(D.ORD_TYPE_CD, '110', '330', '190') AS ORD_TYPE_CD, DECODE(D.ORD_DETAIL_CD, '1000', '1201', '1031') AS ORD_DETAIL_CD
+									  FROM THRM100 A
+									     , (   SELECT 	SUB1.*
+	        									 FROM 	THRM151 SUB1
+	        									      , (  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+	        				   								  FROM 	THRM151
+	        			 	   								 WHERE 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	        			 	   								 GROUP BY ENTER_CD, SABUN
+	        			 	   						    ) SUB2
+	        			    					WHERE 	SUB1.ENTER_CD	= SUB2.ENTER_CD
+	          									  AND 	SUB1.SABUN	    = SUB2.SABUN
+	        									  AND 	SUB1.SDATE      = SUB2.SDATE
+	        							   ) B
+	        							 , (   SELECT 	SUB1.*
+	       										 FROM 	TORG101 SUB1
+	       										      , (  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, ORG_CD
+	       				   									  FROM 	TORG101
+	       			 	   									 WHERE 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+	       			 	   									 GROUP BY ENTER_CD, ORG_CD
+	       			 	   							    ) SUB2
+	       			    						WHERE 	SUB1.ENTER_CD = SUB2.ENTER_CD
+				      							  AND 	SUB1.ORG_CD     = SUB2.ORG_CD
+	       			      						  AND 	SUB1.SDATE    = SUB2.SDATE
+	       			      				   ) C
+	       			      				 , THRM221 D
+									 WHERE A.ENTER_CD = #{ssnEnterCd}
+									   AND A.TRA_YMD BETWEEN REPLACE(#{ordYmdFrom},'-','') AND REPLACE(#{ordYmdTo},'-','')
+									   AND A.ENTER_CD = B.ENTER_CD
+									   AND A.SABUN = B.SABUN
+									   AND B.ENTER_CD = C.ENTER_CD
+									   AND B.ORG_CD = C.ORG_CD
+									   AND A.ENTER_CD = D.ENTER_CD
+									   AND A.SABUN = D.SABUN
+									   AND D.ORD_TYPE_CD = '110'
+									   AND D.ORD_DETAIL_CD = '1000'
+								) Y
+							WHERE X.ENTER_CD = Y.ENTER_CD(+)
+							  AND X.SABUN = Y.SABUN(+)
+							)
+							ORDER BY TRA_YMD ASC
+
+				]]>
+
+
+		</select>
+
+		<delete parameterType="map" id="deleteEscapeApprentice221">
+
+				<![CDATA[
+
+					DELETE FROM THRM221
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND ORD_TYPE_CD = #{ordTypeCd}
+					   AND ORD_DETAIL_CD = #{ordDetailCd}
+					   AND SABUN = #{sabun}
+					   AND ORD_YMD = #{ordYmd}
+
+				]]>
+
+
+		</delete>
+
+		<insert parameterType="map" id="insertEscapeApprentice221">
+
+				<![CDATA[
+
+					INSERT INTO THRM221 (
+         						ENTER_CD
+         					  , ORD_TYPE_CD
+         					  , ORD_DETAIL_CD
+         					  , SABUN
+         					  , ORD_YMD
+         					  , APPLY_SEQ
+         					  , ORD_E_YMD
+         					  , STATUS_CD
+         					  , MANAGE_CD
+         					  , WORK_TYPE
+         					  , PAY_TYPE
+         					  , ORG_CD
+         					  , JOB_CD
+         					  , POSITION_CD
+         					  , JIKWEE_CD
+         					  , JIKGUB_CD
+         					  , SAL_CLASS
+         					  , SG_POINT
+         					  , JIKCHAK_CD
+         					  , PLACE_WORK_CD
+         					  , NOJO_YN
+         					  , WORKTEAM_CD
+         					  , EXCEPTION_YN
+         					  , ORD_YN
+         					  , CHKDATE
+         					  , CHKID
+                  )
+                         SELECT #{ssnEnterCd}
+                              , #{ordTypeCd}
+                              , #{ordDetailCd}
+                              , #{sabun}
+                              , #{ordYmd}
+                              , 1
+                              , '99991231'
+                              , B.STATUS_CD
+                              , B.MANAGE_CD
+                              , B.WORK_TYPE
+                              , B.PAY_TYPE
+                              , B.ORG_CD
+                              , B.JOB_CD
+                              , B.POSITION_CD
+                              , B.JIKWEE_CD
+                              , B.JIKGUB_CD
+                              , B.SAL_CLASS
+                              , B.SG_POINT
+                              , B.JIKCHAK_CD
+                              , B.PLACE_WORK_CD
+                              , B.NOJO_YN
+                              , B.WORKTEAM_CD
+                              , B.EXCEPTION_YN
+                              , '1'
+                              , SYSDATE
+                              , #{ssnSabun}
+          	               FROM THRM100 A,
+			         		    (   SELECT 	SUB1.*
+			         				FROM 	THRM151 SUB1,
+			         						(  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+			         				   			FROM 	THRM151
+			         			 	   			WHERE 	ENTER_CD = #{ssnEnterCd}
+			           	 						AND 	TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+			         			 	   			GROUP BY ENTER_CD, SABUN) SUB2
+			         			    WHERE 	SUB1.ENTER_CD   = #{ssnEnterCd}
+			           				AND 	SUB1.ENTER_CD	= SUB2.ENTER_CD
+			           				AND 	SUB1.SABUN	    = SUB2.SABUN
+			         				AND 	SUB1.SDATE      = SUB2.SDATE
+			         		    ) B
+                         WHERE A.ENTER_CD 	= #{ssnEnterCd}
+		                   AND A.SABUN 	 	= #{sabun}
+		     			   AND A.ENTER_CD	= B.ENTER_CD
+		     			   AND A.SABUN 	 	= B.SABUN
+
+				]]>
+
+
+		</insert>
+
+		<update parameterType="map" id="prcExecAppmtApprentice" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_POST_APPRENTICE(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{processNo,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+
+</mapper>

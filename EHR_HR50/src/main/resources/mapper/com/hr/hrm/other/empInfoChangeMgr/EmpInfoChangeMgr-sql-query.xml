@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="hrm.other.empInfoChangeMgr">
+		<select id="execQuery" parameterType="map" resultType="cMap">
+
+				<![CDATA[
+					${query}
+					   
+				]]>
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getEmpInfoChangeSeq">
+
+				<![CDATA[
+					SELECT NVL(MAX(APPL_SEQ), 0) + 1 AS APPL_SEQ
+					  FROM THRM803 A
+					 WHERE ENTER_CD = #{ssnEnterCd}
+				]]>
+
+		</select>
+		<update parameterType="map" id="saveEmpInfoChangeMgr">
+
+					MERGE INTO THRM803 T
+					USING (SELECT *
+					         FROM (SELECT NULL AS ENTER_CD
+					                     ,NULL AS APPL_SEQ
+					                     ,NULL AS APPL_YMD
+					                     ,NULL AS EMP_TABLE
+					                     ,NULL AS SABUN
+					                     ,NULL AS NAME
+					                     ,NULL AS ORG_NM
+					                     ,NULL AS APPL_TYPE
+					                     ,NULL AS APPL_STATUS_CD
+					                     ,NULL AS APPR_YMD
+					                     ,NULL AS APPR_SABUN
+					                     ,NULL AS RETURN_MESSAGE
+					                     ,NULL AS ERROR_LOG
+					                     ,NULL AS MEMO
+					                 FROM DUAL
+					               
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL         
+					               SELECT #{ssnEnterCd} AS ENTER_CD
+					                     ,TRIM(#{rm.applSeq}) AS APPL_SEQ
+					                     ,TRIM(#{rm.applYmd}) AS APPL_YMD
+					                     ,UPPER(TRIM(#{rm.empTable})) AS EMP_TABLE
+					                     ,TRIM(#{rm.sabun}) AS SABUN
+					                     ,(SELECT NAME FROM THRM100 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun})) AS NAME
+					                     ,F_COM_GET_ORG_NM2(#{ssnEnterCd}, #{rm.sabun}, #{rm.applYmd}) AS ORG_NM
+					                     ,TRIM(#{rm.applType}) AS APPL_TYPE
+					                     ,TRIM(#{rm.applStatusCd}) AS APPL_STATUS_CD
+					                     ,TO_CHAR(SYSDATE,'YYYYMMDD') AS APPR_YMD
+					                     ,#{ssnSabun} AS APPR_SABUN
+					                     ,TRIM(#{rm.returnMessage}) AS RETURN_MESSAGE
+					                     ,TRIM(#{rm.errorLog}) AS ERROR_LOG
+					                     ,TRIM(#{rm.memo}) AS MEMO
+					                 FROM DUAL
+</foreach>
+					                 )
+					        WHERE ENTER_CD IS NOT NULL ) S
+					ON (T.ENTER_CD = S.ENTER_CD AND T.APPL_SEQ = S.APPL_SEQ)
+					WHEN MATCHED THEN
+					  UPDATE
+					     SET T.APPL_STATUS_CD = S.APPL_STATUS_CD
+					        ,T.APPR_YMD       = DECODE(S.APPL_STATUS_CD, '2',S.APPR_YMD,'')
+					        ,T.APPR_SABUN     = S.APPR_SABUN
+					        ,T.RETURN_MESSAGE = S.RETURN_MESSAGE
+					        ,T.ERROR_LOG      = S.ERROR_LOG
+					        ,T.MEMO           = S.MEMO
+					        ,T.CHKID          = #{ssnSabun}
+					        ,T.CHKDATE        = SYSDATE
+					WHEN NOT MATCHED THEN
+					  INSERT
+					    (T.ENTER_CD
+					    ,T.APPL_SEQ
+					    ,T.APPL_YMD
+					    ,T.EMP_TABLE
+					    ,T.SABUN
+					    ,T.NAME
+					    ,T.ORG_NM
+					    ,T.APPL_TYPE
+					    ,T.APPL_STATUS_CD
+					    
+					    ,T.CHKID
+					    ,T.CHKDATE)
+					  VALUES
+					    (S.ENTER_CD
+					    ,S.APPL_SEQ
+					    ,S.APPL_YMD
+					    ,S.EMP_TABLE
+					    ,S.SABUN
+					    ,S.NAME
+					    ,S.ORG_NM
+					    ,S.APPL_TYPE
+					    ,S.APPL_STATUS_CD
+					    
+					    ,#{ssnSabun}
+					    ,SYSDATE)
+
+
+		</update>
+		<delete parameterType="map" id="deleteEmpInfoChangeMgr">
+
+					DELETE FROM THRM803
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN  
+							(
+							NULL
+<foreach item="rm" collection="deleteRows" >
+							,#{rm.applSeq}
+</foreach>
+							)
+
+
+		</delete>
+		<delete parameterType="map" id="deleteEmpInfoChangeMgr2">
+				<![CDATA[
+					DELETE FROM ${table}
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ = #{applSeq}
+				]]>
+
+		</delete>
+
+	<select parameterType="map" resultType="cMap" id="getEmpInfoChangeMgrList">
+
+		SELECT A.APPL_SEQ			AS APPL_SEQ
+		,A.APPL_YMD			AS APPL_YMD
+		,A.EMP_TABLE			AS EMP_TABLE
+		,A.SABUN				AS SABUN
+		,A.NAME				AS NAME
+		,A.ORG_NM				AS ORG_NM
+		,A.APPL_TYPE			AS APPL_TYPE
+		,A.APPL_STATUS_CD		AS APPL_STATUS_CD
+		,A.APPL_STATUS_CD		AS APPL_STATUS_CD_TMP
+		,A.APPR_YMD			AS APPR_YMD
+		,(SELECT NAME FROM THRM100 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.APPR_SABUN) AS APPR_NAME
+		,A.RETURN_MESSAGE		AS RETURN_MESSAGE
+		,A.ERROR_LOG			AS ERROR_LOG
+		,A.MEMO				AS MEMO
+		FROM THRM803 A
+		<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+			, THRM151 B
+		</if>
+		WHERE A.ENTER_CD = #{ssnEnterCd}
+		<if test='searchSabunName !=null and !searchSabunName.equals("")'>
+			AND (A.SABUN LIKE '%'||#{searchSabunName} ||'%' OR A.NAME LIKE '%'||#{searchSabunName} ||'%' )
+		</if>
+		<if test='(searchFromApplYmd != null and !searchFromApplYmd.equals("")) or (searchToApplYmd != null and !searchToApplYmd.equals(""))'>
+			AND A.APPL_YMD BETWEEN NVL(REPLACE( #{searchFromApplYmd} ,'-',''),'19000101') AND NVL(REPLACE( #{searchToApplYmd} ,'-',''),'99991231')
+		</if>
+		<if test='searchEmpTable != null and !searchEmpTable.equals("")'>
+			AND A.EMP_TABLE = #{searchEmpTable}
+		</if>
+		<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+			AND A.APPL_STATUS_CD = #{searchApplStatusCd}
+		</if>
+		<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+			AND A.ENTER_CD = B.ENTER_CD
+			AND A.SABUN = B.SABUN
+			AND A.APPL_YMD BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+			<choose><when test='searchIncChldOrg != null and searchIncChldOrg.equals("Y")'>
+				AND B.ORG_CD IN (
+				SELECT #{searchOrgCd} FROM DUAL
+				UNION ALL
+				SELECT A.ORG_CD
+				FROM TORG105 A
+				WHERE 1=1
+				START WITH A.PRIOR_ORG_CD = #{searchOrgCd}
+				AND A.ENTER_CD = #{ssnEnterCd}
+				AND A.SDATE = #{searchOrgSdate}
+				CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+				AND PRIOR A.SDATE = A.SDATE
+				AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+				)
+			</when>
+				<otherwise>
+					AND B.ORG_CD = #{searchOrgCd}
+				</otherwise>
+			</choose>
+		</if>
+		ORDER BY A.APPL_SEQ DESC, A.APPL_YMD DESC, A.EMP_TABLE, A.SABUN
+
+
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getEmpCommonMgrList">
+		SELECT * FROM
+			(
+			    SELECT
+			        A.APPL_SEQ		AS APPL_SEQ
+					,A.EMP_TABLE			AS EMP_TABLE
+					,CASE
+						WHEN A.APPL_TYPE = 'I' THEN '입력'
+						WHEN A.APPL_TYPE = 'U' THEN '수정'
+						WHEN A.APPL_TYPE = 'D' THEN '삭제'
+						ELSE ''
+						END     			AS APPL_TYPE_NM
+			        ,A.APPL_STATUS_CD	AS APPL_STATUS_CD
+					,F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H90028' , A.APPL_STATUS_CD, #{ssnLocaleCd})	AS APPL_STATUS_CD_NM
+					,TO_CHAR(TO_DATE(A.APPL_YMD),'YYYY-MM-DD') 		AS APPL_YMD
+			        ,A.NAME			AS NAME
+					,B.EMP_TABLE_NM	AS EMP_TABLE_NM
+					,''				AS APPL_CD
+					,''				AS APPL_SABUN
+					,''				AS APPL_IN_SABUN
+					FROM THRM803 A
+					INNER JOIN THRM800 B
+					ON A.ENTER_CD = B.ENTER_CD
+					AND A.EMP_TABLE = B.EMP_TABLE
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					<if test='searchSabunName !=null and !searchSabunName.equals("")'>
+						AND (A.SABUN LIKE '%'||#{searchSabunName} ||'%' OR A.NAME LIKE '%'||#{searchSabunName} ||'%' )
+					</if>
+					<if test='(searchFromApplYmd != null and !searchFromApplYmd.equals("")) or (searchToApplYmd != null and !searchToApplYmd.equals(""))'>
+						AND A.APPL_YMD BETWEEN NVL(REPLACE( #{searchFromApplYmd} ,'-',''),'19000101') AND NVL(REPLACE( #{searchToApplYmd} ,'-',''),'99991231')
+					</if>
+					<if test='searchEmpTable != null and !searchEmpTable.equals("")'>
+						AND A.EMP_TABLE = #{searchEmpTable}
+					</if>
+					<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+						AND A.APPL_STATUS_CD = #{searchApplStatusCd}
+					</if>
+
+					UNION ALL
+
+		SELECT
+		B.APPL_SEQ
+		, '' AS EMP_TABLE
+		,C.APPL_NM AS APPL_TYPE_NM
+		,B.APPL_STATUS_CD	AS APPL_STATUS_CD
+		, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010' , B.APPL_STATUS_CD, '') AS APPL_STATUS_CD_NM
+		,TO_CHAR(TO_DATE(B.APPL_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS APPL_YMD
+		,F_COM_GET_NAMES(B.ENTER_CD, B.APPL_SABUN, '') AS NAME
+		,B.TITLE			AS EMP_TABLE_NM
+		,B.APPL_CD			AS APPL_CD
+		,B.APPL_SABUN		AS APPL_SABUN
+		,B.APPL_IN_SABUN	AS APPL_IN_SABUN
+		FROM THRI103 B
+		INNER JOIN (
+		SELECT A.APPL_CD, NVL(A.APPL_NM, B.APPL_NM) AS APPL_NM, A.ENTER_CD
+		FROM THRI131 A
+		INNER JOIN THRI101 B
+		ON B.ENTER_CD = A.ENTER_CD
+		AND B.APPL_CD = A.APPL_CD
+		AND NVL(B.USE_YN, 'N') = 'Y'
+		WHERE A.ENTER_CD = #{ssnEnterCd}
+		AND A.MAIN_MENU_CD = #{mainMenuCd}
+		AND A.GRP_CD = #{ssnGrpCd}
+		AND NVL(A.USE_YN, 'N') = 'Y'
+		AND NOT EXISTS
+		(
+		SELECT 1
+		FROM THRM800
+		WHERE ENTER_CD = A.ENTER_CD
+		AND EMP_TABLE = A.APPL_CD
+		)
+		-- 신청/결재 프로그램ID 의 .do 앞의 부분이 대상자의 권한에 추가되어 있는지
+		AND EXISTS(
+		SELECT 1
+		FROM TSYS311
+		WHERE ENTER_CD = A.ENTER_CD
+		AND GRP_CD = #{ssnGrpCd}
+		AND PRG_CD LIKE '%' || SUBSTR(DETAIL_PRG_CD,
+		INSTR(DETAIL_PRG_CD, '/', -1) + 1,
+		INSTR(DETAIL_PRG_CD, '.do') - INSTR(DETAIL_PRG_CD, '/', -1) - 1
+		) || '%'
+		)
+		) C
+		ON B.ENTER_CD 			= C.ENTER_CD
+		AND B.APPL_CD			= C.APPL_CD
+					WHERE 1=1
+					AND B.ENTER_CD  = #{ssnEnterCd}
+					<if test='searchEmpTable != null and !searchEmpTable.equals("")'>
+						AND B.APPL_CD  = TRIM( #{searchEmpTable} )
+					</if>
+					<if test='(searchFromApplYmd != null and !searchFromApplYmd.equals("")) or (searchToApplYmd != null and !searchToApplYmd.equals(""))'>
+						AND B.APPL_YMD BETWEEN NVL(REPLACE( #{searchFromApplYmd} ,'-',''),'19000101') AND NVL(REPLACE( #{searchToApplYmd} ,'-',''),'99991231')
+					</if>
+					AND B.APPL_SABUN     = #{ssnSabun}
+				) X
+		ORDER BY X.APPL_YMD DESC
+-- 		ORDER BY APPL_YMD DESC
+-- 		ORDER BY A.APPL_SEQ DESC, A.APPL_YMD DESC, A.EMP_TABLE, A.SABUN
+	</select>
+
+		<select parameterType="map" resultType="cMap" id="getEmpInfoColumnPkSeqList">
+
+				<![CDATA[
+					SELECT COLUMN_CD
+					FROM THRM802
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND EMP_TABLE = UPPER ( #{empTable} )
+					  AND PK_TYPE IN ( 'P', 'S' )
+				]]>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getEmpInfoColumnUseList">
+
+				<![CDATA[
+				
+				SELECT COUNT(*) CNT
+				FROM	(
+							SELECT * 
+							FROM THRM803 A
+							   , ${empTableHist} B
+							WHERE A.ENTER_CD = #{ssnEnterCd}
+							  AND A.ENTER_CD = B.ENTER_CD
+							  AND A.APPL_SEQ = B.APPL_SEQ
+							  AND A.EMP_TABLE = UPPER ( #{empTable} )
+							  
+							  ${columnCdQuery}
+							  
+							  AND A.APPL_STATUS_CD = '1'
+						)
+				]]>
+
+		</select>
+		
+
+</mapper>
+

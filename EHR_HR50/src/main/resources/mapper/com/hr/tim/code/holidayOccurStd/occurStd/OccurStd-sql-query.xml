@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.holidayOccurStd.occurStd">
+
+<!-- 휴가 발생조건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOccurStdList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GNT_CD
+					     , A.SEQ
+					     , A.CONDITION_S
+					     , A.CONDITION_E
+					     , A.UPBASE
+					     , A.DANWI
+					     , A.DAY
+					  FROM TTIM006 A
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					 ORDER BY A.GNT_CD, A.CONDITION_S
+				]]>
+
+
+		</select>
+
+				
+<!-- 휴가 발생조건 저장 -->
+		<update parameterType="map" id="saveOccurStd">
+
+					MERGE INTO TTIM006 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.GNT_CD
+							     , A.SEQ
+							     , A.CONDITION_S
+							     , A.CONDITION_E
+							     , A.UPBASE
+							     , A.DANWI
+							     , A.DAY
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS GNT_CD
+										 , NULL AS SEQ
+										 , NULL AS CONDITION_S
+										 , NULL AS CONDITION_E
+									     , NULL AS UPBASE
+									     , NULL AS DANWI
+									     , NULL AS DAY
+									FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.gntCd} )			AS  GNT_CD
+									<choose><when test=' rm.seq != null and !rm.seq.equals("")'>
+										 , TRIM(#{rm.seq}) 			AS SEQ
+									</when><otherwise>
+										 , TO_CHAR( (
+														SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+														  FROM TTIM006
+														 WHERE ENTER_CD = #{ssnEnterCd}
+														   AND GNT_CD = TRIM( #{rm.gntCd} )
+													) )	AS SEQ
+										<bind name="icnt" value="icnt + 1" />
+									</otherwise>
+									</choose>
+										 , TRIM( #{rm.conditionS})		AS  CONDITION_S
+										 , TRIM( #{rm.conditionE})		AS  CONDITION_E
+										 , TRIM( #{rm.upbase})			AS  UPBASE
+										 , TRIM( #{rm.danwi})			AS  DANWI
+										 , TRIM( #{rm.day} )			AS  DAY
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GNT_CD = S.GNT_CD AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CONDITION_S    	= S.CONDITION_S
+									, T.CONDITION_E    	= S.CONDITION_E
+									, T.UPBASE         	= S.UPBASE
+									, T.DANWI         	= S.DANWI
+									, T.DAY            	= S.DAY
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.GNT_CD
+							, T.SEQ
+							, T.CONDITION_S
+							, T.CONDITION_E
+							, T.UPBASE
+							, T.DANWI
+							, T.DAY
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.GNT_CD
+							, S.SEQ
+							, S.CONDITION_S
+							, S.CONDITION_E
+							, S.UPBASE
+							, S.DANWI
+							, S.DAY
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 휴가 발생조건 삭제 -->
+		<delete parameterType="map" id="deleteOccurStd">
+
+					DELETE FROM TTIM006
+					 WHERE ENTER_CD||'_'||GNT_CD||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")
+												and rm.seq != null and !rm.seq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.gntCd} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

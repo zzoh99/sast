@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.deptPartPayRealChaMon">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getDeptPartPayRealChaMonList">
+
+				<![CDATA[
+				 SELECT  ENTER_CD, SABUN, NAME, ORG_NM, JIKWEE_NM
+				                  ,BENEFIT_BIZ_CD, BENEFIT_BIZ_NM, SUM_MON 
+				                  ,PAY_ACTION_CD, PAY_ACTION_NM 
+				                  ,ELEMENT_NM, PAY_MON_205
+				                  ,CHA_MON
+				   FROM (               
+				             SELECT  ENTER_CD, SABUN, NAME
+				                        ,BENEFIT_BIZ_CD,F_COM_GET_GRCODE_NAME(ENTER_CD, 'B10230', BENEFIT_BIZ_CD) AS BENEFIT_BIZ_NM, SUM_MON 
+				                        ,PAY_ACTION_CD, (SELECT PAY_ACTION_NM FROM TCPN201 WHERE ENTER_CD = H.ENTER_CD AND PAY_ACTION_CD=H.PAY_ACTION_CD) AS PAY_ACTION_NM 
+				                        ,ELEMENT_NM, PAY_MON_205
+				                        ,(NVL(SUM_MON, 0) - NVL(PAY_MON_205, 0)) AS CHA_MON
+				                        ,F_COM_GET_ORG_NM2(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+				                        ,F_COM_GET_JIKWEE_NM(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+				                        FROM (      
+				                                  SELECT ENTER_CD, SABUN, NAME, BENEFIT_BIZ_CD, SUM_MON, PAY_ACTION_CD
+				                                             ,NVL((SELECT SUM(RESULT_MON)
+				                                                  FROM TCPN205
+				                                                 WHERE ENTER_CD         = G.ENTER_CD
+				                                                     AND SABUN              = G.SABUN
+				                                                     AND PAY_ACTION_CD = G.PAY_ACTION_CD
+				                                                     AND ELEMENT_CD = (SELECT ELEMENT_CD 
+				                                                                                    FROM TBEN005
+				                                                                                  WHERE ENTER_CD = G.ENTER_CD
+				                                                                                      AND PAY_CD    = G.PAY_CD              
+				                                                                                      AND BENEFIT_BIZ_CD = G.BENEFIT_BIZ_CD)
+				                                                                                  ), 0) AS PAY_MON_205 
+				                                             ,(SELECT ELEMENT_NM
+				                                                  FROM TCPN011 I
+				                                                 WHERE ENTER_CD         = G.ENTER_CD
+				                                                     AND SDATE              = (SELECT MAX(SDATE)
+				                                                                                         FROM TCPN011
+				                                                                                        WHERE ENTER_CD = I.ENTER_CD
+				                                                                                            AND ELEMENT_CD = I.ELEMENT_CD
+				                                                                                            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231'))   
+				                                                     AND ELEMENT_CD = (SELECT ELEMENT_CD 
+				                                                                                    FROM TBEN005
+				                                                                                  WHERE ENTER_CD = G.ENTER_CD
+				                                                                                      AND PAY_CD    = G.PAY_CD              
+				                                                                                      AND BENEFIT_BIZ_CD = G.BENEFIT_BIZ_CD)
+				                                                                                  ) AS ELEMENT_NM                                                                                                       
+				                                     FROM (                                              
+				                                                SELECT A.ENTER_CD  
+				                                                          ,C.SABUN
+				                                                          ,D.NAME
+				                                                          ,A.BENEFIT_BIZ_CD
+				                                                          ,SUM(C.PAY_MON) AS SUM_MON
+				                                                          ,A.PAY_ACTION_CD
+				                                                          ,E.PAY_CD
+				                                                  FROM TCPN431 A, THRI103 B, TCPN433 C, THRM100 D, TCPN201 E
+				                                                WHERE A.ENTER_CD = #{ssnEnterCd}
+				                                                    AND B.ENTER_CD = A.ENTER_CD    
+				                                                    AND B.APPL_SEQ = A.APPL_SEQ
+				                                                    AND C.ENTER_CD = A.ENTER_CD
+				                                                    AND C.APPL_SEQ = A.APPL_SEQ
+				                                                            ]]>
+																<if test='searchBenefitBizCd != null and !searchBenefitBizCd.equals("")'>
+																	AND A.BENEFIT_BIZ_CD = #{searchBenefitBizCd}
+																</if>
+				                                                    AND B.APPL_STATUS_CD = '99' 
+				                                                    AND D.ENTER_CD = C.ENTER_CD
+				                                                    AND D.SABUN      = C.SABUN
+				                                                    AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD
+				                                                                                           FROM TCPN980
+				                                                                                          WHERE ENTER_CD = A.ENTER_CD
+				                                                                                            AND NVL(DEPT_PART_PAY_YN, 'N') = 'Y')      
+				                                                    --AND A.PAY_YM = '201911' 
+																<if test='searchPayActionCd != null and !searchPayActionCd.equals("")'>
+																	AND A.PAY_ACTION_CD = #{searchPayActionCd}
+																</if>
+				                                                    AND E.ENTER_CD = A.ENTER_CD
+				                                                    AND E.PAY_ACTION_CD = A.PAY_ACTION_CD  
+				                                                GROUP BY A.ENTER_CD, C.SABUN, A.BENEFIT_BIZ_CD, A.PAY_ACTION_CD, D.NAME, E.PAY_CD 
+				                                          ) G        
+				                     ) H                           
+				       )
+				<![CDATA[
+				 WHERE ((NVL( #{searchChaMon} ,'N')='Y' AND CHA_MON <> 0) OR (NVL( #{searchChaMon} ,'N') ='N' AND CHA_MON LIKE '%'))
+				           ]]>
+				<if test='searchSabunName != null and !searchSabunName.equals("")'>
+				     AND (SABUN LIKE '%'|| #{searchSabunName} ||'%' OR NAME LIKE '%'|| #{searchSabunName} ||'%')
+				</if>
+				<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+				     AND ORG_NM LIKE '%'|| #{searchOrgNm} ||'%'
+				</if>
+				ORDER BY ELEMENT_NM ASC, NAME ASC
+
+
+
+		</select>
+		
+	</mapper>

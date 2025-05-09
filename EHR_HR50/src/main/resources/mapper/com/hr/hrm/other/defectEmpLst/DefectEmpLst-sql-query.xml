@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.defectEmpLst">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getDefectEmpLstList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD			-- 회사코드
+							 , D.ENTER_NM 			-- 사업장명
+						     , D.ENTER_NO			-- 사업자등록번호
+						     , A.SABUN				-- 사번
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME	-- 장애인근로자명
+						     , CRYPTIT.DECRYPT(RES_NO, A.ENTER_CD) AS RES_NO	-- 주민등록번호
+						     , DECODE(SUBSTR(CRYPTIT.DECRYPT(RES_NO, A.ENTER_CD),7,1), '1','남', '2','여', '3','남', '4','여', '5','남', '6','여') AS SEX_TYPE
+						     , C.JANG_TYPE -- 장애인정구분
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20336',C.JANG_TYPE, '') AS JANG_TYPE_NM
+						     , C.JANG_CD	-- 장애유형
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20320',C.JANG_CD, '') AS JANG_NM
+						     , C.JANG_GRADE_CD	-- 장애등급
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20330',C.JANG_GRADE_CD, '') AS JANG_GRADE_NM
+						     , C.JANG_STATUS_CD	-- 중중(경증) 여부
+							 , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20335',C.JANG_STATUS_CD, '') AS JANG_STATUS_NM
+						     , '' AS JANG_DOUBLE_YN	-- 중증 2배수 인정여부
+						     , C.JANG_YMD	-- 장애인정일
+						     , C.JANG_NO	-- 장애인정번호
+						     , A.EMP_YMD	-- 입사일
+						     , A.RET_YMD	-- 퇴사일
+						     , '' AS WORK_TYPE	-- 근무직종
+						     , '' AS PAY		-- 임금(원)
+						     , '' AS PERIOD		-- 고용보험버 등에 따른 각종 자료금 및 지원금을 지급받은 기간
+						     , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO
+						     , F_SYS_GET_ENDOW_AUTH_YN( A.ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  A.SABUN ) AS AUTH_YN
+					FROM THRM100 A, THRM151 B, THRM120 C, TORG900 D
+					WHERE A.ENTER_CD = B.ENTER_CD
+					  AND A.SABUN = B.SABUN
+					  AND NVL(REPLACE(#{searchYmd}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')	-- 조회조건 기준일
+					  AND A.ENTER_CD = C.ENTER_CD
+					  AND A.SABUN = C.SABUN
+					  AND A.ENTER_CD = D.ENTER_CD
+					  AND A.ENTER_CD = #{ssnEnterCd} ]]>
+					  <if test='searchStatusCd != null and searchStatusCd.equals("RA")'>
+					  AND B.STATUS_CD NOT LIKE 'RA%'
+					 </if>
+					  <if test='searchSabunName !=null and !searchSabunName.equals("")'>
+					  	AND (A.SABUN LIKE  '%'|| #{searchSabunName} ||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)  LIKE '%'|| #{searchSabunName} ||'%')
+					  </if>
+					  AND TRIM(C.JANG_TYPE) IS NOT NULL			
+					  
+					<if test='except1 != null and except1.equals("Y")'>
+					   <![CDATA[ AND B.STATUS_CD <> 'CA' ]]>
+					</if>
+<!--					<if test='except2 != null and except2.equals("Y")'>-->
+<!--					<![CDATA[-->
+<!--					    AND NVL((SELECT X.CNT_TYPE_CD-->
+<!--						           FROM TCPN403 X-->
+<!--						          WHERE X.ENTER_CD = B.ENTER_CD-->
+<!--						            AND X.SABUN = B.SABUN-->
+<!--						  		    AND (X.ENTER_CD, X.SABUN, X.SDATE) IN ( SELECT Y.ENTER_CD, Y.SABUN, MAX(Y.SDATE)-->
+<!--						            	                                         FROM TCPN403 Y-->
+<!--						              	                                    	WHERE Y.ENTER_CD = X.ENTER_CD-->
+<!--						                                                       	  AND Y.SABUN = X.SABUN-->
+<!--						                                                       	  AND REPLACE(NVL(#{searchYmd}, TO_CHAR(SYSDATE,'YYYYMMDD')), '-', '')  BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231')-->
+<!--						                                                     	GROUP BY Y.ENTER_CD, Y.SABUN ) ), '^' ) <> '070'-->
+<!--					    ]]>-->
+<!--					</if>-->
+					<if test='except3 != null and except3.equals("Y")'>
+					   <![CDATA[ AND B.JIKWEE_CD <> '177' ]]>
+					</if>
+					
+					ORDER BY F_COM_JIKJE_SORT (A.ENTER_CD, A.SABUN, NVL(REPLACE(#{searchYmd}, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')) )	-- 조회조건 기준일
+
+
+
+	</select>
+		
+
+</mapper>

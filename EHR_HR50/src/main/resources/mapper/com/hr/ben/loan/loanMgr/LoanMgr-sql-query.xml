@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.loan.loanMgr">
+
+	<select id="getLoanMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+			 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+			 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+			 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+			 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+			 , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+			 , F_COM_GET_STATUS_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_NM
+		     , A.LOAN_CD
+		     , A.REP_SEQ
+		     , A.REP_YMD
+		     , A.REPAY_TYPE
+		     , TO_CHAR(TO_DATE(A.APPLY_SDATE,'YYYYMMDD'),'YYYY-MM-DD') || ' ~ ' || TO_CHAR(TO_DATE(A.APPLY_EDATE,'YYYYMMDD'),'YYYY-MM-DD') AS APPLY_YMD
+		     , A.APPLY_DAY
+		     , A.LOAN_STD_MON
+		     , A.INT_RATE
+		     , A.REP_MON
+		     , A.INT_MON
+		     , A.LOAN_REM_MON
+		     , A.PAY_YM
+		     , A.CLOSE_YN
+		     , A.PAY_ACTION_CD
+		     , A.NOTE
+		     , B.LOAN_YMD
+		     , B.LOAN_MON
+		     , B.REP_MON AS LOAN_REP_MON
+		     , B.LOAN_PERIOD
+			 , CASE WHEN A.REPAY_TYPE = '02' OR NVL(A.CLOSE_YN, 'N') = 'Y' THEN '0' ELSE '1' END AS ROW_EDIT
+		  FROM TBEN625 A, TBEN623 B 
+		 WHERE A.ENTER_CD      = TRIM(#{ssnEnterCd})
+		   AND A.ENTER_CD      = B.ENTER_CD
+		   AND A.APPL_SEQ      = B.APPL_SEQ ]]>
+		<if test='searchfinYn != null and searchfinYn eq "Y"'>
+		   AND A.REP_YMD = ( SELECT MAX(X.REP_YMD)
+                               FROM TBEN625 X
+                              WHERE X.ENTER_CD = A.ENTER_CD
+                                AND X.APPL_SEQ = A.APPL_SEQ )
+		</if>
+		<if test="searchLoanYn != null and searchLoanYn neq ''">
+		   AND A.LOAN_REM_MON > 0
+		</if>
+		<if test="searchYm != null and searchYm neq ''">
+		   AND A.PAY_YM = REPLACE(#{searchYm}, '-','')
+		</if>
+		<if test="searchRepayType != null and searchRepayType neq ''">
+		   AND A.REPAY_TYPE = #{searchRepayType}
+		</if>
+		<if test="searchWorkType != null and searchWorkType neq ''">
+		   AND F_COM_GET_WORKTYPE(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) = #{searchWorkType}
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+		   AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+		</if>
+		<if test="searchSYmd != null and searchSYmd neq '' and searchEYmd != null and searchEYmd neq ''">
+		   AND A.REP_YMD BETWEEN REPLACE(#{searchSYmd}, '-','') AND REPLACE(#{searchEYmd}, '-','')
+		</if>
+		 ORDER BY A.REP_YMD DESC  
+	</select>
+
+	<update id="saveLoanMgr" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN625 T 
+		 USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			   SELECT TRIM(#{ssnEnterCd})	AS ENTER_CD 
+		            , TRIM(#{rm.applSeq}) 	AS APPL_SEQ
+		            , TRIM(#{rm.sabun}) 	AS SABUN
+		            , TRIM(#{rm.loanCd}) 	AS LOAN_CD
+		            , TRIM(#{rm.repSeq}) 	AS REP_SEQ
+		            , TRIM(#{rm.repMon}) 	AS REP_MON
+		            , TRIM(#{rm.intMon}) 	AS INT_MON
+		            , TRIM(#{rm.payYm}) 	AS PAY_YM
+		            , TRIM(#{rm.closeYn}) 	AS CLOSE_YN
+		            , TRIM(#{rm.note}) 		AS NOTE
+		        FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+		     AND  T.SABUN 		= S.SABUN 
+		     AND  T.LOAN_CD 	= S.LOAN_CD 
+		     AND  T.REP_SEQ 	= S.REP_SEQ 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE		= sysdate 
+		            , T.CHKID	    = #{ssnSabun} 
+		            , T.REP_MON 	= S.REP_MON 
+		            , T.INT_MON 	= S.INT_MON 
+		            , T.PAY_YM 		= S.PAY_YM 
+		            , T.CLOSE_YN 	= S.CLOSE_YN 
+		            , T.NOTE 		= S.NOTE 
+	]]>
+	</update>
+		
+	<delete id="deleteLoanMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN625
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( APPL_SEQ, SABUN,LOAN_CD, REP_SEQ ) IN ( ( NULL,NULL,NULL,NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.applSeq != null and rm.applSeq neq '' and rm.sabun != null and rm.sabun neq ''
+			 	  and rm.loanCd != null and rm.loanCd neq '' and rm.repSeq != null and rm.repSeq neq ''">
+				, ( TRIM( #{rm.applSeq} ),TRIM( #{rm.sabun} ),TRIM( #{rm.loanCd} ),TRIM( #{rm.repSeq} ) )
+			</if>
+		</foreach>
+			)
+	</delete>
+		
+	<!-- 이자생성 -->
+	<update id="prcLoanMgr" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_MTH_LOAN_CRE(
+			#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+		
+	<!-- 중도상환 등록 -->
+	<update id="prcLoanMgrRepReg" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_LOAN_REP_REG(
+			#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{sabun,mode=IN,jdbcType=VARCHAR},
+			#{applSeq,mode=IN,jdbcType=VARCHAR},
+			#{loanCd,mode=IN,jdbcType=VARCHAR},
+			#{intRate,mode=IN,jdbcType=VARCHAR},
+			#{applySdate,mode=IN,jdbcType=VARCHAR},
+			#{applyDay,mode=IN,jdbcType=VARCHAR},
+			#{repYmd,mode=IN,jdbcType=VARCHAR},
+			#{repMon,mode=IN,jdbcType=VARCHAR},
+			#{intMon,mode=IN,jdbcType=VARCHAR},
+			#{note,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>	
+	</update>
+	
+</mapper>

@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ 
+<mapper namespace="common.other">
+	
+	<select id="getSequence" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_SEQ(#{seqId}) AS GET_SEQ FROM DUAL
+		]]>
+	</select>
+	
+	<select id="getImagePrint" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_SQL_BLOB(#{ssnEnterCd}, #{ssnSabun})AS GET_IMAGE FROM DUAL
+		]]>
+	</select>
+	
+	<select id="getBase64En" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT UTL_ENCODE.TEXT_ENCODE(#{data1}, 'WE8ISO8859P1', 1) AS CODE FROM DUAL
+		]]>
+	</select>
+	
+	<select id="getBase64De" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT UTL_ENCODE.TEXT_DECODE(#{data1}, 'WE8ISO8859P1', 1) AS CODE FROM DUAL
+		]]>
+	</select>
+	
+	<select id="getViewQuery" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT TEXT
+			  FROM USER_VIEWS
+			 WHERE VIEW_NAME = #{searchViewNm}
+		]]>
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getOrdBatchPsnlPostData">
+		SELECT A.*
+		     , B.ORD_YMD AS MAX_ORD_YMD_211
+		     , B.APPLY_SEQ AS MAX_APPLY_SEQ_211
+		     , (
+		        SELECT NVL(MAX(APPLY_SEQ), 0) + 1
+		          FROM THRM221
+		         WHERE ENTER_CD = A.ENTER_CD
+		           AND SABUN = A.SABUN
+		           AND ORD_YMD = A.ORD_YMD
+		       ) AS NEW_APPLY_SEQ
+		     , DECODE(D.SABUN,NULL,0,1) AS DUP_CNT
+		     , D.PROCESS_NO AS DUP_PROCESS_NO
+		     , (SELECT PROCESS_TITLE FROM THRM220 WHERE ENTER_CD = D.ENTER_CD AND PROCESS_NO = D.PROCESS_NO) AS DUP_PROCESS_TITLE
+	<foreach item="rm" collection="postItemList" >
+		<if test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+			 , C.${rm.columnCd}
+			<if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+			 , C.${rm.nmColumnCd}
+			</if>
+		</if>
+	</foreach>
+		  FROM (
+				SELECT #{ssnEnterCd} AS ENTER_CD
+					 , #{ordDetailCd} AS ORD_DETAIL_CD
+					 , #{sabun} AS SABUN
+					 , #{name} AS NAME
+					 , #{ordYmd} AS ORD_YMD
+					 , #{ordTypeCd} AS ORD_TYPE_CD
+					 , #{ordReasonCd} AS ORD_REASON_CD
+					 , #{processNo} AS PROCESS_NO
+					 , 'N' AS ORD_YN
+					 , #{visualYn} AS VISUAL_YN
+					 , #{sNo} AS S_NO
+					 , #{seq} AS SEQ
+					 , #{seqNm} AS SEQ_NM
+					 , #{applKey} AS APPL_KEY
+					 , #{ssnSabun} AS SSN_SABUN
+				  FROM DUAL
+			   ) A
+		  LEFT JOIN (
+				SELECT ENTER_CD
+					 , SABUN
+					 , ORD_YMD
+					 , MAX(APPLY_SEQ) AS APPLY_SEQ
+				  FROM THRM221
+				 WHERE (ENTER_CD, SABUN, ORD_YMD) IN (
+													   SELECT ENTER_CD, SABUN, MAX(ORD_YMD) AS ORD_YMD
+														 FROM THRM221
+														WHERE ENTER_CD = #{ssnEnterCd}
+														  AND SABUN = #{sabun}
+														GROUP BY ENTER_CD, SABUN
+													 )
+				 GROUP BY ENTER_CD, SABUN, ORD_YMD
+			   ) B
+			ON A.ENTER_CD = B.ENTER_CD
+		  LEFT JOIN (
+				/* 발령 항목 매핑필드 리스트 조회 */
+		    	SELECT C1.ENTER_CD, C1.SABUN
+		<foreach item="rm" collection="postItemList" >
+			<if test='rm.columnCd != null and !rm.columnCd.equals("MEMO")'>
+		    	     /* 발령 항목 매핑필드 코드 */
+		    	     , DECODE(C1.SABUN
+				              , NULL
+				<choose>
+					<when test='rm.columnCd != null and rm.columnCd.equals("STATUS_CD")'>
+				              , C1.ORD_${rm.columnCd}
+						      , C1.ORD_${rm.columnCd}
+					</when>
+					<otherwise>
+				              , C1.${rm.columnCd}
+				              , NVL(
+									(SELECT POST_ITEM_VALUE
+									   FROM THRM223
+									  WHERE ENTER_CD = #{ssnEnterCd}
+									    AND ORD_DETAIL_CD = C2.ORD_DETAIL_CD
+									    AND SABUN = #{sabun}
+									    AND ORD_YMD = C2.ORD_YMD
+									    AND APPLY_SEQ = C2.APPLY_SEQ
+									    AND POST_ITEM = #{rm.postItem}
+								    ), C1.${rm.columnCd}
+				                   )
+					</otherwise>
+				</choose>
+		    	             ) AS ${rm.columnCd}
+				<if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+					/* 발령 항목 매핑필드 명 */
+		    	     , DECODE(C2.SABUN
+				              , NULL
+				<choose>
+					<when test='rm.nmColumnCd != null and (rm.nmColumnCd.equals("STATUS_NM") or rm.nmColumnCd.equals("DISPATCH_ORG_NM"))'>
+				              , C1.ORD_${rm.nmColumnCd}
+				              , C1.ORD_${rm.nmColumnCd}
+					</when>
+					<otherwise>
+				              , C1.${rm.nmColumnCd}
+				              , NVL(
+									(SELECT POST_ITEM_VALUE
+									   FROM THRM223
+									  WHERE ENTER_CD = #{ssnEnterCd}
+									    AND ORD_DETAIL_CD = C2.ORD_DETAIL_CD
+									    AND SABUN = #{sabun}
+									    AND ORD_YMD = C2.ORD_YMD
+									    AND APPLY_SEQ = C2.APPLY_SEQ
+									    AND POST_ITEM = #{rm.postItem}||'_NM'
+								    ), C1.${rm.nmColumnCd}
+				                   )
+					</otherwise>
+				</choose>
+		    	             ) AS ${rm.nmColumnCd}
+				</if>
+			</if>
+		</foreach>
+		          FROM (
+		              	SELECT S.*
+							 , F_COM_GET_ORD_DETAIL_TYPE_CD2(S.ENTER_CD, #{ordTypeCd}, #{ordDetailCd}, 1) AS ORD_STATUS_CD /* 발령 항목에 맞는 재직상태 코드 */
+							 , F_COM_GET_ORD_DETAIL_TYPE_CD2(S.ENTER_CD, #{ordTypeCd}, #{ordDetailCd}, 2) AS ORD_STATUS_NM /* 발령 항목에 맞는 재직상태 명 */
+		              	     , F_COM_GET_ORG_NM(S.ENTER_CD, S.ORG_CD, #{ordYmd}) AS ORG_NM
+		              	     , F_COM_GET_ORG_NM(S.ENTER_CD, S.DISPATCH_ORG_CD, #{ordYmd}) AS ORD_DISPATCH_ORG_NM
+		              	     , F_COM_GET_JOB_NM_201(S.ENTER_CD, S.JOB_CD, #{ordYmd}) AS JOB_NM
+		              	  FROM THRM151 S
+		              	 WHERE ENTER_CD = #{ssnEnterCd}
+		              	   AND SABUN = #{sabun}
+		              	   AND SDATE = (
+										SELECT MAX(SDATE)
+										  FROM THRM151
+										 WHERE ENTER_CD = #{ssnEnterCd}
+										   AND SABUN = #{sabun}
+										   AND #{ordYmd} BETWEEN SDATE AND EDATE
+									   )
+					   ) C1
+		          LEFT JOIN (
+		              	SELECT *
+		              	  FROM THRM221
+		              	 WHERE ENTER_CD = #{ssnEnterCd}
+		              	   AND SABUN = #{sabun}
+		              	   AND (ORD_YMD, APPLY_SEQ) IN (
+		              	   								SELECT ORD_YMD, MAX(APPLY_SEQ)
+		              	   								  FROM THRM221
+		              	   								 WHERE ENTER_CD = #{ssnEnterCd}
+		              	   								   AND SABUN = #{sabun}
+		              	   								   AND ORD_YMD IN (
+																			SELECT MAX(ORD_YMD)
+																			  FROM THRM221
+																			 WHERE ENTER_CD = #{ssnEnterCd}
+																			   AND SABUN = #{sabun}
+																		  )
+		              	 								 GROUP BY ORD_YMD
+		              	                               )
+					   ) C2
+		            ON C1.ENTER_CD = C2.ENTER_CD
+		           AND C1.SABUN = C2.SABUN
+		       ) C
+		    ON A.ENTER_CD = C.ENTER_CD
+		   AND A.SABUN = C.SABUN
+		  LEFT JOIN THRM221 D
+		    ON A.ENTER_CD = D.ENTER_CD
+		   AND A.ORD_TYPE_CD = D.ORD_TYPE_CD
+		   AND A.ORD_DETAIL_CD = D.ORD_DETAIL_CD
+		   AND A.SABUN = D.SABUN
+		   AND A.ORD_YMD = D.ORD_YMD
+		 WHERE ROWNUM = 1
+	</select>
+
+	<insert parameterType="map" id="saveOrdBatchMaster">
+		INSERT
+		  INTO THRM221
+		     ( ENTER_CD
+			 , ORD_DETAIL_CD
+			 , SABUN
+			 , NAME
+			 , ORD_YMD
+			 , APPLY_SEQ
+			 , ORD_TYPE_CD
+			 , ORD_REASON_CD
+			 , PROCESS_NO
+			 , ORD_YN
+			 , VISUAL_YN
+			 , MEMO
+			 , CHKDATE
+			 , CHKID
+			 , SEQ
+			 , SEQ_NM
+			 , APPL_KEY
+			 )
+		SELECT #{enterCd}
+			 , #{ordDetailCd}
+			 , #{sabun}
+			 , DECODE(#{name},
+					  NULL,
+					  (SELECT NAME FROM THRM100 WHERE ENTER_CD = #{enterCd} AND SABUN = #{sabun} ),
+					  #{name} )
+			 , #{ordYmd}
+			 , #{newApplySeq}
+			 , #{ordTypeCd}
+			 , #{ordReasonCd}
+			 , #{processNo}
+			 , 'N'
+			 , #{visualYn}
+			 , NULL
+			 , SYSDATE
+			 , #{ssnSabun}
+			 , #{seq}
+			 , #{seqNm}
+			 , #{applKey}
+		  FROM DUAL
+	</insert>
+
+	<insert parameterType="map" id="saveOrdBatchDetail">
+		INSERT
+		  INTO THRM223
+			 ( ENTER_CD
+			 , ORD_DETAIL_CD
+			 , SABUN
+			 , ORD_YMD
+			 , APPLY_SEQ
+			 , POST_ITEM
+			 , ORD_TYPE_CD
+			 , CHKDATE
+			 , CHKID
+			 , POST_ITEM_VALUE
+		     )
+		<foreach item="rm" collection="postItemList" index="index" separator=" UNION ALL ">
+		SELECT #{enterCd} AS ENTER_CD
+			 , #{ordDetailCd} AS ORD_DETAIL_CD
+			 , #{sabun} AS SABUN
+			 , #{ordYmd} AS ORD_YMD
+			 , #{newApplySeq} AS APPLY_SEQ
+			 , #{rm.postItem} AS POST_ITEM
+			 , #{ordTypeCd} AS ORD_TYPE_CD
+			 , SYSDATE AS CHKDATE
+			 , #{ssnSabun} AS CHKID
+			 , #{rm.value} AS POST_ITEM_VALUE
+		  FROM DUAL
+		<if test='rm.cType != null and (rm.cType.equals("P") or rm.cType.equals("C"))'>
+		 UNION ALL
+	    SELECT #{enterCd} AS ENTER_CD
+			 , #{ordDetailCd} AS ORD_DETAIL_CD
+			 , #{sabun} AS SABUN
+			 , #{ordYmd} AS ORD_YMD
+			 , #{newApplySeq} AS APPLY_SEQ
+			 , #{rm.postItem}||'_NM' AS POST_ITEM
+			 , #{ordTypeCd} AS ORD_TYPE_CD
+			 , SYSDATE AS CHKDATE
+			 , #{ssnSabun} AS CHKID
+			 , #{rm.nmValue} AS POST_ITEM_VALUE
+		  FROM DUAL
+		</if>
+		</foreach>
+	</insert>
+
+	<select id="getPreOrdCntCheck" parameterType="map" resultType="cMap">
+		SELECT COUNT(*) AS CNT
+          FROM THRM221
+         WHERE ENTER_CD = #{ssnEnterCd}
+           AND SABUN = #{sabun}
+           AND ORD_YMD > #{ordYmd}
+           AND ORD_YN = 'N'
+	</select>
+</mapper>

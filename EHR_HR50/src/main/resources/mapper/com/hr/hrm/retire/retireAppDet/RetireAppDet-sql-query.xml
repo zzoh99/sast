@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.retire.retireAppDet">
+
+<!-- 퇴직신청 결재자 구분 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireGb">
+
+				<![CDATA[
+					SELECT F_HRM_GET_RETIRE_GB( #{ssnEnterCd}, #{ssnSabun}, #{applSeq} ) AS RETIRE_GB
+					  FROM DUAL
+				]]>
+
+
+		</select>
+
+<!-- 퇴직신청 세부내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireAppDetList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_YMD
+					     , A.APPL_STATUS_CD
+					     , A.APPL_SEQ
+					     , A.APPL_SABUN
+					     , A.APPL_IN_SABUN
+					     , B.SABUN
+					     , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) AS NAME
+					     , B.FIN_WORK_YMD
+					     , B.RET_SCH_YMD
+					     , B.RET_YMD
+					     , B.RET_REASON_CD
+					     , B.NOTE
+					     , B.CONV_SABUN1
+					     , F_COM_GET_NAMES(B.ENTER_CD, B.CONV_SABUN1, #{ssnLocaleCd}) AS CONV_NAME1
+					     , B.RET_REASON_CD1
+					     , B.CONV_NOTE1
+					     , B.CONFIRM_YN
+					     , B.CONV_SABUN2
+					     , B.RET_REASON_CD2
+					     , B.RET_PATH_CD
+					     , B.MOVE_COMPANY
+					     , B.CONV_NOTE2
+					     , B.TAKEOVER_SABUN
+					     , F_COM_GET_NAMES(B.ENTER_CD, B.TAKEOVER_SABUN, #{ssnLocaleCd}) AS TAKEOVER_NAME
+					     , B.TAKEOVER_SDATE
+					     , B.TAKEOVER_EDATE
+					     , B.AGREE_YN
+					     , B.AGREE_DATE
+					     , B.SIGN_FILE_SEQ
+					     , B.SIGN_FILE_SEQ1
+						 , B.SIGN_YN
+						 , B.RET_CONTRACT_NO
+						 , (SELECT AGREE_SABUN FROM THRI107 WHERE ENTER_CD = A.ENTER_CD AND APPL_SEQ =  A.APPL_SEQ AND AGREE_SEQ = 2) AS INTERVIEW2_SABUN
+						 , NVL(( SELECT COUNT(*)  FROM THRM185
+                     	      WHERE ENTER_CD = B.ENTER_CD
+					   		   AND SABUN 	= B.SABUN
+					           AND CCR_CD 	= '90'
+					           AND APPL_SEQ = TRIM( #{applSeq} )
+                               AND DECODE('2', '2',ADVISER, '3', NULL) =(SELECT AGREE_SABUN FROM THRI107 WHERE ENTER_CD = A.ENTER_CD AND APPL_SEQ =  A.APPL_SEQ AND AGREE_SEQ = 2)			
+                           ),0) AS INTERVIEW_CNT
+					  FROM THRI103 A, THRM551 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_SEQ = TRIM( #{applSeq} )
+				]]>
+
+
+		</select>
+
+<!-- 퇴직신청 세부내역 저장 -->
+		<update parameterType="map" id="saveRetireAppDet">
+
+					MERGE INTO THRM551 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.SABUN
+							     , A.REQ_DATE
+							     , A.APPL_SEQ
+							     , A.FIN_WORK_YMD
+							     , A.RET_SCH_YMD
+							     , A.RET_YMD
+							     , A.RET_REASON_CD
+							     , A.NOTE
+							     , A.CONV_SABUN1
+							     , A.RET_REASON_CD1
+							     , A.CONV_NOTE1
+							     , A.CONFIRM_YN
+							     , A.CONV_SABUN2
+							     , A.RET_REASON_CD2
+							     , A.RET_PATH_CD
+							     , A.MOVE_COMPANY
+							     , A.CONV_NOTE2
+							     , A.TAKEOVER_SABUN
+							     , A.TAKEOVER_SDATE
+							     , A.TAKEOVER_EDATE
+							     , A.AGREE_YN
+							     , A.AGREE_DATE
+							     , A.SIGN_FILE_SEQ
+							     , A.SIGN_FILE_SEQ1
+							     , A.SIGN_YN
+							     , A.RET_CONTRACT_NO
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS SABUN
+										 , NULL AS REQ_DATE
+										 , NULL AS APPL_SEQ
+										 , NULL AS FIN_WORK_YMD
+										 , NULL AS RET_SCH_YMD
+										 , NULL AS RET_YMD
+										 , NULL AS RET_REASON_CD
+										 , NULL AS NOTE
+										 , NULL AS CONV_SABUN1
+										 , NULL AS RET_REASON_CD1
+										 , NULL AS CONV_NOTE1
+										 , NULL AS CONFIRM_YN
+										 , NULL AS CONV_SABUN2
+										 , NULL AS RET_REASON_CD2
+										 , NULL AS RET_PATH_CD
+										 , NULL AS MOVE_COMPANY
+										 , NULL AS CONV_NOTE2
+										 , NULL AS TAKEOVER_SABUN
+										 , NULL AS TAKEOVER_SDATE
+										 , NULL AS TAKEOVER_EDATE
+										 , NULL AS AGREE_YN
+										 , NULL AS AGREE_DATE
+										 , NULL AS SIGN_FILE_SEQ
+										 , NULL AS SIGN_FILE_SEQ1
+							     		 , NULL AS SIGN_YN
+							     		 , NULL AS RET_CONTRACT_NO
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS ENTER_CD
+										 , TRIM( #{rm.sabun} )			AS SABUN
+										 , TRIM( #{rm.applYmd} )		AS REQ_DATE
+										 , TRIM( #{rm.applSeq} )		AS APPL_SEQ
+										 , TRIM( #{rm.finWorkYmd})		AS FIN_WORK_YMD
+										 , TRIM( #{rm.retSchYmd})		AS RET_SCH_YMD
+										 , TRIM( #{rm.retSchYmd})		AS RET_YMD
+										 , TRIM( #{rm.retReasonCd})	AS RET_REASON_CD
+										 , TRIM( #{rm.note} )			AS NOTE
+										 , TRIM( #{rm.convSabun1})		AS CONV_SABUN1
+										 , TRIM( #{rm.retReasonCd1})	AS RET_REASON_CD1
+										 , TRIM( #{rm.convNote1})		AS CONV_NOTE1
+										 , TRIM( #{rm.confirmYn})		AS CONFIRM_YN
+										 , TRIM( #{rm.convSabun2})		AS CONV_SABUN2
+										 , TRIM( #{rm.retReasonCd2})	AS RET_REASON_CD2
+										 , TRIM( #{rm.retPathCd})		AS RET_PATH_CD
+										 , TRIM( #{rm.moveCompany})	AS MOVE_COMPANY
+										 , TRIM( #{rm.convNote2})		AS CONV_NOTE2
+										 , TRIM( #{rm.takeoverSabun})	AS TAKEOVER_SABUN
+										 , TRIM( #{rm.takeoverSdate})	AS TAKEOVER_SDATE
+										 , TRIM( #{rm.takeoverEdate})	AS TAKEOVER_EDATE
+										 , TRIM( #{rm.agreeYn} )		AS AGREE_YN
+										 <choose><when test='rm.agreeYn != null and rm.agreeYn.equals("Y") and rm.agreeDate != null and rm.agreeDate.equals("")'>
+										 , SYSDATE						AS AGREE_DATE
+										 </when>
+										 <when test='rm.agreeDate != null and !rm.agreeDate.equals("")'>
+										 , REPLACE(TRIM( #{rm.agreeDate}),'-','') 	AS  AGREE_DATE
+										 </when><otherwise>
+										 , NULL							AS AGREE_DATE
+											 </otherwise>
+										 </choose>
+										 , TRIM( #{schSignFileSeq}  )		AS SIGN_FILE_SEQ
+										 , TRIM( #{schSignFileSeq1})		AS SIGN_FILE_SEQ1
+										 , TRIM( #{rm.signYn})			AS SIGN_YN
+										 , TRIM( #{rm.retContractNo})	AS RET_CONTRACT_NO
+										         
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.REQ_DATE IS NOT NULL
+										  AND A.APPL_SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.REQ_DATE = S.REQ_DATE AND T.APPL_SEQ = S.APPL_SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.FIN_WORK_YMD  	= S.FIN_WORK_YMD
+									, T.RET_SCH_YMD   	= S.RET_SCH_YMD
+									, T.RET_YMD   		= S.RET_YMD									
+									, T.RET_REASON_CD 	= S.RET_REASON_CD
+									, T.NOTE            = S.NOTE
+									, T.CONV_SABUN1     = S.CONV_SABUN1
+									, T.RET_REASON_CD1  = S.RET_REASON_CD1
+									, T.CONV_NOTE1      = S.CONV_NOTE1
+									, T.CONFIRM_YN      = S.CONFIRM_YN
+									, T.CONV_SABUN2     = S.CONV_SABUN2
+									, T.RET_REASON_CD2  = S.RET_REASON_CD2
+									, T.RET_PATH_CD     = S.RET_PATH_CD
+									, T.MOVE_COMPANY    = S.MOVE_COMPANY
+									, T.CONV_NOTE2      = S.CONV_NOTE2
+									, T.TAKEOVER_SABUN  = S.TAKEOVER_SABUN
+									, T.TAKEOVER_SDATE  = S.TAKEOVER_SDATE
+									, T.TAKEOVER_EDATE  = S.TAKEOVER_EDATE
+									, T.AGREE_YN  		= S.AGREE_YN
+									, T.RET_CONTRACT_NO  = S.RET_CONTRACT_NO
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.REQ_DATE
+							, T.APPL_SEQ
+							, T.FIN_WORK_YMD
+							, T.RET_SCH_YMD
+							, T.RET_YMD
+							, T.RET_REASON_CD
+							, T.NOTE
+							, T.CONV_SABUN1
+							, T.RET_REASON_CD1
+							, T.CONV_NOTE1
+							, T.CONFIRM_YN
+							, T.CONV_SABUN2
+							, T.RET_REASON_CD2
+							, T.RET_PATH_CD
+							, T.MOVE_COMPANY
+							, T.CONV_NOTE2
+							, T.TAKEOVER_SABUN
+							, T.TAKEOVER_SDATE
+							, T.TAKEOVER_EDATE
+							, T.AGREE_YN
+							, T.AGREE_DATE
+							, T.SIGN_FILE_SEQ
+							, T.SIGN_FILE_SEQ1
+							, T.SIGN_YN
+							, T.RET_CONTRACT_NO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.REQ_DATE
+							, S.APPL_SEQ
+							, S.FIN_WORK_YMD
+							, S.RET_SCH_YMD
+							, S.RET_YMD
+							, S.RET_REASON_CD
+							, S.NOTE
+							, S.CONV_SABUN1
+							, S.RET_REASON_CD1
+							, S.CONV_NOTE1
+							, S.CONFIRM_YN
+							, S.CONV_SABUN2
+							, S.RET_REASON_CD2
+							, S.RET_PATH_CD
+							, S.MOVE_COMPANY
+							, S.CONV_NOTE2
+							, S.TAKEOVER_SABUN
+							, S.TAKEOVER_SDATE
+							, S.TAKEOVER_EDATE
+							, S.AGREE_YN
+							, S.AGREE_DATE
+							, S.SIGN_FILE_SEQ
+							, S.SIGN_FILE_SEQ1
+							, S.SIGN_YN
+							, S.RET_CONTRACT_NO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		<!-- 퇴직신청(퇴직설문지) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireSurveyPopList">
+
+				<![CDATA[
+					SELECT  A.GUBUN
+              			  , A.QUESTION
+	                      , A.ANSWER
+	                      , A.APPL_SEQ
+	                      , A.SEQ
+	                      , A.SORT_NO
+	                      , A.MEMO
+	                      , A.SURVEY_MEMO
+	                  FROM THRM555 A
+	                 WHERE A.ENTER_CD = #{ssnEnterCd}
+	                   AND A.APPL_SEQ = TRIM( #{applSeq} )
+	                 ORDER BY A.GUBUN,A.SORT_NO,A.QUESTION
+				]]>
+
+
+		</select>
+		
+		<!-- 퇴직신청(퇴직설문지 저장데이터 없을시 항목관리에서 가져오기) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireSurveyPopList1">
+
+				<![CDATA[				
+					SELECT  A.GUBUN
+              			  , A.QUESTION
+	                      , '' AS ANSWER
+	                      , TRIM( #{applSeq} ) AS APPL_SEQ
+	                      , '' AS SEQ
+	                      , A.SORT_NO
+	                      , '' AS MEMO
+	                      , '' AS SURVEY_MEMO
+	                FROM THRM553 A
+	               WHERE A.ENTER_CD = #{ssnEnterCd}
+	               ORDER BY A.GUBUN,A.SORT_NO,A.QUESTION
+				]]>
+
+
+		</select>
+		
+		<!-- 퇴직신청(퇴직설문지-불만 이하 리스트) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireSurveyPopDisList">
+
+				<![CDATA[				
+					SELECT  A.GUBUN
+              			  , A.QUESTION
+	                      , A.MEMO
+	                  FROM THRM555 A
+	                 WHERE A.ENTER_CD = #{ssnEnterCd}
+	                   AND A.APPL_SEQ = TRIM( #{applSeq} )
+	                   --AND A.ANSWER < 3
+	                   AND MEMO IS NOT NULL
+	                 ORDER BY A.GUBUN,A.SORT_NO,A.QUESTION
+				]]>
+
+
+		</select>
+		
+		<!-- 퇴직신청(퇴직설문지) 저장 -->
+		<update parameterType="map" id="saveRetireSurveyPopList">
+
+					MERGE INTO THRM555 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.APPL_SEQ
+							     , A.SEQ
+							     , A.SORT_NO
+							     , A.GUBUN
+							     , A.QUESTION
+							     , A.ANSWER
+							     , A.MEMO
+							     , A.SURVEY_MEMO
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS APPL_SEQ
+										 , NULL AS SEQ
+										 , NULL AS SORT_NO
+										 , NULL AS GUBUN
+										 , NULL AS QUESTION
+										 , NULL AS ANSWER
+										 , NULL AS MEMO
+										 , NULL AS SURVEY_MEMO
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" index="index" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS ENTER_CD
+										 , TRIM( #{rm.applSeq} )		AS APPL_SEQ
+										 <choose><when test='rm.seq != null and !rm.seq.equals("")'>
+										 , TRIM(#{rm.seq})				AS	SEQ
+										 </when><otherwise>
+										 , TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + #{index} + 1) FROM THRM555 WHERE ENTER_CD = #{ssnEnterCd}) )	AS SEQ
+										 </otherwise>
+										 </choose>
+										 , TRIM( #{rm.sortNo})			AS SORT_NO
+										 , TRIM( #{rm.gubun} )			AS GUBUN
+										 , TRIM( #{rm.question})		AS QUESTION
+										 , TRIM( #{rm.answer})			AS ANSWER
+										 , TRIM( #{rm.memo} )			AS MEMO
+										 , TRIM( #{surveyMemoHid} )		AS SURVEY_MEMO
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.APPL_SEQ IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.APPL_SEQ = S.APPL_SEQ AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SORT_NO  		= S.SORT_NO
+									, T.GUBUN   		= S.GUBUN
+									, T.QUESTION 		= S.QUESTION
+									, T.ANSWER          = S.ANSWER
+									, T.MEMO     		= S.MEMO
+									, T.SURVEY_MEMO     = S.SURVEY_MEMO
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPL_SEQ
+							, T.SEQ
+							, T.SORT_NO
+							, T.GUBUN
+							, T.QUESTION
+							, T.ANSWER
+							, T.MEMO
+							, T.SURVEY_MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPL_SEQ
+							, S.SEQ
+							, S.SORT_NO
+							, S.GUBUN
+							, S.QUESTION
+							, S.ANSWER
+							, S.MEMO
+							, S.SURVEY_MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		<!-- 퇴직신청 설문지 등록여부 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireSurveyYnMap">
+
+				<![CDATA[
+					SELECT CASE WHEN COUNT(1) > 0 THEN 'Y'
+								ELSE 'N'
+							END AS SURVEY_YN
+					  FROM THRM555
+					 WHERE ENTER_CD = #{ssnEnterCd}
+	                   AND APPL_SEQ = TRIM( #{applSeq} )
+				]]>
+
+
+		</select>
+
+</mapper>

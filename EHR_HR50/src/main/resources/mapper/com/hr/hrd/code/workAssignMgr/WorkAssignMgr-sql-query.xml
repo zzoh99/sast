@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.code.workAssignMgr">
+        <select parameterType="map" resultType="cMap" id="getWorkAssignMgrList">
+
+                <![CDATA[
+					SELECT A.ENTER_CD
+						 , A.WORK_ASSIGN_CD
+						 , A.PRIOR_WORK_ASSIGN_CD
+						 , A.WORK_ASSIGN_NM
+						 , A.WORK_ASSIGN_TYPE
+						 , A.APP_TYPE
+						 , A.SYSTEM_TYPE
+						 , A.GROUP_TYPE
+						 , A.JOB_CD
+						 , A.START_YMD
+						 , A.END_YMD
+						 , A.REG_YMD
+						 , A.SEQ
+						 , A.USE_YN
+						 , A.WORK_ASSIGN_DESC
+						 , A.CHKDATE
+						 , A.CHKID
+						 , A.NOTE_NEED_YN
+						 , A.RATING_1
+						 , A.RATING_2
+						 , A.RATING_3
+						 , A.RATING_4
+						 , A.RATING_5
+						 , A.RATING_6
+						 , A.RATING_7
+						 , A.RATING_8
+						 , A.ORG_CD
+						 , A.COMMON_YN
+						 , A.JIKRYUL_CD
+						 , (SELECT JOB_NM FROM TORG201 WHERE ENTER_CD = A.ENTER_CD AND JOB_CD = A.JOB_CD AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')) AS JOB_NM
+					  FROM TCDPW501 A
+					 WHERE  ENTER_CD    = #{ssnEnterCd}
+					            ]]>
+				     <if test='searchWorkAssignType != null and !searchWorkAssignType.equals("")'>
+					   AND A.WORK_ASSIGN_TYPE = #{searchWorkAssignType}
+					 </if>
+					 <if test='searchPriorWorkAssignCd != null and !searchPriorWorkAssignCd.equals("")'>
+					   AND A.PRIOR_WORK_ASSIGN_CD = #{searchPriorWorkAssignCd}
+					 </if>
+					ORDER BY WORK_ASSIGN_CD
+        </select>
+
+        <update parameterType="map" id="saveWorkAssignMgrList">
+
+					MERGE INTO TCDPW501 T
+					USING (
+							SELECT A.ENTER_CD
+								 , A.WORK_ASSIGN_CD
+								 , A.PRIOR_WORK_ASSIGN_CD
+								 , A.WORK_ASSIGN_NM
+								 , A.WORK_ASSIGN_TYPE
+								 , A.JOB_CD
+								 , A.START_YMD
+								 , A.END_YMD
+								 , A.REG_YMD
+								 , A.USE_YN
+								 , A.CHKDATE
+								 , A.CHKID
+							  FROM (
+									SELECT NULL AS ENTER_CD
+										 , NULL AS WORK_ASSIGN_CD
+										 , NULL AS PRIOR_WORK_ASSIGN_CD
+										 , NULL AS WORK_ASSIGN_NM
+										 , NULL AS WORK_ASSIGN_TYPE
+										 , NULL AS JOB_CD
+										 , NULL AS START_YMD
+										 , NULL AS END_YMD
+										 , NULL AS REG_YMD
+										 , NULL AS USE_YN
+										 , NULL AS CHKDATE
+										 , NULL AS CHKID
+									  FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+									 UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )     AS ENTER_CD
+										 <choose><when test='rm.workAssignCd != null and !rm.workAssignCd.equals("")'>
+								 		   , TRIM(#{rm.workAssignCd}) AS WORK_ASSIGN_CD
+                                         </when><otherwise>
+										   , (SELECT DECODE(#{rm.workAssignType},'G','GWA','M','MWA','SWA') || LPAD(SUBSTR(MAX(WORK_ASSIGN_CD),4) + ${icnt},5,0) FROM TCDPW501 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_ASSIGN_TYPE = #{rm.workAssignType})  AS WORK_ASSIGN_CD
+											<bind name="icnt" value="icnt + 1" />
+                                         </otherwise>
+                                         </choose>
+										 , DECODE(#{rm.workAssignType},'G','00000000',TRIM( #{rm.priorWorkAssignCd})) AS PRIOR_WORK_ASSIGN_CD
+										 , TRIM( #{rm.workAssignNm}) AS WORK_ASSIGN_NM
+										 , TRIM( #{rm.workAssignType}) AS WORK_ASSIGN_TYPE
+										 , TRIM( #{rm.jobCd}) AS JOB_CD
+										 , TO_CHAR(SYSDATE,'YYYYMMDD') AS START_YMD
+										 , '99991231' AS END_YMD
+										 , TO_CHAR(SYSDATE,'YYYYMMDD') AS REG_YMD
+										 , TRIM( #{rm.useYn}) AS USE_YN
+										 , SYSDATE AS CHKDATE
+										 , #{ssnSabun} AS CHKID
+									  FROM DUAL
+</foreach>
+								  ) A WHERE A.ENTER_CD IS NOT NULL
+							  ) S
+						   ON ( T.ENTER_CD = S.ENTER_CD AND T.WORK_ASSIGN_CD = S.WORK_ASSIGN_CD )
+					     WHEN MATCHED THEN
+							  UPDATE SET T.WORK_ASSIGN_NM = S.WORK_ASSIGN_NM
+									   , T.USE_YN = S.USE_YN
+								       , T.JOB_CD = S.JOB_CD
+									   , T.CHKDATE = S.CHKDATE
+									   , T.CHKID = S.CHKID
+					     WHEN NOT MATCHED THEN
+ 							  INSERT ( 
+ 							  		T.ENTER_CD
+								  , T.WORK_ASSIGN_CD
+								  , T.PRIOR_WORK_ASSIGN_CD
+								  , T.WORK_ASSIGN_NM
+								  , T.WORK_ASSIGN_TYPE
+								  , T.JOB_CD
+								  , T.START_YMD
+								  , T.END_YMD
+								  , T.REG_YMD
+								  , T.USE_YN
+								  , T.CHKDATE
+								  , T.CHKID
+ 							  ) VALUES ( 
+ 							   		S.ENTER_CD
+								  , S.WORK_ASSIGN_CD
+								  , S.PRIOR_WORK_ASSIGN_CD
+								  , S.WORK_ASSIGN_NM
+								  , S.WORK_ASSIGN_TYPE
+								  , S.JOB_CD
+								  , S.START_YMD
+								  , S.END_YMD
+								  , S.REG_YMD
+								  , S.USE_YN
+								  , S.CHKDATE
+								  , S.CHKID
+ 							  )
+		</update>
+
+        <delete parameterType="map" id="deleteWorkAssignMgrList">
+
+                    DELETE FROM TCDPW501
+                    WHERE (ENTER_CD, WORK_ASSIGN_CD) IN ( (NULL, NULL)
+                   <foreach item="rm" collection="deleteRows" >
+                     <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.workAssignCd != null and !rm.workAssignCd.equals("")'>
+                     	,(TRIM(#{ssnEnterCd}),TRIM(#{rm.workAssignCd}))
+					 </if>
+				   </foreach>
+                   )
+		</delete>
+        
+        <select parameterType="map" resultType="cMap" id="getWorkAssignMgrPopupList">
+
+                <![CDATA[
+					SELECT A.JOB_CD,
+						   A.JOB_NM
+					  FROM  TORG201 A
+					 WHERE 1=1
+					   AND A.ENTER_CD = #{ssnEnterCd}
+		               AND A.JOB_TYPE = '10030' ]]>
+		               <if test='jobNm != null and !jobNm.equals("")'>
+					    AND A.JOB_NM LIKE '%' || #{jobNm} || '%'
+					   </if>
+		               
+                    ORDER BY JOB_CD
+
+
+        </select>
+        
+
+</mapper>

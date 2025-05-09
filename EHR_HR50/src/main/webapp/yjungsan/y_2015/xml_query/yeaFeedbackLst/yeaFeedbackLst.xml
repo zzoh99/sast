@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	담당자 FeedBack
+ -->
+<root>
+
+	<!-- 담당자 FeedBack 자료 조회 -->
+	<query id="selectYeaFeedbackLstList">
+		<![CDATA[
+			SELECT
+				X.*
+				, Y.MANAGER_NOTE -- 담당자멘트
+				, Y.EMPLOYEE_NOTE -- 직원멘트
+				, F_COM_GET_ORG_NM21(X.ENTER_CD, X.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM -- 부서명
+				, '0' AS DETAIL_POPUP
+			FROM
+				(
+					SELECT
+						T1.ENTER_CD, T1.WORK_YY, T1.ADJUST_TYPE, T1.SABUN, T1.GUBUN_CD, T1.GUBUN_SORT, T1.NAME
+						, T1.GUBUN_CD AS GUBUN_NM 
+						, SUM(DECODE(T1.FEEDBACK_TYPE, 'X', T1.CNT, 0)) AS CNT_0
+						, SUM(DECODE(T1.FEEDBACK_TYPE, '1', T1.CNT, 0)) AS CNT_1
+						, SUM(DECODE(T1.FEEDBACK_TYPE, '2', T1.CNT, 0)) AS CNT_2
+						, SUM(DECODE(T1.FEEDBACK_TYPE, '3', T1.CNT, 0)) AS CNT_3
+						, SUM(DECODE(T1.FEEDBACK_TYPE, '4', T1.CNT, 0)) AS CNT_4
+						, SUM(DECODE(T1.FEEDBACK_TYPE, '5', T1.CNT, 0)) AS CNT_5
+						, SUM(DECODE(T1.FEEDBACK_TYPE, '6', T1.CNT, 0)) AS CNT_6
+					FROM 
+						(
+							SELECT 
+								A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE
+								, D.NAME
+								, A.SABUN
+								, B.GUBUN_CD
+								, B.GUBUN_SORT
+								, C.CODE AS FEEDBACK_TYPE
+								, CASE
+									WHEN B.GUBUN_CD = 'PENS' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN830 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND AA.SAVING_DEDUCT_TYPE  IN
+													(SELECT B.CODE
+													FROM TSYS005 B	
+													WHERE B.ENTER_CD = AA.ENTER_CD
+														AND B.GRCODE_CD = 'C00317'
+														AND B.NOTE1 = '2')
+												AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									WHEN B.GUBUN_CD = 'INSU' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN828 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									WHEN B.GUBUN_CD = 'MEDI' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN825 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									WHEN B.GUBUN_CD = 'EDUC' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN829 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									WHEN B.GUBUN_CD = 'RENT' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN839 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									WHEN B.GUBUN_CD = 'DONA' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN827 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									WHEN B.GUBUN_CD = 'HOUS' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN830 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND AA.SAVING_DEDUCT_TYPE  IN
+													(SELECT B.CODE
+													FROM TSYS005 B
+													WHERE B.ENTER_CD = A.ENTER_CD
+														AND B.GRCODE_CD = 'C00317'
+														AND B.NOTE1 = '4') 
+					 							AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									WHEN B.GUBUN_CD = 'CARD' THEN
+										(
+											SELECT COUNT(*) AS CNT FROM TCPN821 AA
+											WHERE AA.ENTER_CD = A.ENTER_CD
+												AND AA.WORK_YY = A.WORK_YY
+												AND AA.ADJUST_TYPE = A.ADJUST_TYPE
+												AND AA.SABUN = A.SABUN
+												AND NVL(AA.FEEDBACK_TYPE, 'X') = C.CODE
+										)
+									END AS CNT
+							FROM TCPN811 A
+								, (
+									SELECT 0 AS GUBUN_SORT, 'COMM' AS GUBUN_CD FROM DUAL -- 일반
+									UNION ALL SELECT 1 AS GUBUN_SORT, 'PENS' AS GUBUN_CD FROM DUAL -- 연금
+									UNION ALL SELECT 2 AS GUBUN_SORT, 'INSU' AS GUBUN_CD FROM DUAL -- 보험료
+									UNION ALL SELECT 3 AS GUBUN_SORT, 'MEDI' AS GUBUN_CD FROM DUAL -- 의료비
+									UNION ALL SELECT 4 AS GUBUN_SORT, 'EDUC' AS GUBUN_CD FROM DUAL -- 교육비
+									UNION ALL SELECT 5 AS GUBUN_SORT, 'RENT' AS GUBUN_CD FROM DUAL -- 주택자금
+									UNION ALL SELECT 6 AS GUBUN_SORT, 'DONA' AS GUBUN_CD FROM DUAL -- 기부금
+									UNION ALL SELECT 8 AS GUBUN_SORT, 'HOUS' AS GUBUN_CD FROM DUAL -- 주택/증권저축
+									UNION ALL SELECT 9 AS GUBUN_SORT, 'CARD' AS GUBUN_CD FROM DUAL -- 신용카드
+									UNION ALL SELECT 10 AS GUBUN_SORT, 'ETCC' AS GUBUN_CD FROM DUAL -- 기타
+								) B
+								, (
+									SELECT CODE, CODE_NM FROM TSYS005 WHERE ENTER_CD = #ssnEnterCd# AND GRCODE_CD = 'C00329'
+									UNION ALL SELECT 'X' AS CODE, 'NULL' AS CODE_NM FROM DUAL
+								) C
+								, THRM100 D
+							WHERE D.ENTER_CD = A.ENTER_CD
+								AND D.SABUN    = A.SABUN
+								AND A.ENTER_CD = #ssnEnterCd# -- 회사코드
+								AND A.WORK_YY = #searchWorkYy# -- 년도
+								AND A.ADJUST_TYPE = #searchAdjustType# -- 작업구분
+								AND B.GUBUN_CD LIKE #searchGubunCd#||'%' -- 자료구분
+								AND (D.NAME LIKE '%' || #searchSbNm# || '%' OR A.SABUN LIKE '%' || #searchSbNm# || '%') -- 성명/사번
+						) T1
+					GROUP BY T1.ENTER_CD, T1.WORK_YY, T1.ADJUST_TYPE, T1.SABUN, T1.GUBUN_SORT, T1.GUBUN_CD, T1.NAME
+				) X
+				, TCPN840 Y
+			WHERE Y.ENTER_CD(+) = X.ENTER_CD
+				AND Y.WORK_YY(+) = X.WORK_YY
+				AND Y.ADJUST_TYPE(+) = X.ADJUST_TYPE
+				AND Y.SABUN(+) = X.SABUN
+				AND Y.GUBUN_CD(+) = X.GUBUN_CD
+				-- dynamic query 보안 이슈 때문에 수정
+				AND DECODE(#searchSuccessType#, NULL, 1, 0, X.CNT_0, 1, X.CNT_1, 2, X.CNT_2, 3, X.CNT_3, 4, X.CNT_4, 5, X.CNT_5, 6, X.CNT_6, 1 ) > 0
+			ORDER BY X.ENTER_CD, X.WORK_YY, X.ADJUST_TYPE, X.SABUN, X.GUBUN_SORT
+		]]> 
+	</query>
+
+	<!-- 담당자-임직원 FeedBack 담당자 입력 -->
+	<query id="mergeYeaFeedback">
+		<![CDATA[
+			   MERGE INTO TCPN840 T
+					USING	(
+							SELECT A.ENTER_CD
+                                 , A.WORK_YY
+                                 , A.ADJUST_TYPE
+                                 , A.SABUN
+                                 , A.GUBUN_CD
+                                 , A.GUBUN_NM
+                                 , A.MANAGER_NOTE
+							  FROM (
+									SELECT #ssnEnterCd#   AS ENTER_CD
+                                         , #work_yy#      AS WORK_YY
+                                         , #adjust_type#  AS ADJUST_TYPE
+                                         , #sabun#        AS SABUN
+                                         , #gubun_cd#     AS GUBUN_CD
+                                         , #gubun_nm#     AS GUBUN_NM
+                                         , #manager_note# AS MANAGER_NOTE
+									  FROM DUAL
+									) A
+							 WHERE A.ENTER_CD    IS NOT NULL
+							   AND A.WORK_YY     IS NOT NULL
+							   AND A.ADJUST_TYPE IS NOT NULL
+							   AND A.SABUN	     IS NOT NULL
+							   AND A.GUBUN_CD    IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= S.ENTER_CD
+						AND	T.WORK_YY	    = S.WORK_YY
+						AND	T.ADJUST_TYPE	= S.ADJUST_TYPE
+						AND	T.SABUN			= S.SABUN
+						AND T.GUBUN_CD      = S.GUBUN_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET    T.MANAGER_NOTE    = S.MANAGER_NOTE
+                                    , T.MANAGER_CHKDATE = SYSDATE   
+                                    , T.MANAGER_CHKID   = #ssnSabun#
+                                    , T.CHKDATE         = SYSDATE
+                                    , T.CHKID           = #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+				            , T.WORK_YY
+				            , T.ADJUST_TYPE
+				            , T.SABUN
+				            , T.GUBUN_CD
+				            , T.GUBUN_NM
+				            , T.MANAGER_NOTE
+				            , T.MANAGER_CHKDATE
+				            , T.MANAGER_CHKID
+				            , T.CHKDATE
+				            , T.CHKID
+						)
+						VALUES
+						(
+                              S.ENTER_CD
+				            , S.WORK_YY
+				            , S.ADJUST_TYPE
+				            , S.SABUN
+				            , S.GUBUN_CD
+				            , S.GUBUN_NM
+				            , S.MANAGER_NOTE
+				            , SYSDATE
+                            , #ssnSabun#
+                            , SYSDATE
+                            , #ssnSabun#
+						)
+		]]> 
+	</query>
+	
+</root>

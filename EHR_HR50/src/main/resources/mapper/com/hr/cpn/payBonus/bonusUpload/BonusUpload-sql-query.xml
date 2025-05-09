@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.payBonus.bonusUpload">
+    <!-- 성과급 업로드 조회 -->
+    <select parameterType="map" resultType="cMap" id="getBonusUploadList">
+        <![CDATA[
+                SELECT BONUS_GRP
+                     , BONUS_RESOURCE_MON
+                     , TOT_MON
+                     , BONUS_RESOURCE_MON-TOT_MON AS GAP_MON
+                FROM (
+                        SELECT A.BONUS_GRP
+                             , A.BONUS_RESOURCE_MON
+                             , ( SELECT SUM(NVL(RESULT_MON, NVL(PLAN_MON, 0)))
+                                   FROM TCPN615 B
+                                  WHERE B.ENTER_CD = A.ENTER_CD
+                                    AND B.YYYY = A.YYYY
+                                    AND B.BONUS_GRP = A.BONUS_GRP
+                               ) AS TOT_MON
+                         FROM TCPN610 A
+                        WHERE A.ENTER_CD   = TRIM(#{ssnEnterCd})
+                          AND A.BONUS_TYPE = TRIM(#{searchBonusType})
+                          AND A.YYYY       = TRIM(#{searchYear})
+                )        
+        ]]>
+    </select>
+
+    <!-- 성과급 업로드 조회 -->
+    <select parameterType="map" resultType="cMap" id="getBonusUploadDetailList">
+        <![CDATA[
+             SELECT A.YYYY
+                  , A.BONUS_GRP
+                  , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, B.SDATE) AS ORG_NM
+                  , A.SABUN
+                  , C.NAME
+                  , B.JIKWEE_NM
+                  , B.JIKCHAK_NM
+                  , A.RATE
+                  , A.PLAN_MON
+                  , A.RESULT_MON
+               FROM TCPN615 A
+                  , THRM151 B
+                  , THRM100 C
+              WHERE A.ENTER_CD  = B.ENTER_CD
+                AND A.SABUN     = B.SABUN
+                AND A.ENTER_CD  = C.ENTER_CD
+                AND A.SABUN     = C.SABUN
+                AND A.ENTER_CD  = TRIM(#{ssnEnterCd}) /*회사코드*/
+                AND A.YYYY      = TRIM(#{searchYear})
+                AND A.BONUS_GRP = TRIM(#{searchBonusType})
+                AND B.SDATE     = ( SELECT BB.SDATE
+                                     FROM THRM151 BB
+                                    WHERE BB.ENTER_CD = B.ENTER_CD
+                                      AND BB.SABUN = B.SABUN
+                                      AND TRIM(#{searchYear}) ||'1231' BETWEEN BB.SDATE AND NVL(BB.EDATE, '99991231')
+                                   )
+         ]]>
+    </select>
+
+    <!-- 성과급 업로드 저장 -->
+    <update parameterType="map" id="saveBonusUpload">
+        MERGE INTO TCPN615 T 
+             USING (   
+                    SELECT A.ENTER_CD      AS ENTER_CD 
+                         , A.YYYY          AS YYYY
+                         , A.BONUS_GRP     AS BONUS_GRP
+                         , A.SABUN         AS SABUN
+                         , A.PLAN_MON      AS PLAN_MON
+                      FROM ( SELECT NULL AS ENTER_CD 
+                                  , NULL AS YYYY
+                                  , NULL AS BONUS_GRP
+                                  , NULL AS SABUN
+                                  , NULL AS PLAN_MON
+                               FROM DUAL
+                    <foreach item="rm" collection="mergeRows" >
+                               SELECT TRIM(#{ssnEnterCd})     AS ENTER_CD 
+                                    , TRIM(#{rm.yyyy})        AS YYYY
+                                    , TRIM(#{rm.bonusGrp})    AS BONUS_GRP
+                                    , TRIM(#{rm.sabun})       AS SABUN
+                                    , TRIM(#{rm.planMon})     AS PLAN_MON
+                                FROM DUAL
+                    </foreach>
+                       ) A 
+                         WHERE A.YYYY       IS NOT NULL
+                           AND A.BONUS_GRP  IS NOT NULL
+                           AND A.SABUN      IS NOT NULL
+                ) S 
+                ON ( 
+                          T.ENTER_CD  = S.ENTER_CD 
+                     AND  T.YYYY      = S.YYYY 
+                     AND  T.BONUS_GRP = S.BONUS_GRP 
+                     AND  T.SABUN     = S.SABUN 
+                ) 
+                WHEN MATCHED THEN 
+                   UPDATE SET T.CHKDATE   = SYSDATE 
+                            , T.CHKID     = #{ssnSabun}
+                            , T.PLAN_MON  = S.PLAN_MON
+                WHEN NOT MATCHED THEN 
+                   INSERT 
+                   ( 
+                              T.ENTER_CD
+                            , T.YYYY
+                            , T.BONUS_GRP
+                            , T.SABUN
+                            , T.PLAN_MON
+                            , T.CHKDATE
+                            , T.CHKID
+                   ) 
+                   VALUES 
+                   ( 
+                              S.ENTER_CD
+                            , S.YYYY
+                            , S.BONUS_GRP
+                            , S.SABUN
+                            , S.PLAN_MON
+                            , SYSDATE
+                            ,  #{ssnSabun}
+                   ) 
+    </update>
+        
+    <!-- 성과급 업로드 삭제 -->
+    <delete  id="deleteBonusUpload">
+        DELETE FROM TCPN615
+              WHERE ENTER_CD = TRIM(:ssnEnterCd) 
+                AND ( YYYY,BONUS_GRP,SABUN ) IN ( ( NULL,NULL,NULL) 
+        <foreach item="rm" collection="deleteRows" >
+            <if test='rm.yyyy and !rm.yyyy.equals("") and rm.bonusGrp and !rm.bonusGrp.equals("") and rm.sabun and !rm.sabun.equals("")'>
+                 , ( TRIM( #{rm.yyyy} ),TRIM( #{rm.bonusGrp} ),TRIM( #{rm.sabun} )) 
+            </if>
+        </foreach>
+    )
+    </delete>
+</mapper>

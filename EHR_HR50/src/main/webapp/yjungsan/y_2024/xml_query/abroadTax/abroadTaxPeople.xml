@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	외납세대상자관리
+ -->
+<root>
+<!-- 외납세 대상자 조회  -->
+	<query id="selectAbroadTaxPeopleList">
+		<![CDATA[
+			SELECT *
+			  FROM (
+			         SELECT A.ENTER_CD
+			              , A.SABUN
+			              , NVL(D.FAM_NM, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)) AS NAME
+			              , A.PAY_YY
+			              , A.NATIONAL_CD
+			              , A.GUBUN
+			              , A.TOT_MON
+			              , A.CST_MON
+			              , A.PAY_MON
+			              , A.REDUCE_TRG
+			              , A.REDUCE_RATE
+			              , A.REDUCE_MON
+			              , A.PAY_TAX_MON
+			              , A.EXC_TAX_MON
+			              , A.MEMO
+			              -- -----------------------------------------------------------------------
+			              -- 납부연도 당기 반영 정보
+			              -- -----------------------------------------------------------------------
+			              , B.PREV_CARRIED_MON AS B_PREV_CARRIED_MON -- 전기 이월
+			              , B.LIMIT_MON        AS B_LIMIT_MON    -- 납부연도 당기 공제한도
+			              , B.DED_MON          AS B_DED_MON      -- 납부연도 당기 반영금액
+			              , NVL(B.CARRIED_MON, 0) + NVL(B.CARRIED_MON_841, 0) AS B_CARRIED_MON  -- 납부연도 당기 이월금액
+			              -- -----------------------------------------------------------------------
+			              -- 이월분 차기 최종반영 정보
+			              -- -----------------------------------------------------------------------
+			              , NVL2(C.ENTER_CD, ROW_NUMBER() OVER(PARTITION BY C.ENTER_CD, C.SABUN, C.PAY_YY, C.NATIONAL_CD ORDER BY C.WORK_YY DESC), 1) AS C_RN
+			              , C.WORK_YY     AS C_WORK_YY
+			              , C.ADJUST_TYPE AS C_ADJUST_TYPE
+			              , SUM(NVL(C.CUR_DED_MON, 0)) OVER(PARTITION BY C.ENTER_CD, C.SABUN, C.PAY_YY, C.NATIONAL_CD) AS C_CUR_DED_MON
+			              , SUM(NVL(C.DED_MON, 0)) OVER(PARTITION BY C.ENTER_CD, C.SABUN, C.PAY_YY, C.NATIONAL_CD) AS C_DED_MON
+			              , SUM(NVL(C.CARRIED_MON_841, 0)) OVER(PARTITION BY C.ENTER_CD, C.SABUN, C.PAY_YY, C.NATIONAL_CD) AS C_CARRIED_MON_841
+			              , SUM( 
+			                     CASE WHEN A.PAY_YY BETWEEN B.WORK_YY AND TO_CHAR(TO_NUMBER(B.WORK_YY)+10) 
+                                      THEN ( CASE WHEN B.CARRIED_MON > 0 OR B.CARRIED_MON_841 > 0 THEN 1 ELSE 0 END )
+                                      ELSE 0
+                                 END
+                            ) OVER(PARTITION BY C.ENTER_CD, C.SABUN, C.PAY_YY, C.NATIONAL_CD) AS C_CNT_CARRIED
+			           FROM TCPN885 A
+			      LEFT JOIN TCPN886 B -- 납부연도 당기 반영 정보
+			             ON B.ENTER_CD    = A.ENTER_CD	  -- 회사구분(TORG900)
+			            AND B.SABUN       = A.SABUN	      -- 사원번호
+			            AND B.PAY_YY      = A.PAY_YY	  -- 납부연도
+			            AND B.NATIONAL_CD = A.NATIONAL_CD -- 국가코드(H20295). (1), (2)
+			            AND B.WORK_YY     = A.PAY_YY      -- 납부연도 = 반영연도
+			          --AND REGEXP_LIKE(NVL(B.ADJUST_TYPE, '1'), '^[139]') -- 시뮬레이션 자료 등은 조회되지 않도록
+			            AND B.ADJUST_TYPE IN ('1', '3') -- 재정산 히스토리는 취급되면 안 됨
+			      LEFT JOIN TCPN886 C -- 이월분 차기 최종반영 정보
+			             ON C.ENTER_CD    = A.ENTER_CD	 
+			            AND C.SABUN       = A.SABUN	     
+			            AND C.PAY_YY      = A.PAY_YY	   
+			            AND C.NATIONAL_CD = A.NATIONAL_CD
+			          --AND REGEXP_LIKE(NVL(C.ADJUST_TYPE, '1'), '^[139]') -- 시뮬레이션 자료 등은 조회되지 않도록
+			            AND C.ADJUST_TYPE IN ('1', '3') -- 재정산 히스토리는 취급되면 안 됨
+			      LEFT JOIN TCPN823 D
+			             ON D.ENTER_CD	  = C.ENTER_CD   
+			            AND D.SABUN	      = C.SABUN      
+			            AND D.WORK_YY	  = C.WORK_YY     
+			            AND D.ADJUST_TYPE = C.ADJUST_TYPE
+			            AND D.FAM_CD      = '0'
+			          WHERE A.ENTER_CD	  = #ssnEnterCd#
+			          --AND A.NATIONAL_CD = 국가코드조회조건에멀티셀렉트로추가하고싶다 
+			        )
+			  WHERE NVL(C_RN, 1) = 1
+			    AND C_CNT_CARRIED >= #searchMon#
+			    AND PAY_YY      LIKE #searchYear# || '%'
+			    AND (#searchSbNm# IS NULL OR SABUN LIKE '%' || #searchSbNm# || '%' OR NAME LIKE '%' || #searchSbNm# || '%')
+			    AND (#searchBizPlaceCd# IS NULL OR #searchBizPlaceCd# = F_CPN_YEA_BP_CD(ENTER_CD, C_WORK_YY, C_ADJUST_TYPE, SABUN))
+			  ORDER BY SABUN, 
+			       PAY_YY DESC,
+			       C_WORK_YY DESC,
+			       C_ADJUST_TYPE,
+                   C_CUR_DED_MON,
+                   C_CARRIED_MON_841 DESC, -- 미공제액 이월순서를 알아야하니까 추가함. 공제액이 큰 것부터 미공제액 이월됨
+                   C_DED_MON DESC,
+                   NATIONAL_CD
+	   ]]>
+	</query>
+	
+	<!-- 외납세 대상자 유효성 체크 (중복, TCPN886 연관자료 유무) -->
+	<query id="chkValid">
+		<![CDATA[
+			SELECT ( -- 1건 이상 : 중복되어 저장할 수 없습니다.
+				     SELECT COUNT(1) AS CNT
+					   FROM TCPN885 
+					  WHERE ENTER_CD    = #ssnEnterCd#
+					    AND SABUN       = #sabun#
+					    AND PAY_YY      = #pay_yy#
+					    AND NATIONAL_CD = #national_cd#
+					    AND #sStatus#   = 'I' -- 신규 입력일 경우, 기존 중복 자료가 있는지 체크
+				   ) AS IS_DUP
+				 , ( -- 1건 이상 : 관련 자료가 존재합니다. 삭제할 수 없습니다.
+				     SELECT COUNT(1) AS CNT
+					   FROM TCPN886 
+					  WHERE ENTER_CD     = #ssnEnterCd#
+					    AND SABUN        = #sabun#
+					    AND PAY_YY       = #pay_yy#
+					    AND NATIONAL_CD  = #national_cd#
+					    AND #sStatus#    = 'D' -- 삭제일 경우, 관련 자료가 있는지 체크
+				   ) AS IS_EXIST_CHILD
+				 , ( -- 1건 이상 : 관련 자료가 존재합니다.\n수정할 수 없습니다. ( 국외원천소득, 감면액, 외납세액, 이월배제액 )
+				     SELECT NVL(SUM( CASE WHEN B.WORK_YY < #srchYear# THEN 1  -- 과거 자료 : 수정불가로 처리해보자
+				                          WHEN B.WORK_YY = #srchYear# THEN 0  -- 당해 귀속년도 자료 : 마감 여부를 봐야할 거 같지만 계산을 돌릴 수 있도록 수정 허용 처리해보자
+				                          WHEN B.WORK_YY > #srchYear# THEN 0  -- 미래 자료 : 당장 문제 없으니 수정 허용 해보자
+				                          ELSE 1 -- 일단 수정 불가
+				                     END ), 0) AS CNT
+					   FROM TCPN885 A
+					   JOIN TCPN886 B
+					     ON B.ENTER_CD     = A.ENTER_CD
+					    AND B.SABUN        = A.SABUN
+					    AND B.PAY_YY       = A.PAY_YY
+					    AND B.NATIONAL_CD  = A.NATIONAL_CD
+					  WHERE A.ENTER_CD     = #ssnEnterCd#
+					    AND A.SABUN        = #sabun#
+					    AND A.PAY_YY       = #pay_yy#
+					    AND A.NATIONAL_CD  = #national_cd#
+					 -- AND sStatus     IN ('I', 'U') -- 신규 입력이거나 수정일 경우, 관련 자료가 있는지 체크
+					    AND #sStatus#      = 'U'        -- 수정일 경우, 과거 관련 자료가 있는지 체크
+					    AND (   NVL(A.PAY_MON, 0)     <> TO_NUMBER(NVL(#pay_mon#, '0'))
+					         OR NVL(A.REDUCE_MON, 0)  <> TO_NUMBER(NVL(#reduce_mon#, '0'))
+					         OR NVL(A.PAY_TAX_MON, 0) <> TO_NUMBER(NVL(#pay_tax_mon#, '0'))
+					         OR NVL(A.EXC_TAX_MON, 0) <> TO_NUMBER(NVL(#exc_tax_mon#, '0'))
+					        )
+				   ) AS IS_EXIST_REL
+		      FROM DUAL 
+		]]> 
+	</query>
+	
+	<!-- 외납세 대상자 저장  -->
+	<query id="insertAbroadTaxPeople">
+		<![CDATA[
+			INSERT INTO TCPN885 
+			(
+				ENTER_CD  		
+				, SABUN
+				, PAY_YY
+				, NATIONAL_CD
+				, GUBUN
+				, TOT_MON
+				, CST_MON
+				, PAY_MON
+				, REDUCE_TRG
+				, REDUCE_RATE
+				, REDUCE_MON
+				, PAY_TAX_MON
+				, EXC_TAX_MON
+				, MEMO
+				, CRTDATE
+				, CRTID
+				, CHKDATE
+				, CHKID
+			)
+			VALUES	
+			(
+				#ssnEnterCd#
+				,#sabun#
+				,#pay_yy#
+				,#national_cd#
+				,#gubun#
+				,#tot_mon#
+				,#cst_mon#
+				,#pay_mon#
+				,#reduce_trg#
+				,#reduce_rate#
+				,#reduce_mon#
+				,#pay_tax_mon#
+				,#exc_tax_mon#
+				,#memo#     
+				,SYSDATE
+				,#ssnSabun#
+				,SYSDATE
+				,#ssnSabun#
+		  	) 
+		]]>
+	</query>
+	
+	<!-- 외납세 대상자 수정 -->
+	<query id="updateAbroadTaxPeople">
+		<![CDATA[
+			UPDATE TCPN885
+			SET	GUBUN       = #gubun#      
+              , TOT_MON     = #tot_mon#    
+              , CST_MON     = #cst_mon#    
+              , PAY_MON     = #pay_mon#    
+              , REDUCE_TRG  = #reduce_trg# 
+              , REDUCE_RATE = #reduce_rate#
+              , REDUCE_MON  = #reduce_mon# 
+              , PAY_TAX_MON = #pay_tax_mon#
+              , EXC_TAX_MON = #exc_tax_mon# 
+			  , MEMO        = #memo#     
+              , CHKDATE	    = SYSDATE      
+			  , CHKID    	= #ssnSabun#      
+		  WHERE ENTER_CD    = #ssnEnterCd#
+			AND PAY_YY      = #pay_yy#
+			AND SABUN       = #sabun#
+			AND NATIONAL_CD = #national_cd# 
+		]]>
+	</query>
+
+	<!-- 외납세 대상자 삭제 -->
+	<query id="deleteAbroadTaxPeople">
+		<![CDATA[
+		 DELETE FROM TCPN885
+		  WHERE ENTER_CD    = #ssnEnterCd#
+			AND PAY_YY      = #pay_yy#
+			AND SABUN       = #sabun#
+			AND NATIONAL_CD = #national_cd# 
+		]]>
+	</query>
+</root>

@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.psnalInfo.psnalBasicUser">
+
+	<!-- 인사기본_임직원공통 헤더 정보 조회 -->
+	<select id="getPsnalBasicUserEmployeeHeader" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT A.ENTER_CD, A.SABUN
+			     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS EMP_NAME
+			     , B.STATUS_CD
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010', B.STATUS_CD, #{ssnLocaleCd}) AS STATUS_NM
+			     , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+			     , F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'HP') AS CELL_PHONE
+			     , NVL(F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'IM'), F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN, 'OM')) AS EMAIL
+			  FROM THRM100 A
+			 INNER JOIN THRM151 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			   AND B.SDATE =
+			       (
+			           SELECT MAX(SDATE)
+			             FROM THRM151
+			            WHERE ENTER_CD = B.ENTER_CD
+			              AND SABUN = B.SABUN
+			              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				   )
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 개인정보 조회 -->
+	<select id="getPsnalBasicUserPsnlInfo" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT A.NAME, A.NAME_US, A.NAME_CN
+			     , REGEXP_REPLACE(CRYPTIT.DECRYPT(A.RES_NO, A.ENTER_CD), '(\d{6})(\d{7})', '\1-*******') AS RES_NO
+			     , CASE WHEN F_COM_IS_DATE_YN(A.BIR_YMD) = 'Y'
+			            THEN REGEXP_REPLACE(A.BIR_YMD, '(\d{4})(\d{2})(\d{2})', '\1년 \2월 \3일')
+			            ELSE '-' END AS BIR_YMD
+			     , CASE WHEN F_COM_IS_DATE_YN(A.BIR_YMD) = 'Y'
+			            THEN F_COM_GET_AGE(A.ENTER_CD, A.BIR_YMD, A.RES_NO, TO_CHAR(SYSDATE, 'YYYYMMDD')) || '세'
+			            ELSE '-' END AS AGE
+			     , F_COM_GET_STATUS_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS STATUS_NM
+			  FROM THRM100 A
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN    = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 연락처 조회 -->
+	<select id="getPsnalBasicUserContacts" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT B.CODE_NM AS CONT_TYPE_NM
+			     , A.CONT_ADDRESS
+			  FROM THRM124 A
+			 INNER JOIN TSYS005 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.GRCODE_CD = 'H12410'
+			   AND B.CODE = A.CONT_TYPE
+			   AND B.USE_YN = 'Y'
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN    = #{ssnSabun}
+			   AND A.CONT_ADDRESS IS NOT NULL
+			 ORDER BY B.SEQ
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 근무정보 조회 -->
+	<select id="getPsnalBasicUserWorkInfo" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_HQ_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS HQ_NM
+			     , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN, 'W', 'YYMM', '1', NULL, #{ssnLocaleCd}) AS WORK_PERIOD
+			     , F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+			     , CASE WHEN F_COM_IS_DATE_YN(A.GEMP_YMD) = 'Y' THEN TO_CHAR(TO_DATE(A.GEMP_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+			            ELSE A.GEMP_YMD END AS GEMP_YMD
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+			     , CASE WHEN F_COM_IS_DATE_YN(A.EMP_YMD) = 'Y' THEN TO_CHAR(TO_DATE(A.EMP_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE A.EMP_YMD END AS EMP_YMD
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020', B.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+				 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'F10001', A.STF_TYPE, #{ssnLocaleCd}) AS STF_TYPE_NM
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10030', B.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+			     , CASE WHEN A.RET_YMD IS NULL THEN '-'
+			            WHEN F_COM_IS_DATE_YN(A.EMP_YMD) = 'Y' THEN TO_CHAR(TO_DATE(A.RET_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+			            ELSE A.RET_YMD END AS RET_YMD
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10050', B.WORK_TYPE, #{ssnLocaleCd}) AS WORK_TYPE_NM
+			     , TO_CHAR(TO_DATE(F_COM_GET_CURR_ORG_YMD(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), 'YYYYMMDD'), 'YYYY-MM-DD') AS ORG_JOIN_YMD
+			     , F_COM_GET_JOB_NM(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JOB_NM
+			     , TO_CHAR(TO_DATE(F_COM_GET_CURR_JIKCHAK_YMD(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), 'YYYYMMDD'), 'YYYY-MM-DD') AS CURR_JIKCHAK_YMD
+			  FROM THRM100 A
+			 INNER JOIN THRM151 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN    = #{ssnSabun}
+			   AND B.SDATE =
+			       (
+			           SELECT MAX(SDATE)
+				         FROM THRM151
+				        WHERE ENTER_CD = B.ENTER_CD
+				          AND SABUN = B.SABUN
+				          AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				   )
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 주소 조회 -->
+	<select id="getPsnalBasicUserAddress" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT C.CODE_NM AS ADDR_TYPE_NM
+			     , B.ADDR1 || CASE WHEN B.ADDR1 IS NULL OR B.ADDR2 IS NULL THEN '' ELSE ' ' END || B.ADDR2 AS ADDR
+			     , B.NOTE
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM123 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 INNER JOIN TSYS005 C
+			    ON C.ENTER_CD = B.ENTER_CD
+			   AND C.GRCODE_CD = 'H20185'
+			   AND C.CODE = B.ADD_TYPE
+			   AND C.USE_YN = 'Y'
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY C.SEQ
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 가족 조회 -->
+	<select id="getPsnalBasicUserFamily" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT C.CODE_NM AS FAM_TYPE_NM
+			     , NVL(C.NOTE5, 'green') AS FAM_TYPE_CLASS_NM
+			     , B.FAM_NM
+			     , CASE WHEN F_COM_IS_DATE_YN(B.FAM_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.FAM_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+			            ELSE B.FAM_YMD END AS FAM_YMD
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H00010', B.SEX_TYPE, #{ssnLocaleCd}) AS GENDER_NM
+			     , REGEXP_REPLACE(CRYPTIT.DECRYPT(B.FAMRES, B.ENTER_CD), '(\d{6})(\d{7})', '\1-*******') AS FAM_RES_NO
+			     , NVL(B.FAM_YN, 'N') AS LIVE_WITH_YN
+			     , NVL(B.H_SUPPORT_YN, 'N') AS H_SUPPORT_YN
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20130', B.ACA_CD, #{ssnLocaleCd}) AS ACA_NM -- 학력
+			     , B.OFFICE_NM
+			     , B.FAM_JIKWEE_NM
+			     , B.NOTE
+			     , B.FILE_SEQ
+			     , ROW_NUMBER() OVER(ORDER BY C.SEQ, B.FAM_YMD) AS RNUM
+			  FROM THRM100 A
+			 INNER JOIN THRM111 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 INNER JOIN TSYS005 C
+			    ON C.ENTER_CD = B.ENTER_CD
+			   AND C.GRCODE_CD = 'H20120'
+			   AND C.CODE = B.FAM_CD
+			   AND C.USE_YN = 'Y'
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			   AND B.SDATE =
+			       (
+			           SELECT MAX(SDATE)
+			             FROM THRM111
+			            WHERE ENTER_CD = B.ENTER_CD
+			              AND SABUN = B.SABUN
+			              AND FAM_NM = B.FAM_NM
+			              AND FAM_CD = B.FAM_CD
+			              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+			       )
+			 ORDER BY C.SEQ, B.FAM_YMD
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 보증보험 조회 -->
+	<select id="getPsnalBasicUserGuaranteeInsurance" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT C.CODE_NM AS WRRNT_TYPE_NM
+				 , CASE WHEN F_COM_IS_DATE_YN(B.WARRANTY_S_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.WARRANTY_S_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.WARRANTY_S_YMD END AS WARRANTY_S_YMD
+				 , CASE WHEN F_COM_IS_DATE_YN(B.WARRANTY_E_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.WARRANTY_E_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.WARRANTY_E_YMD END AS WARRANTY_E_YMD
+			     , B.WARRANTY_NO -- 증권번호
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'S10030', B.CURRENCY_CD, #{ssnLocaleCd}) AS CURRENCY_NM -- 통화단위
+			     , RTRIM(TO_CHAR(B.WARRANTY_MON, 'FM999,999,999,990'), '.') AS WARRANTY_MON -- 보증금액
+			     , B.NOTE
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM119 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			   AND B.TYPE = '1' -- 보증보험
+			 INNER JOIN TSYS005 C
+			    ON C.ENTER_CD = B.ENTER_CD
+			   AND C.GRCODE_CD = 'H20380'
+			   AND C.CODE = B.WARRANTY_CD
+			   AND C.USE_YN = 'Y'
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY C.SEQ
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 발령 데이터 조회 -->
+	<select id="getPsnalBasicUserPost" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT CASE WHEN F_COM_IS_DATE_YN(B.ORD_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.ORD_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ORD_YMD END AS ORD_YMD
+			     , NVL(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD, 'tsys011', B.ORD_TYPE_CD, #{ssnLocaleCd}), F_COM_GET_ORD_TYPE_NM(B.ENTER_CD, B.ORD_TYPE_CD)) AS ORD_TYPE_NM
+			     , NVL(F_COM_GET_LANGUAGE_MAPPING(B.ENTER_CD, 'tsys013', B.ORD_DETAIL_CD, #{ssnLocaleCd}), F_COM_GET_ORD_DETAIL_NM(A.ENTER_CD, B.ORD_TYPE_CD, B.ORD_DETAIL_CD)) AS ORD_DETAIL_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10010', B.STATUS_CD, #{ssnLocaleCd}) AS STATUS_NM
+			     , F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, B.ORD_YMD, #{ssnLocaleCd}) AS ORG_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20020', B.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20030', B.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20010', B.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+			     , F_COM_GET_JOB_NM_201(B.ENTER_CD, B.JOB_CD, B.ORD_YMD, #{ssnLocaleCd}) AS JOB_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10050', B.WORK_TYPE, #{ssnLocaleCd}) AS WORK_TYPE_NM
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10030', B.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+			  FROM THRM100 A
+			 INNER JOIN THRM191 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+		]]>
+		<if test='mainYn != null and mainYn.equals("Y")'>
+			   AND EXISTS
+			       (
+			           SELECT 1
+			             FROM TSYS011
+			            WHERE ENTER_CD = B.ENTER_CD
+			              AND ORD_TYPE_CD = B.ORD_TYPE_CD
+			              AND NVL(MAIN_YN, 'N') = 'Y'
+			       )
+		</if>
+		<![CDATA[
+			 ORDER BY B.ORD_YMD DESC, B.APPLY_SEQ DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 포상사항 데이터 조회 -->
+	<select id="getPsnalBasicUserReward" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20250', B.PRIZE_CD, #{ssnLocaleCd}) AS PRIZE_NM
+			     , CASE WHEN F_COM_IS_DATE_YN(B.PRIZE_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.PRIZE_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.PRIZE_YMD END AS PRIZE_YMD
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20271', B.IN_OUT_CD, #{ssnLocaleCd}) AS IN_OUT_NM
+				 , F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, NVL(B.PRIZE_YMD, TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS ORG_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20010', C.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20030', C.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20020', C.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10030', C.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+			     , B.PRIZE_OFFICE_NM
+			     , B.PRIZE_NO
+			     , RTRIM(TO_CHAR(B.PRIZE_MON, 'FM999,999,999,990'), '.') AS PRIZE_MON -- 포상금액
+			     , TO_CHAR(TO_DATE(B.PAYMENT_YM, 'YYYYMM'), 'YYYY-MM') AS PAYMENT_YM
+			     , B.MEMO2 AS PRIZE_REASON -- 포상사유
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM128 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 INNER JOIN THRM151 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			   AND C.SDATE =
+			       (
+			           SELECT MAX(SDATE)
+			             FROM THRM151
+			            WHERE ENTER_CD = C.ENTER_CD
+			              AND SABUN = C.SABUN
+			              AND NVL(B.PRIZE_YMD, TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN SDATE AND NVL(EDATE, '99991231')
+				   )
+			 ORDER BY B.PRIZE_YMD DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 징계사항 데이터 조회 -->
+	<select id="getPsnalBasicUserPunish" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20270', B.PUNISH_CD, #{ssnLocaleCd}) AS PUNISH_NM
+				 , CASE WHEN F_COM_IS_DATE_YN(B.PUNISH_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.PUNISH_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.PUNISH_YMD END AS PUNISH_YMD
+				 , F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, NVL(B.PUNISH_YMD, TO_CHAR(SYSDATE, 'YYYYMMDD')), #{ssnLocaleCd}) AS ORG_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20010', C.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20030', C.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H20020', C.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+				 , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'H10030', C.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+				 , B.PUNISH_OFFICE AS PUNISH_OFFICE_NM -- 징계기관
+				 , B.AUDIT_OFFICE AS AUDIT_OFFICE_NM -- 감사기관
+				 , CASE WHEN F_COM_IS_DATE_YN(B.SDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.SDATE END AS SDATE
+				 , CASE WHEN F_COM_IS_DATE_YN(B.EDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.EDATE END AS EDATE
+				 , B.PUNISH_NO -- 징계번호
+			     , B.PUNISH_MEMO AS PUNISH_REASON -- 징계사유
+				 , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM129 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 INNER JOIN THRM151 C
+			    ON C.ENTER_CD = A.ENTER_CD
+			   AND C.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			   AND C.SDATE =
+			       (
+			           SELECT MAX(SDATE)
+						 FROM THRM151
+			            WHERE ENTER_CD = C.ENTER_CD
+			              AND SABUN = C.SABUN
+			              AND NVL(B.PUNISH_YMD, TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN SDATE AND NVL(EDATE, '99991231')
+				   )
+			 ORDER BY B.PUNISH_YMD DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 교육 데이터 조회 -->
+	<select id="getPsnalBasicUserEducation" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT D.EDU_COURSE_NM
+				 , CASE WHEN F_COM_IS_DATE_YN(E.EDU_S_YMD) = 'Y' THEN TO_CHAR(TO_DATE(E.EDU_S_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE E.EDU_S_YMD END AS EDU_S_YMD
+				 , CASE WHEN F_COM_IS_DATE_YN(E.EDU_E_YMD) = 'Y' THEN TO_CHAR(TO_DATE(E.EDU_E_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE E.EDU_E_YMD END AS EDU_E_YMD
+				 , F_COM_GET_GRCODE_NOTE_VAL(D.ENTER_CD, 'L10010', D.EDU_BRANCH_CD, 2) AS EDU_BRANCH_CLASS_NM
+				 , F_COM_GET_GRCODE_NAME(D.ENTER_CD, 'L10010', D.EDU_BRANCH_CD, #{ssnLocaleCd}) AS EDU_BRANCH_NM -- 교육구분
+				 , F_COM_GET_GRCODE_NAME(D.ENTER_CD, 'L20020', D.IN_OUT_TYPE, #{ssnLocaleCd}) AS IN_OUT_TYPE_NM -- 사내/외
+				 , F_COM_GET_GRCODE_NAME(D.EDU_M_BRANCH_CD, 'L10015', D.EDU_M_BRANCH_CD, #{ssnLocaleCd}) AS EDU_M_BRANCH_NM -- 교육분류
+				 , F_COM_GET_GRCODE_NAME(D.EDU_METHOD_CD, 'L10050', D.EDU_METHOD_CD, #{ssnLocaleCd}) AS EDU_METHOD_NM -- 시행방법
+				 , RTRIM(TO_CHAR(E.REAL_EXPENSE_MON, 'FM999,999,999,990'), '.') AS REAL_EXPENSE_MON -- 교육비
+				 , DECODE(E.LABOR_RETURN_YN, 'Y', 'YES', 'NO') AS LABOR_RETURN_YN -- 고용보험적용여부
+				 , DECODE(A.EDU_CONFIRM_TYPE, '1', '인정', '미인정') AS EDU_CONFIRM_TYPE -- 교육수료구분
+				 , C.EDU_ORG_NM -- 교육기관
+				 , ROW_NUMBER() OVER(ORDER BY D.EDU_COURSE_NM, A.EDU_EVENT_SEQ) AS RNUM
+			  FROM TTRA301 A
+			 INNER JOIN TTRA101 D
+				ON D.ENTER_CD = A.ENTER_CD
+			   AND D.EDU_SEQ = A.EDU_SEQ
+			 INNER JOIN TTRA121 E
+				ON E.ENTER_CD = A.ENTER_CD
+			   AND E.EDU_SEQ = A.EDU_SEQ
+			   AND E.EDU_EVENT_SEQ = A.EDU_EVENT_SEQ
+			  LEFT OUTER JOIN TTRA001 C
+				ON C.ENTER_CD = A.ENTER_CD
+			   AND C.EDU_ORG_CD = D.EDU_ORG_CD
+			  LEFT OUTER JOIN
+				   (
+					   SELECT B1.ENTER_CD, B1.EDU_SEQ, B1.EDU_EVENT_SEQ, B1.SABUN
+							, B1.APPL_SEQ, B2.APPL_STATUS_CD
+						 FROM TTRA203 B1
+						INNER JOIN THRI103 B2
+						   ON B2.ENTER_CD = B1.ENTER_CD
+						  AND B2.APPL_SEQ = B1.APPL_SEQ
+						WHERE B1.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+				   ) B
+				ON B.ENTER_CD = A.ENTER_CD
+			   AND B.EDU_SEQ = A.EDU_SEQ
+			   AND B.EDU_EVENT_SEQ = A.EDU_EVENT_SEQ
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 자격 데이터 조회 -->
+	<select id="getPsnalBasicUserLicense" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT NVL(B.LICENSE_NM, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20160', B.LICENSE_CD, #{ssnLocaleCd})) AS LICENSE_NM
+			     , B.LICENSE_GRADE
+				 , CASE WHEN F_COM_IS_DATE_YN(B.LIC_S_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.LIC_S_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.LIC_S_YMD END AS LIC_S_YMD -- 취득일
+			     , B.LICENSE_NO -- 자격증번호
+				 , B.OFFICE_CD AS OFFICE_NM -- 발급기관
+				 , CASE WHEN F_COM_IS_DATE_YN(B.LIC_U_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.LIC_U_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.LIC_U_YMD END AS LIC_U_YMD -- 갱신일(교부일)
+				 , CASE WHEN F_COM_IS_DATE_YN(B.LIC_E_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.LIC_E_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.LIC_E_YMD END AS LIC_E_YMD -- 만료일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.ALLOW_SYMD) = 'Y' THEN TO_CHAR(TO_DATE(B.ALLOW_SYMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ALLOW_SYMD END AS ALLOW_SYMD -- 수당지급시작일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.ALLOW_EYMD) = 'Y' THEN TO_CHAR(TO_DATE(B.ALLOW_EYMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ALLOW_EYMD END AS ALLOW_EYMD -- 수당지급종료일
+			     , B.LICENSE_BIGO -- 관련근거
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM113 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY B.LIC_S_YMD DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 학력 데이터 조회 -->
+	<select id="getPsnalBasicUserSchool" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20130', B.ACA_CD, #{ssnLocaleCd}) AS ACA_NM
+			     , F_COM_GET_GRCODE_NOTE_VAL(B.ENTER_CD, 'H20130', B.ACA_CD, 4) AS ACA_CLASS_NM
+			     , NVL(B.ACA_SCH_NM, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20145', B.ACA_SCH_CD, #{ssnLocaleCd})) AS ACA_SCH_NM
+			     , CASE WHEN LENGTH(B.ACA_S_YM) = 6 THEN TO_CHAR(TO_DATE(B.ACA_S_YM, 'YYYYMM'), 'YYYY-MM')
+			            WHEN F_COM_IS_DATE_YN(B.ACA_S_YM) = 'Y' THEN TO_CHAR(TO_DATE(B.ACA_S_YM, 'YYYYMMDD'), 'YYYY-MM-DD')
+			            ELSE B.ACA_S_YM END AS ACA_S_YM -- 입학년월일
+				 , CASE WHEN LENGTH(B.ACA_E_YM) = 6 THEN TO_CHAR(TO_DATE(B.ACA_E_YM, 'YYYYMM'), 'YYYY-MM')
+						WHEN F_COM_IS_DATE_YN(B.ACA_E_YM) = 'Y' THEN TO_CHAR(TO_DATE(B.ACA_E_YM, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ACA_E_YM END AS ACA_E_YM -- 졸업년월일
+			     , B.ACAMAJ_NM -- 전공명
+				 , B.DOUMAJ_NM -- 복수전공명
+			     , B.ENTRY_TYPE -- 편입여부(Y/N)
+			     , B.ACA_TYPE -- 최종학력여부(Y/N)
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'F20140', B.ACA_YN, #{ssnLocaleCd}) AS ACA_YN -- 졸업구분(F20140)
+			     , NVL(B.ACA_PLACE_NM, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'F64140', B.ACA_PLACE_CD, #{ssnLocaleCd})) AS ACA_PLACE_NM -- 소재지
+			     , DECODE(B.E_TYPE, 'N', '분교', '본교') AS E_TYPE_NM
+			     , DECODE(B.D_TYPE, 'N', '야간', '주간') AS D_TYPE_NM
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM115 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY B.ACA_E_YM DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 경력 정보 조회 -->
+	<select id="getPsnalBasicUserCareerInfo" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_CAREER_CNT(NVL(#{searchUserEnterCd}, #{ssnEnterCd}), #{ssnSabun}, 'N', 'YYMM', '1', null, #{ssnLocaleCd}) AS OUTER_CAREER_CNT
+			     , F_COM_GET_CAREER_CNT(NVL(#{searchUserEnterCd}, #{ssnEnterCd}), #{ssnSabun}, 'W', 'YYMM', '1', null, #{ssnLocaleCd}) AS INNER_CAREER_CNT
+			  FROM DUAL
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 사외경력 데이터 조회 -->
+	<select id="getPsnalBasicUserOuterCareer" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT B.CMP_NM -- 근무처명
+				 , CASE WHEN F_COM_IS_DATE_YN(B.SDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.SDATE END AS SDATE -- 입사일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.EDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.EDATE END AS SDATE -- 퇴사일
+			     , B.DEPT_NM -- 부서명
+				 , B.JIKWEE_NM -- 직위명
+				 , B.JOB_NM -- 담당업무
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H10040', B.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM
+				 , B.MEMO2 AS RET_REASON -- 퇴직사유
+				 , B.AGREE_RATE -- 인정비율
+				 , B.CAREER_YY_CNT -- 인정경력(년)
+				 , B.CAREER_MM_CNT -- 인정경력(월)
+				 , B.NOTE -- 비고
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM117 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY B.SDATE DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 사내경력 데이터 조회 -->
+	<select id="getPsnalBasicUserInnerCareer" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT B.TF_ORG_NM -- 조직명
+				 , CASE WHEN F_COM_IS_DATE_YN(B.SDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.SDATE END AS SDATE -- 시작일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.EDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.EDATE END AS EDATE -- 종료일
+			     , B.JIKWEE_NM -- 직위
+				 , B.EVAL_TXT -- 평가
+				 , B.JOB_NM -- 담당업무
+				 , B.NOTE -- 비고
+			  FROM THRM100 A
+			 INNER JOIN THRM116 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY B.SDATE DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 어학 데이터 조회 -->
+	<select id="getPsnalBasicUserLanguage" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20307', B.F_TEST_CD, #{ssnLocaleCd}) AS F_TEST_NM -- 외국어시험종류명
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20300', B.FOREIGN_CD, #{ssnLocaleCd}) AS FOREIGN_NM -- 외국어종류
+				 , CASE WHEN F_COM_IS_DATE_YN(B.APPLY_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.APPLY_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.APPLY_YMD END AS APPLY_YMD -- 취득일
+				 , B.TEST_POINT -- 등급
+				 , B.PASS_SCORES -- 점수
+				 , B.OFFICE_NM -- 기관명
+				 , CASE WHEN F_COM_IS_DATE_YN(B.STA_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.STA_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.STA_YMD END AS EDATE -- 수당지급시작일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.END_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.END_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.END_YMD END AS EDATE -- 수당지급종료일
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM125 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY B.APPLY_YMD DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 해외연수 데이터 조회 -->
+	<select id="getPsnalBasicUserOverseasStudy" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20290', B.NATION_CD, #{ssnLocaleCd}) AS NATION_NM -- 외국어시험종류명
+			     , B.CITY_NM -- 도시명
+				 , CASE WHEN F_COM_IS_DATE_YN(B.SDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.SDATE END AS SDATE -- 시작일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.EDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.EDATE END AS EDATE -- 종료일
+				 , B.PURPOSE -- 연수목적
+				 , B.NOTE -- 연수내용
+			     , B.FILE_SEQ
+			  FROM THRM100 A
+			 INNER JOIN THRM131 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+			 ORDER BY B.SDATE DESC
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 병역사항 데이터 조회 -->
+	<select id="getPsnalBasicUserMilitary" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20200', B.TRANSFER_CD, #{ssnLocaleCd}) AS TRANSFER_NM -- 병역구분
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20230', B.ARMY_CD, #{ssnLocaleCd}) AS ARMY_NM -- 군별
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20220', B.ARMY_GRADE_CD, #{ssnLocaleCd}) AS ARMY_GRADE_NM -- 계급
+				 , B.ARMY_NO -- 군번
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20210', B.ARMY_D_CD, #{ssnLocaleCd}) AS ARMY_D_NM -- 병과
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20240', B.DISCHARGE_CD, #{ssnLocaleCd}) AS DISCHARGE_NM -- 전역사유
+				 , CASE WHEN F_COM_IS_DATE_YN(B.ARMY_S_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.ARMY_S_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ARMY_S_YMD END AS ARMY_S_YMD -- 입대일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.ARMY_E_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.ARMY_E_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ARMY_E_YMD END AS ARMY_E_YMD -- 제대일
+				 , B.ARMY_MEMO -- 비고
+			  FROM THRM100 A
+			 INNER JOIN THRM121 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 병역특례 데이터 조회 -->
+	<select id="getPsnalBasicUserMilitaryException" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT DECODE(B.TARGET_YN, '0', '비대상', '대상') AS TARGET_YN -- 대상여부
+			     , DECODE(B.ARMY_EDU_YN, '1', '수료', '미수료') AS ARMY_EDU_YN -- 군사교육수료여부
+				 , CASE WHEN F_COM_IS_DATE_YN(B.SDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.SDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.SDATE END AS SDATE -- 특례편입일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.EDATE) = 'Y' THEN TO_CHAR(TO_DATE(B.EDATE, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.EDATE END AS EDATE -- 특례만료일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.ARMY_EDU_SYMD) = 'Y' THEN TO_CHAR(TO_DATE(B.ARMY_EDU_SYMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ARMY_EDU_SYMD END AS ARMY_EDU_SYMD -- 군사교육_시작일
+				 , CASE WHEN F_COM_IS_DATE_YN(B.ARMY_EDU_EYMD) = 'Y' THEN TO_CHAR(TO_DATE(B.ARMY_EDU_EYMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.ARMY_EDU_EYMD END AS ARMY_EDU_EYMD -- 군사교육_종료일
+				 , B.ARMY_EDU_NM -- 훈련부대명
+			  FROM THRM100 A
+			 INNER JOIN THRM132 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 보훈사항 데이터 조회 -->
+	<select id="getPsnalBasicUserVeteransAffairs" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20310', B.BOHUN_CD, #{ssnLocaleCd}) AS BOHUN_NM -- 보훈구분
+			     , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20120', B.FAM_CD, #{ssnLocaleCd}) AS FAM_NM -- 보훈관계
+				 , B.BOHUN_NO -- 보훈번호
+				 , B.BOHUN_P_NM -- 유공자성명
+			     , B.EMP_ORDER_NO -- 고용명령번호
+			     , B.NOTE -- 비고
+			  FROM THRM100 A
+			 INNER JOIN THRM122 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+		]]>
+	</select>
+
+	<!-- 인사기본_임직원공통 장애사항 데이터 조회 -->
+	<select id="getPsnalBasicUserDisability" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20320', B.JANG_CD, #{ssnLocaleCd}) AS JANG_NM -- 장애유형
+				 , CASE WHEN F_COM_IS_DATE_YN(B.JANG_YMD) = 'Y' THEN TO_CHAR(TO_DATE(B.JANG_YMD, 'YYYYMMDD'), 'YYYY-MM-DD')
+						ELSE B.JANG_YMD END AS JANG_YMD -- 장애인정일
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20330', B.JANG_GRADE_CD, #{ssnLocaleCd}) AS JANG_GRADE_NM -- 장애등급
+				 , B.JANG_NO -- 장애등록번호
+				 , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'H20336', B.JANG_TYPE, #{ssnLocaleCd}) AS JANG_TYPE_NM -- 장애구분
+				 , B.JANG_ORG_NM -- 장애인정기관
+			     , B.JANG_MEMO -- 비고
+			  FROM THRM100 A
+			 INNER JOIN THRM120 B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = NVL(#{searchUserEnterCd}, #{ssnEnterCd})
+			   AND A.SABUN = #{ssnSabun}
+		]]>
+	</select>
+</mapper>

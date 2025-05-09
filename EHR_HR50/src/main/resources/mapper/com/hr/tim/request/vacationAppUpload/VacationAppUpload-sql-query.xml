@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.vacationAppUpload">
+
+<!-- 일괄근태업로드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppUploadList">
+
+				<![CDATA[
+				  SELECT A.ENTER_CD
+				       , A.SABUN
+				       , A.GNT_CD
+				       , A.APPL_YMD
+				       , A.SDATE
+				       , A.EDATE
+				       , A.DAY_CNT
+				       , A.BIGO
+				       , A.APPL_SEQ
+				       , A.REF_APPL_SEQ
+				       , F_TIM_GET_HOLIDAY_CNT(A.ENTER_CD, A.SABUN, A.GNT_CD, A.SDATE, A.EDATE) AS HOLIDAY_CNT
+				       , CASE WHEN A.GNT_CD = '15' OR A.GNT_CD = '16'
+				       			THEN 0.5
+				              WHEN A.GNT_CD = '17' OR A.GNT_CD = '18'
+				       			THEN 0.25
+				       		  ELSE
+				       		    A.DAY_CNT - F_TIM_GET_HOLIDAY_CNT(A.ENTER_CD, A.SABUN, A.GNT_CD, A.SDATE, A.EDATE) 
+				       	 END CLOSE_CNT
+				       , DECODE(C.APPL_STATUS_CD,'99','Y','N') AS APPLY_YN
+				       , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+				       , (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.SDATE) FROM DUAL) AS ORG_NM
+				       , F_COM_GET_JIKGUB_NM	( A.ENTER_CD, A.SABUN, A.SDATE) AS JIKGUB_NM
+				       , F_COM_GET_PAY_TYPE_NM	( A.ENTER_CD, A.SABUN, A.SDATE) AS PAY_TYPE_NM
+				       , (SELECT F_COM_GET_LOCATION_CD2( A.ENTER_CD, A.SABUN, A.SDATE) FROM DUAL) AS LOCATION_CD
+					FROM TTIM311 A, TTIM301 B, THRI103 C
+					]]>
+				<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+					   , BP_V E
+				</if>
+				   WHERE A.ENTER_CD = B.ENTER_CD(+)
+					 AND A.APPL_SEQ = B.APPL_SEQ(+)
+					 AND A.ENTER_CD = C.ENTER_CD(+)
+					 AND A.APPL_SEQ = C.APPL_SEQ(+)
+					 AND A.ENTER_CD  = #{ssnEnterCd}
+   					<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+			      	 AND (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, A.SDATE) FROM DUAL) LIKE '%' || #{searchOrgCd} || '%'
+					</if>
+					<choose><when test='searchGntCd != null and !searchGntCd.equals("")'>
+			      	 AND A.GNT_CD = #{searchGntCd}
+					</when><otherwise>
+			      	 AND A.GNT_CD IN (SELECT GNT_CD FROM TTIM014 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_YN = 'Y')
+					</otherwise>
+					</choose>
+					<if test='searchSbNm != null and !searchSbNm.equals("")'>
+			      	 AND (A.SABUN LIKE '%' || #{searchSbNm} || '%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) LIKE '%' || #{searchSbNm} || '%')
+					</if>
+					<if test='searchApplyYn != null and !searchApplyYn.equals("")'>
+			      	 AND DECODE(C.APPL_STATUS_CD,'99','Y','N') = #{searchApplyYn}
+					</if>
+					<if test='fromSdate != null and !fromSdate.equals("")'>
+			      	 <![CDATA[ AND A.SDATE >= REPLACE( #{fromSdate} , '-', '') ]]>
+					</if>
+					<if test='toSdate != null and !toSdate.equals("")'>
+					<![CDATA[  AND A.SDATE <= REPLACE( #{toSdate} , '-', '') ]]>
+					</if>
+					<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+					 AND A.ENTER_CD = E.ENTER_CD
+					 AND A.SABUN    = E.SABUN
+					 AND A.SDATE    BETWEEN  E.SDATE(+) AND NVL(E.EDATE(+), '99991231')
+					 AND E.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+					</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+					AND (SELECT F_COM_GET_LOCATION_CD2( A.ENTER_CD, A.SABUN, A.SDATE) FROM DUAL) = #{searchLocationCd}
+</if>
+				ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD, B.SABUN, A.APPL_YMD)
+
+
+		</select>
+
+<!-- 근태업로드 대상자생성 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationAppUploadListCre">
+
+				<![CDATA[
+				SELECT A.ENTER_CD
+				     , A.SABUN
+				     , #{searchGntCd} AS GNT_CD
+				     , REPLACE(#{fromSdate},'-','')   AS SDATE
+				     , REPLACE(#{toSdate},'-','')     AS EDATE
+				     , TO_CHAR(SYSDATE, 'YYYYMMDD') AS APPL_YMD
+				     , 'N' AS APPLY_YN
+				     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+				     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM
+				     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10050', A.WORK_TYPE) AS WORK_TYPE_NM --직군명
+				     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10110', A.PAY_TYPE)  AS PAY_TYPE_NM --급여유형
+				  FROM THRM151 A
+				  ]]>
+				<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+					 , BP_V E
+				</if>
+				 WHERE A.ENTER_CD  = #{ssnEnterCd}
+				   AND A.STATUS_CD = 'AA'
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND A.EDATE
+  				<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+		      	   AND A.ORG_CD = #{searchOrgCd}
+				</if>
+				<if test='searchBizPlaceCd != null and !searchBizPlaceCd.equals("")'>
+				 AND A.ENTER_CD = E.ENTER_CD
+				 AND A.SABUN    = E.SABUN
+				 AND A.SDATE    BETWEEN  E.SDATE(+) AND NVL(E.EDATE(+), '99991231')
+				 AND E.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+				</if>
+
+				ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+		</select>
+
+<!-- 일괄근태업로드 저장 -->
+		<update parameterType="map" id="saveVacationAppUpload">
+
+					MERGE INTO TTIM311 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.SABUN
+							     , A.GNT_CD
+							     , A.APPL_YMD
+							     , A.SDATE
+							     , A.EDATE
+							     , A.DAY_CNT
+							     , A.BIGO
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS SABUN
+										 , NULL AS GNT_CD
+										 , NULL AS APPL_YMD
+										 , NULL AS SDATE
+										 , NULL AS EDATE
+									     , NULL AS DAY_CNT
+									     , NULL AS BIGO
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 , TRIM( #{rm.sabun} )		AS  SABUN
+										 , TRIM( #{rm.gntCd} )		AS  GNT_CD
+										 , REPLACE(TRIM( #{rm.applYmd} ),'-','')	AS  APPL_YMD
+										 , REPLACE(TRIM( #{rm.sdate} ),'-','')		AS  SDATE
+										 , REPLACE(TRIM( #{rm.edate} ),'-','')		AS  EDATE
+										 , TRIM( #{rm.dayCnt})		AS  DAY_CNT
+										 , TRIM( #{rm.bigo})		AS  BIGO
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.GNT_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.GNT_CD = S.GNT_CD AND T.APPL_YMD = S.APPL_YMD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SDATE		= S.SDATE
+									, T.EDATE		= S.EDATE
+                                    , T.DAY_CNT		= S.DAY_CNT
+                                    , T.BIGO		= S.BIGO
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.GNT_CD
+							, T.APPL_YMD
+							, T.SDATE
+							, T.EDATE
+							, T.DAY_CNT
+							, T.BIGO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.GNT_CD
+							, S.APPL_YMD
+							, S.SDATE
+							, S.EDATE
+							, S.DAY_CNT
+							, S.BIGO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 일괄근태업로드 삭제 -->
+		<delete parameterType="map" id="deleteVacationAppUpload">
+
+					DELETE FROM TTIM311
+					 WHERE ENTER_CD||'_'||SABUN||'_'||GNT_CD||'_'||APPL_YMD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")
+												and rm.applYmd != null and !rm.applYmd.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.gntCd} )||'_'||REPLACE(TRIM( #{rm.applYmd} ),'-','')
+										</if>
+</foreach>
+										)
+		</delete>
+
+				<delete parameterType="map" id="deleteVacationAppUploadFirst">
+
+				<![CDATA[
+					DELETE FROM THRI103
+					WHERE  ENTER_CD = #{ssnEnterCd}
+					AND	   APPL_SEQ = #{applSeq}
+				]]>
+
+
+				</delete>
+
+		<delete parameterType="map" id="deleteVacationAppUploadSecond">
+
+				<![CDATA[
+					DELETE FROM THRI107
+					WHERE  ENTER_CD = #{ssnEnterCd}
+					AND	   APPL_SEQ = #{applSeq}
+				]]>
+
+
+		</delete>
+
+		<delete parameterType="map" id="deleteVacationAppUploadThird">
+
+				<![CDATA[
+					DELETE FROM TTIM301
+					WHERE  ENTER_CD = #{ssnEnterCd}
+					AND	   APPL_SEQ = #{applSeq}
+				]]>
+
+		</delete>
+
+		<update parameterType="map" id="prcP_TIM_CREW_CREATE" statementType="CALLABLE">
+
+			<![CDATA[
+					CALL P_TIM_CREW_CREATE(#{sqlCode},#{sqlErrm},#{ssnEnterCd},#{searchSabun},#{searchApplYmd},#{searchGntCd},#{ssnSabun})
+			]]>
+		</update>
+
+		<update parameterType="map" id="prcP_TIM_VACATION_CLEAN" statementType="CALLABLE">
+
+			<![CDATA[
+					CALL P_TIM_VACATION_CLEAN(#{sqlCode},#{sqlErrm},#{ssnEnterCd},#{sabun},#{gntCd},#{sdate})
+			]]>
+		</update>
+
+	<!-- 적용일수 조회 -->
+	<select parameterType="map" resultType="cMap" id="getVacationAppUploadCloseCnt">
+		SELECT CASE WHEN #{searchGntCd} = '15' OR #{searchGntCd} = '16'
+						THEN 0.5
+					WHEN #{searchGntCd} = '17' OR #{searchGntCd} = '18'
+						THEN 0.25
+					ELSE TO_NUMBER(#{dayCnt}) - F_TIM_GET_HOLIDAY_CNT(#{ssnEnterCd}, #{searchSabun}, #{searchGntCd}, #{searchSdate}, #{searchEdate})
+				   END CLOSE_CNT
+		FROM DUAL
+	</select>
+
+</mapper>

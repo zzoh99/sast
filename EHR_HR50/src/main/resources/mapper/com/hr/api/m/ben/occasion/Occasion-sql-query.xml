@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="api.m.ben.occasion">
+	<select parameterType="map" resultType="cMap" id="getOccasionList">
+		SELECT *
+		FROM (
+			SELECT
+				ROWNUM AS NUM,
+				T1.*
+			FROM (
+		<![CDATA[
+		SELECT
+				  T.*
+			FROM (
+		   SELECT A.APPL_SEQ
+				, A.SABUN
+				, A.OCC_CD
+				, A.OCC_YMD
+				, A.FAM_CD
+				, A.FAM_NM
+				, A.OCC_MON
+				, A.OCC_HOLIDAY
+				, A.WORK_MONTH
+				, A.WREATH_YN
+				, A.OUTFIT_YN
+				, A.GIFT_YN
+				, A.ADDR
+				, A.PHONE_NO
+				, A.BANK_CD
+				, A.ACC_NM
+				, A.ACC_NO
+				, A.PAY_YMD
+				, A.PAY_NOTE
+				, A.NOTE
+				, A.FLOWER_BASKET_YN
+				, B.APPL_YMD
+				, B.APPL_STATUS_CD
+				, B.AGREE_YMD
+				, B.APPL_SABUN
+				, B.APPL_IN_SABUN
+				, 0 AS DETAIL
+			 FROM TBEN471 A, THRI103 B
+			WHERE A.ENTER_CD = #{ssnEnterCd}
+			  AND A.SABUN    = #{searchSabun}
+			  AND A.ENTER_CD = B.ENTER_CD
+			  AND A.APPL_SEQ = B.APPL_SEQ
+			  ) T
+			  WHERE 1=1
+		]]>
+			<choose>
+				<when test="applStatusCd != null and applStatusCd eq '21'">
+			  AND T.APPL_STATUS_CD IN ('21', '31')
+				</when>
+				<when test='applStatusCd != null and applStatusCd eq "99"'>
+			  AND T.APPL_STATUS_CD IN ('23', '33', '99')
+				</when>
+				<otherwise>
+			  AND T.APPL_STATUS_CD IN ('21', '23', '31', '33', '99')
+				</otherwise>
+			</choose>
+			ORDER BY T.APPL_YMD DESC, T.APPL_SEQ DESC
+			) T1
+			WHERE ROWNUM <![CDATA[<=]]> TO_NUMBER(#{edNum})
+		) T2
+		WHERE T2.NUM >= TO_NUMBER(#{stNum})
+	</select>
+
+	<select parameterType="map" resultType="int" id="getOccAppListCnt">
+		<![CDATA[
+			SELECT COUNT(*) FROM (
+						 SELECT A.APPL_SEQ
+							  , A.SABUN
+							  , A.OCC_CD
+							  , A.OCC_YMD
+							  , A.FAM_CD
+							  , A.FAM_NM
+							  , A.OCC_MON
+							  , A.OCC_HOLIDAY
+							  , A.WORK_MONTH
+							  , A.WREATH_YN
+							  , A.OUTFIT_YN
+							  , A.GIFT_YN
+							  , A.ADDR
+							  , A.PHONE_NO
+							  , A.BANK_CD
+							  , A.ACC_NM
+							  , A.ACC_NO
+							  , A.PAY_YMD
+							  , A.PAY_NOTE
+							  , A.NOTE
+							  , A.FLOWER_BASKET_YN
+							  , B.APPL_YMD
+							  , B.APPL_STATUS_CD
+							  , B.AGREE_YMD
+							  , B.APPL_SABUN
+							  , B.APPL_IN_SABUN
+							  , 0 AS DETAIL
+						 FROM TBEN471 A, THRI103 B
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND A.SABUN    = #{searchSabun}
+						   AND A.ENTER_CD = B.ENTER_CD
+						   AND A.APPL_SEQ = B.APPL_SEQ
+						 ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+		) T
+		WHERE 1=1
+		]]>
+	</select>
+	<select id="getOccCdList" parameterType="map" resultType="cMap">
+		SELECT CODE, CODE_NM
+		FROM TSYS005
+		WHERE GRCODE_CD = #{grpCd}
+		  AND ENTER_CD = #{ssnEnterCd}
+		  AND USE_YN = 'Y'
+	</select>
+	<!-- 신청자정보 조회 -->
+	<select id="getOccAppDetUseInfo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_CONT_ADDRESS(A.ENTER_CD, A.SABUN,'HP') AS PHONE_NO
+			 , F_COM_GET_CAREER_CNT(A.ENTER_CD, A.SABUN,'W', 'MM', '') AS WORK_MONTH
+			 , CASE WHEN B.ACC_NAME IS NULL THEN F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})
+					ELSE B.ACC_NAME END AS ACC_NM
+			 , B.BANK_CD
+			 , B.ACCOUNT_NO AS ACC_NO
+			 , B.ACCOUNT_TYPE
+			 , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS APPL_NAME
+		FROM THRM100 A,
+			 ( SELECT ENTER_CD
+					, SABUN
+					, ACCOUNT_TYPE
+					, BANK_CD
+					, CRYPTIT.DECRYPT(ACCOUNT_NO,ENTER_CD) AS ACCOUNT_NO
+					, ACC_NAME
+			   FROM TCPN180
+			   WHERE ENTER_CD     = #{ssnEnterCd}
+				 AND ACCOUNT_TYPE = '01'
+				 AND SABUN        = TRIM( #{searchApplSabun} )
+				 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'29991231')
+			 ) B  /*은행계좌*/
+		WHERE A.ENTER_CD =	#{ssnEnterCd}
+		  AND A.SABUN    = TRIM( #{searchApplSabun} )
+		  AND A.ENTER_CD = B.ENTER_CD(+)
+		  AND A.SABUN    = B.SABUN(+)
+		]]>
+	</select>
+	<!-- 신청내역 조회 -->
+	<select id="getOccDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.OCC_CD
+			 , A.OCC_YMD
+			 , A.FAM_CD
+			 , A.FAM_NM
+			 , A.OCC_MON
+			 , A.OCC_HOLIDAY
+			 , A.WORK_MONTH
+			 , A.WREATH_YN
+			 , A.OUTFIT_YN
+			 , A.GIFT_YN
+			 , A.ADDR
+			 , A.PHONE_NO
+			 , A.BANK_CD
+			 , A.ACC_NM
+			 , A.ACC_NO
+			 , A.PAY_YMD
+			 , A.PAY_NOTE
+			 , A.NOTE
+			 , A.ACC_TYPE_CD
+			 , A.FLOWER_BASKET_YN
+			 , B.EVIDENCE_DOC
+		FROM TBEN471 A
+		   , TBEN470 B
+		WHERE A.ENTER_CD   = #{ssnEnterCd}
+		  AND A.APPL_SEQ   = TRIM( #{searchApplSeq} )
+		  AND A.ENTER_CD   = B.ENTER_CD
+		  AND A.OCC_CD     = B.OCC_CD
+		  AND A.FAM_CD     = B.FAM_CD
+		  AND A.OCC_YMD BETWEEN B.OCC_SDATE AND B.OCC_EDATE
+		  AND F_COM_GET_WORKTYPE(A.ENTER_CD, A.SABUN, A.OCC_YMD) = B.WORK_TYPE
+		]]>
+	</select>
+	<!-- 중복신청 조회 -->
+	<select id="getOccasionAppDupChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT COUNT(1) AS CNT
+		FROM TBEN471 A
+		   , TBEN470 B
+		   , THRI103 C
+		WHERE A.ENTER_CD   = #{ssnEnterCd}
+		  AND A.OCC_CD     = TRIM( #{occCd} )
+		  AND A.FAM_CD     = TRIM( #{famCd} )
+		  AND A.FAM_NM     = TRIM( #{famNm} )
+		  AND A.ENTER_CD   = B.ENTER_CD
+		  AND A.OCC_CD     = B.OCC_CD
+		  AND A.FAM_CD     = B.FAM_CD
+		  AND B.WORK_TYPE  = F_COM_GET_WORKTYPE(#{ssnEnterCd}, #{searchApplSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+		  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.OCC_SDATE AND NVL(B.OCC_EDATE,'99991231')
+		  AND NVL(B.DUP_CHK_YN,'N') = 'Y'
+		  AND A.ENTER_CD   = C.ENTER_CD
+		  AND A.APPL_SEQ   = C.APPL_SEQ
+		  AND C.APPL_STATUS_CD IN ( '21', '31', '99' )
+		]]>
+	</select>
+	<!--  세부내역 저장 -->
+	<update id="saveOccasionAppDet" parameterType="map">
+		<![CDATA[
+		MERGE INTO TBEN471 T
+		USING  ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT    TRIM( #{ssnEnterCd} )					AS ENTER_CD
+			, TRIM( #{rm.searchApplSeq} )			AS APPL_SEQ
+			, TRIM( #{rm.searchApplSabun} )			AS SABUN
+			, TRIM( #{rm.occCd} ) 					AS OCC_CD
+			, REPLACE(TRIM(#{rm.occYmd}),'-','') 	AS OCC_YMD
+			, TRIM( #{rm.famCd} ) 					AS FAM_CD
+			, TRIM( #{rm.famNm} ) 					AS FAM_NM
+			, REPLACE(TRIM( #{rm.occMon} ),',','')	AS OCC_MON
+			, TRIM( #{rm.occHoliday} ) 				AS OCC_HOLIDAY
+			, TRIM( #{rm.workMonth} ) 				AS WORK_MONTH
+			, TRIM( #{rm.wreathYn} ) 				AS WREATH_YN
+			, TRIM( #{rm.outfitYn} ) 				AS OUTFIT_YN
+			, TRIM( #{rm.giftYn} ) 					AS GIFT_YN
+			, TRIM( #{rm.flowerBasketYn} ) 			AS FLOWER_BASKET_YN
+			, TRIM( #{rm.addr} ) 					AS ADDR
+			, TRIM( #{rm.phoneNo} ) 				AS PHONE_NO
+			, TRIM( #{rm.bankCd} ) 					AS BANK_CD
+			, TRIM( #{rm.accNm} ) 					AS ACC_NM
+			, TRIM( #{rm.accNo} ) 					AS ACC_NO
+			, TRIM( #{rm.note} ) 					AS NOTE
+			, TRIM( #{rm.accTypeCd} ) 				AS ACC_TYPE_CD
+			FROM DUAL
+		</foreach>
+		<![CDATA[
+				) S
+		ON (      T.ENTER_CD = S.ENTER_CD
+		      AND T.APPL_SEQ = S.APPL_SEQ
+		   )
+		WHEN MATCHED THEN
+			UPDATE SET	  T.OCC_CD     			= S.OCC_CD
+						, T.OCC_YMD     		= S.OCC_YMD
+						, T.FAM_CD     			= S.FAM_CD
+						, T.FAM_NM     			= S.FAM_NM
+						, T.OCC_MON     		= S.OCC_MON
+						, T.OCC_HOLIDAY     	= S.OCC_HOLIDAY
+						, T.WORK_MONTH      	= S.WORK_MONTH
+						, T.WREATH_YN     		= S.WREATH_YN
+						, T.OUTFIT_YN     		= S.OUTFIT_YN
+						, T.GIFT_YN     		= S.GIFT_YN
+						, T.FLOWER_BASKET_YN	= S.FLOWER_BASKET_YN
+						, T.ADDR    			= S.ADDR
+						, T.PHONE_NO    		= S.PHONE_NO
+						, T.BANK_CD     		= S.BANK_CD
+						, T.ACC_NM     			= S.ACC_NM
+						, T.ACC_NO     			= S.ACC_NO
+						, T.NOTE     			= S.NOTE
+						, T.CHKDATE				= SYSDATE
+						, T.CHKID				= #{ssnSabun}
+						, T.ACC_TYPE_CD			= S.ACC_TYPE_CD
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  T.ENTER_CD
+				, T.APPL_SEQ
+				, T.SABUN
+				, T.OCC_CD
+				, T.OCC_YMD
+				, T.FAM_CD
+				, T.FAM_NM
+				, T.OCC_MON
+				, T.OCC_HOLIDAY
+				, T.WORK_MONTH
+				, T.WREATH_YN
+				, T.OUTFIT_YN
+				, T.GIFT_YN
+				, T.FLOWER_BASKET_YN
+				, T.ADDR
+				, T.PHONE_NO
+				, T.BANK_CD
+				, T.ACC_NM
+				, T.ACC_NO
+				, T.NOTE
+				, T.CHKDATE
+				, T.CHKID
+				, T.ACC_TYPE_CD
+			)
+			VALUES
+			(
+				  S.ENTER_CD
+				, S.APPL_SEQ
+				, S.SABUN
+				, S.OCC_CD
+				, S.OCC_YMD
+				, S.FAM_CD
+				, S.FAM_NM
+				, S.OCC_MON
+				, S.OCC_HOLIDAY
+				, S.WORK_MONTH
+				, S.WREATH_YN
+				, S.OUTFIT_YN
+				, S.GIFT_YN
+				, S.FLOWER_BASKET_YN
+				, S.ADDR
+				, S.PHONE_NO
+				, S.BANK_CD
+				, S.ACC_NM
+				, S.ACC_NO
+				, S.NOTE
+				, SYSDATE
+				, #{ssnSabun}
+				, S.ACC_TYPE_CD
+			)
+	]]>
+	</update>
+</mapper>

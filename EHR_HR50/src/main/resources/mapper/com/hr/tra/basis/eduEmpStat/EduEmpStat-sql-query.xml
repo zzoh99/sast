@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.basis.eduEmpStat">
+<!-- 		과정별수강인원현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduEmpStatList">
+			
+				<![CDATA[
+				SELECT A.EDU_COURSE_NM, B.EDU_EVENT_SEQ, B.EDU_EVENT_NM, B.EDU_S_YMD, B.EDU_E_YMD,
+				       (SELECT X.EDU_ORG_NM FROM TTRA001 X WHERE X.ENTER_CD = C.ENTER_CD AND X.EDU_ORG_CD = B.EDU_ORG_CD) AS EDU_ORG_NM,
+				       F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'L10010', A.EDU_BRANCH_CD) AS EDU_BRANCH_NM,
+				       F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'L10015', A.EDU_M_BRANCH_CD) AS EDU_M_BRANCH_NM,
+				       F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'L10050', A.EDU_METHOD_CD) AS EDU_METHOD_NM, A.MANDATORY_YN,
+				       F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'L20020', A.IN_OUT_TYPE) AS IN_OUT_TYPE_NM,
+				       MAX(NVL(B.EDU_HOUR, 0)) AS EDU_HOUR, SUM(NVL(B.PER_EXPENSE_MON, 0)) AS PER_EXPENSE_MON,
+				       B.LABOR_APPLY_YN, SUM(NVL(B.LABOR_MON, 0)) AS LABOR_MON, COUNT(*) AS CNT,
+				       SUM(NVL(B.REAL_EXPENSE_MON, 0)) AS REAL_EXPENSE_MON
+				  FROM TTRA101 A, TTRA121 B, TTRA301 C
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND B.ENTER_CD = A.ENTER_CD
+				   AND C.ENTER_CD = B.ENTER_CD
+				   AND A.EDU_SEQ = B.EDU_SEQ
+				   AND C.EDU_SEQ = B.EDU_SEQ
+				   AND C.EDU_EVENT_SEQ = B.EDU_EVENT_SEQ
+				   /* 교육일 조회조건 */
+				   AND B.EDU_S_YMD <= REPLACE(#{searchEYmd}, '-', '') -- 종료일파라미터
+				   AND B.EDU_E_YMD >= REPLACE(#{searchSYmd}, '-', '') -- 시작일파라미터 ]]>
+				   <if test="searchEduBranchCd != null and searchEduBranchCd neq ''">
+				   /* 교육구분 조회조건 */
+				   AND A.EDU_BRANCH_CD = #{searchEduBranchCd}
+				   </if>
+				   <if test="searchEduMBanchCd != null and searchEduMBanchCd neq ''">
+				   /* 교육분류 조회조건 */
+				   AND A.EDU_M_BRANCH_CD = #{searchEduMBanchCd}
+				   </if>
+				   <if test="searchEduMethodCd != null and searchEduMethodCd neq ''">
+				   /* 시행방법 조회조건 */
+				   AND A.EDU_METHOD_CD = #{searchEduMethodCd}
+				   </if>
+				   <if test="searchInOutType != null and searchInOutType neq ''">
+				   /* 사내외구분 조회조건 */
+				   AND A.IN_OUT_TYPE = #{searchInOutType}
+				   </if>
+				   <if test="searchMandatory != null and searchMandatory neq ''">
+				   /* 필수여부 조회조건 */
+				   AND A.MANDATORY_YN = #{searchMandatory}
+				   </if>
+				 GROUP BY C.ENTER_CD, A.EDU_COURSE_NM, B.EDU_EVENT_SEQ, B.EDU_EVENT_NM, B.EDU_S_YMD, B.EDU_E_YMD,
+				          B.EDU_ORG_CD, A.EDU_BRANCH_CD, A.EDU_M_BRANCH_CD, A.EDU_METHOD_CD, A.MANDATORY_YN, A.IN_OUT_TYPE, B.LABOR_APPLY_YN
+		</select>
+</mapper>

@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.carAllocate.carAllocateMgr">
+
+	<!-- 업무차량 관리 조회 -->
+	<select id="getCarAllocateMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ENTER_CD
+		     , CAR_NO
+		     , CAR_NM
+		     , CAR_SPEC
+		     , USE_YN
+		     , BUSINESS_PLACE_CD
+		     , CHARGE_ORG_CD
+		     , CHARGE_ORG_NM
+		     , CHARGE_SABUN
+		     , CHARGE_NAME
+		     , AWAY_USEABLE
+		     , NOTE
+		  FROM TBEN896
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+		<if test="businessPlaceCd != null and businessPlaceCd neq ''">
+		   AND BUSINESS_PLACE_CD IN
+		<foreach collection="businessPlaceCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		</if>
+		<if test="searchCarNo != null and searchCarNo neq ''">
+		   AND UPPER(TRIM(CAR_NO)) LIKE '%'||UPPER(TRIM(#{searchCarNo}))||'%'
+		</if>
+		<if test="searchCarNm != null and searchCarNm neq ''">
+		   AND UPPER(TRIM(CAR_NM)) LIKE '%'||UPPER(TRIM(#{searchCarNm}))||'%'
+		</if>
+		ORDER BY BUSINESS_PLACE_CD
+	</select>
+
+	<!-- 업무차량 관리 저장 -->
+	<update id="saveCarAllocateMgr" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN896 T
+		USING (
+				SELECT ENTER_CD
+				     , CAR_NO
+				     , CAR_NM
+				     , CAR_SPEC
+				     , USE_YN
+				     , BUSINESS_PLACE_CD
+				     , CHARGE_ORG_CD
+				     , CHARGE_ORG_NM
+				     , CHARGE_SABUN
+				     , CHARGE_NAME
+				     , AWAY_USEABLE
+				     , NOTE
+				     , CHKID
+				     , CHKDATE
+				  FROM (
+						SELECT NULL    AS ENTER_CD
+						     , NULL    AS CAR_NO
+						     , NULL    AS CAR_NM
+						     , NULL    AS CAR_SPEC
+						     , NULL    AS USE_YN
+						     , NULL    AS BUSINESS_PLACE_CD
+						     , NULL    AS CHARGE_ORG_CD
+						     , NULL    AS CHARGE_ORG_NM
+						     , NULL    AS CHARGE_SABUN
+						     , NULL    AS CHARGE_NAME
+						     , NULL    AS AWAY_USEABLE
+						     , NULL    AS NOTE
+						     , NULL    AS CHKID
+						     , NULL    AS CHKDATE
+						  FROM DUAL ]]>
+			<foreach item="rm" collection="mergeRows">
+						  UNION ALL
+						SELECT #{ssnEnterCd} AS ENTER_CD
+						     , TRIM( #{rm.carNo} ) AS CAR_NO
+						     , TRIM( #{rm.carNm} ) AS CAR_NM
+						     , TRIM( #{rm.carSpec} ) AS CAR_SPEC
+						     , TRIM( #{rm.useYn} ) AS USE_YN
+						     , TRIM( #{rm.businessPlaceCd} ) AS BUSINESS_PLACE_CD
+						     , TRIM( #{rm.chargeOrgCd} ) AS CHARGE_ORG_CD
+						     , TRIM( #{rm.chargeOrgNm} ) AS CHARGE_ORG_NM
+						     , TRIM( #{rm.chargeSabun} ) AS CHARGE_SABUN
+						     , TRIM( #{rm.chargeName} ) AS CHARGE_NAME
+						     , TRIM( #{rm.awayUseable} ) AS AWAY_USEABLE
+						     , TRIM( #{rm.note} ) AS NOTE
+						     , #{ssnSabun} AS CHKID
+						     , SYSDATE AS CHKDATE
+						  FROM DUAL
+			</foreach>
+		<![CDATA[						
+				) WHERE ENTER_CD IS NOT NULL
+				    AND CAR_NO IS NOT NULL
+			) S
+		ON ( T.ENTER_CD = S.ENTER_CD
+		AND T.CAR_NO = S.CAR_NO
+		)
+		WHEN MATCHED THEN
+		UPDATE SET T.CAR_NM = S.CAR_NM
+				 , T.CAR_SPEC = S.CAR_SPEC
+				 , T.USE_YN = S.USE_YN
+				 , T.BUSINESS_PLACE_CD = S.BUSINESS_PLACE_CD
+				 , T.CHARGE_ORG_CD = S.CHARGE_ORG_CD
+				 , T.CHARGE_ORG_NM = S.CHARGE_ORG_NM
+				 , T.CHARGE_SABUN = S.CHARGE_SABUN
+				 , T.CHARGE_NAME = S.CHARGE_NAME
+				 , T.AWAY_USEABLE = S.AWAY_USEABLE
+				 , T.NOTE = S.NOTE
+				 , T.CHKDATE = S.CHKDATE
+				 , T.CHKID = S.CHKID
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  T.ENTER_CD
+				, T.CAR_NO
+				, T.CAR_NM
+				, T.CAR_SPEC
+				, T.USE_YN
+				, T.BUSINESS_PLACE_CD
+				, T.CHARGE_ORG_CD
+				, T.CHARGE_ORG_NM
+				, T.CHARGE_SABUN
+				, T.CHARGE_NAME
+				, T.AWAY_USEABLE
+				, T.NOTE
+				, T.CHKDATE
+				, T.CHKID
+			)
+			VALUES
+			(
+				  S.ENTER_CD
+				, S.CAR_NO
+				, S.CAR_NM
+				, S.CAR_SPEC
+				, S.USE_YN
+				, S.BUSINESS_PLACE_CD
+				, S.CHARGE_ORG_CD
+				, S.CHARGE_ORG_NM
+				, S.CHARGE_SABUN
+				, S.CHARGE_NAME
+				, S.AWAY_USEABLE
+				, S.NOTE
+				, S.CHKDATE
+				, S.CHKID
+			)
+	]]>
+	</update>
+
+	<!-- 업무차량 관리 삭제 -->
+	<delete id="deleteCarAllocateMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN896
+		WHERE 	(ENTER_CD, CAR_NO) IN 	( (NULL,NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.carNo != null and rm.carNo neq ''">
+				(#{ssnEnterCd}, TRIM( #{rm.carNo} ))
+			</if>
+		</foreach>
+		)
+	</delete>
+</mapper>

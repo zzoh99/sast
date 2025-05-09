@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="main.privacyAgreement">
+
+	<select id="getPrivacyAgreementList" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT B.INFO_SEQ, 
+			       B.ELE_SEQ, 
+			       B.ELE_SUMMARY, 
+			       B.ELE_CONTENTS, 
+			       B.ELE_TYPE, 
+			       NVL(C.AGREE_YN, 'N') AS AGREE_YN, 
+			       B.ORDER_SEQ ,
+                   D.SUBJECT,
+				   B.COL_SIZE,
+				   B.UP_DOWN,
+				   B.WHITE_SPACE,
+				   B.AGREE_YN AS AGREE_YN623
+			  FROM THRM100 A, TSYS623 B, TSYS625 C, TSYS621 D
+			 WHERE A.ENTER_CD = #{ssnEnterCd} 
+		       AND A.SABUN = #{ssnSabun} 
+		       AND B.OPEN_YN = 'Y' 
+		       AND B.ENTER_CD = D.ENTER_CD
+		       AND B.INFO_SEQ = D.INFO_SEQ
+               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND D.EDATE
+		       AND C.ENTER_CD(+) = B.ENTER_CD
+		       AND C.INFO_SEQ(+) = B.INFO_SEQ
+		       AND C.ELE_SEQ(+)  = B.ELE_SEQ
+		       AND C.SABUN(+) = #{ssnSabun}
+		       AND A.ENTER_CD = B.ENTER_CD(+) 
+			ORDER BY B.ORDER_SEQ
+		]]>
+	</select>
+	
+	<select id="getPrivacyAgreementMaster" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * 
+			  FROM (
+			        SELECT A.ENTER_CD, A.SABUN, B.INFO_SEQ, F_SYS_GET_PRIVACY_AGREEMENT_YN(A.ENTER_CD, B.INFO_SEQ, SABUN, NULL) AS YN , SUBJECT  
+			          FROM THRM100 A, TSYS621 B
+			        WHERE A.ENTER_CD = B.ENTER_CD 
+			          AND A.ENTER_CD = #{ssnEnterCd} 
+			          AND A.SABUN = #{ssnSabun}
+			          AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+			        ORDER BY B.INFO_SEQ )
+			WHERE YN = 'N'
+		]]>
+	</select>
+	
+	<select id="getPrivacyAgreementMap" parameterType="map" resultType="cMap">
+		<![CDATA[
+			SELECT * 
+			  FROM (
+		        SELECT A.ENTER_CD, A.SABUN, B.INFO_SEQ, F_SYS_GET_PRIVACY_AGREEMENT_YN(A.ENTER_CD, B.INFO_SEQ, SABUN, NULL) AS YN   
+		          FROM THRM100 A, TSYS621 B
+		        WHERE A.ENTER_CD = B.ENTER_CD 
+		          AND A.ENTER_CD = #{ssnEnterCd} 
+		          AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+		          AND SABUN = #{ssnSabun}
+		        ORDER BY INFO_SEQ )
+			WHERE YN = 'N'
+		]]>
+	</select>
+	
+	<insert id="insertPrivacyAgreement" parameterType="map">
+		<![CDATA[
+			INSERT INTO TSYS625
+			(
+				  ENTER_CD
+				, INFO_SEQ
+				, ELE_SEQ
+				, SABUN
+				, AGREE_YN
+				, CHKDATE
+				, CHKID
+			)
+			SELECT	  S.ENTER_CD
+					, S.INFO_SEQ
+					, S.ELE_SEQ
+					, S.SABUN
+					, S.AGREE_YN
+					, sysdate
+					, #{ssnSabun}
+			FROM (
+					SELECT    NULL 	AS ENTER_CD
+							, NULL 	AS INFO_SEQ
+							, NULL 	AS ELE_SEQ
+							, NULL 	AS SABUN
+							, NULL 	AS AGREE_YN
+					FROM   DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+			UNION ALL
+				SELECT	  TRIM(#{ssnEnterCd})	AS ENTER_CD
+						, TRIM(#{rm.infoSeq})	AS INFO_SEQ
+						, TRIM(#{rm.eleSeq})	AS ELE_SEQ
+						, TRIM(#{ssnSabun})		AS SABUN
+						, TRIM(#{rm.agreeYn})	AS AGREE_YN
+				FROM   DUAL
+		</foreach>
+		<![CDATA[) S
+			   WHERE S.ENTER_CD IS NOT NULL
+		]]>
+	</insert>
+	
+</mapper>

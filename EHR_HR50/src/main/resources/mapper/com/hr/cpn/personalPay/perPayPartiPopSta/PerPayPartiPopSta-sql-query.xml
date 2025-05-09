@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급여명세서
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perPayPartiPopSta">
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiPopStaBasicMap">
+			
+				<![CDATA[
+                    SELECT X.ENTER_CD, X.NAME, X.SABUN, X.ORG_NM, X.PAY_ACTION_NM, X.PAYMENT_YMD, X.TOT_EARNING_MON, X.TOT_DED_MON, X.TAX_BASE_MON, X.RESULT_MON, X.BIGO, X.ACCOUNT_TYPE
+                         , (SELECT CASE WHEN CODE_NM IS NULL THEN '' ELSE CODE_NM||'('|| CRYPTIT.DECRYPT(G.ACCOUNT_NO,G.ENTER_CD) || ')' END FROM TSYS005 WHERE ENTER_CD=G.ENTER_CD AND GRCODE_CD='H30001' AND CODE=G.BANK_CD)
+                           AS BANK_NM
+                    FROM (
+                            SELECT B.ENTER_CD
+                                 , B.NAME
+                                 , B.SABUN
+                                 , F_COM_GET_ORG_NM2(B.ENTER_CD, B.SABUN, C.PAYMENT_YMD) AS ORG_NM
+                                 , C.PAY_ACTION_NM
+                                 , C.PAYMENT_YMD
+                                 , CASE WHEN NVL(A.TOT_EARNING_MON,0) = 0 THEN ''
+                                        ELSE TRIM(TO_CHAR(NVL(A.TOT_EARNING_MON,0),'999,999,999,990')) END TOT_EARNING_MON
+                                 , CASE WHEN NVL(A.TOT_DED_MON,0) = 0 THEN ''
+                                        ELSE TRIM(TO_CHAR(NVL(A.TOT_DED_MON,0),'999,999,999,990')) END TOT_DED_MON
+                                 , (SELECT TRIM(TO_CHAR(SUM(RESULT_MON),'999,999,999,990'))
+                                    FROM TCPN205
+                                    WHERE ENTER_CD = A.ENTER_CD
+                                      AND PAY_ACTION_CD = A.PAY_ACTION_CD
+                                      AND SABUN = A.SABUN
+                                      AND ELEMENT_CD IN (SELECT ELEMENT_CD FROM TCPN072 WHERE ENTER_CD = A.ENTER_CD AND ELEMENT_SET_CD = '30')) AS TAX_BASE_MON
+                                 , CASE WHEN (NVL(A.TOT_EARNING_MON,0)-NVL(A.TOT_DED_MON,0)) = 0 THEN ''
+                                        ELSE TRIM(TO_CHAR((NVL(A.TOT_EARNING_MON,0)-NVL(A.TOT_DED_MON,0)),'999,999,999,990')) END RESULT_MON
+                                 , TRIM(C.BIGO) AS BIGO
+                                 , F.ACCOUNT_TYPE
+                              FROM TCPN303 A
+                                 , THRM100 B
+                                 , TCPN201 C
+                                 , TCPN051 F
+                             WHERE A.ENTER_CD        = B.ENTER_CD
+                               AND A.SABUN           = B.SABUN
+                               AND A.ENTER_CD        = C.ENTER_CD
+                               AND A.PAY_ACTION_CD   = C.PAY_ACTION_CD
+                               AND C.ENTER_CD        = F.ENTER_CD
+                               AND C.PAY_CD          = F.PAY_CD
+                               AND A.ENTER_CD        = #{ssnEnterCd}
+                               AND A.PAY_ACTION_CD   = #{payActionCd}
+                               AND A.SABUN           = #{sabun}
+                         ) X
+                        ,  TCPN180 G
+                      WHERE X.ENTER_CD = G.ENTER_CD(+)
+                       AND X.SABUN = G.SABUN(+)
+                       AND X.ACCOUNT_TYPE = G.ACCOUNT_TYPE(+)
+                       AND X.PAYMENT_YMD BETWEEN G.SDATE(+) AND NVL ( G.EDATE(+), '99991231')
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiPopStaCalcList">
+			
+				<![CDATA[
+					SELECT REPORT_NM
+						 , CASE WHEN NVL(RESULT_MON,0) = 0 THEN ''
+								ELSE TRIM(TO_CHAR(NVL(RESULT_MON,0),'999,999,999,990')) END RESULT_MON
+					  FROM (
+							SELECT TRIM(B.REPORT_NM)	AS REPORT_NM
+								 , CASE WHEN B.REPORT_NM IS NULL THEN 0 ELSE MIN(B.PRIORITY) END PRIORITY
+								 , SUM(A.RESULT_MON)	AS RESULT_MON
+							  FROM TCPN205 A
+								 , (
+									SELECT SUB1.ENTER_CD
+										 , SUB1.ELEMENT_CD
+										 , SUB1.ELEMENT_TYPE
+										 , SUB1.REPORT_NM
+										 , SUB1.PRIORITY
+										 , SUB1.DEDUCTION_TYPE
+									  FROM TCPN011 SUB1
+									  WHERE SUB1.ENTER_CD	= #{ssnEnterCd}
+									    AND SUB1.ELEMENT_CD	NOT IN (SELECT ELEMENT_CD FROM TCPN072 WHERE ENTER_CD = #{ssnEnterCd} AND ELEMENT_SET_CD = '30')
+									) B
+							 WHERE A.ENTER_CD		= #{ssnEnterCd}
+							   AND A.PAY_ACTION_CD	= #{payActionCd}
+							   AND A.SABUN			= #{sabun}
+							   AND B.ELEMENT_TYPE	= #{elementType}
+							   AND (B.DEDUCTION_TYPE IS NULL OR B.DEDUCTION_TYPE <> 'ER_CAG')
+							   AND A.ENTER_CD		= B.ENTER_CD
+							   AND A.ELEMENT_CD		= B.ELEMENT_CD
+							GROUP BY ROLLUP (B.REPORT_NM)
+							)
+					ORDER BY PRIORITY
+				]]>
+			
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPerPayPartiPopStaCalcTaxList">
+			
+				<![CDATA[
+					SELECT REPORT_NM
+						 , CASE WHEN NVL(RESULT_MON,0) = 0 THEN ''
+								ELSE TRIM(TO_CHAR(NVL(RESULT_MON,0),'999,999,999,990')) END RESULT_MON
+					  FROM (
+							SELECT TRIM(B.REPORT_NM)	AS REPORT_NM
+								 , CASE WHEN B.REPORT_NM IS NULL THEN 0 ELSE MIN(B.PRIORITY) END PRIORITY
+								 , SUM(A.RESULT_MON)	AS RESULT_MON
+							  FROM TCPN205 A
+								 , (
+									SELECT SUB1.ENTER_CD
+										 , SUB1.ELEMENT_CD
+										 , SUB1.ELEMENT_TYPE
+										 , SUB1.REPORT_NM
+										 , SUB1.PRIORITY
+										 , SUB1.DEDUCTION_TYPE
+									  FROM TCPN011 SUB1
+									  WHERE SUB1.ENTER_CD	= #{ssnEnterCd}
+									    AND SUB1.ELEMENT_CD	IN (SELECT ELEMENT_CD FROM TCPN072 WHERE ENTER_CD = #{ssnEnterCd} AND ELEMENT_SET_CD = '30')
+									) B
+							 WHERE A.ENTER_CD		= #{ssnEnterCd}
+							   AND A.PAY_ACTION_CD	= #{payActionCd}
+							   AND A.SABUN			= #{sabun}
+							   AND (B.DEDUCTION_TYPE IS NULL OR B.DEDUCTION_TYPE <> 'ER_CAG')
+							   AND A.ENTER_CD		= B.ENTER_CD
+							   AND A.ELEMENT_CD		= B.ELEMENT_CD
+							GROUP BY ROLLUP (B.REPORT_NM)
+							)
+					ORDER BY PRIORITY
+				]]>
+			
+		</select>
+</mapper>

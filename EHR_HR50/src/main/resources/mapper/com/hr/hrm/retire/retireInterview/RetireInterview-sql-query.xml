@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.retire.retireInterview">
+
+<!-- 퇴직면담 대상자 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireInterviewList">
+
+				<![CDATA[
+					SELECT *
+					  FROM ( 
+							SELECT A.ENTER_CD
+							     , '0' AS IBS_IMAGE
+							     , A.APPL_YMD
+							     , A.APPL_SEQ
+							     , A.APPL_SABUN
+				               	 , F_COM_GET_ORG_NM2(A.ENTER_CD,A.APPL_SABUN,A.APPL_YMD) AS ORG_NM
+				               	 , F_COM_GET_ORG_CD(A.ENTER_CD,A.APPL_SABUN,A.APPL_YMD) AS ORG_CD				               	 
+				               	 , F_COM_GET_NAMES(A.ENTER_CD,A.APPL_SABUN,'ko_KR',A.APPL_YMD) AS NAME
+				               	 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD,A.APPL_SABUN,A.APPL_YMD) AS JIKCHAK_NM
+				               	 , F_COM_GET_JIKWEE_NM(A.ENTER_CD,A.APPL_SABUN,A.APPL_YMD) AS JIKWEE_NM
+				               	 , F_COM_GET_JIKGUB_NM(A.ENTER_CD,A.APPL_SABUN,A.APPL_YMD) AS JIKGUB_NM
+				               	 , B.RET_SCH_YMD
+								 , A.APPL_IN_SABUN
+								 , A.APPL_STATUS_CD
+								 , B.SABUN
+				                 , '0' AS SURVEY_IMAGE
+							  FROM THRI103 A, THRM551 B
+							 WHERE A.ENTER_CD = B.ENTER_CD
+							   AND A.APPL_SEQ = B.APPL_SEQ
+							   AND A.ENTER_CD = #{ssnEnterCd}
+				               -- 결재라인 기준
+				               AND #{ssnSabun} IN ( SELECT X.AGREE_SABUN
+							                        FROM THRI107 X
+							                       WHERE X.ENTER_CD = A.ENTER_CD
+							                         AND X.APPL_SEQ = A.APPL_SEQ
+							                         AND X.GUBUN = DECODE(#{retInterviewCd}, '2','1', '3','3', NULL)	)
+							                         ]]>
+				               -- 신청서 상태
+				               <choose><when test='applStatusCd != null and !applStatusCd.equals("")'>
+								   AND A.APPL_STATUS_CD = #{applStatusCd}
+								</when><otherwise>
+								   AND A.APPL_STATUS_CD NOT IN ('11', 'ZZ')
+							   </otherwise>
+							   </choose>
+				            )
+				     WHERE 1=1
+				       AND RET_SCH_YMD BETWEEN REPLACE( #{searchFrom} ,'-','') AND REPLACE( #{searchTo} ,'-','')
+		            <if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					   AND ORG_NM LIKE '%' || TRIM( #{searchOrgNm}) || '%'
+					</if>
+					<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					   AND (NAME LIKE '%' || TRIM( #{searchSabunName} ) || '%' OR SABUN LIKE '%' || TRIM( #{searchSabunName} ) || '%')
+					</if>
+		             ORDER BY RET_SCH_YMD DESC, F_COM_JIKJE_SORT(ENTER_CD, SABUN, NVL(REPLACE(RET_SCH_YMD, '-', ''), TO_CHAR(SYSDATE, 'YYYYMMDD')))
+		</select>
+		
+		<!-- 퇴직면담 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireRecodeList">
+
+				<![CDATA[
+					SELECT  SEQ
+						  , SABUN
+						  , CCR_YMD
+					      , CCR_CD
+					      , F_COM_GET_NAMES(ENTER_CD, ADVISER, 'ko_KR' , CCR_YMD) AS ADVISER_NAME
+					      , ADVISER
+					      , RET_INTERVIEW_SEQ
+					      , MEMO
+					      , APPL_SEQ
+					  FROM THRM185
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND SABUN 	= #{sabun}
+					   AND CCR_CD 	= '90'
+					   AND APPL_SEQ = #{schApplSeq}
+					]]>
+					<if test='retInterviewCd != null and !retInterviewCd.equals("")'>
+					   AND DECODE(#{retInterviewCd}, '2',ADVISER, '3',#{ssnSabun}, NULL) = #{ssnSabun}
+					</if>
+					 ORDER BY RET_INTERVIEW_SEQ
+		</select>
+
+<!-- 퇴직면담 삭제 -->
+		<delete parameterType="map" id="deleteRetireInterview">
+
+					DELETE FROM THRM185
+					 WHERE ENTER_CD||'_'||SABUN||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.seq != null and !rm.seq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+		</delete>
+		
+		<!-- 퇴직면담 저장 -->
+		<update parameterType="map" id="saveRetireInterview">
+
+
+					MERGE INTO THRM185 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.SABUN
+							     , A.SEQ
+							     , A.CCR_YMD
+							     , A.CCR_CD
+							     , A.MEMO
+							     , A.ADVISER
+							     , A.RET_INTERVIEW_SEQ
+							     , A.APPL_SEQ
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS SABUN
+										 , NULL AS SEQ
+										 , NULL AS CCR_YMD
+										 , NULL AS CCR_CD
+										 , NULL AS MEMO
+										 , NULL AS ADVISER
+										 , NULL AS RET_INTERVIEW_SEQ
+										 , NULL AS APPL_SEQ
+									FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )			AS ENTER_CD
+										 , TRIM( #{rm.sabun} )				AS SABUN
+										<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+										 , TRIM(#{rm.seq})				AS	SEQ
+										</when><otherwise>
+										 , TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM THRM185 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun})) )	AS SEQ
+											<bind name="icnt" value="icnt + 1" />
+										</otherwise>
+										</choose>
+										 , TRIM( #{rm.ccrYmd} )			AS CCR_YMD
+										 , TRIM( #{rm.ccrCd} )			AS CCR_CD
+										 , TRIM( #{rm.memo} )			AS MEMO
+										<choose><when test='rm.adviser != null and !rm.adviser.equals("")'>
+										 , TRIM( #{rm.adviser )		AS ADVISER
+										</when><otherwise>
+										 , TRIM( #{ssnSabun} )			AS ADVISER
+										</otherwise>
+										</choose>
+										 , TRIM( #{rm.retInterviewSeq} )	AS RET_INTERVIEW_SEQ
+										 , TRIM( #{rm.applSeq} )	APPL_SEQ
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.SEQ IS NOT NULL
+										  AND A.CCR_YMD IS NOT NULL
+										  AND A.CCR_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.SEQ = S.SEQ)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CCR_YMD  			= S.CCR_YMD
+									, T.CCR_CD				= CCR_CD
+									, T.MEMO				= MEMO
+									, T.ADVISER				= ADVISER
+									, T.RET_INTERVIEW_SEQ	= RET_INTERVIEW_SEQ
+									, T.APPL_SEQ	= APPL_SEQ
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SEQ
+							, T.CCR_YMD
+							, T.CCR_CD
+							, T.MEMO
+							, T.ADVISER
+							, T.RET_INTERVIEW_SEQ
+							, T.APPL_SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SEQ
+							, S.CCR_YMD
+							, S.CCR_CD
+							, S.MEMO
+							, #{ssnSabun}
+							, S.RET_INTERVIEW_SEQ
+							, S.APPL_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+
+</mapper>

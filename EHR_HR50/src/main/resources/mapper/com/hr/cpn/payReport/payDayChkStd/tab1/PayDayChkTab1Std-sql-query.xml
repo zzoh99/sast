@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payReport.payDayChkStd.tab1">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayDayChkTab1StdList">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL
+						  , X.SABUN
+					      ,F_COM_GET_NAMES(X.ENTER_CD,X.SABUN) AS NAME
+					      ,F_COM_GET_NAMES(X.ENTER_CD,X.SABUN,'ALIAS') AS ALIAS
+					      ,F_COM_GET_JIKGUB_NM (X.ENTER_CD,X.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+						  ,F_COM_GET_JIKWEE_NM (X.ENTER_CD,X.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+					      ,X.ORG_NM
+					      ,F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'C00130', Y.DAY_CHK_TYPE, #{ssnLocaleCd}) AS DAY_CHK_TYPE_NM
+					      ,(SELECT K.ORD_DETAIL_NM
+					          FROM TSYS013 K
+					         WHERE K.ENTER_CD = Y.ENTER_CD
+					           AND K.ORD_DETAIL_CD = Y.ORD_DETAIL_CD) AS ORD_DETAIL_NM
+					      , Y.ORD_DETAIL_CD
+					      ,F_COM_GET_GRCODE_NAME(Y.ENTER_CD, 'H40110', Y.ORD_DETAIL_REASON, #{ssnLocaleCd}) AS ORD_DETAIL_REASON_NM
+					      ,Y.ORD_DETAIL_REASON
+					      ,Y.SYMD
+					      ,Y.EYMD
+					      ,(SELECT K.ELEMENT_SET_NM
+					          FROM TCPN071 K
+					         WHERE K.ENTER_CD = Y.ENTER_CD
+					           AND K.ELEMENT_SET_CD = Y.ELEMENT_SET_CD) AS ELEMENT_SET_NM
+					      , Y.ELEMENT_SET_CD
+					      ,DECODE(Y.DAY_CHK_TYPE,'C',Y.RATE,NULL) AS RATE -- 일할구분이 C(휴직)의 경우만
+					      ,Y.PAY_ACTION_CD
+					  FROM TCPN203 X
+					      ,TCPN305 Y
+					 WHERE X.ENTER_CD = Y.ENTER_CD
+					   AND X.PAY_ACTION_CD = Y.PAY_ACTION_CD
+					   AND X.SABUN    = Y.SABUN
+					   AND X.ENTER_CD = #{ssnEnterCd}
+					   AND X.PAY_ACTION_CD = #{searchPayActionNmHidden}
+					   AND (X.SABUN LIKE #{searchKeyword} || '%' OR X.NAME LIKE #{searchKeyword} || '%')
+					   AND Y.DAY_CHK_TYPE <> 'G' -- 징계 제외
+					   		]]>
+					   <if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					      AND X.BUSINESS_PLACE_CD= #{businessPlaceCd}
+					   </if>
+					ORDER BY X.SABUN
+
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePayDayChkTab1Std">
+
+
+					MERGE INTO TCPN009 T
+					USING	(
+							SELECT	A.SEQ
+							        , A.PAY_CD
+                                    , A.ORD_DETAIL_CD
+                                    , A.ORD_DETAIL_REASON
+									, A.F_WORK_MONTH
+									, A.T_WORK_MONTH
+									, A.F_REST_PERIOD
+									, A.T_REST_PERIOD
+									, A.ELEMENT_SET_CD
+									, A.RATE
+							FROM	(
+									SELECT	  NULL      AS SEQ
+                                            , NULL      AS PAY_CD
+                                            , NULL      AS ORD_DETAIL_CD
+									        , NULL		AS ORD_DETAIL_REASON
+											, NULL		AS F_WORK_MONTH
+											, NULL		AS T_WORK_MONTH
+											, NULL		AS F_REST_PERIOD
+											, NULL		AS T_REST_PERIOD
+											, NULL		AS ELEMENT_SET_CD
+                                            , NULL      AS RATE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											<choose>
+												<when test='rm.seq != null and !rm.seq.equals("")'>
+													TRIM(#{rm.seq}) 			AS SEQ
+												</when>
+												<when test='rm.seq != null and rm.seq.equals("")'>
+													<![CDATA[
+													TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+													FROM TCPN009
+													WHERE ENTER_CD = #{ssnEnterCd}
+													AND PAY_CD = #{rm.payCd}
+													AND ORD_DETAIL_CD = #{rm.ordDetailCd}
+													) )	AS SEQ
+													]]>
+													<bind name="icnt" value="icnt + 1" />
+												</when>
+											</choose>
+											, TRIM(#{rm.payCd})           AS PAY_CD
+                                            , TRIM(#{rm.ordDetailCd})     AS ORD_DETAIL_CD
+                                            , TRIM(#{rm.ordDetailReason}) AS ORD_DETAIL_REASON
+											, TRIM(#{rm.fWorkMonth})      AS F_WORK_MONTH
+											, TRIM(#{rm.tWorkMonth})      AS T_WORK_MONTH
+											, TRIM(#{rm.fRestPeriod})     AS F_REST_PERIOD
+											, TRIM(#{rm.tRestPeriod})     AS T_REST_PERIOD
+											, TRIM(#{rm.elementSetCd})    AS ELEMENT_SET_CD
+											, TRIM(#{rm.rate})            AS RATE
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ORD_DETAIL_REASON IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= #{ssnEnterCd}
+					AND  T.PAY_CD = S.PAY_CD
+					AND  T.ORD_DETAIL_CD = S.ORD_DETAIL_CD
+                    AND  T.SEQ = S.SEQ
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ORD_DETAIL_REASON = S.ORD_DETAIL_REASON
+									, T.F_WORK_MONTH      = S.F_WORK_MONTH
+									, T.T_WORK_MONTH      = S.T_WORK_MONTH
+									, T.F_REST_PERIOD     = S.F_REST_PERIOD
+									, T.T_REST_PERIOD     = S.T_REST_PERIOD
+                                    , T.ELEMENT_SET_CD    = S.ELEMENT_SET_CD
+                                    , T.RATE              = S.RATE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD -- KEY
+							, T.PAY_CD -- KEY
+							, T.ORD_DETAIL_CD -- KEY
+							, T.SEQ -- KEY
+							, T.ORD_DETAIL_REASON
+							, T.F_WORK_MONTH
+							, T.T_WORK_MONTH
+							, T.F_REST_PERIOD
+							, T.T_REST_PERIOD
+							, T.ELEMENT_SET_CD
+							, T.RATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+                              #{ssnEnterCd} -- KEY
+                            , S.PAY_CD -- KEY
+                            , S.ORD_DETAIL_CD -- KEY
+                            , S.SEQ -- KEY
+                            , S.ORD_DETAIL_REASON
+                            , S.F_WORK_MONTH
+                            , S.T_WORK_MONTH
+                            , S.F_REST_PERIOD
+                            , S.T_REST_PERIOD
+                            , S.ELEMENT_SET_CD
+                            , S.RATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayDayChkTab1Std">
+					DELETE FROM TCPN009
+					WHERE 	(ENTER_CD, PAY_CD, ORD_DETAIL_CD, SEQ) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test='rm.payCd != null and !rm.payCd.equals("")'>
+                                            <if test='rm.ordDetailCd != null and !rm.ordDetailCd.equals("")'>
+                                              <if test='rm.seq != null and !rm.seq.equals("")'>
+											   (#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.ordDetailCd} ), TRIM( #{rm.seq} ) )
+											  </if>
+											</if>
+										  </if>
+										</if>
+</foreach>
+										)
+
+		</delete>
+	</mapper>

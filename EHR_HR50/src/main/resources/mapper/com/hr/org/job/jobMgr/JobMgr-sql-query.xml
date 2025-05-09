@@ -1,0 +1,1675 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobMgr">
+<!-- 		직무기술서 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrList">
+
+						SELECT 
+					<if test='codeType != null and !codeType.equals("")'>
+						       A.JOB_CD AS CODE,
+						       A.JOB_NM AS CODE_NM,
+					</if>
+						       '0' AS DETAIL,
+						       A.JOB_CD,
+						       A.SDATE,
+						       A.EDATE,
+						       A.JOB_NM,
+						       A.JOB_ENG_NM,
+						       A.JOB_TYPE,
+						       A.MEMO,
+						       A.JOB_DEFINE,
+						       A.ACADEMY_REQ,
+						       A.MAJOR_REQ,
+						       A.JIKGUB_REQ,
+						       A.CAREER_REQ,
+						       A.OTHER_JOB_REQ,
+						       A.NOTE,
+						       A.SEQ,
+						       A.LANGUAGE_CD,
+							   F_COM_GET_LANGUAGE_MAPPING (A.ENTER_CD, 'torg201', LANGUAGE_CD, #{ssnLocaleCd}) AS LANGUAGE_NM,
+							   A.MAJOR_REQ2,
+							   A.MAJOR_NEED,
+							   A.MAJOR_NEED2
+						 FROM  TORG201 A
+						WHERE 1 = 1
+					<choose><when test='enterCd != null and !enterCd.equals("")'>
+						  AND A.ENTER_CD = #{enterCd}
+					</when><otherwise>
+						  AND A.ENTER_CD = #{ssnEnterCd}
+					</otherwise>
+					</choose>
+					<if test='searchSingleJobCd != null and !searchSingleJobCd.equals("")'>
+						  AND A.JOB_CD = TRIM(#{searchSingleJobCd})
+					</if>
+					<if test='searchJobCd != null and !searchJobCd.equals("")'>
+						AND A.JOB_CD LIKE '%'||TRIM(#{searchJobCd})||'%'
+					</if>
+					<if test='searchJobNm != null and !searchJobNm.equals("")'>
+						  AND A.JOB_NM LIKE '%'||TRIM(#{searchJobNm})||'%'
+					</if>
+					<if test='searchSdate != null and !searchSdate.equals("")'>
+						  AND REPLACE(TRIM(#{searchSdate}),'-','') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+					</if>
+					<if test='searchJobType != null and !searchJobType.equals("")'>
+						  AND A.JOB_TYPE = TRIM( #{searchJobType} )
+					</if>
+						ORDER BY A.JOB_TYPE DESC, A.JOB_CD, A.SDATE, A.EDATE
+
+
+		</select>
+
+<!-- 		직무기술서 저장 -->
+		<update parameterType="map" id="saveJobMgr">
+
+					MERGE INTO TORG201 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.SDATE
+									, A.EDATE
+									, A.JOB_NM
+									, A.JOB_ENG_NM
+									, A.JOB_TYPE
+									, A.MEMO
+									, A.JOB_DEFINE
+									, A.ACADEMY_REQ
+									, A.MAJOR_REQ
+									, A.JIKGUB_REQ
+									, A.CAREER_REQ
+									, A.OTHER_JOB_REQ
+									, A.NOTE
+									, A.SEQ
+									, A.LANGUAGE_CD
+									, A.MAJOR_REQ2
+									, A.MAJOR_NEED
+									, A.MAJOR_NEED2
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS JOB_NM
+											, NULL      AS JOB_ENG_NM
+											, NULL		AS JOB_TYPE
+											, NULL		AS MEMO
+											, NULL		AS JOB_DEFINE
+											, NULL		AS ACADEMY_REQ
+											, NULL		AS MAJOR_REQ
+											, NULL		AS JIKGUB_REQ
+											, NULL		AS CAREER_REQ
+											, NULL		AS OTHER_JOB_REQ
+											, NULL		AS NOTE
+											, NULL		AS SEQ
+											, NULL      AS LANGUAGE_CD
+											, NULL		AS MAJOR_REQ2
+											, NULL		AS MAJOR_NEED
+											, NULL		AS MAJOR_NEED2
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.jobNm} )	AS JOB_NM
+											, TRIM( #{rm.jobEngNm}) AS JOB_ENG_NM
+											, TRIM( #{rm.jobType}) AS JOB_TYPE
+											, TRIM( #{rm.memo} ) AS MEMO
+											, TRIM( #{rm.jobDefine}) AS JOB_DEFINE
+											, TRIM( #{rm.academyReq}) AS ACADEMY_REQ
+											, TRIM( #{rm.majorReq}) AS MAJOR_REQ
+											, TRIM( #{rm.jikgubReq}) AS JIKGUB_REQ
+											, TRIM( #{rm.careerReq}) AS CAREER_REQ
+											, TRIM( #{rm.otherJobReq}) AS OTHER_JOB_REQ
+											, TRIM( #{rm.note}) AS NOTE
+											, TRIM( #{rm.seq} ) AS SEQ
+											, TRIM( #{rm.languageCd})	AS LANGUAGE_CD
+											, TRIM( #{rm.majorReq2}) AS MAJOR_REQ2
+											, TRIM( #{rm.majorNeed}) AS MAJOR_NEED
+											, TRIM( #{rm.majorNeed2}) AS MAJOR_NEED2
+											FROM   DUAL
+</foreach>
+									) A WHERE A.JOB_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.JOB_NM	= S.JOB_NM
+									, T.JOB_ENG_NM = S.JOB_ENG_NM
+									, T.JOB_TYPE = S.JOB_TYPE
+									, T.MEMO = S.MEMO
+									, T.JOB_DEFINE = S.JOB_DEFINE
+									, T.ACADEMY_REQ = S.ACADEMY_REQ
+									, T.MAJOR_REQ = S.MAJOR_REQ
+									, T.JIKGUB_REQ = S.JIKGUB_REQ
+									, T.CAREER_REQ = S.CAREER_REQ
+									, T.OTHER_JOB_REQ = S.OTHER_JOB_REQ
+									, T.NOTE = S.NOTE
+									, T.SEQ = S.SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+									, T.LANGUAGE_CD = S.LANGUAGE_CD
+									, T.MAJOR_REQ2 = S.MAJOR_REQ2
+									, T.MAJOR_NEED = S.MAJOR_NEED
+									, T.MAJOR_NEED2 = S.MAJOR_NEED2
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.SDATE
+							, T.EDATE
+							, T.JOB_NM
+							, T.JOB_ENG_NM
+							, T.JOB_TYPE
+							, T.MEMO
+							, T.JOB_DEFINE
+							, T.ACADEMY_REQ
+							, T.MAJOR_REQ
+							, T.JIKGUB_REQ
+							, T.CAREER_REQ
+							, T.OTHER_JOB_REQ
+							, T.NOTE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+							, T.LANGUAGE_CD
+							, T.MAJOR_REQ2
+							, T.MAJOR_NEED
+							, T.MAJOR_NEED2
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.SDATE
+							, S.EDATE
+							, S.JOB_NM
+							, S.JOB_ENG_NM
+							, S.JOB_TYPE
+							, S.MEMO
+							, S.JOB_DEFINE
+							, S.ACADEMY_REQ
+							, S.MAJOR_REQ
+							, S.JIKGUB_REQ
+							, S.CAREER_REQ
+							, S.OTHER_JOB_REQ
+							, S.NOTE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+							, S.LANGUAGE_CD
+							, S.MAJOR_REQ2
+							, S.MAJOR_NEED
+							, S.MAJOR_NEED2
+						)
+		</update>
+<!-- 		직무기술서 삭제 -->
+		<delete parameterType="map" id="deleteJobMgr">
+
+					DELETE FROM TORG201
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.jobCd != null and !rm.jobCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		수행조직 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrOrgList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD,
+						       A.JOB_CD,
+						       A.ORG_CD,
+						       F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM,
+						       A.SDATE,
+						       A.EDATE,
+						       A.MEMO
+						  FROM TORG211 A
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND A.JOB_CD = TRIM(#{searchJobCd})
+						ORDER BY A.SDATE, A.EDATE
+				]]>
+
+
+		</select>
+
+<!-- 		수행조직 저장 -->
+		<update parameterType="map" id="saveJobMgrOrg">
+
+					MERGE INTO TORG211 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.ORG_CD
+									, A.SDATE
+									, A.EDATE
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS ORG_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.orgCd})	AS ORG_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.memo} ) AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ORG_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.ORG_CD = S.ORG_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.MEMO = S.MEMO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.ORG_CD
+							, T.SDATE
+							, T.EDATE
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.ORG_CD
+							, S.SDATE
+							, S.EDATE
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		수행조직 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrOrg">
+
+					DELETE FROM TORG211
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||ORG_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.orgCd != null and !rm.orgCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.orgCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		핵심공통사무 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrTaskList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+						  ,JOB_CD
+						  ,TASK
+						  ,TASKWEIGHT
+						  ,ACTIVITY
+						  ,ACTIVITYWEIGHT
+						  ,PROCESS_CODE
+						  ,PROCESS_TEXT
+						  ,OUTPUT
+						  ,IMPORTANCE
+						  ,DIFFICULTY
+						  ,ROLE_ENTRY
+						  ,ROLE_JM
+						  ,ROLE_SM
+						  ,ROLE_GM,SDATE
+						  ,EDATE
+						  ,CHKID
+						  ,CHKDATE
+					  FROM TORG291
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						 AND JOB_CD = TRIM(#{searchJobCd})
+						ORDER BY  TASK,ACTIVITY,PROCESS_CODE
+				]]>
+
+
+		</select>
+
+<!-- 		핵심공통사무 저장 -->
+		<update parameterType="map" id="saveJobMgrTask">
+
+					MERGE INTO TORG291 T
+					USING	(
+							SELECT	  ENTER_CD
+                                     ,JOB_CD
+                                     ,TASK
+                                     ,TASKWEIGHT
+                                     ,ACTIVITY
+                                     ,ACTIVITYWEIGHT
+                                     ,PROCESS_CODE
+                                     ,PROCESS_TEXT
+                                     ,OUTPUT
+                                     ,IMPORTANCE
+                                     ,DIFFICULTY
+                                     ,ROLE_ENTRY
+                                     ,ROLE_JM
+                                     ,ROLE_SM
+                                     ,ROLE_GM
+                                     ,SDATE
+                                     ,EDATE
+                                     ,CHKID
+                                     ,CHKDATE
+							FROM	(
+									SELECT	  NULL AS ENTER_CD
+                                            , NULL AS JOB_CD
+                                            , NULL AS TASK
+                                            , NULL AS TASKWEIGHT
+                                            , NULL AS ACTIVITY
+                                            , NULL AS ACTIVITYWEIGHT
+                                            , NULL AS PROCESS_CODE
+                                            , NULL AS PROCESS_TEXT
+                                            , NULL AS OUTPUT
+                                            , NULL AS IMPORTANCE
+                                            , NULL AS DIFFICULTY
+                                            , NULL AS ROLE_ENTRY
+                                            , NULL AS ROLE_JM
+                                            , NULL AS ROLE_SM
+                                            , NULL AS ROLE_GM
+                                            , NULL AS SDATE
+                                            , NULL AS EDATE
+                                            , NULL AS CHKID
+                                            , NULL AS CHKDATE
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM(#{ssnEnterCd}) AS ENTER_CD
+                                            , TRIM(#{rm.jobCd}) AS JOB_CD
+                                            , TRIM(#{rm.task}) AS TASK
+                                            , TRIM(#{rm.taskweight}) AS TASKWEIGHT
+                                            , TRIM(#{rm.activity}) AS ACTIVITY
+                                            , TRIM(#{rm.activityweight}) AS ACTIVITYWEIGHT
+                                          <choose><when test='rm.processCode != null and !rm.processCode.equals("")'>
+                                            , TRIM(#{rm.processCode}) AS PROCESS_CODE
+										  </when><otherwise>
+                                            , (
+							    				 SELECT NVL(MAX(PROCESS_CODE), 0)+ ${icnt}
+                                            	   FROM torg291
+                                            	   WHERE ENTER_CD =  TRIM(#{ssnEnterCd})
+                                            	   AND	 JOB_CD	  =  TRIM(#{rm.jobCd})
+                                              )  AS PROCESS_CODE
+											  <bind name="icnt" value="icnt + 1" />
+										  </otherwise>
+										  </choose>
+                                            , TRIM(#{rm.processText}) AS PROCESS_TEXT
+                                            , TRIM(#{rm.output}) AS OUTPUT
+                                            , TRIM(#{rm.importance}) AS IMPORTANCE
+                                            , TRIM(#{rm.difficulty}) AS DIFFICULTY
+                                            , TRIM(#{rm.roleEntry}) AS ROLE_ENTRY
+                                            , TRIM(#{rm.roleJm}) AS ROLE_JM
+                                            , TRIM(#{rm.roleSm}) AS ROLE_SM
+                                            , TRIM(#{rm.roleGm}) AS ROLE_GM
+                                            , TRIM(#{rm.sdate}) AS SDATE
+                                            , TRIM(#{rm.edate}) AS EDATE
+                                            , TRIM(#{rm.chkid}) AS CHKID
+                                            , TRIM(#{rm.chkdate}) AS CHKDATE
+                                    FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.PROCESS_CODE = S.PROCESS_CODE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.TASK =S.TASK
+                                     ,T.TASKWEIGHT =S.TASKWEIGHT
+                                     ,T.ACTIVITY =S.ACTIVITY
+                                     ,T.ACTIVITYWEIGHT =S.ACTIVITYWEIGHT
+                                     ,T.PROCESS_TEXT = S.PROCESS_TEXT
+                                     ,T.OUTPUT = S.OUTPUT
+                                     ,T.IMPORTANCE = S.IMPORTANCE
+                                     ,T.DIFFICULTY = S.DIFFICULTY
+                                     ,T.ROLE_ENTRY = S.ROLE_ENTRY
+                                     ,T.ROLE_JM = S.ROLE_JM
+                                     ,T.ROLE_SM = S.ROLE_SM
+                                     ,T.ROLE_GM = S.ROLE_GM
+                                     ,T.SDATE = S.SDATE
+                                     ,T.EDATE = S.EDATE
+                                     ,T.CHKID = #{ssnSabun}
+                                     ,T.CHKDATE = SYSDATE
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+                            , T.JOB_CD
+                            , T.TASK
+                            , T.TASKWEIGHT
+                            , T.ACTIVITY
+                            , T.ACTIVITYWEIGHT
+                            , T.PROCESS_CODE
+                            , T.PROCESS_TEXT
+                            , T.OUTPUT
+                            , T.IMPORTANCE
+                            , T.DIFFICULTY
+                            , T.ROLE_ENTRY
+                            , T.ROLE_JM
+                            , T.ROLE_SM
+                            , T.ROLE_GM
+                            , T.SDATE
+                            , T.EDATE
+                            , T.CHKID
+                            , T.CHKDATE
+						)
+						VALUES
+						(
+						      S.ENTER_CD
+                            , S.JOB_CD
+                            , S.TASK
+                            , TO_NUMBER(S.TASKWEIGHT)
+                            , S.ACTIVITY
+                            , TO_NUMBER(S.ACTIVITYWEIGHT)
+                            , S.PROCESS_CODE
+                            , S.PROCESS_TEXT
+                            , S.OUTPUT
+                            , S.IMPORTANCE
+                            , S.DIFFICULTY
+                            , S.ROLE_ENTRY
+                            , S.ROLE_JM
+                            , S.ROLE_SM
+                            , S.ROLE_GM
+                            , S.SDATE
+                            , S.EDATE
+                            , #{ssnSabun}
+                            , SYSDATE
+						)
+		</update>
+<!-- 		핵심공통사무 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrTask">
+
+					DELETE FROM TORG291
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||PROCESS_CODE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.jobCd != null and !rm.jobCd.equals("")'>
+											<if test='rm.processCode != null and !rm.processCode.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.processCode})
+											</if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		자격증 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrLicenseList">
+
+				<![CDATA[
+					SELECT ENTER_CD
+      					  ,JOB_CD
+      					  ,LICENSE_CD
+      					  ,SDATE
+      					  ,MEMO
+      					  ,EDATE
+      					  ,SEQ
+      					  ,REQ_GB
+      					  ,CHKDATE
+      					  ,CHKID
+      					  ,LICENSE_NM
+      					  ,LICENSE_GRADE
+					FROM TORG225
+					WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					AND   JOB_CD = TRIM(#{searchJobCd})
+					ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+<!-- 		어학 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrLgLicenseList">
+
+				<![CDATA[
+				SELECT JOB_CD,
+				       FOREIGN_CD,
+				       SDATE,
+				       EDATE,
+				       FOREIGN_LEVEL,
+				       TEST_KIND_CD, 
+				       TEST_POINT,
+ 				       CHKDATE,
+				       CHKID,
+				       REQ_GB
+				FROM TORG223
+				WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+				AND   JOB_CD = TRIM(#{searchJobCd})
+				]]>
+
+
+		</select>
+
+
+<!-- 		자격증 저장 -->
+		<update parameterType="map" id="saveJobMgrLicense">
+
+					MERGE INTO TORG225 T
+					USING	(
+							SELECT	 ENTER_CD
+                                   , JOB_CD
+                                   , LICENSE_CD
+                                   , SDATE
+                                   , MEMO
+                                   , EDATE
+                                   , SEQ
+                                   , REQ_GB
+                                   , CHKDATE
+                                   , CHKID
+                                   , LICENSE_GRADE
+                                   , LICENSE_NM
+							FROM	(
+									SELECT	  NULL  AS  ENTER_CD
+                                            , NULL  AS   JOB_CD
+                                            , NULL  AS   LICENSE_CD
+                                            , NULL  AS   SDATE
+                                            , NULL  AS   MEMO
+                                            , NULL  AS   EDATE
+                                            , NULL  AS   SEQ
+                                            , NULL  AS   REQ_GB
+                                            , NULL  AS   CHKDATE
+                                            , NULL  AS   CHKID
+                                            , NULL  AS   LICENSE_GRADE
+                                            , NULL  AS   LICENSE_NM
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	    AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	    AS JOB_CD
+											, TRIM(#{rm.licenseCd}) AS LICENSE_CD
+                                            , TRIM( #{rm.sdate} )	    AS SDATE
+                                            , TRIM( '' )	    		AS MEMO
+                                            , TRIM( #{rm.edate} )	    AS EDATE
+                                            , TRIM( #{rm.seq} )	        AS SEQ
+											, TRIM( #{rm.reqGb})	    AS REQ_GB
+                                            , TRIM( #{rm.chkdate})	    AS CHKDATE
+                                            , TRIM( #{rm.chkid})	    AS CHKID
+                                            , TRIM( #{rm.licenseGrade})	    AS LICENSE_GRADE
+                                            , TRIM( #{rm.licenseNm})	    AS LICENSE_NM
+											
+                                    FROM   DUAL
+</foreach>
+									) A WHERE A.LICENSE_CD IS NOT NULL
+                                        AND JOB_CD IS NOT NULL
+                                        AND LICENSE_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.LICENSE_CD = S.LICENSE_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	 T.SDATE = S.SDATE
+                                   , T.MEMO = S.MEMO
+                                   , T.EDATE = S.EDATE
+                                   , T.SEQ = S.SEQ
+                                   , T.REQ_GB = S.REQ_GB
+                                   , T.CHKDATE = SYSDATE
+                                   , T.CHKID = #{ssnSabun}
+                                   , T.LICENSE_NM = S.LICENSE_NM
+                                   , T.LICENSE_GRADE = S.LICENSE_GRADE
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+                            , T.JOB_CD
+                            , T.LICENSE_CD
+                            , T.SDATE
+                            , T.MEMO
+                            , T.EDATE
+                            , T.SEQ
+                            , T.REQ_GB
+                            , T.CHKDATE
+                            , T.CHKID
+                            , T.LICENSE_GRADE
+                            , T.LICENSE_NM
+						)
+						VALUES
+						(
+						      S.ENTER_CD
+                            , S.JOB_CD
+                            , S.LICENSE_CD
+                            , S.SDATE
+                            , S.MEMO
+                            , S.EDATE
+                            , S.SEQ
+                            , S.REQ_GB
+                            , SYSDATE
+                            , #{ssnSabun}
+                            , S.LICENSE_GRADE
+                            , S.LICENSE_NM
+						)
+		</update>
+
+<!-- 		어학 저장 -->
+		<update parameterType="map" id="saveJobMgrLgLicense">
+
+					MERGE INTO TORG223 T
+					USING	(
+							SELECT	  ENTER_CD
+                                    , JOB_CD
+                                    , FOREIGN_CD
+                                    , SDATE
+                                    , EDATE
+                                    , FOREIGN_LEVEL
+                                    , TEST_KIND_CD
+                                    , TEST_POINT
+                                    , CHKDATE
+                                    , CHKID
+                                    , REQ_GB
+							FROM	(
+									SELECT	  NULL AS ENTER_CD
+                                            , NULL AS JOB_CD
+                                            , NULL AS FOREIGN_CD
+                                            , NULL AS SDATE
+                                            , NULL AS EDATE
+                                            , NULL AS FOREIGN_LEVEL
+                                            , NULL AS TEST_KIND_CD
+                                            , NULL AS TEST_POINT
+                                            , NULL AS CHKDATE
+                                            , NULL AS CHKID
+                                            , NULL AS REQ_GB
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	        AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	        AS JOB_CD
+											, TRIM( #{rm.foreignCd})	    AS FOREIGN_CD
+                                            , TRIM( #{rm.sdate} )	        AS SDATE
+                                            , TRIM( #{rm.edate} )	        AS EDATE
+                                            , TRIM( #{rm.foreignLevel})    AS FOREIGN_LEVEL
+                                            , TRIM( #{rm.testKindCd})	    AS TEST_KIND_CD
+											, TRIM( #{rm.testPoint})	    AS TEST_POINT
+                                            , TRIM( #{rm.chkdate})	        AS CHKDATE
+                                            , TRIM( #{rm.chkid})	        AS CHKID
+                                            , TRIM( #{rm.reqGb})	        AS REQ_GB
+											
+                                    FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+                                        AND JOB_CD IS NOT NULL
+                                        AND FOREIGN_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.FOREIGN_CD = S.FOREIGN_CD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SDATE = S.SDATE
+                                    , T.EDATE = S.EDATE
+                                    , T.FOREIGN_LEVEL = S.FOREIGN_LEVEL
+                                    --, T.TEST_KIND_CD = S.TEST_KIND_CD
+                                    , T.TEST_POINT = S.TEST_POINT
+                                    , T.CHKDATE = SYSDATE
+                                    , T.CHKID = #{ssnSabun}
+                                    , T.REQ_GB = S.REQ_GB
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+                            , T.JOB_CD
+                            , T.FOREIGN_CD
+                            , T.SDATE
+                            , T.EDATE
+                            , T.FOREIGN_LEVEL
+                            , T.TEST_KIND_CD
+                            , T.TEST_POINT
+                            , T.CHKDATE
+                            , T.CHKID
+                            , T.REQ_GB
+						)
+						VALUES
+						(
+						      S.ENTER_CD
+                            , S.JOB_CD
+                            , S.FOREIGN_CD
+                            , S.SDATE
+                            , S.EDATE
+                            , S.FOREIGN_LEVEL
+                            , S.TEST_KIND_CD
+                            , S.TEST_POINT
+                            , S.CHKDATE
+                            , S.CHKID
+                            , S.REQ_GB
+						)
+		</update>
+		
+		
+<!-- 		자격증 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrLicense">
+
+					DELETE FROM TORG225
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||LICENSE_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.licenseCd != null and !rm.licenseCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.licenseCd})
+										</if>
+</foreach>
+										)
+		</delete>
+		
+<!-- 		어학 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrLgLicense">
+
+					DELETE FROM TORG223
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||FOREIGN_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.foreignCd != null and !rm.foreignCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.foreignCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		역량요건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrCompetencyList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD,
+					       A.JOB_CD,
+					       A.COMPETENCY_CD,
+					       B.COMPETENCY_NM,
+					       A.COMPETENCY_GB,
+					       A.DEMAND_LEVEL,
+					       A.SDATE,
+					       A.EDATE,
+					       A.SEQ
+					  FROM TORG226 A, TORG051 B
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.COMPETENCY_CD = B.COMPETENCY_CD(+)
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.JOB_CD = TRIM(#{searchJobCd})
+					 ORDER BY A.SEQ, A.SDATE, A.EDATE
+				]]>
+
+
+		</select>
+
+<!-- 		역량요건 저장 -->
+		<update parameterType="map" id="saveJobMgrCompetency">
+
+					MERGE INTO TORG226 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.COMPETENCY_CD
+									, A.COMPETENCY_GB
+									, A.DEMAND_LEVEL
+									, A.SDATE
+									, A.EDATE
+									, A.SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS COMPETENCY_CD
+											, NULL		AS COMPETENCY_GB
+											, NULL		AS DEMAND_LEVEL
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.competencyCd} )	AS COMPETENCY_CD
+											, TRIM( #{rm.competencyGb})	AS COMPETENCY_GB
+											, TRIM( #{rm.demandLevel})	AS DEMAND_LEVEL
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.seq} ) AS SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.COMPETENCY_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.COMPETENCY_CD = S.COMPETENCY_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.COMPETENCY_GB = S.COMPETENCY_GB
+									, T.DEMAND_LEVEL = S.DEMAND_LEVEL
+									, T.SEQ = S.SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.COMPETENCY_CD
+							, T.COMPETENCY_GB
+							, T.DEMAND_LEVEL
+							, T.SDATE
+							, T.EDATE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.COMPETENCY_CD
+							, S.COMPETENCY_GB
+							, S.DEMAND_LEVEL
+							, S.SDATE
+							, S.EDATE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		역량요건 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrCompetency">
+
+					DELETE FROM TORG226
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||COMPETENCY_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.competencyCd != null and !rm.competencyCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.competencyCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+		
+		<!-- 기술역량요건 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrSkillCompetencyList">
+
+				<![CDATA[
+					SELECT ENTER_CD,
+					       JOB_CD,
+					       COMPETENCY_TEXT,
+					       DEMAND_LEVEL,
+					       SDATE,
+					       EDATE,
+					       SEQ
+					  FROM TORG296
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND JOB_CD = TRIM(#{searchJobCd})
+					 ORDER BY SEQ, SDATE, EDATE
+				]]>
+
+
+		</select>
+
+		<!-- 기술역량요건 저장 -->
+		<update parameterType="map" id="saveJobMgrSkillCompetency">
+
+					MERGE INTO TORG296 T
+					USING	(
+							SELECT  A.ENTER_CD
+                                    , A.JOB_CD
+                                    , A.COMPETENCY_TEXT
+                                    , A.DEMAND_LEVEL
+                                    , A.SDATE
+                                    , A.EDATE
+                                    , A.SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS COMPETENCY_TEXT
+											, NULL		AS DEMAND_LEVEL
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SEQ
+									FROM	DUAL
+		<bind name="icnt" value="1" />
+		<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.competencyText})	AS COMPETENCY_TEXT
+											, TRIM( #{rm.demandLevel})	AS DEMAND_LEVEL
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+										<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+											, TRIM(#{rm.seq}) 				AS SEQ
+										</when><otherwise>
+											, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+												FROM TORG296
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND JOB_CD = #{rm.jobCd}
+											) )	AS SEQ
+										<bind name="icnt" value="icnt + 1" />
+										</otherwise>
+										</choose>
+											FROM   DUAL
+		</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.SEQ = S.SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SDATE	= S.SDATE
+                                    , T.EDATE	= S.EDATE
+									, T.COMPETENCY_TEXT = S.COMPETENCY_TEXT
+									, T.DEMAND_LEVEL = S.DEMAND_LEVEL
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.COMPETENCY_TEXT
+							, T.DEMAND_LEVEL
+							, T.SDATE
+							, T.EDATE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.COMPETENCY_TEXT
+							, S.DEMAND_LEVEL
+							, S.SDATE
+							, S.EDATE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 기술역량요건 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrSkillCompetency">
+
+					DELETE FROM TORG296
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||SEQ||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.seq})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+			<!-- 		연관업무_선행직무 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrPriorJobList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD,
+					       A.JOB_CD,
+					       A.PRIOR_JOB_CD,
+					       B.JOB_NM AS PRIOR_JOB_NM,
+					       A.SDATE,
+					       A.EDATE,
+					       A.SEQ,
+					       A.RELATED_LEVEL,
+					       A.EXP_YEARS
+					  FROM TORG213 A, TORG201 B
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.PRIOR_JOB_CD = B.JOB_CD(+)
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.JOB_CD = TRIM(#{searchJobCd})
+					 ORDER BY A.SEQ, A.SDATE, A.EDATE
+				]]>
+
+
+		</select>
+
+<!-- 		연관업무_선행직무 저장 -->
+		<update parameterType="map" id="saveJobMgrPriorJob">
+
+					MERGE INTO TORG213 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.PRIOR_JOB_CD
+									, A.SDATE
+									, A.EDATE
+									, A.SEQ
+									, A.RELATED_LEVEL
+									, A.EXP_YEARS
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS PRIOR_JOB_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SEQ
+											, NULL		AS RELATED_LEVEL
+											, NULL		AS EXP_YEARS
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.priorJobCd})	AS PRIOR_JOB_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.seq} ) AS SEQ
+											, TRIM( #{rm.relatedLevel}) AS RELATED_LEVEL
+											, TRIM( #{rm.expYears}) AS EXP_YEARS
+											FROM   DUAL
+</foreach>
+									) A WHERE A.PRIOR_JOB_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.PRIOR_JOB_CD = S.PRIOR_JOB_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.SEQ = S.SEQ
+									, T.RELATED_LEVEL = S.RELATED_LEVEL
+									, T.EXP_YEARS = S.EXP_YEARS
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.PRIOR_JOB_CD
+							, T.SDATE
+							, T.EDATE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+							, T.RELATED_LEVEL
+							, T.EXP_YEARS
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.PRIOR_JOB_CD
+							, S.SDATE
+							, S.EDATE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+							, S.RELATED_LEVEL
+							, S.EXP_YEARS
+						)
+		</update>
+<!-- 		연관업무_선행직무 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrPriorJob">
+
+					DELETE FROM TORG213
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||PRIOR_JOB_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.priorJobCd != null and !rm.priorJobCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.priorJobCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		연관업무_후행직무 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrAfterJobList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD,
+					       A.JOB_CD,
+					       A.AFTER_JOB_CD,
+					       B.JOB_NM AS AFTER_JOB_NM,
+					       A.SDATE,
+					       A.EDATE,
+					       A.SEQ,
+					       A.RELATED_LEVEL
+					  FROM TORG215 A, TORG201 B
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.AFTER_JOB_CD = B.JOB_CD(+)
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.JOB_CD = TRIM(#{searchJobCd})
+					 ORDER BY A.SEQ, A.SDATE, A.EDATE
+				]]>
+
+
+		</select>
+
+<!-- 		연관업무_후행직무 저장 -->
+		<update parameterType="map" id="saveJobMgrAfterJob">
+
+					MERGE INTO TORG215 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.AFTER_JOB_CD
+									, A.SDATE
+									, A.EDATE
+									, A.SEQ
+									, A.RELATED_LEVEL
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS AFTER_JOB_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SEQ
+											, NULL		AS RELATED_LEVEL
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.afterJobCd})	AS AFTER_JOB_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.seq} ) AS SEQ
+											, TRIM( #{rm.relatedLevel}) AS RELATED_LEVEL
+											FROM   DUAL
+</foreach>
+									) A WHERE A.AFTER_JOB_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.AFTER_JOB_CD = S.AFTER_JOB_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.SEQ = S.SEQ
+									, T.RELATED_LEVEL = S.RELATED_LEVEL
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.AFTER_JOB_CD
+							, T.SDATE
+							, T.EDATE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+							, T.RELATED_LEVEL
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.AFTER_JOB_CD
+							, S.SDATE
+							, S.EDATE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+							, S.RELATED_LEVEL
+						)
+		</update>
+<!-- 		연관업무_후행직무 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrAfterJob">
+
+					DELETE FROM TORG215
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||AFTER_JOB_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.afterJobCd != null and !rm.afterJobCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.afterJobCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		이동가능직무_직군내 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrMoveJikgunJobList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD,
+					       A.JOB_CD,
+					       A.MOVE_JOB_CD AS MOVE_JIKGUN_JOB_CD,
+					       B.JOB_NM AS MOVE_JIKGUN_JOB_NM,
+					       A.SDATE,
+					       A.EDATE,
+					       A.SEQ
+					  FROM TORG217 A, TORG201 B
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.MOVE_JOB_CD = B.JOB_CD(+)
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.JOB_CD = TRIM(#{searchJobCd})
+					 ORDER BY A.SEQ, A.SDATE, A.EDATE
+				]]>
+
+
+		</select>
+
+<!-- 		이동가능직무_직군내 저장 -->
+		<update parameterType="map" id="saveJobMgrMoveJikgunJob">
+
+					MERGE INTO TORG217 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.MOVE_JOB_CD
+									, A.SDATE
+									, A.EDATE
+									, A.SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS MOVE_JOB_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.moveJikgunJobCd})	AS MOVE_JOB_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.seq} ) AS SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.MOVE_JOB_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.MOVE_JOB_CD = S.MOVE_JOB_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.SEQ = S.SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.MOVE_JOB_CD
+							, T.SDATE
+							, T.EDATE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.MOVE_JOB_CD
+							, S.SDATE
+							, S.EDATE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		이동가능직무_직군내 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrMoveJikgunJob">
+
+					DELETE FROM TORG217
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||MOVE_JOB_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.moveJikgunJobCd != null and !rm.moveJikgunJobCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.moveJikgunJobCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+
+										)
+		</delete>
+
+			<!-- 		이동가능직무_직렬내 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrMoveJikryulJobList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD,
+					       A.JOB_CD,
+					       A.MOVE_JOB_CD AS MOVE_JIKRYUL_JOB_CD,
+					       B.JOB_NM AS MOVE_JIKRYUL_JOB_NM,
+					       A.SDATE,
+					       A.EDATE,
+					       A.SEQ
+					  FROM TORG218 A, TORG201 B
+					 WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.MOVE_JOB_CD = B.JOB_CD(+)
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.JOB_CD = TRIM(#{searchJobCd})
+					 ORDER BY A.SEQ, A.SDATE, A.EDATE
+				]]>
+
+
+		</select>
+
+<!-- 		이동가능직무_직렬내 저장 -->
+		<update parameterType="map" id="saveJobMgrMoveJikryulJob">
+
+					MERGE INTO TORG218 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.JOB_CD
+									, A.MOVE_JOB_CD
+									, A.SDATE
+									, A.EDATE
+									, A.SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS MOVE_JOB_CD
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.moveJikryulJobCd})	AS MOVE_JOB_CD
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.seq} ) AS SEQ
+											FROM   DUAL
+</foreach>
+									) A WHERE A.MOVE_JOB_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.MOVE_JOB_CD = S.MOVE_JOB_CD AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE	= S.EDATE
+									, T.SEQ = S.SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.MOVE_JOB_CD
+							, T.SDATE
+							, T.EDATE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.MOVE_JOB_CD
+							, S.SDATE
+							, S.EDATE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		이동가능직무_직렬내 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrMoveJikryulJob">
+
+					DELETE FROM TORG218
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||MOVE_JOB_CD||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.moveJikryulJobCd != null and !rm.moveJikryulJobCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.moveJikryulJobCd})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+
+										)
+		</delete>
+
+		
+		<!-- 교육/훈련 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobMgrEducationList">
+
+				<![CDATA[
+					SELECT 
+						  ENTER_CD
+						, JOB_CD
+						, EDU_NM
+						, EDU_ORG
+						, EDU_CONTENTS
+						, SDATE
+						, EDATE
+						, SEQ
+					  FROM TORG293
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND JOB_CD = TRIM(#{searchJobCd})
+					 ORDER BY SEQ, SDATE, EDATE
+				]]>
+
+
+		</select>
+
+		<!-- 교육/훈련 저장 -->
+		<update parameterType="map" id="saveJobMgrEducationList">
+
+					MERGE INTO TORG293 T
+					USING	(
+							SELECT  A.ENTER_CD
+                                    , A.JOB_CD
+                                    , A.EDU_NM
+                                    , A.EDU_ORG
+                                    , A.EDU_CONTENTS
+                                    , A.SDATE
+                                    , A.EDATE
+                                    , A.SEQ
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS JOB_CD
+											, NULL		AS EDU_NM
+                                    		, NULL		AS EDU_ORG
+                                    		, NULL		AS EDU_CONTENTS
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SEQ
+									FROM	DUAL
+		<bind name="icnt" value="1" />
+		<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+											, TRIM( #{rm.eduNm})	AS EDU_NM
+											, TRIM( #{rm.eduOrg})	AS EDU_ORG
+											, null					AS EDU_CONTENTS
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+										<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+											, TRIM(#{rm.seq}) 				AS SEQ
+										</when><otherwise>
+											, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+												FROM TORG293
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND JOB_CD = #{rm.jobCd}
+											) )	AS SEQ
+										<bind name="icnt" value="icnt + 1" />
+										</otherwise>
+										</choose>
+											FROM   DUAL
+		</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.SEQ = S.SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SDATE	= S.SDATE
+                                    , T.EDATE	= S.EDATE
+									, T.EDU_NM = S.EDU_NM
+									, T.EDU_ORG = S.EDU_ORG
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.JOB_CD
+							, T.EDU_NM
+							, T.EDU_ORG
+							, T.EDU_CONTENTS
+							, T.SDATE
+							, T.EDATE
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.JOB_CD
+							, S.EDU_NM
+							, S.EDU_ORG
+							, NULL
+							, S.SDATE
+							, S.EDATE
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 교육/훈련 삭제 -->
+		<delete parameterType="map" id="deleteJobMgrEducationList">
+
+					DELETE FROM TORG293
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||SEQ||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.seq})||'_'||TRIM(#{rm.sdate})
+										</if>
+</foreach>
+
+										)
+		</delete>
+		
+		<!-- kpi 조회 -->
+		<select parameterType="map" resultType="cMap" id="getKpiList">
+
+				<![CDATA[
+						SELECT * FROM TORG233
+						WHERE ENTER_CD = #{ssnEnterCd}
+						AND JOB_CD = #{searchJobCd}
+						ORDER BY KPI_CD
+				]]>
+
+
+		</select>
+		
+		<!-- kpi 저장 -->
+		<update parameterType="map" id="saveKpiList">
+
+					MERGE INTO TORG233 T
+					USING	(
+							SELECT  A.ENTER_CD
+                                    , A.JOB_CD
+                                    , A.KPI_CD
+                                    , A.KPI_NM
+                                    , A.KPI_FORMULA_NM
+                                    , A.NOTE
+							FROM	(
+									SELECT	NULL AS ENTER_CD
+                                          , NULL AS JOB_CD
+                                          , NULL AS KPI_CD
+                                          , NULL AS KPI_NM
+                                          , NULL AS KPI_FORMULA_NM
+                                          , NULL AS NOTE
+									FROM	DUAL
+		<bind name="icnt" value="1" />
+		<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.jobCd} )	AS JOB_CD
+                                          <choose><when test='rm.kpiCd != null and !rm.kpiCd.equals("")'>
+                                            , TRIM(#{rm.kpiCd}) AS KPI_CD
+										  </when><otherwise>
+                                            , NVL((select max(KPI_CD)+1 
+                                            	   from TORG233 
+                                            	   WHERE ENTER_CD =  TRIM(#{ssnEnterCd})
+                                            	   AND	 JOB_CD	  =  TRIM(#{rm.jobCd})
+                                            	   ), 1)  AS KPI_CD
+										  </otherwise>
+										  </choose>
+											, TRIM( #{rm.kpiNm})	AS KPI_NM
+											, TRIM( #{rm.kpiFormulaNm})	AS KPI_FORMULA_NM
+											, TRIM( #{rm.note})	AS NOTE
+                                            
+										
+										<bind name="icnt" value="icnt + 1" />
+											FROM   DUAL
+		</foreach>
+									) A WHERE A.JOB_CD IS NOT NULL
+                                      AND A.KPI_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.JOB_CD = S.JOB_CD AND T.KPI_CD = S.KPI_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.KPI_NM	= S.KPI_NM
+									, T.KPI_FORMULA_NM = S.KPI_FORMULA_NM
+									, T.NOTE	= S.NOTE
+                                    , T.CHKDATE = SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+                            , T.JOB_CD
+                            , T.KPI_CD
+                            , T.KPI_NM
+                            , T.KPI_FORMULA_NM
+                            , T.NOTE
+                            , T.CHKDATE
+                            , T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+                            , S.JOB_CD
+                            , S.KPI_CD
+                            , S.KPI_NM
+                            , S.KPI_FORMULA_NM
+                            , S.NOTE
+                            , SYSDATE
+                            , #{ssnSabun}
+						)
+		</update>
+		
+
+		<!-- kpi 삭제 -->
+		<delete parameterType="map" id="deleteKpiList">
+
+					DELETE FROM TORG233
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||JOB_CD||'_'||KPI_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.kpiCd != null and !rm.kpiCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.jobCd})||'_'||TRIM(#{rm.kpiCd})
+										</if>
+</foreach>
+										)
+		</delete>
+		
+
+
+</mapper>

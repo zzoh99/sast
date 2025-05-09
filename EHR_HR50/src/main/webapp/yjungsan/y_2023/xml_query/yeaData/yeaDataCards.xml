@@ -1,0 +1,1024 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	신용카드
+ -->
+<root>
+    <query id="selectYeaDataCard">
+        <![CDATA[
+            SELECT *
+            FROM(
+	            SELECT TO_CHAR(NVL(SUM(CASE WHEN NTS_YN = 'Y' AND ADJ_INPUT_TYPE = '07' THEN APPL_MON ELSE 0 END ),0),'999,999,999,999') AS NTS_IN
+	                 , TO_CHAR(NVL(SUM(CASE WHEN NTS_YN = 'Y' AND ADJ_INPUT_TYPE != '07' THEN APPL_MON ELSE 0 END),0),'999,999,999,999') AS NTS_MN
+	                 , TO_CHAR(NVL(SUM(CASE WHEN NTS_YN != 'Y' THEN APPL_MON ELSE 0 END                          ),0),'999,999,999,999') AS ETCSUM
+	            FROM TCPN821
+	            WHERE ENTER_CD     = #ssnEnterCd#
+	              AND WORK_YY      = #searchWorkYy#
+	              AND USE_YYYY     = #searchWorkYy#
+	              AND ADJUST_TYPE  = #searchAdjustType#
+	              AND SABUN        = #searchSabun# ) A
+               ,(
+                SELECT TO_CHAR(NVL(SUM(CASE WHEN NTS_YN = 'Y' AND ADJ_INPUT_TYPE = '07' THEN APPL_MON ELSE 0 END ),0),'999,999,999,999') AS BE_NTS_IN
+                     , TO_CHAR(NVL(SUM(CASE WHEN NTS_YN = 'Y' AND ADJ_INPUT_TYPE != '07' THEN APPL_MON ELSE 0 END),0),'999,999,999,999') AS BE_NTS_MN
+                     , TO_CHAR(NVL(SUM(CASE WHEN NTS_YN != 'Y' THEN APPL_MON ELSE 0 END                          ),0),'999,999,999,999') AS BE_ETCSUM
+                FROM TCPN821
+                WHERE ENTER_CD     = #ssnEnterCd#
+                  AND WORK_YY      = #searchWorkYy#
+                  AND USE_YYYY     = TO_CHAR(#searchWorkYy#-1)
+                  AND ADJUST_TYPE  = #searchAdjustType#
+                  AND SABUN        = #searchSabun# ) B
+        ]]>
+    </query>
+
+	<!-- 신용카드 조회 -->
+	<query id="selectYeaDataCardsList_test">
+		<![CDATA[
+            SELECT A.WORK_YY
+                 , A.USE_YYYY
+                 , A.ADJUST_TYPE
+                 , A.SABUN
+                 , A.CARD_TYPE
+                 , A.CARD_ENTER_NM
+                 , A.SEQ
+                 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                 , B.FAM_CD
+                 , SUM(A.USE_MON) USE_MON
+                 , SUM(A.MED_MON) MED_MON
+                 , SUM(A.CO_DEDUCT_MON) CO_DEDUCT_MON
+                 , A.NTS_YN
+                 , SUM(A.APPL_MON) APPL_MON
+                 , A.ADJ_INPUT_TYPE
+                 , A.FEEDBACK_TYPE
+                 , '' DOC_SEQ
+                 , '' DOC_SEQ_DETAIL
+              FROM TCPN821 A, TCPN823 B
+             WHERE A.ENTER_CD     = B.ENTER_CD
+               AND A.WORK_YY      = B.WORK_YY
+               AND A.ADJUST_TYPE  = B.ADJUST_TYPE
+               AND A.SABUN        = B.SABUN
+               AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+               AND A.ENTER_CD     = #ssnEnterCd#
+               AND A.WORK_YY      = #searchWorkYy#
+               AND A.USE_YYYY     = #searchUseYyyy#
+               AND A.ADJUST_TYPE  = #searchAdjustType#
+               AND A.SABUN        = #searchSabun#
+               AND A.CARD_TYPE IN ('1', '2', '3', '4', '7', '11', '13','15', '17','35')
+             GROUP BY A.ENTER_CD
+                    , A.WORK_YY
+                    , A.USE_YYYY
+                    , A.ADJUST_TYPE
+                    , A.SABUN
+                    , A.SEQ
+                    , A.CARD_TYPE
+                    , A.CARD_ENTER_NM
+                    , F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+                    , B.FAM_CD
+                    , A.NTS_YN
+                    , A.ADJ_INPUT_TYPE
+                    , A.FEEDBACK_TYPE
+             ORDER BY B.FAM_CD, A.CARD_TYPE
+		]]>
+	</query>
+
+	<!-- 신용카드 조회 -->
+    <query id="selectYeaDataCardsList_backup20171208-2">
+        <![CDATA[
+            SELECT A.WORK_YY
+                 , A.ADJUST_TYPE
+                 , A.SABUN
+                 , A.SEQ
+                 , A.CARD_TYPE
+                 , A.CARD_ENTER_NM
+                 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                 , A.HALF_GUBUN
+                 , A.USE_MON
+                 , A.MED_MON
+                 , A.CO_DEDUCT_MON
+                 , A.NTS_YN
+                 , A.APPL_MON
+                 , A.ADJ_INPUT_TYPE
+                 , A.FEEDBACK_TYPE
+                 , A.DOC_SEQ
+                 , A.DOC_SEQ_DETAIL
+              FROM TCPN821 A, TCPN823 B
+             WHERE A.ENTER_CD     = #ssnEnterCd#
+               AND A.WORK_YY      = #searchWorkYy#
+               AND A.ADJUST_TYPE  = #searchAdjustType#
+               AND A.SABUN        = #searchSabun#
+               AND A.ENTER_CD     = B.ENTER_CD
+               AND A.WORK_YY      = B.WORK_YY
+               AND A.ADJUST_TYPE  = B.ADJUST_TYPE
+               AND A.SABUN        = B.SABUN
+               AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+               AND A.CARD_TYPE IN ('1', '2', '3', '4', '7', '11', '13','15', '17','35')
+               --AND (CASE
+               --       WHEN #searchYyType# = '0' AND CARD_TYPE IN ('1', '2', '3', '4', '7', '11', '13','15', '17','35') THEN 1 /* 당해년도 */
+               --       WHEN #searchYyType# = '-1' AND CARD_TYPE IN ('51', '52', '53', '54', '55', '56', '57', '58', '59') THEN 1 /* 전년도 */
+               --       WHEN #searchYyType# = '-2' AND CARD_TYPE IN ('41', '42', '43', '44', '45', '46', '47', '48', '49') THEN 1 /* 전전년도 */
+               --       WHEN #searchYyType# = '-99' AND CARD_TYPE IN ('1', '2', '3', '4', '7', '11', '13','15', '17', '51', '52', '53', '54', '55', '56', '57', '58', '59', '41', '42', '43', '44', '45', '46', '47', '48', '49','35') THEN 1 /* 전체 */
+               --       ELSE 0 END) = 1
+             ORDER BY B.FAM_CD, A.HALF_GUBUN ,A.CARD_TYPE
+        ]]>
+    </query>
+
+	<!-- 신용카드 조회 -->
+    <query id="selectYeaDataCardsList">
+        <![CDATA[
+            SELECT A.WORK_YY
+                 , A.USE_YYYY
+                 , A.ADJUST_TYPE
+                 , A.SABUN
+                 , A.SEQ
+                 , A.CARD_TYPE
+                 , A.CARD_ENTER_NM
+                 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                 , A.HALF_GUBUN
+                 , A.USE_MON
+                 , A.MED_MON
+                 , A.CO_DEDUCT_MON
+                 , A.NTS_YN
+                 , A.APPL_MON
+                 , A.ADJ_INPUT_TYPE
+                 , A.FEEDBACK_TYPE
+                 , A.DOC_SEQ
+                 , A.DOC_SEQ_DETAIL
+              FROM TCPN821 A, TCPN823 B
+             WHERE A.ENTER_CD     = #ssnEnterCd#
+               AND A.WORK_YY      = #searchWorkYy#
+               AND A.ADJUST_TYPE  = #searchAdjustType#
+               AND A.SABUN        = #searchSabun#
+               AND A.ENTER_CD     = B.ENTER_CD
+               AND A.WORK_YY      = B.WORK_YY
+               AND A.ADJUST_TYPE  = B.ADJUST_TYPE
+               AND A.SABUN        = B.SABUN
+               AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+               AND A.USE_YYYY     = #searchUseYyyy#
+               AND A.CARD_TYPE IN ('1', '2', '3', '4', '6', '7', '11', '13', '14', '111', '113', '114', '121', '123', '124', '15', '17', '18', '71', '72', '73', '74', '75', '76', '35', '61', '63', '65', '67', '611', '613', '615', '617', '621', '623', '625', '627')
+               $query$
+             ORDER BY B.FAM_CD, A.FAMRES, A.HALF_GUBUN ,A.CARD_TYPE, A.CARD_ENTER_NM
+        ]]>
+    </query>
+
+	<query id="selectYeaDataCardsInfo_pre">
+	    <![CDATA[
+	    SELECT *
+	    FROM (
+			WITH BAS_LST AS
+			   (SELECT F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                     , B.FAM_NM
+                     , B.FAM_CD
+			         , DECODE(B.FAM_CD, 0, 'S', 'F') USE_TYPE
+			         , A.CARD_TYPE CARD_TYPE
+			         , SUM(A.APPL_MON) APPL_MON
+			      FROM TCPN821 A, TCPN823 B
+			     WHERE A.ENTER_CD    = B.ENTER_CD
+			       AND A.WORK_YY     = B.WORK_YY
+			       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+			       AND A.SABUN       = B.SABUN
+			       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+			       AND A.ENTER_CD    = #ssnEnterCd#
+			       AND A.WORK_YY     = #searchWorkYy#
+                   AND A.USE_YYYY    = #searchWorkYy#
+			       AND A.ADJUST_TYPE = #searchAdjustType#
+			       AND A.SABUN       = #searchSabun#
+			     GROUP BY A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD), B.FAM_NM, B.FAM_CD, A.CARD_TYPE)
+			SELECT '10' AS ORDER_SEQ
+			     , #searchWorkYy# AS YY
+			     , 'S' AS USE_TYPE
+                 , (SELECT MAX(FAM_CD)   FROM BAS_LST WHERE USE_TYPE = 'S') AS FAM_CD
+			     , (SELECT MAX(FAMRES)   FROM BAS_LST WHERE USE_TYPE = 'S') AS FAMRES
+			     , (SELECT MAX(FAM_NM)   FROM BAS_LST WHERE USE_TYPE = 'S') AS FAM_NM
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '1') AS CARD_AMT
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '7') AS CASH_AMT
+
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '2') AS CHECK_AMT
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '6') AS ZEROCHECK_AMT /* 직불.기명식선불카드(제로페이) */
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '2', '6' )) AS TOT_CHECK_AMT /* 직불카드등 제로페이 포함 합계 */
+
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '61') AS BOOKCARD_AMT
+	             , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '63') AS BOOKCHECK_AMT
+	             , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '65') AS BOOKCHASH_AMT
+	             , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '67') AS BOOKZERO_AMT /* 도서공연등사용분(제로페이) */
+	             , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '61', '63', '65', '67' )) AS TOT_BOOK_AMT /* 도서공연등 제로페이 포함 합계 */
+	             
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '611') AS BOOKCARD_AMT1 /*2023.10.25 도서공연등사용분(신용카드) 1~3월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '613') AS BOOKCHECK_AMT1 /*2023.10.25 도서공연등사용분(직불카드) 1~3월*/
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '615') AS BOOKCHASH_AMT1 /*2023.10.25 도서공연등사용분(현금영수증) 1~3월*/
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '617') AS BOOKZERO_AMT1 /*2023.10.25 도서공연등사용분(제로페이) 1~3월*/
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '611', '613', '615', '617' )) AS TOT_BOOK_AMT1 /*2023.10.25 도서공연등 제로페이 포함 합계 1~3월*/
+                 
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '621') AS BOOKCARD_AMT2 /*2023.10.25 도서공연등사용분(신용카드) 4~12월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '623') AS BOOKCHECK_AMT2 /*2023.10.25 도서공연등사용분(직불카드) 4~12월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '625') AS BOOKCHASH_AMT2 /*2023.10.25 도서공연등사용분(현금영수증) 4~12월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '627') AS BOOKZERO_AMT2 /*2023.10.25 도서공연등사용분(제로페이) 4~12월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '621', '623', '625', '627' )) AS TOT_BOOK_AMT2 /*2023.10.25 도서공연등 제로페이 포함 합계 4~12월 */
+                 
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '111', '113' )) AS MARKET_AMT1 /*2023.10.25 전통시장사용분(신용카드, 직불카드, 현금영수증) 1~3월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '114') AS MARKETZERO_AMT1 /*2023.10.25 전통시장사용분(제로페이) 1~3월*/
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '111', '113', '114' )) AS TOT_MARKET_AMT1 /*2023.10.25 전통시장사용분 제로페이 포함 합계 1~3월*/
+                 
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '121', '123' )) AS MARKET_AMT2 /*2023.10.25 전통시장사용분(신용카드, 직불카드, 현금영수증) 4~12월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '124') AS MARKETZERO_AMT2 /*2023.10.25 전통시장사용분(제로페이) 4~12월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '121', '123', '124' )) AS TOT_MARKET_AMT2 /*2023.10.25 전통시장사용분 제로페이 포함 합계 4~12월 */
+
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '14') AS ZEROMARKET_AMT  /* 전통시장사용분(제로페이) */
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '11', '13', '14' )) AS TOT_MARKET_AMT /* 전통시장사용분 제로페이 포함 합계 */
+
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '15', '17' )) AS BUS_AMT
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE = '18') AS ZEROBUS_AMT  /* 대중교통이용분(제로페이) */
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ( '15', '17', '18' )) AS TOT_BUS_AMT /* 대중교통이용분 제로페이 포함 합계 */
+
+			     , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ('3', '4')) AS BUSINESS_AMT
+			     /*, (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' ) AS TOT_AMT*/
+			     , NVL((SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE NOT IN ('3', '4')),0)
+			      -  NVL((SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND CARD_TYPE IN ('3', '4')),0) AS TOT_AMT /* 사업관련비용 제외 - 2020.02.14 */
+                ,(SELECT NVL(A.APPL_MON,0) - NVL(B.APPL_MON,0) AS TOT_AMT
+                  FROM
+                    (SELECT SUM(APPL_MON) AS APPL_MON
+                     FROM TCPN821 A, TCPN823 B
+                     WHERE A.ENTER_CD    = B.ENTER_CD
+                       AND A.WORK_YY     = B.WORK_YY
+                       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+                       AND A.SABUN       = B.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+                       AND A.ENTER_CD    = #ssnEnterCd#
+                       AND A.WORK_YY     = #searchWorkYy#
+                       AND A.USE_YYYY    = '2021'
+                       AND A.ADJUST_TYPE = #searchAdjustType#
+                       AND A.SABUN       = #searchSabun#
+                       AND A.CARD_TYPE NOT IN ('3', '4')
+                       AND B.FAM_CD = '0') A,
+                  (SELECT SUM(APPL_MON) AS APPL_MON
+                        FROM TCPN821 A, TCPN823 B
+                     WHERE A.ENTER_CD    = B.ENTER_CD
+                       AND A.WORK_YY     = B.WORK_YY
+                       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+                       AND A.SABUN       = B.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+                       AND A.ENTER_CD    = #ssnEnterCd#
+                       AND A.WORK_YY     = #searchWorkYy#
+                       AND A.USE_YYYY    = '2021'
+                       AND A.ADJUST_TYPE = #searchAdjustType#
+                       AND A.SABUN       = #searchSabun#
+                       AND A.CARD_TYPE IN ('3', '4')
+                       AND B.FAM_CD = '0') B ) AS TOT_AMT_2021
+			     , (SELECT (CASE WHEN SUM(INPUT_MON) = 0 THEN NULL ELSE SUM(INPUT_MON) END)
+			          FROM TCPN843 A
+			         WHERE A.ENTER_CD    = #ssnEnterCd#
+			           AND A.WORK_YY     = #searchWorkYy#
+			           AND A.ADJUST_TYPE = #searchAdjustType#
+			           AND A.sabun       = #searchSabun#
+			           AND ADJ_ELEMENT_CD = 'A100_65'
+			       ) AS ADD_AMT
+			    , 0 AS ADMIN_ADD_MON
+			  FROM DUAL
+			 UNION ALL
+			SELECT '20' AS ORDER_SEQ
+			     , #searchWorkYy# AS YY
+			     , USE_TYPE
+			     , FAM_CD
+			     , FAMRES
+			     , MAX(FAM_NM) AS FAM_NM
+			     , SUM(CASE WHEN CARD_TYPE = '1'            		THEN APPL_MON ELSE 0 END) AS CARD_AMT
+			     , SUM(CASE WHEN CARD_TYPE = '7'            		THEN APPL_MON ELSE 0 END) AS CASH_AMT
+
+			     , SUM(CASE WHEN CARD_TYPE = '2'            		THEN APPL_MON ELSE 0 END) AS CHECK_AMT
+			     , SUM(CASE WHEN CARD_TYPE = '6'            		THEN APPL_MON ELSE 0 END) AS ZEROCHECK_AMT /* 직불.기명식선불카드(제로페이) */
+			     , SUM(CASE WHEN CARD_TYPE IN ('2','6')   			THEN APPL_MON ELSE 0 END) AS TOT_CHECK_AMT /* 직불카드등 제로페이 포함 합계 */
+
+			     , SUM(CASE WHEN CARD_TYPE = '61'					THEN APPL_MON ELSE 0 END) AS BOOKCARD_AMT
+	             , SUM(CASE WHEN CARD_TYPE = '63'					THEN APPL_MON ELSE 0 END) AS BOOKCHECK_AMT
+	             , SUM(CASE WHEN CARD_TYPE = '65'					THEN APPL_MON ELSE 0 END) AS BOOKCHASH_AMT
+	             , SUM(CASE WHEN CARD_TYPE = '67'					THEN APPL_MON ELSE 0 END) AS BOOKZERO_AMT /* 도서공연등사용분(제로페이) */
+	             , SUM(CASE WHEN CARD_TYPE IN ('61','63','65','67') THEN APPL_MON ELSE 0 END) AS TOT_BOOK_AMT /* 도서공연등 제로페이 포함 합계 */
+	             
+	             , SUM(CASE WHEN CARD_TYPE = '611'                  THEN APPL_MON ELSE 0 END) AS BOOKCARD_AMT1 /*2023.10.25 도서공연등사용분(신용카드) 1~3월 */
+                 , SUM(CASE WHEN CARD_TYPE = '613'                  THEN APPL_MON ELSE 0 END) AS BOOKCHECK_AMT1 /*2023.10.25 도서공연등사용분(직불카드) 1~3월*/
+                 , SUM(CASE WHEN CARD_TYPE = '615'                  THEN APPL_MON ELSE 0 END) AS BOOKCHASH_AMT1 /*2023.10.25 도서공연등사용분(현금영수증) 1~3월*/
+                 , SUM(CASE WHEN CARD_TYPE = '617'                  THEN APPL_MON ELSE 0 END) AS BOOKZERO_AMT1 /*2023.10.25 도서공연등사용분(제로페이) 1~3월*/
+                 , SUM(CASE WHEN CARD_TYPE IN ('611','613','615','617') THEN APPL_MON ELSE 0 END) AS TOT_BOOK_AMT1 /*2023.10.25 도서공연등 제로페이 포함 합계 1~3월*/
+                 
+                 , SUM(CASE WHEN CARD_TYPE = '621'                  THEN APPL_MON ELSE 0 END) AS BOOKCARD_AMT2 /*2023.10.25 도서공연등사용분(신용카드) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '623'                  THEN APPL_MON ELSE 0 END) AS BOOKCHECK_AMT2 /*2023.10.25 도서공연등사용분(직불카드) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '625'                  THEN APPL_MON ELSE 0 END) AS BOOKCHASH_AMT2 /*2023.10.25 도서공연등사용분(현금영수증) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '627'                  THEN APPL_MON ELSE 0 END) AS BOOKZERO_AMT2 /*2023.10.25 도서공연등사용분(제로페이) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE IN ('621','623','625','627')  THEN APPL_MON ELSE 0 END) AS TOT_BOOK_AMT2 /*2023.10.25 도서공연등 제로페이 포함 합계 4~12월 */
+                 
+                 , SUM(CASE WHEN CARD_TYPE IN ('111','113')         THEN APPL_MON ELSE 0 END) AS MARKET_AMT1     /*2023.10.25 전통시장사용분(신용카드,현금영수증)1~3월 */
+                 , SUM(CASE WHEN CARD_TYPE = '114'                  THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT1 /*2023.10.25 전통시장사용분(제로페이)1~3월 */
+                 , SUM(CASE WHEN CARD_TYPE IN ('111','113','114')   THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT1 /*2023.10.25 전통시장사용분 제로페이 포함 합계1~3월 */
+                 
+                 , SUM(CASE WHEN CARD_TYPE IN ('121','123')         THEN APPL_MON ELSE 0 END) AS MARKET_AMT2     /*2023.10.25 전통시장사용분(신용카드,현금영수증)4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '124'                  THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT2 /*2023.10.25 전통시장사용분(제로페이)4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE IN ('121','123','124')   THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT2 /*2023.10.25 전통시장사용분 제로페이 포함 합계4~12월 */
+
+			     , SUM(CASE WHEN CARD_TYPE IN ('11','13')   		THEN APPL_MON ELSE 0 END) AS MARKET_AMT
+			     , SUM(CASE WHEN CARD_TYPE = '14'					THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT  /* 전통시장사용분(제로페이) */
+			     , SUM(CASE WHEN CARD_TYPE IN ('11','13','14')   	THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT /* 전통시장사용분 제로페이 포함 합계 */
+
+			     , SUM(CASE WHEN CARD_TYPE IN ('15','17')   		THEN APPL_MON ELSE 0 END) AS BUS_AMT
+			     , SUM(CASE WHEN CARD_TYPE = '18'					THEN APPL_MON ELSE 0 END) AS ZEROBUS_AMT  /* 대중교통이용분(제로페이) */
+			     , SUM(CASE WHEN CARD_TYPE IN ('15','17','18')   	THEN APPL_MON ELSE 0 END) AS TOT_BUS_AMT /* 대중교통이용분 제로페이 포함 합계 */
+
+			     , SUM(CASE WHEN CARD_TYPE IN ('3','4')     		THEN APPL_MON ELSE 0 END) AS BUSINESS_AMT
+			     /*, SUM(CASE WHEN CARD_TYPE NOT IN ('3','4') 		THEN APPL_MON ELSE 0 END) AS TOT_AMT*/
+			     , SUM(CASE WHEN CARD_TYPE NOT IN ('3','4') 		THEN APPL_MON ELSE 0 END)
+			      - SUM(CASE WHEN CARD_TYPE IN ('3','4')     		THEN APPL_MON ELSE 0 END) AS TOT_AMT /* 사업관련비용 제외 - 2020.02.14 */
+                ,(SELECT NVL(A.APPL_MON,0) - NVL(B.APPL_MON,0) AS TOT_AMT
+                  FROM
+                    (SELECT SUM(APPL_MON) AS APPL_MON
+                     FROM TCPN821 A, TCPN823 B
+                     WHERE A.ENTER_CD    = B.ENTER_CD
+                       AND A.WORK_YY     = B.WORK_YY
+                       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+                       AND A.SABUN       = B.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+                       AND A.ENTER_CD    = #ssnEnterCd#
+                       AND A.WORK_YY     = #searchWorkYy#
+                       AND A.USE_YYYY    = '2021'
+                       AND A.ADJUST_TYPE = #searchAdjustType#
+                       AND A.SABUN       = #searchSabun#
+                       AND A.CARD_TYPE NOT IN ('3', '4')
+                       AND B.FAM_CD != '0') A,
+                  (SELECT SUM(APPL_MON) AS APPL_MON
+                        FROM TCPN821 A, TCPN823 B
+                     WHERE A.ENTER_CD    = B.ENTER_CD
+                       AND A.WORK_YY     = B.WORK_YY
+                       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+                       AND A.SABUN       = B.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+                       AND A.ENTER_CD    = #ssnEnterCd#
+                       AND A.WORK_YY     = #searchWorkYy#
+                       AND A.USE_YYYY    = '2021'
+                       AND A.ADJUST_TYPE = #searchAdjustType#
+                       AND A.SABUN       = #searchSabun#
+                       AND A.CARD_TYPE IN ('3', '4')
+                       AND B.FAM_CD != '0') B ) AS TOT_AMT_2021
+			     , 0 AS ADD_AMT
+			     , 0 AS ADMIN_ADD_MON
+			  FROM BAS_LST
+			 WHERE USE_TYPE != 'S'
+			 GROUP BY FAM_CD, FAMRES, USE_TYPE
+			 ORDER BY ORDER_SEQ, FAM_CD , FAM_NM
+			 )
+			 --$query$
+	    ]]>
+	</query>
+    <query id="selectYeaDataCardsInfo">
+        <![CDATA[
+        SELECT *
+        FROM (
+            WITH BAS_LST AS
+               (SELECT F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                     , B.FAM_NM
+                     , B.FAM_CD
+                     , DECODE(B.FAM_CD, 0, 'S', 'F') USE_TYPE
+                     , A.CARD_TYPE CARD_TYPE
+                     , SUM(A.APPL_MON) APPL_MON
+                     , A.USE_YYYY AS USE_YYYY
+                  FROM TCPN821 A, TCPN823 B
+                 WHERE A.ENTER_CD    = B.ENTER_CD
+                   AND A.WORK_YY     = B.WORK_YY
+                   AND A.ADJUST_TYPE = B.ADJUST_TYPE
+                   AND A.SABUN       = B.SABUN
+                   AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+                   AND A.ENTER_CD    = #ssnEnterCd#
+                   AND A.WORK_YY     = #searchWorkYy#
+                   AND A.ADJUST_TYPE = #searchAdjustType#
+                   AND A.SABUN       = #searchSabun#
+                 GROUP BY A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN, F_COM_DECRYPT(A.FAMRES, A.ENTER_CD), B.FAM_NM, B.FAM_CD, A.CARD_TYPE, A.USE_YYYY)
+            SELECT '10' AS ORDER_SEQ
+                 , #searchWorkYy# AS YY
+                 , 'S' AS USE_TYPE
+                 , (SELECT MAX(FAM_CD)   FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy#) AS FAM_CD
+                 , (SELECT MAX(FAMRES)   FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy#) AS FAMRES
+                 , (SELECT MAX(FAM_NM)   FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy#) AS FAM_NM
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '1') AS CARD_AMT
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '7') AS CASH_AMT
+
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '2') AS CHECK_AMT
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '6') AS ZEROCHECK_AMT /* 직불.기명식선불카드(제로페이) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '2', '6' )) AS TOT_CHECK_AMT /* 직불카드등 제로페이 포함 합계 */
+
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '61') AS BOOKCARD_AMT
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '63') AS BOOKCHECK_AMT
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '65') AS BOOKCHASH_AMT
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '67') AS BOOKZERO_AMT /* 도서공연등사용분(제로페이) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '61', '63', '65', '67' )) AS TOT_BOOK_AMT /* 도서공연등 제로페이 포함 합계 */
+                 
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '611') AS BOOKCARD_AMT1 /*2023.10.25 도서공연등사용분(신용카드) 1~3월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '613') AS BOOKCHECK_AMT1 /*2023.10.25 도서공연등사용분(직불카드) 1~3월*/
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '615') AS BOOKCHASH_AMT1 /*2023.10.25 도서공연등사용분(현금영수증) 1~3월*/
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '617') AS BOOKZERO_AMT1 /*2023.10.25 도서공연등사용분(제로페이) 1~3월*/
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '611', '613', '615', '617' )) AS TOT_BOOK_AMT1 /*2023.10.25 도서공연등 제로페이 포함 합계 1~3월*/
+				                 
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '621') AS BOOKCARD_AMT2 /*2023.10.25 도서공연등사용분(신용카드) 4~12월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '623') AS BOOKCHECK_AMT2 /*2023.10.25 도서공연등사용분(직불카드) 4~12월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '625') AS BOOKCHASH_AMT2 /*2023.10.25 도서공연등사용분(현금영수증) 4~12월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '627') AS BOOKZERO_AMT2 /*2023.10.25 도서공연등사용분(제로페이) 4~12월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '621', '623', '625', '627' )) AS TOT_BOOK_AMT2 /*2023.10.25 도서공연등 제로페이 포함 합계 4~12월 */
+				                  
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '111', '113' )) AS MARKET_AMT1 /*2023.10.25 전통시장사용분(신용카드, 직불카드, 현금영수증) 1~3월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '114') AS MARKETZERO_AMT1 /*2023.10.25 전통시장사용분(제로페이) 1~3월*/
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '111', '113', '114' )) AS TOT_MARKET_AMT1 /*2023.10.25 전통시장사용분 제로페이 포함 합계 1~3월*/
+				                 
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '121', '123' )) AS MARKET_AMT2 /*2023.10.25 전통시장사용분(신용카드, 직불카드, 현금영수증) 4~12월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '124') AS MARKETZERO_AMT2 /*2023.10.25 전통시장사용분(제로페이) 4~12월 */
+				 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '121', '123', '124' )) AS TOT_MARKET_AMT2 /*2023.10.25 전통시장사용분 제로페이 포함 합계 4~12월 */
+
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '14') AS ZEROMARKET_AMT  /* 전통시장사용분(제로페이) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '11', '13', '14' )) AS TOT_MARKET_AMT /* 전통시장사용분 제로페이 포함 합계 */
+                 
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT_2022            /* 2022.10.27 전통시장분(신용카드,직불카드,현금영수증) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '14') AS ZEROMARKET_AMT_2022                   /* 2022.10.27  전통시장사용분(제로페이) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '11', '13', '14' )) AS TOT_MARKET_AMT_2022  /* 2022.10.27 전통시장사용분 제로페이 포함 합계 */
+                 
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy#-1 AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT_2021           /* 2022.10.27 전통시장분(신용카드,직불카드,현금영수증) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy#-1 AND CARD_TYPE = '14') AS ZEROMARKET_AMT_2021                  /* 2022.10.27 전통시장사용분(제로페이) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy#-1 AND CARD_TYPE IN ( '11', '13', '14' )) AS TOT_MARKET_AMT_2021 /* 2022.10.27 전통시장사용분 제로페이 포함 합계 */
+
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '15', '17' )) AS BUS_AMT            /* 대중교통이용분(신용카드,직불카드,현금영수증)*/
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '18') AS ZEROBUS_AMT                   /* 대중교통이용분(제로페이) */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '15', '17', '18' )) AS TOT_BUS_AMT  /* 대중교통이용분 제로페이 포함 합계 */
+
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '71', '72' )) AS BUS_AMT1           /* 2022.10.27 대중교통이용분(신용카드,직불카드,현금영수증) 1~6월*/
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '73') AS ZEROBUS_AMT1                  /* 2022.10.27 대중교통이용분(제로페이) 1~6월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '71', '72', '73' )) AS TOT_BUS_AMT1 /* 2022.10.27 대중교통이용분 제로페이 포함 합계 1~6월  */
+				 
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '74', '75' )) AS BUS_AMT2           /* 2022.10.27 대중교통이용분(신용카드,직불카드,현금영수증) 7~12월*/
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE = '76') AS ZEROBUS_AMT2                  /* 2022.10.27 대중교통이용분(제로페이) 7~12월 */
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ( '74', '75', '76' )) AS TOT_BUS_AMT2 /* 2022.10.27 대중교통이용분 제로페이 포함 합계 7~12월  */
+
+                 , (SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ('3', '4')) AS BUSINESS_AMT
+                 , NVL((SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE NOT IN ('3', '4')),0)
+                  -  NVL((SELECT SUM(APPL_MON) FROM BAS_LST WHERE USE_TYPE = 'S' AND USE_YYYY    = #searchWorkYy# AND CARD_TYPE IN ('3', '4')),0) AS TOT_AMT /* 사업관련비용 제외 - 2020.02.14 */
+                ,(SELECT NVL(A.APPL_MON,0) - NVL(B.APPL_MON,0) AS TOT_AMT
+                  FROM
+                    (SELECT SUM(APPL_MON) AS APPL_MON
+                     FROM TCPN821 A, TCPN823 B
+                     WHERE A.ENTER_CD    = B.ENTER_CD
+                       AND A.WORK_YY     = B.WORK_YY
+                       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+                       AND A.SABUN       = B.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+                       AND A.ENTER_CD    = #ssnEnterCd#
+                       AND A.WORK_YY     = #searchWorkYy#
+                       AND A.USE_YYYY    = '2023'
+                       AND A.ADJUST_TYPE = #searchAdjustType#
+                       AND A.SABUN       = #searchSabun#
+                       AND A.CARD_TYPE NOT IN ('3', '4')
+                       AND B.FAM_CD = '0') A,
+                  (SELECT SUM(APPL_MON) AS APPL_MON
+                        FROM TCPN821 A, TCPN823 B
+                     WHERE A.ENTER_CD    = B.ENTER_CD
+                       AND A.WORK_YY     = B.WORK_YY
+                       AND A.ADJUST_TYPE = B.ADJUST_TYPE
+                       AND A.SABUN       = B.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD) = F_YEA_GET_EX_DECRYPT(B.FAMRES, B.ENTER_CD)
+                       AND A.ENTER_CD    = #ssnEnterCd#
+                       AND A.WORK_YY     = #searchWorkYy#
+                       AND A.USE_YYYY    = '2022'
+                       AND A.ADJUST_TYPE = #searchAdjustType#
+                       AND A.SABUN       = #searchSabun#
+                       AND A.CARD_TYPE IN ('3', '4')
+                       AND B.FAM_CD = '0') B ) AS TOT_AMT_2022
+                 , (SELECT (CASE WHEN SUM(INPUT_MON) = 0 THEN NULL ELSE SUM(INPUT_MON) END)
+                      FROM TCPN843 A
+                     WHERE A.ENTER_CD    = #ssnEnterCd#
+                       AND A.WORK_YY     = #searchWorkYy#
+                       AND A.ADJUST_TYPE = #searchAdjustType#
+                       AND A.sabun       = #searchSabun#
+                       AND ADJ_ELEMENT_CD = 'A100_65'
+                   ) AS ADD_AMT
+                , 0 AS ADMIN_ADD_MON
+              FROM DUAL
+             UNION ALL
+            SELECT '20' AS ORDER_SEQ
+                 , #searchWorkYy# AS YY
+                 , USE_TYPE
+                 , FAM_CD
+                 , FAMRES
+                 , MAX(FAM_NM) AS FAM_NM
+                 , SUM(CASE WHEN CARD_TYPE = '1'                     AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS CARD_AMT
+                 , SUM(CASE WHEN CARD_TYPE = '7'                     AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS CASH_AMT
+
+                 , SUM(CASE WHEN CARD_TYPE = '2'                     AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS CHECK_AMT
+                 , SUM(CASE WHEN CARD_TYPE = '6'                     AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROCHECK_AMT /* 직불.기명식선불카드(제로페이) */
+                 , SUM(CASE WHEN CARD_TYPE IN ('2','6')              AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_CHECK_AMT /* 직불카드등 제로페이 포함 합계 */
+
+                 , SUM(CASE WHEN CARD_TYPE = '61'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCARD_AMT
+                 , SUM(CASE WHEN CARD_TYPE = '63'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCHECK_AMT
+                 , SUM(CASE WHEN CARD_TYPE = '65'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCHASH_AMT
+                 , SUM(CASE WHEN CARD_TYPE = '67'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKZERO_AMT /* 도서공연등사용분(제로페이) */
+                 , SUM(CASE WHEN CARD_TYPE IN ('61','63','65','67')  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_BOOK_AMT /* 도서공연등 제로페이 포함 합계 */
+                 
+                 , SUM(CASE WHEN CARD_TYPE = '611'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCARD_AMT1 /*2023.10.25 도서공연등사용분(신용카드) 1~3월 */
+                 , SUM(CASE WHEN CARD_TYPE = '613'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCHECK_AMT1 /*2023.10.25 도서공연등사용분(직불카드) 1~3월*/
+                 , SUM(CASE WHEN CARD_TYPE = '615'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCHASH_AMT1 /*2023.10.25 도서공연등사용분(현금영수증) 1~3월*/
+                 , SUM(CASE WHEN CARD_TYPE = '617'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKZERO_AMT1 /*2023.10.25 도서공연등사용분(제로페이) 1~3월*/
+                 , SUM(CASE WHEN CARD_TYPE IN ('611','613','615','617') AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_BOOK_AMT1 /*2023.10.25 도서공연등 제로페이 포함 합계 1~3월*/
+                 
+                 , SUM(CASE WHEN CARD_TYPE = '621'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCARD_AMT2 /*2023.10.25 도서공연등사용분(신용카드) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '623'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCHECK_AMT2 /*2023.10.25 도서공연등사용분(직불카드) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '625'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKCHASH_AMT2 /*2023.10.25 도서공연등사용분(현금영수증) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '627'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BOOKZERO_AMT2 /*2023.10.25 도서공연등사용분(제로페이) 4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE IN ('621','623','625','627')  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_BOOK_AMT2 /*2023.10.25 도서공연등 제로페이 포함 합계 4~12월 */
+                 
+                 , SUM(CASE WHEN CARD_TYPE IN ('111','113')         AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS MARKET_AMT1     /*2023.10.25 전통시장사용분(신용카드,현금영수증)1~3월 */
+                 , SUM(CASE WHEN CARD_TYPE = '114'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT1 /*2023.10.25 전통시장사용분(제로페이)1~3월 */
+                 , SUM(CASE WHEN CARD_TYPE IN ('111','113','114')   AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT1 /*2023.10.25 전통시장사용분 제로페이 포함 합계1~3월 */
+                 
+                 , SUM(CASE WHEN CARD_TYPE IN ('121','123')         AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS MARKET_AMT2     /*2023.10.25 전통시장사용분(신용카드,현금영수증)4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE = '124'                  AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT2 /*2023.10.25 전통시장사용분(제로페이)4~12월 */
+                 , SUM(CASE WHEN CARD_TYPE IN ('121','123','124')   AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT2 /*2023.10.25 전통시장사용분 제로페이 포함 합계4~12월 */
+
+                 , SUM(CASE WHEN CARD_TYPE IN ('11','13')            AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS MARKET_AMT
+                 , SUM(CASE WHEN CARD_TYPE = '14'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT /* 전통시장사용분(제로페이) */
+                 , SUM(CASE WHEN CARD_TYPE IN ('11','13','14')       AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT /* 전통시장사용분 제로페이 포함 합계 */
+                 
+                 , SUM(CASE WHEN CARD_TYPE IN ('11','13')            AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS MARKET_AMT_2022       /* 2022.10.27 전통시장분(신용카드,직불카드,현금영수증) */
+                 , SUM(CASE WHEN CARD_TYPE = '14'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT_2022   /* 2022.10.27 전통시장사용분(제로페이) */
+                 , SUM(CASE WHEN CARD_TYPE IN ('11','13','14')       AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT_2022   /* 2022.10.27 전통시장사용분 제로페이 포함 합계 */
+                                                                                                                                                            
+                 , SUM(CASE WHEN CARD_TYPE IN ('11','13')            AND USE_YYYY    = #searchWorkYy#-1 THEN APPL_MON ELSE 0 END) AS MARKET_AMT_2021      /*2022.10.27 전통시장분(신용카드,직불카드,현금영수증) */
+                 , SUM(CASE WHEN CARD_TYPE = '14'                    AND USE_YYYY    = #searchWorkYy#-1 THEN APPL_MON ELSE 0 END) AS ZEROMARKET_AMT_2021  /*2022.10.27 전통시장사용분(제로페이) */
+                 , SUM(CASE WHEN CARD_TYPE IN ('11','13','14')       AND USE_YYYY    = #searchWorkYy#-1 THEN APPL_MON ELSE 0 END) AS TOT_MARKET_AMT_2021  /*2022.10.27 전통시장사용분 제로페이 포함 합계 */
+
+                 , SUM(CASE WHEN CARD_TYPE IN ('15','17')            AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BUS_AMT      /* 대중교통이용분(신용카드,직불카드,현금영수증)*/
+                 , SUM(CASE WHEN CARD_TYPE = '18'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROBUS_AMT  /* 대중교통이용분(제로페이) */
+                 , SUM(CASE WHEN CARD_TYPE IN ('15','17','18')       AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_BUS_AMT  /* 대중교통이용분 제로페이 포함 합계 */
+
+                 , SUM(CASE WHEN CARD_TYPE IN ('71','72')            AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BUS_AMT1      /* 2022.10.27 대중교통이용분(신용카드,직불카드,현금영수증) 1~6월*/
+                 , SUM(CASE WHEN CARD_TYPE = '73'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROBUS_AMT1  /* 2022.10.27 대중교통이용분(제로페이) 1~6월 */
+                 , SUM(CASE WHEN CARD_TYPE IN ('71','72','73')       AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_BUS_AMT1  /* 2022.10.27 대중교통이용분 제로페이 포함 합계 1~6월  */
+                                                                                                                                                    
+                 , SUM(CASE WHEN CARD_TYPE IN ('74','75')            AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BUS_AMT2      /* 2022.10.27 대중교통이용분(신용카드,직불카드,현금영수증) 7~12월*/
+                 , SUM(CASE WHEN CARD_TYPE = '76'                    AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS ZEROBUS_AMT2  /* 2022.10.27 대중교통이용분(제로페이) 7~12월*/
+                 , SUM(CASE WHEN CARD_TYPE IN ('74','75','76')       AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_BUS_AMT2  /* 2022.10.27 대중교통이용분 제로페이 포함 합계 7~12월*/
+
+
+                 , SUM(CASE WHEN CARD_TYPE IN ('3','4')              AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS BUSINESS_AMT
+                 , SUM(CASE WHEN CARD_TYPE NOT IN ('3','4')          AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END)
+                  - SUM(CASE WHEN CARD_TYPE IN ('3','4')             AND USE_YYYY    = #searchWorkYy# THEN APPL_MON ELSE 0 END) AS TOT_AMT /* 사업관련비용 제외 - 2020.02.14 */
+                 , SUM(CASE WHEN CARD_TYPE NOT IN ('3','4')          AND USE_YYYY = #searchWorkYy#-1 THEN APPL_MON ELSE 0 END)
+                  - SUM(CASE WHEN CARD_TYPE IN ('3','4')             AND USE_YYYY = #searchWorkYy#-1 THEN APPL_MON ELSE 0 END) AS TOT_AMT_2022
+                 , 0 AS ADD_AMT
+                 , 0 AS ADMIN_ADD_MON
+              FROM BAS_LST
+             WHERE USE_TYPE != 'S'
+             GROUP BY FAM_CD, FAMRES, USE_TYPE
+             ORDER BY ORDER_SEQ, FAM_CD , FAM_NM
+             )
+             --$query$
+        ]]>
+    </query>
+	<!-- 당해년도, 전년도, 전전년도 합계금액 조회 -->
+	<query id="selectYeaDataCardsInfo_BACKUP20171130">
+		<![CDATA[
+			WITH T AS (
+				SELECT HALF_GUBUN,CARD_TYPE,APPL_MON,USE_TYPE,APPL_MON_2015,APPL_MON_2014,APPL_MON_ADD_2014,APPL_MON_ADD,
+	                   (CASE WHEN APPL_MON_2015 > APPL_MON_2014 THEN 'Y'
+	                        ELSE 'N'
+	                   END) AS ADD_MON_YN
+	            FROM (
+	            SELECT HALF_GUBUN
+	                           , CARD_TYPE
+	                           , APPL_MON
+	                           , DECODE(F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD)
+	                              , (
+	                                 SELECT F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD)
+	                                 FROM TCPN823
+	                                 WHERE ENTER_CD		= #ssnEnterCd#
+										AND WORK_YY		= #searchWorkYy#
+										AND ADJUST_TYPE	= #searchAdjustType#
+										AND SABUN		= #searchSabun#
+	                                    AND FAM_CD = '0'
+	                                 )
+	                              , 'S', 'F') AS USE_TYPE
+	                           ,NVL((SELECT SUM(APPL_MON)
+	                                 FROM TCPN821
+	                                 WHERE ENTER_CD		= A.ENTER_CD
+	                                    AND WORK_YY		= A.WORK_YY
+	                                    AND ADJUST_TYPE	= A.ADJUST_TYPE
+	                                    AND SABUN		= A.SABUN
+	                                    AND HALF_GUBUN = '2015'),0) AS APPL_MON_2015
+	                           ,NVL((SELECT SUM(APPL_MON)
+	                                 FROM TCPN821
+	                                 WHERE ENTER_CD		= A.ENTER_CD
+	                                    AND WORK_YY		= A.WORK_YY
+	                                    AND ADJUST_TYPE	= A.ADJUST_TYPE
+	                                    AND SABUN		= A.SABUN
+	                                    AND HALF_GUBUN = '2014'),0) AS APPL_MON_2014
+	                           ,NVL((SELECT SUM(APPL_MON)
+	                                 FROM TCPN821
+	                                 WHERE ENTER_CD		= A.ENTER_CD
+	                                    AND WORK_YY		= A.WORK_YY
+	                                    AND ADJUST_TYPE	= A.ADJUST_TYPE
+	                                    AND SABUN		= A.SABUN
+	                                    AND HALF_GUBUN = '2014'
+	                                    AND CARD_TYPE NOT IN ('41', '48', '49')),0) AS APPL_MON_ADD_2014
+	                           ,NVL((SELECT SUM(APPL_MON)
+	                                 FROM TCPN821
+	                                 WHERE ENTER_CD		= A.ENTER_CD
+	                                    AND WORK_YY		= A.WORK_YY
+	                                    AND ADJUST_TYPE	= A.ADJUST_TYPE
+	                                    AND SABUN		= A.SABUN
+	                                    AND HALF_GUBUN = '10'
+	                                    AND CARD_TYPE IN ('4')),0) AS APPL_MON_ADD
+	                        FROM TCPN821 A
+	                        WHERE ENTER_CD		= #ssnEnterCd#
+								AND WORK_YY		= #searchWorkYy#
+								AND ADJUST_TYPE	= #searchAdjustType#
+								AND SABUN		= #searchSabun#
+	            )
+			)
+			/* 추가공제율사용분(ADD_AMT) : 전체 금액에서 신용카드, 사업관련비용 제외 한 금액의 합(2016 하반기는 표기 제외) */
+			/* 당해년도 상반기 */
+			SELECT 10 AS ORDER_SEQ
+				, #searchWorkYy# AS YY
+				, '10' AS HALF_GUBUN
+				, 'S' AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'S' AND CARD_TYPE = '1') AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'S' AND CARD_TYPE = '7') AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'S' AND CARD_TYPE = '2') AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '15', '17' )) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'S' AND CARD_TYPE IN ('3', '4')) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'S' AND CARD_TYPE NOT IN ('3', '4')) AS TOT_AMT
+				, (SELECT (CASE WHEN SUM(INPUT_MON) = 0 THEN NULL ELSE SUM(INPUT_MON) END)
+	               FROM TCPN843 A
+                   WHERE A.ENTER_CD = #ssnEnterCd#
+                     AND A.WORK_YY     = #searchWorkYy#
+                     AND A.ADJUST_TYPE = #searchAdjustType#
+                     AND A.sabun = #searchSabun#
+                     AND ADJ_ELEMENT_CD = 'A100_65'
+                     AND 'Y' = (SELECT DISTINCT(ADD_MON_YN)
+                                FROM T )) AS ADD_AMT
+                , ( SELECT DECODE( MAX(B.ADMIN_REG_YN), 'Y', ( MAX(NVL(B.ADD_CASH_MON,0))+MAX(NVL(B.ADD_CARD_MON,0))+MAX(NVL(B.ADD_DEBIT_MON,0)) ), '')
+                      FROM TCPN822 B
+                     WHERE B.ENTER_CD = #ssnEnterCd#
+                       AND B.WORK_YY     = #searchWorkYy#
+                       AND B.ADJUST_TYPE = #searchAdjustType#
+                       AND B.sabun = #searchSabun#  ) AS ADMIN_ADD_MON
+			FROM DUAL
+			UNION ALL SELECT 20 AS ORDER_SEQ
+				, #searchWorkYy# AS YY
+				, '10' AS HALF_GUBUN
+				, 'F' AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'F' AND CARD_TYPE = '1') AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'F' AND CARD_TYPE = '7') AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'F' AND CARD_TYPE = '2') AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'F' AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'F' AND CARD_TYPE IN ( '15', '17' )) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'F' AND CARD_TYPE IN ('3','4')) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '10' AND USE_TYPE = 'F' AND CARD_TYPE NOT IN ('3', '4')) AS TOT_AMT
+				, NULL AS ADD_AMT
+				, NULL AS ADMIN_ADD_MON
+			FROM DUAL
+
+			/* 당해년도 하반기 */
+			UNION ALL SELECT 30 AS ORDER_SEQ
+				, #searchWorkYy# AS YY
+				, '20' AS HALF_GUBUN
+				, 'S' AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'S' AND CARD_TYPE = '1') AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'S' AND CARD_TYPE = '7') AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'S' AND CARD_TYPE = '2') AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '15', '17' )) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'S' AND CARD_TYPE IN ('3','4')) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'S' AND CARD_TYPE NOT IN ('3', '4')) AS TOT_AMT
+				, NULL AS ADD_AMT
+				, NULL AS ADMIN_ADD_MON
+			FROM DUAL
+			UNION ALL SELECT 40 AS ORDER_SEQ
+				, #searchWorkYy# AS YY
+				, '20' AS HALF_GUBUN
+				, 'F' AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'F' AND CARD_TYPE = '1') AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'F' AND CARD_TYPE = '7') AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'F' AND CARD_TYPE = '2') AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'F' AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'F' AND CARD_TYPE IN ( '15', '17' )) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'F' AND CARD_TYPE IN ('3','4')) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '20' AND USE_TYPE = 'F' AND CARD_TYPE NOT IN ('3', '4')) AS TOT_AMT
+				, NULL AS ADD_AMT
+				, NULL AS ADMIN_ADD_MON
+			FROM DUAL
+
+			/* 당해년도 합계 */
+			UNION ALL SELECT 45 AS ORDER_SEQ
+				, #searchWorkYy# ||'_SUM' AS YY
+				, NULL AS HALF_GUBUN
+				, NULL AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN IN ('10', '20') AND CARD_TYPE = '1') AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN IN ('10', '20') AND CARD_TYPE = '7') AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN IN ('10', '20') AND CARD_TYPE = '2') AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN IN ('10', '20') AND CARD_TYPE IN ( '11', '13' )) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN IN ('10', '20') AND CARD_TYPE IN ( '15', '17' )) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN IN ('10', '20') AND CARD_TYPE IN ('3','4')) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN IN ('10', '20') AND CARD_TYPE NOT IN ('3', '4') ) AS TOT_AMT
+				, NULL AS ADD_AMT
+				, NULL AS ADMIN_ADD_MON
+			FROM DUAL
+
+			/* 전년도 */
+			UNION ALL SELECT 50 AS ORDER_SEQ
+				, TO_CHAR(TO_NUMBER(#searchWorkYy#) - 1) AS YY
+				, '2015' AS HALF_GUBUN
+				, 'S' AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE = '51') AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE = '53') AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE = '52') AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '54', '55' )) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '56', '57' )) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE IN ('58','59')) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE NOT IN ('58','59')) AS TOT_AMT
+            , NULL AS ADD_AMT
+            , NULL AS ADMIN_ADD_MON
+			FROM DUAL
+
+			/* 전전년도 */
+			UNION ALL SELECT 60 AS ORDER_SEQ
+				, TO_CHAR(TO_NUMBER(#searchWorkYy#) - 2) AS YY
+				, '2014' AS HALF_GUBUN
+				, 'S' AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE = '41') AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE = '43') AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE = '42') AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '44', '45' )) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '46', '47' )) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE IN ('48','49')) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE NOT IN ('48','49')) AS TOT_AMT
+            	, (SELECT MAX(APPL_MON_ADD_2014) FROM T WHERE HALF_GUBUN = '2014' AND  ADD_MON_YN = 'Y') AS ADD_AMT
+            	, NULL AS ADMIN_ADD_MON
+			FROM DUAL
+
+			/* 합계 */
+			UNION ALL SELECT 999 AS ORDER_SEQ
+				, 'SUM' AS YY
+				, NULL AS HALF_GUBUN
+				, NULL AS USE_TYPE
+				, (SELECT SUM(APPL_MON) FROM T WHERE (HALF_GUBUN IN ('10', '20') AND CARD_TYPE = '1')
+													OR (HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE = '51')
+													OR (HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE = '41')
+													) AS CARD_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE (HALF_GUBUN IN ('10', '20') AND CARD_TYPE = '7')
+													OR (HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE = '53')
+													OR (HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE = '43')
+													) AS CASH_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE (HALF_GUBUN IN ('10', '20') AND CARD_TYPE = '2')
+													OR (HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE = '52')
+													OR (HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE = '42')
+													) AS CHECK_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE (HALF_GUBUN IN ('10', '20') AND CARD_TYPE IN ( '11', '13' ))
+													OR (HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '54', '55' ))
+													OR (HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '44', '45' ))
+													) AS MARKET_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE (HALF_GUBUN IN ('10', '20') AND CARD_TYPE IN ( '15', '17' ))
+													OR (HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '56', '57' ))
+													OR (HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '46', '47' ))
+													) AS BUS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE (HALF_GUBUN IN ('10', '20') AND CARD_TYPE IN ( '3','4' ))
+													OR (HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '58', '59' ))
+													OR (HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE IN ( '48', '49' ))
+													) AS BUSINESS_AMT
+				, (SELECT SUM(APPL_MON) FROM T WHERE (HALF_GUBUN IN ('10', '20') AND CARD_TYPE NOT IN ( '3', '4' ))
+													OR (HALF_GUBUN = '2015' AND USE_TYPE = 'S' AND CARD_TYPE NOT IN ( '58', '59' ))
+													OR (HALF_GUBUN = '2014' AND USE_TYPE = 'S' AND CARD_TYPE NOT IN ( '48', '49' ))
+													) AS TOT_AMT
+				, NULL AS ADD_AMT
+				, NULL AS ADMIN_ADD_MON
+			FROM DUAL
+
+			ORDER BY ORDER_SEQ
+		]]>
+	</query>
+
+	<!-- 전년도 정보 조회 -->
+	<query id="selectPreYeaDataInfo_2014">
+		<![CDATA[
+            SELECT FUNC_COMMA( (PRE_TOT_SUM_TMP1 + (CASE WHEN PRE_TOT_SUM_TMP2 < 0 THEN 0 ELSE PRE_TOT_SUM_TMP2 END )
+                   ), 0) AS PRE_TOT_SUM --전년도 총 사용액(2014신용카드 사용액에서 2014사업관련비용을 뺀 금액이 0보다 작으면 0을 더함.)
+                 , FUNC_COMMA( BILL_SUM, 0 )   AS BILL_SUM           --현금영수증
+                 , FUNC_COMMA( CHECK_SUM, 0 )  AS CHECK_SUM          --직불카드
+                 , FUNC_COMMA( MARKET_SUM, 0 ) AS MARKET_SUM         --전통시장사용분
+                 , FUNC_COMMA( BUS_SUM, 0 )    AS BUS_SUM            --대중교통이용분
+                 , FUNC_COMMA( CHECK_BILL_SUM, 0 ) AS CHECK_BILL_SUM --체크카드 등 사용액 50%
+              FROM (
+                     SELECT NVL(SUM(CASE WHEN A.CARD_TYPE IN ('42', '43', '44', '45', '46', '47') THEN A.APPL_MON ELSE 0 END), 0) AS PRE_TOT_SUM_TMP1 -- 2014사용액(2014신용카드 제외)
+                          , ( NVL(SUM(CASE WHEN A.CARD_TYPE = '41' THEN A.APPL_MON ELSE 0 END), 0)
+                            - NVL(SUM(CASE WHEN A.CARD_TYPE = '48' THEN A.APPL_MON ELSE 0 END), 0) ) AS PRE_TOT_SUM_TMP2 --2014신용카드 사용액에서 2014사업관련비용을 뺀 금액
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE = '43' THEN A.APPL_MON ELSE 0 END), 0) AS BILL_SUM  --현금영수증
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE = '42' THEN A.APPL_MON ELSE 0 END), 0) AS CHECK_SUM --직불카드
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE IN ('44','45') THEN A.APPL_MON ELSE 0 END), 0) AS MARKET_SUM --전통시장사용분
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE IN ('46','47') THEN A.APPL_MON ELSE 0 END), 0) AS BUS_SUM    --대중교통이용분
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE IN ('42', '43', '45', '47') THEN A.APPL_MON ELSE 0 END )/2, 0) AS CHECK_BILL_SUM --체크카드 등 사용액 50%
+                       FROM TCPN821 A
+                      WHERE A.ENTER_CD        = #ssnEnterCd#
+                        AND A.WORK_YY         = #searchWorkYy#
+                        AND A.ADJUST_TYPE     = #searchAdjustType#
+                        AND A.SABUN           = #searchSabun#
+                   )
+		]]>
+	</query>
+
+	<!-- 전년도 정보 조회 -->
+	<query id="selectPreYeaDataInfo_2013">
+		<![CDATA[
+            SELECT FUNC_COMMA( (PRE_TOT_SUM_TMP1 + (CASE WHEN PRE_TOT_SUM_TMP2 < 0 THEN 0 ELSE PRE_TOT_SUM_TMP2 END )
+                   ), 0) AS PRE_TOT_SUM --전년도 총 사용액(2013신용카드 사용액에서 2013사업관련비용을 뺀 금액이 0보다 작으면 0을 더함.)
+                 , FUNC_COMMA( BILL_SUM, 0 )   AS BILL_SUM           --현금영수증
+                 , FUNC_COMMA( CHECK_SUM, 0 )  AS CHECK_SUM          --직불카드
+                 , FUNC_COMMA( MARKET_SUM, 0 ) AS MARKET_SUM         --전통시장사용분
+                 , FUNC_COMMA( BUS_SUM, 0 )    AS BUS_SUM            --대중교통이용분
+                 , FUNC_COMMA( CHECK_BILL_SUM, 0 ) AS CHECK_BILL_SUM --체크카드 등 사용액 50%
+              FROM (
+                     SELECT NVL(SUM(CASE WHEN A.CARD_TYPE IN ('21', '23', '25', '27', '29', '31') THEN A.APPL_MON ELSE 0 END), 0) AS PRE_TOT_SUM_TMP1 -- 2013사용액(2013신용카드 제외)
+                          , ( NVL(SUM(CASE WHEN A.CARD_TYPE = '19' THEN A.APPL_MON ELSE 0 END), 0)
+                            - NVL(SUM(CASE WHEN A.CARD_TYPE = '33' THEN A.APPL_MON ELSE 0 END), 0) ) AS PRE_TOT_SUM_TMP2 --2013신용카드 사용액에서 2013사업관련비용을 뺀 금액
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE = '23' THEN A.APPL_MON ELSE 0 END), 0) AS BILL_SUM  --현금영수증
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE = '21' THEN A.APPL_MON ELSE 0 END), 0) AS CHECK_SUM --직불카드
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE IN ('25','27') THEN A.APPL_MON ELSE 0 END), 0) AS MARKET_SUM --전통시장사용분
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE IN ('29','31') THEN A.APPL_MON ELSE 0 END), 0) AS BUS_SUM    --대중교통이용분
+                          , NVL(SUM(CASE WHEN A.CARD_TYPE IN ('21', '23', '27', '31') THEN A.APPL_MON ELSE 0 END )/2, 0) AS CHECK_BILL_SUM --체크카드 등 사용액 50%
+                       FROM TCPN821 A
+                      WHERE A.ENTER_CD        = #ssnEnterCd#
+                        AND A.WORK_YY         = #searchWorkYy#
+                        AND A.ADJUST_TYPE     = #searchAdjustType#
+                        AND A.SABUN           = #searchSabun#
+                   )
+		]]>
+	</query>
+
+	<!-- 본인 정보 조회 -->
+	<query id="selectOwnDataInfo">
+		<![CDATA[
+			SELECT DISTINCT F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS OWN_FAM_CD, A.FAM_NM AS CODE_NM
+				 , A.SABUN, B.SEQ, A.FAM_CD AS FAM_CD
+			  FROM TCPN823 A ,(SELECT * FROM TSYS005 WHERE ENTER_CD = #ssnEnterCd# AND GRCODE_CD='C00309') B
+			 WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.WORK_YY  	  = #searchWorkYy#
+			   AND A.ADJUST_TYPE  = #searchAdjustType#
+			   AND A.SABUN        = #searchSabun#
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.FAM_CD = B.CODE
+			   and A.FAM_CD = '0'
+			   AND A.DPNDNT_YN LIKE #searchDpndntYn# ||'%'
+			   AND A.FAM_CD NOT IN ('Z','6','7','8') -- dynamic query 보안 이슈 때문에 수정
+			 ORDER BY A.SABUN, B.SEQ
+		]]>
+	</query>
+
+	<!-- 공통코드(반기구분) -->
+	<query id="selectYeaDataCardsHalfGubun">
+		<![CDATA[
+			SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+			  FROM TSYS005
+			WHERE ENTER_CD = #ssnEnterCd#
+				AND GRCODE_CD = 'C00304'
+				AND NVL(VISUAL_YN, 'Y') = 'Y'
+				AND NVL(USE_YN, 'Y') = 'Y'
+				AND CODE IN ('10', '20', '30')
+			ORDER BY SEQ
+		]]>
+	</query>
+
+	   <!-- 공통코드(반기구분) -->
+    <query id="selectYeaDataCardsHalfGubun_BACKUP20171130">
+        <![CDATA[
+            SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+              FROM TSYS005
+            WHERE ENTER_CD = #ssnEnterCd#
+                AND GRCODE_CD = 'C00304'
+                AND NVL(VISUAL_YN, 'Y') = 'Y'
+                AND NVL(USE_YN, 'Y') = 'Y'
+                AND CODE IN ('10', '20', '30')
+                --AND (CASE
+                --  WHEN #searchYyType# IS NULL THEN 1
+                --  WHEN #searchYyType# = '0' AND CODE IN ('10', '20', '30') THEN 1 /* 당해년도 */
+                --  WHEN #searchYyType# = '-1' AND CODE IN ('2015') THEN 1 /* 전년도 */
+                --  WHEN #searchYyType# = '-2' AND CODE IN ('2014') THEN 1 /* 전전년도 */
+                --  WHEN #searchYyType# = '-99' AND CODE IN ('2014', '2015', '10', '20', '30') THEN 1 /* 전전년도 */
+                --  ELSE 0 END) = 1
+            ORDER BY SEQ
+        ]]>
+    </query>
+
+	<!-- 공통코드(신용카드구분) -->
+	<query id="selectYeaDataCardCardType">
+		<![CDATA[
+			SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+			  FROM TSYS005
+			WHERE ENTER_CD = #ssnEnterCd#
+				AND GRCODE_CD = 'C00305'
+				AND VISUAL_YN = 'Y'
+				AND USE_YN = 'Y'
+				AND NOTE1 = 'Y'
+               AND (CASE
+               		/* 23년 귀속 연말정산시 도서공연등사용분을 1-6월 / 7-12월로 나누어 공제함에 따라 해당 내용의 코드로 추가 */
+               		/* 23년 귀속 연말정산시 전통시장사용분을 1-6월 / 7-12월로 나누어 공제함에 따라 해당 내용의 코드로 추가 */
+               		/* 23년 귀속 연말정산시 대중교통이용븐 합산하여 공제함에 따라 해당 내용의 코드로 수정 */
+               		WHEN #searchYyType# = '0' AND CODE IN ('1', '2', '3', '4', '6', '7', '15', '17', '18', '35', '611', '613', '615', '617', '621', '623', '625', '627', '111', '113', '114', '121', '123', '124') THEN 1 /* 당해년도 */
+               		WHEN #searchYyType# = '-1' AND CODE IN ('51', '52', '53', '54', '55', '56', '57', '58', '59') THEN 1 /* 전년도 */
+               		WHEN #searchYyType# = '-2' AND CODE IN ('41', '42', '43', '44', '45', '46', '47', '48', '49') THEN 1 /* 전전년도 */
+               		WHEN #searchYyType# = '-99' AND CODE IN ('1', '2', '3', '4', '7', '11', '13','15', '17', '41', '42', '43', '44', '45', '46', '47', '48', '49','51', '52', '53', '54', '55', '56', '57', '58', '59','35') THEN 1 /* 전전년도 */
+               		ELSE 0 END) = 1
+			ORDER BY SEQ
+		]]>
+	</query>
+		<!-- pdf 파일 저장 (미반영 위한 용도) -->
+	<query id="updateYeaDataPdf">
+		<![CDATA[
+			UPDATE TCPN851
+			SET STATUS_CD = DECODE(#sDelete#,'1','D','')
+			  , EXCEPT_GUBUN = DECODE(#sDelete#,'1',#exceptCheck#,'')
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND SABUN = #sabun#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND WORK_YY = #work_yy#
+			  AND DOC_SEQ = #doc_seq#
+			  AND SEQ = #doc_seq_detail#
+		]]>
+	</query>
+		<!-- 추가공제율 사용분 입력 -->
+	<query id="insertDeleteYeaDataAddCards">
+		<![CDATA[
+			INSERT INTO TCPN822
+			(
+			      ENTER_CD
+				, WORK_YY
+				, ADJUST_TYPE
+				, SABUN
+				, ADD_CARD_MON
+				, ADD_DEBIT_MON
+				, ADD_CASH_MON
+				, ADMIN_REG_YN
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #add_card_mon#
+				, #add_debit_mon#
+				, #add_cash_mon#
+				, #admin_reg_yn#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 추가공제율 사용분 수정 -->
+	<query id="updateDeleteYeaDataAddCards">
+		<![CDATA[
+			UPDATE TCPN822
+				 SET   ADD_CARD_MON		= #add_card_mon#
+					 , ADD_DEBIT_MON	= #add_debit_mon#
+					 , ADD_CASH_MON		= #add_cash_mon#
+					 , ADMIN_REG_YN		= #admin_reg_yn#
+					 , CHKDATE 			= SYSDATE
+					 , CHKID			= #ssnSabun#
+			 WHERE ENTER_CD				= #ssnEnterCd#
+				 AND WORK_YY  	    	= #work_yy#
+			     AND ADJUST_TYPE    	= #adjust_type#
+			     AND SABUN          	= #sabun#
+		]]>
+	</query>
+
+	<!-- 추가공제율 사용분 삭제 (사용하지는 않으나 달아놓음)-->
+	<query id="deleteYeaDataAddCards">
+		<![CDATA[
+			DELETE FROM TCPN822 A
+			 WHERE A.ENTER_CD			= #ssnEnterCd#
+				 AND A.WORK_YY  	    = #work_yy#
+			     AND A.ADJUST_TYPE    	= #adjust_type#
+			     AND A.SABUN          	= #sabun#
+		]]>
+	</query>
+
+	<!-- 추가공제율 사용분 조회 -->
+	<query id="selectYeaDataAddCardsList">
+		<![CDATA[
+			SELECT A.WORK_YY
+				 , A.ADJUST_TYPE
+				 , A.SABUN
+				 , A.ADD_CASH_MON
+				 , A.ADD_DEBIT_MON
+				 , A.ADD_CARD_MON
+				 , A.ADMIN_REG_YN
+				 , A.ADMIN_REG_YN AS ORIGIN_ADMIN_REG_YN
+			  FROM TCPN822 A
+			 WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.WORK_YY = #searchWorkYy#
+			   AND A.ADJUST_TYPE  = #searchAdjustType#
+			   AND A.SABUN        = #searchSabun#
+		]]>
+	</query>
+
+</root>

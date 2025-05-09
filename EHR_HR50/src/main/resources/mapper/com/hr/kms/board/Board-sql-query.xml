@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kms.board">
+
+
+		<!-- BOARD INFO -->
+		<select parameterType="map" resultType="cMap" id="boardInfoMap">
+
+				<![CDATA[
+					SELECT CASE WHEN (SELECT COUNT(*)
+					                    FROM TSYS701
+					                   WHERE ENTER_CD = AA.ENTER_CD
+					                     AND BBS_CD   = AA.BBS_CD
+					                     AND GB_CD    = 'A001'
+					                     AND VALUE    = BB.SABUN
+					                     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN NVL(SDATE, TO_CHAR(SYSDATE, 'YYYYMMDD')) AND NVL(EDATE, '99991231')
+					                  ) = 0 THEN 'N'
+					             ELSE 'Y' END AS ADMIN_YN
+					       , BBS_NM,
+					       BBS_CD,
+
+					       CASE NVL(MANAGE_ALL_YN, 'N') WHEN 'Y' THEN 'Y'
+					                                    WHEN 'N' THEN CASE WHEN (SELECT COUNT(*) AS MANAGE_YN
+					                                                               FROM TSYS701 A
+					                                                              WHERE A.ENTER_CD = AA.ENTER_CD
+					                                                                AND A.BBS_CD     = AA.BBS_CD
+					                                                                AND A.GB_CD      = 'A002'
+					                                                                AND ((A.KEY = 'ORG_CD' AND A.VALUE = BB.ORG_CD)
+					                                                                     OR (A.KEY = 'WORK_TYPE' AND A.VALUE = BB.WORK_TYPE)
+					                                                                     OR (A.KEY = 'JIKCHAK_CD' AND A.VALUE = BB.JIKCHAK_CD))
+					                                                             ) = 0 THEN 'N'
+					                                                       ELSE 'Y' END
+					        END AS MANAGE_YN,
+
+					        CASE NVL(SEARCH_ALL_YN, 'N') WHEN 'Y' THEN 'Y'
+					                                     WHEN 'N' THEN NVL(F_COM_GET_SEARCH_SEQ_YN(AA.ENTER_CD, TRIM('081262'), AA.SEARCH_ALL_SEQ, TO_CHAR(SYSDATE, 'YYYYMMDD')), 'N')
+					         END AS SEARCH_YN,
+					       NVL(REPLY_YN, 'N') AS REPLY_YN,
+					       NVL(NOTIFY_YN, 'N') AS NOTIFY_YN,
+					       NVL(COMMENT_YN,'N') AS COMMENT_YN,
+					       NVL(FILE_YN, 'N') AS FILE_YN,
+					       NVL(CONTACT_YN, 'N') AS CONTACT_YN,
+					       NVL(TAG_YN, 'N') AS TAG_YN,
+					       NVL(HEAD_YN, 'N') AS HEAD_YN,
+
+					       CASE WHEN NVL(HEAD_YN, 'N') = 'N' THEN ''
+					            ELSE (SELECT NVL(VALUE, 'N')
+					                    FROM TSYS701 A
+					                   WHERE A.ENTER_CD = AA.ENTER_CD
+					                     AND A.BBS_CD   = AA.BBS_CD
+					                     AND A.GB_CD    = 'A005'
+					                     AND ROWNUM = 1)
+					        END AS HEAD,
+					       (SELECT DECODE(VALUE, NULL, NULL, VALUE ||',')
+					          FROM TSYS701 A
+					         WHERE A.ENTER_CD = AA.ENTER_CD
+					           AND A.BBS_CD   = AA.BBS_CD
+					           AND A.GB_CD    = 'A009'
+					           AND ROWNUM = 1) AS BBS_SORT
+					  FROM TSYS700 AA, (SELECT ENTER_CD, SABUN, ORG_CD AS ORG_CD, WORK_TYPE AS WORK_TYPE, JIKCHAK_CD AS JIKCHAK_CD
+					                      FROM THRM151
+					                     WHERE ENTER_CD   = #{ssnEnterCd}
+					                       AND SABUN        = #{ssnSabun}
+					                       AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231') ) BB
+					 WHERE AA.ENTER_CD = BB.ENTER_CD
+					   AND AA.ENTER_CD = #{ssnEnterCd}
+					   AND AA.BBS_CD   = #{bbsCd}
+				]]>
+			
+			
+		</select>
+
+		<!-- 타이틀 -->
+		<select parameterType="map" resultType="cMap"  id="boardInfoTitleMap">
+
+				<![CDATA[
+				SELECT BBS_NM FROM TSYS700
+				 WHERE ENTER_CD      = #{ssnEnterCd}
+				   AND BBS_CD        = #{bbsCd}
+				]]>
+
+			
+		</select>
+
+		<!-- User  정부 -->
+		<select parameterType="map" resultType="cMap"  id="boardInfoUserMap">
+				<![CDATA[
+				SELECT C.ORG_CD AS ORG_CD, C.JOB_CD AS JOB_CD,C.JIKCHAK_CD AS JIKCHAK_CD
+				FROM  THRM151 C
+				WHERE  C.ENTER_CD   = #{ssnEnterCd}
+					AND  C.SABUN 	= #{ssnSabun}
+					AND  TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				]]>
+		</select>
+
+		<!--조회 -->
+		<select parameterType="map" resultType="cMap" id="getBoardList">
+
+				<![CDATA[
+				SELECT
+					CASE WHEN INSTR(RK, 'A') > 0 THEN '공지' ELSE RK END AS RN,
+					TA.RK,
+					TA.BBS_CD,
+					TA.BBS_NM,
+					TA.BBS_SEQ,
+					TA.SABUN,
+					TA.WRITER,
+					TA.DEPTH,
+					TA.TITLE||(CASE WHEN NVL(TA.COMMENTS_CNT,0) > 0 THEN '&nbsp;&nbsp;&nbsp;<b>('||TA.COMMENTS_CNT||')</b>' ELSE '' END) AS TITLE,
+					TA.CONTENTS ,
+					TA.REG_DATE ,
+					TA.VIEW_COUNT,
+					TA.SDATE,
+					TA.EDATE,
+					TA.PRIOR_BBS_SEQ,
+					TA.MASTER_BBS_SEQ,
+					TA.ENTER_CD,
+					TA.FILE_CNT,
+					TA.HEAD ,
+					TA.CONTACT ,
+					TA.TOP_NOTIFY_YN,
+					TA.NOTIFY_SDATE,
+					TA.NOTIFY_EDATE,
+					TA.COMMENTS_CNT,
+					REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{"bbsSeq":"'|| TA.BBS_SEQ ||'","bbsCd":"'|| TA.BBS_CD ||'"}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'')AS BURL
+				FROM (
+					/*상단공지*/
+					SELECT 'A'||RANK () OVER ( ORDER BY ]]>
+			<if test='bbsSort != null and !bbsSort.equals("")'>
+			<foreach collection="bbsSort" item="item" index="index" close="," separator=",">
+				#{item}
+			</foreach>
+			</if>
+			<![CDATA[ A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ(A.ENTER_CD,A.BBS_CD,A.BBS_SEQ))/10 AS RK
+					, A.BBS_CD
+					, B.BBS_NM
+						, A.BBS_SEQ, A.SABUN, F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)|| ' ' || F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.REG_DATE) AS WRITER, A.DEPTH
+						, (SUBSTR('        ',0,DEPTH*2))||DECODE(A.DEPTH, '0','','└RE:')|| DECODE(A.HEAD , NULL,  ('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;')||A.TITLE ,'['|| A.HEAD ||']' ||A.TITLE ) AS TITLE, '' CONTENTS, TO_CHAR(A.CHKDATE,'YYYY-MM-DD') AS REG_DATE
+						, A.VIEW_COUNT, A.SDATE, A.EDATE, A.PRIOR_BBS_SEQ, A.MASTER_BBS_SEQ, A.ENTER_CD
+						, DECODE( (SELECT COUNT(*) FROM TSYS201
+										WHERE ENTER_CD = A.ENTER_CD
+											AND FILE_SEQ = A.FILE_SEQ), 0, '', 0) AS  FILE_CNT
+						, HEAD , CONTACT
+						, A.TOP_NOTIFY_YN
+						, A.NOTIFY_SDATE
+						, A.NOTIFY_EDATE
+						, ( CASE WHEN NVL(B.COMMENT_YN, 'N') = 'Y'
+			                     THEN ( SELECT COUNT(*)
+			                              FROM TSYS730
+								         WHERE ENTER_CD = A.ENTER_CD
+									       AND BBS_CD = A.BBS_CD
+									       AND BBS_SEQ = A.BBS_SEQ )
+			                     ELSE 0 END ) AS  COMMENTS_CNT
+					FROM TSYS710 A, TSYS700 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.BBS_CD = B.BBS_CD
+					AND A.ENTER_CD   = TRIM(#{ssnEnterCd})
+					AND A.BBS_CD = TRIM(#{bbsCd})
+					]]>
+					<if test='searchWord != null and !chkField.equals("")'>
+				  <![CDATA[
+										AND (
+								DECODE(#{searchTitle}, 'ALL', TITLE, 'TITLE', TITLE, '') LIKE '%' || DECODE(#{searchTitle}, 'ALL', #{searchWord}, 'TITLE', #{searchWord}, '') || '%'
+						OR DECODE(#{searchContents}, 'ALL', TO_CHAR(BBS_SEQ), 'CONTENTS', TO_CHAR(BBS_SEQ), '') IN (SELECT TO_CHAR(BBS_SEQ) FROM TSYS710 WHERE DECODE(#{searchContents}, 'ALL', DBMS_LOB.INSTR(CONTENTS, #{searchWord}), 'CONTENTS', DBMS_LOB.INSTR(CONTENTS, #{searchWord}), 0) > 0)
+						OR DECODE(#{searchName}, 'ALL', A.SABUN, 'NAME', A.SABUN, '') IN  (SELECT F_COM_GET_NAMES(ENTER_CD,SABUN) FROM THRM100 WHERE F_COM_GET_NAMES(ENTER_CD,SABUN) LIKE '%' || DECODE(#{searchName}, 'ALL', #{searchWord}, 'NAME', #{searchWord}, 'NULL') || '%')
+					)
+										        ]]>
+					</if>
+	<![CDATA[
+									AND 'Y' = NVL((SELECT 'N' AS BBS_CD FROM TSYS750 WHERE SABUN = TRIM(#{ssnSabun}) AND BBS_CD = A.BBS_CD),'Y')
+									/*조회권한Check*/
+									AND ('Y' = CASE WHEN SEARCH_ALL_YN = 'Y' THEN 'Y' ELSE NVL(F_COM_GET_SEARCH_SEQ_YN(B.ENTER_CD, TRIM(#{ssnSabun}), B.SEARCH_ALL_SEQ, TO_CHAR(sysdate, 'YYYYMMDD')), 'N') END
+											OR (SELECT COUNT(*) FROM TSYS701 X WHERE ENTER_CD = A.ENTER_CD AND BBS_CD = A.BBS_CD AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231') AND KEY = 'SABUN' AND VALUE=#{ssnSabun} ) > 0
+											)
+									AND ('Y' = #{searchYn} OR 'Y' = #{adminYn})
+									AND TOP_NOTIFY_YN = 'Y'
+									UNION ALL
+									/*게시물*/
+					SELECT ''||RANK () OVER ( ORDER BY
+					]]>
+	    <if test='bbsSort != null and !bbsSort.equals("")'>
+		<foreach collection="bbsSort" item="item" index="index"  close="," separator=",">
+				#{item}
+		</foreach>
+		</if>
+			<![CDATA[
+					A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ(A.ENTER_CD,A.BBS_CD,A.BBS_SEQ)) AS RK
+					, A.BBS_CD,B.BBS_NM
+						, A.BBS_SEQ, A.SABUN, F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)|| ' ' || F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, A.REG_DATE) AS WRITER, A.DEPTH
+						, (SUBSTR('        ',0,DEPTH*2))||DECODE(A.DEPTH, '0','','└RE:')|| DECODE(A.HEAD , NULL,  (CASE WHEN SYSDATE < (TO_DATE(SUBSTR(A.REG_DATE,1,8), 'YYYYMMDD')+NVL(F_COM_GET_STD_CD_VALUE(TRIM(#{ssnEnterCd}), 'BBS_NEW_DAYS'),'0')) THEN '&nbsp;<img src="/common/images/icon/ico_new.gif"/>&nbsp;' ELSE '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' END)||A.TITLE ,'['|| A.HEAD ||']' ||A.TITLE ) AS TITLE, '' CONTENTS, TO_CHAR(A.CHKDATE,'YYYY-MM-DD') AS REG_DATE
+						, A.VIEW_COUNT, A.SDATE, A.EDATE, A.PRIOR_BBS_SEQ, A.MASTER_BBS_SEQ, A.ENTER_CD
+						, DECODE( (SELECT COUNT(*) FROM TSYS201
+										WHERE ENTER_CD = A.ENTER_CD
+											AND FILE_SEQ = A.FILE_SEQ), 0, '', 0) AS  FILE_CNT
+						, HEAD , CONTACT
+						, A.TOP_NOTIFY_YN
+						, A.NOTIFY_SDATE
+						, A.NOTIFY_EDATE
+						, ( CASE WHEN NVL(B.COMMENT_YN, 'N') = 'Y'
+			                     THEN ( SELECT COUNT(*)
+					                      FROM TSYS730
+								         WHERE ENTER_CD = A.ENTER_CD
+									       AND BBS_CD = A.BBS_CD
+									       AND BBS_SEQ = A.BBS_SEQ )
+			                     ELSE 0 END ) AS COMMENTS_CNT
+					FROM TSYS710 A, TSYS700 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.BBS_CD = B.BBS_CD
+					AND A.ENTER_CD   = TRIM(#{ssnEnterCd})
+					AND A.BBS_CD = TRIM(#{bbsCd})
+					        ]]>
+					<if test='searchWord != null and !chkField.equals("")'>
+				  <![CDATA[
+					AND (
+								DECODE(#{searchTitle}, 'ALL', TITLE, 'TITLE', TITLE, '') LIKE '%' || DECODE(#{searchTitle}, 'ALL', #{searchWord}, 'TITLE', #{searchWord}, '') || '%'
+						OR DECODE(#{searchContents}, 'ALL', TO_CHAR(BBS_SEQ), 'CONTENTS', TO_CHAR(BBS_SEQ), '') IN (SELECT TO_CHAR(BBS_SEQ) FROM TSYS710 WHERE DECODE(#{searchContents}, 'ALL', DBMS_LOB.INSTR(CONTENTS, #{searchWord}), 'CONTENTS', DBMS_LOB.INSTR(CONTENTS, #{searchWord}), 0) > 0)
+						OR DECODE(#{searchName}, 'ALL', A.SABUN, 'NAME', A.SABUN, '') IN  (SELECT F_COM_GET_NAMES(ENTER_CD,SABUN) FROM THRM100 WHERE F_COM_GET_NAMES(ENTER_CD,SABUN) LIKE '%' || DECODE(#{searchName}, 'ALL', #{searchWord}, 'NAME', #{searchWord}, 'NULL') || '%')
+					)
+					        ]]>
+					</if>
+									AND 'Y' = NVL((SELECT 'N' AS BBS_CD FROM TSYS750 WHERE SABUN = TRIM(#{ssnSabun}) AND BBS_CD = A.BBS_CD),'Y')
+									/*조회권한Check*/
+									AND ('Y' = CASE WHEN SEARCH_ALL_YN = 'Y' THEN 'Y' ELSE NVL(F_COM_GET_SEARCH_SEQ_YN(B.ENTER_CD, TRIM(#{ssnSabun}), B.SEARCH_ALL_SEQ, TO_CHAR(sysdate, 'YYYYMMDD')), 'N') END
+											OR (SELECT COUNT(*) FROM TSYS701 X WHERE ENTER_CD = A.ENTER_CD AND BBS_CD = A.BBS_CD AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231') AND KEY = 'SABUN' AND VALUE=#{ssnSabun} ) > 0
+											)
+									AND ('Y' = #{searchYn} OR 'Y' = #{adminYn})
+				)TA
+				--ORDER BY TA.MASTER_BBS_SEQ DESC ,  F_SYS_BULLETIN_BOARD_LEVEL_SEQ(TA.ENTER_CD,TA.BBS_CD,TA.BBS_SEQ)
+		</select>
+
+		<!-- 내용  -->
+		<select parameterType="map" resultType="cMap" id="writeYn">
+
+				<![CDATA[
+					SELECT CASE WHEN A.MANAGE_ALL_YN = 'Y' THEN 'Y' ELSE NVL(F_COM_GET_SEARCH_SEQ_YN(A.ENTER_CD, TRIM(#{ssnSabun}), A.MANAGE_ALL_SEQ, TO_CHAR(sysdate, 'YYYYMMDD')), 'N') END AS yn
+					FROM TSYS700 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.BBS_CD   = #{bbsCd}
+					AND ROWNUM =1
+				]]>
+
+			
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="adminYn">
+
+				<![CDATA[
+					SELECT CASE WHEN COUNT(*)=0 THEN 'N' ELSE 'Y' END AS yn
+					FROM TSYS701 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.BBS_CD   = #{bbsCd}
+					AND A.VALUE = TRIM(#{ssnSabun})
+					AND ROWNUM =1
+				]]>
+
+			
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="checkYn">
+
+				<![CDATA[
+
+					WITH CHKT AS (
+					SELECT (
+					      SELECT CASE WHEN COUNT(*)=0 THEN 0 ELSE 1 END AS YN
+					      FROM TSYS701 A
+					      WHERE A.ENTER_CD 	= #{ssnEnterCd}
+					      AND A.BBS_CD   	= #{bbsCd}
+					      AND A.VALUE 		= #{ssnSabun}
+					      AND ROWNUM 		= 1 ) A, --관리자
+					      (SELECT DECODE(
+					              NVL(F_COM_GET_SEARCH_SEQ_YN( A.ENTER_CD
+					                                          , #{ssnSabun}
+					                                          , A.MANAGE_ALL_SEQ, TO_CHAR(SYSDATE, 'YYYYMMDD')), 'N'), 'Y',1, 0) AS YN
+					       FROM TSYS700 A
+					       WHERE A.ENTER_CD = #{ssnEnterCd}
+					       AND A.BBS_CD   = #{bbsCd}
+					       AND ROWNUM =1) B, --검색조건
+					      NVL((
+					      SELECT DECODE(A.CHKID,#{ssnSabun}, 1, 0)  AS YN
+					      FROM TSYS710 A
+					      WHERE A.ENTER_CD 	= #{ssnEnterCd}
+					      AND A.BBS_CD   	= #{bbsCd}
+					      AND A.BBS_SEQ  	= #{bbsSeq}  ),0) C -- 작성자
+					     ,(
+					      SELECT DECODE(A.MANAGE_ALL_YN,'Y',1, 0)  AS YN
+					      FROM TSYS700 A
+					      WHERE A.ENTER_CD 	= #{ssnEnterCd}
+					      AND A.BBS_CD   	= #{bbsCd}
+					      AND ROWNUM 		= 1 ) D  --전체 사용자 체크
+						, (
+						   SELECT DECODE(NVL(F_COM_GET_SEARCH_SEQ_YN( A.ENTER_CD, #{ssnSabun}, A.SEARCH_ALL_SEQ, TO_CHAR(SYSDATE, 'YYYYMMDD')), 'N'), 'Y', 1, 0) AS YN
+							 FROM TSYS700 A
+							WHERE A.ENTER_CD = #{ssnEnterCd}
+					          AND A.BBS_CD = #{bbsCd}
+					          AND ROWNUM = 1
+						   ) E -- 조회권한 대상자검색조건
+						, (
+					       SELECT DECODE(A.SEARCH_ALL_YN, 'Y', 1, 0) AS YN
+					         FROM TSYS700 A
+					        WHERE A. ENTER_CD = #{ssnEnterCd}
+					          AND A.BBS_CD = #{bbsCd}
+					          AND ROWNUM = 1
+					      )F
+                       ,TRIM(#{bbsPg}) AS STATUS  --게시판 상태
+                  FROM DUAL
+                  )
+                  SELECT DECODE(DM, 1, 'Y','N') AS YN
+                  FROM (
+                  SELECT CASE   WHEN status = 'L' THEN   CASE  WHEN (a + b + d + e + f) > 0 THEN 1 --관리자 , 검색조건 , 누구나 (입력버튼)
+                                                               ELSE 0
+                                                         END
+                                WHEN status = 'R' THEN   CASE  WHEN (a+ b)> 0 THEN 1
+                                                               WHEN (c + d) >1 THEN 1 -- 누구나 , 작성자
+                                                               ELSE 0
+                                                         END
+                                WHEN status = 'W' THEN  CASE  WHEN (a+ b)> 0 THEN 1
+                                                              WHEN  d > 0  THEN 1 --누구나
+                                                              ELSE 0
+                                                         END
+                                WHEN status = 'S' THEN  CASE  WHEN (a+ b)> 0 THEN 1
+                                                              WHEN  d > 0  THEN 1 --누구나
+                                                              ELSE 0
+                                                         END
+                                ELSE 	  CASE  WHEN (a+ b)> 0 THEN 1
+                                              ELSE 0
+                                        END
+                          END AS DM
+                  FROM CHKT)
+
+				]]>
+
+			
+		</select>
+
+
+
+		<!-- 댓글여부  -->
+		<select parameterType="map" resultType="cMap" id="commentYn">
+
+				<![CDATA[
+					SELECT  NVL(COMMENT_YN,'N') AS yn
+					FROM TSYS700 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.BBS_CD   = #{bbsCd}
+					AND ROWNUM =1
+				]]>
+
+			
+		</select>
+
+		<!-- 넘겨주는값 암호화   -->
+		<select parameterType="map" resultType="cMap"  id="boardCdEncrypt">
+
+				<![CDATA[
+					SELECT  REPLACE(REPLACE(ISU_BLOCK_ENCRYPT('{"bbsSeq":"'|| #{bbsSeq} ||'","bbsCd":"'|| #{bbsCd} ||'"}', #{ssnEncodedKey}) ,CHR(13),''),CHR(10),'')AS BURL
+					FROM DUAL
+				]]>
+
+			
+		</select>
+
+
+		<!-- 내용  -->
+		<select parameterType="map" resultType="cMap" id="tsys710SelectBoardMap">
+
+				<![CDATA[
+					SELECT A.BBS_CD, A.BBS_SEQ, A.SABUN, F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS NAME
+							, DECODE(A.HEAD , NULL,  A.TITLE ,'['|| A.HEAD ||']' ||A.TITLE )AS TITLE
+							, TO_CHAR(TO_DATE(A.REG_DATE,'YYYYMMDDHH24MISS'),'YYYY-MM-DD HH24:MI') AS REG_DATE
+							, A.VIEW_COUNT, A.SDATE, A.EDATE, A.PRIOR_BBS_SEQ, A.MASTER_BBS_SEQ, A.DEPTH
+							, A.ENTER_CD
+							, (SELECT COUNT(*) FROM TSYS201
+									WHERE ENTER_CD = A.ENTER_CD
+									AND FILE_SEQ = A.FILE_SEQ) AS  FILE_CNT
+							, '0'  AS COMMENTS_CNT
+							,  CASE WHEN A.NOTIFY_SDATE IS NOT NULL AND A.NOTIFY_EDATE IS NOT NULL THEN
+								TO_CHAR(TO_DATE(A.NOTIFY_SDATE, 'YYYYMMDD'),'YYYY-MM-DD')||' ~ '||TO_CHAR(TO_DATE(A.NOTIFY_EDATE, 'YYYYMMDD'),'YYYY-MM-DD')
+								ELSE '' END AS NOTIFY_TERM
+							, A.POP_NOTIFY_YN
+							, A.TOP_NOTIFY_YN
+							, A.NOTIFY_SDATE
+							, A.NOTIFY_EDATE
+							, A.CONTENTS , A.HEAD, A.TAG, A.CONTACT, NVL(FILE_SEQ,0) AS FILE_SEQ
+					FROM TSYS710 A, TSYS700 B
+					WHERE A.BBS_CD = B.BBS_CD
+					AND A.ENTER_CD = B.ENTER_CD
+					AND A.ENTER_CD = #{ssnEnterCd}
+					AND A.BBS_CD   = #{bbsCd}
+					AND A.BBS_SEQ  = #{bbsSeq}
+					AND ROWNUM =1
+				]]>
+
+			
+		</select>
+
+
+		<!-- 생성 -->
+		<update parameterType="map" id="tsys710SaveEmptyClob">
+
+				<![CDATA[
+						MERGE INTO TSYS710 T
+					USING	(
+							SELECT
+										MASTER_BBS_SEQ
+									, PRIOR_BBS_SEQ
+									, BBS_SEQ
+									, DEPTH
+									, SABUN
+									, HEAD
+									, CONTACT
+									, TAG
+									, TITLE
+									, REG_DATE
+									, VIEW_COUNT
+									, SDATE
+									, EDATE
+									, FILE_SEQ
+									, POP_NOTIFY_YN
+									, TOP_NOTIFY_YN
+									, NOTIFY_SDATE
+									, NOTIFY_EDATE
+							FROM	(
+									SELECT    TO_NUMBER(NVL(#{masterBbsSeq}, TRIM( #{bbsSeq} ))) AS MASTER_BBS_SEQ
+											, NVL(#{priorBbsSeq}, 0 )	AS PRIOR_BBS_SEQ
+											, TO_NUMBER(TRIM( #{bbsSeq} ))	AS BBS_SEQ
+											, NVL(#{depth}, 0 )	AS DEPTH
+											, TRIM( #{ssnSabun} )	AS SABUN
+											, TRIM( #{boardHeadNm} )AS HEAD
+											, TRIM( #{contact} )	AS CONTACT
+											, TRIM( #{boardTag} )	AS TAG
+											, TRIM( #{title} )	AS TITLE
+											, TO_CHAR(SYSDATE,'yyyymmddhh24miss')AS REG_DATE
+											, 0	AS VIEW_COUNT
+											, TO_CHAR(SYSDATE,'yyyymmdd') AS SDATE
+											, TO_CHAR(SYSDATE,'yyyymmdd') AS EDATE
+											, TRIM( #{fileSeq} ) AS FILE_SEQ
+											, TRIM( #{popNotifyYn} ) AS POP_NOTIFY_YN
+											, TRIM( #{topNotifyYn} ) AS TOP_NOTIFY_YN
+											, REPLACE(TRIM( #{notifySdate} ),'-','') AS NOTIFY_SDATE
+											, REPLACE(TRIM( #{notifyEdate} ),'-','') AS NOTIFY_EDATE
+											FROM   DUAL
+									)  WHERE BBS_SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= #{ssnEnterCd}
+					AND  T.BBS_CD       = #{bbsCd}
+					AND  T.BBS_SEQ      = #{bbsSeq}
+					)
+					WHEN MATCHED THEN
+						UPDATE SET
+										T.HEAD 	= S.HEAD
+									, T.CONTACT = S.CONTACT
+									, T.TITLE 	= S.TITLE
+									, T.TAG		= S.TAG
+									, T.CONTENTS= EMPTY_CLOB()
+									, T.FILE_SEQ= S.FILE_SEQ
+									, T.POP_NOTIFY_YN = S.POP_NOTIFY_YN
+									, T.TOP_NOTIFY_YN = S.TOP_NOTIFY_YN
+									, T.NOTIFY_SDATE = S.NOTIFY_SDATE
+									, T.NOTIFY_EDATE = S.NOTIFY_EDATE
+									, T.CHKDATE = SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+
+								T.ENTER_CD
+							, T.BBS_CD
+							, T.MASTER_BBS_SEQ
+							, T.PRIOR_BBS_SEQ
+							, T.BBS_SEQ
+							, T.DEPTH
+							, T.SABUN
+							, T.HEAD
+							, T.CONTACT
+							, T.TAG
+							, T.TITLE
+							, T.CONTENTS
+							, T.REG_DATE
+							, T.VIEW_COUNT
+							, T.SDATE
+							, T.EDATE
+							, T.POP_NOTIFY_YN
+							, T.TOP_NOTIFY_YN
+							, T.NOTIFY_SDATE
+							, T.NOTIFY_EDATE
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+
+						)
+						VALUES
+						(
+								#{ssnEnterCd}
+							, #{bbsCd}
+							, S.MASTER_BBS_SEQ
+							, S.PRIOR_BBS_SEQ
+							, S.BBS_SEQ
+							, S.DEPTH
+							, S.SABUN
+							, S.HEAD
+							, S.CONTACT
+							, S.TAG
+							, S.TITLE
+							, EMPTY_CLOB()
+							, S.REG_DATE
+							, S.VIEW_COUNT
+							, S.SDATE
+							, S.EDATE
+							, S.POP_NOTIFY_YN
+							, S.TOP_NOTIFY_YN
+							, S.NOTIFY_SDATE
+							, S.NOTIFY_EDATE
+							, S.FILE_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+				]]>
+
+			
+		</update>
+
+		<update parameterType="map" id="tsys710UpdateBoard">
+
+				<![CDATA[
+						UPDATE TSYS710
+						SET	CONTENTS  		= #{content}
+						WHERE 	ENTER_CD 	= #{ssnEnterCd}
+						AND		BBS_SEQ 	= #{bbsSeq}
+
+				]]>
+
+		</update>
+
+
+
+		<!-- 삭제 -->
+		<delete parameterType="map" id="tsys710DeleteBoardSeq">
+
+				<![CDATA[
+					DELETE FROM TSYS710
+					WHERE BBS_SEQ     = #{bbsSeq}
+				]]>
+
+			
+		</delete>
+
+
+
+		<!-- 이전/다음 -->
+		<select parameterType="map" resultType="cMap" id="tsys710SelectPrevNext">
+
+				<![CDATA[
+					SELECT NVL(PREV_SEQ,'') AS PREV_SEQ, NVL(NEXT_SEQ,'') AS NEXT_SEQ
+					FROM (SELECT BBS_SEQ,
+									LAG(BBS_SEQ, 1, NULL) OVER (ORDER BY ]]>
+			<if test='bbsSort != null and !bbsSort.equals("")'>
+			<foreach collection="bbsSort" item="item" index="index"  close="," separator=",">
+				#{item}
+			</foreach>
+			</if>
+			<![CDATA[ MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ(ENTER_CD,BBS_CD,BBS_SEQ))AS NEXT_SEQ,
+									LEAD(BBS_SEQ, 1, NULL) OVER (ORDER BY ]]>
+			<if test='bbsSort != null and !bbsSort.equals("")'>
+			<foreach collection="bbsSort" item="item" index="index"  close="," separator=",">
+				#{item}
+			</foreach>
+			</if>
+			<![CDATA[ MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ(ENTER_CD,BBS_CD,BBS_SEQ))AS PREV_SEQ
+							FROM TSYS710
+							WHERE ENTER_CD  = #{ssnEnterCd}
+							AND BBS_CD  = #{bbsCd}
+						)
+					WHERE BBS_SEQ = #{bbsSeq}
+				]]>
+
+			
+		</select>
+
+		<!-- emileageMgr [bbsSeq is Unique ==> enterCd xxxx ] -->
+		<update parameterType="map" id="tsys710UpdatemileageMgr">
+
+				<![CDATA[
+					UPDATE TSYS710  SET
+					VIEW_COUNT  = NVL(VIEW_COUNT,0)+ 1
+					WHERE BBS_SEQ     = #{bbsSeq}
+				]]>
+
+			
+		</update>
+
+
+		<!-- 타이틀 -->
+		<select parameterType="map" resultType="cMap" id="getCmtList">
+
+				<![CDATA[
+				SELECT A.BBS_CD, A.BBS_SEQ, A.COMMENTS_SEQ, A.SABUN, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS') AS EMP_ALIAS
+					, A.COMMENTS
+					, TO_CHAR(A.CHKDATE, 'YY.MM.DD HH24:mi') AS CHKDATE
+				FROM TSYS730 A, THRM100 B
+				WHERE A.ENTER_CD = B.ENTER_CD
+					AND A.SABUN = B.SABUN
+					AND A.ENTER_CD      = #{ssnEnterCd}
+					AND A.BBS_CD        = #{bbsCd}
+					AND A.BBS_SEQ	   = #{bbsSeq}
+				ORDER BY  A.COMMENTS_SEQ DESC
+				]]>
+
+			
+		</select>
+
+		<insert parameterType="map" id="saveCmt">
+
+				<![CDATA[
+						INSERT INTO TSYS730(ENTER_CD, SABUN, BBS_SEQ, COMMENTS_SEQ, COMMENTS, CHKDATE, CHKID, BBS_CD)
+						VALUES(#{ssnEnterCd}, #{ssnSabun}, #{bbsSeq}, BOARD_COMTSEQ.nextval, #{comments}, sysdate, #{ssnSabun}, #{bbsCd})
+
+				]]>
+
+			
+		</insert>
+
+		<delete parameterType="map" id="delCmt">
+
+				<![CDATA[
+						DELETE TSYS730 WHERE ENTER_CD = #{ssnEnterCd} AND BBS_CD = #{bbsCd} AND COMMENTS_SEQ = #{commentsSeq}
+						   AND SABUN = #{ssnSabun}
+				]]>
+
+			
+		</delete>
+
+
+
+		<!-- 댓글 작성 가능여부 -->
+		<select parameterType="map" resultType="cMap" id="getEnableWriteComment">
+			<![CDATA[
+				SELECT ( CASE WHEN NVL(A.USE_YN, 'Y') = 'N' THEN 'N' -- 게시판 사용안함이면 댓글X
+							  ELSE NVL(A.COMMENT_YN, 'N') -- 댓글기능 사용 여부로 댓글 작성여부 판단
+				         END ) AS COMMENT_YN
+				  FROM TSYS700 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.BBS_CD   = #{bbsCd}
+				   AND ROWNUM = 1
+			]]>
+		</select>
+
+	
+</mapper>

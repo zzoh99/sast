@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.capacity.orgPersonalManageAdmin">
+
+		<select parameterType="map" resultType="cMap" id="getOrgPersonalManageAdminList">
+
+				<![CDATA[
+				SELECT ENTER_CD,
+					   SABUN,
+				       NAME,
+					   ORG_CD,
+				       ORG_NM,
+				       ORG_SDATE,
+				       ORG_EDATE,
+				       JIKWEE_NM,
+				       JIKCHAK_NM,
+				       JOB_NM,
+				       F_HRM_GET_ORD_DETAIL_NM_LIST,
+				       SDATE,
+				       EDATE,
+				       CURR_JIKWEE_NM,
+				       CURR_JIKCHAK_NM,
+				       NVL(CURR_ORG_NM, F_COM_GET_ORG_NM21(ENTER_CD,SABUN,CURR_ORG_YMD)) AS CURR_ORG_NM,
+				       CURR_JOB_NM,
+				       CURR_STATUS_NM,
+				       EMP_YMD,
+				       RET_YMD
+				  FROM
+				       (SELECT A.ENTER_CD,
+				              B.SABUN,
+				              C.NAME,
+				              F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN,B.SDATE) AS JIKWEE_NM,
+				              F_COM_GET_JIKCHAK_NM(B.ENTER_CD, B.SABUN,B.SDATE) AS JIKCHAK_NM,
+				              A.ORG_CD,
+				              A.ORG_NM,
+				              A.SDATE AS ORG_SDATE,
+				              NVL(A.EDATE,'99991231') AS ORG_EDATE,
+				              F_COM_GET_JOB_NM(B.ENTER_CD, B.JOB_CD,B.SDATE) AS JOB_NM,
+				              F_HRM_GET_ORD_DETAIL_NM_LIST(B.ENTER_CD,B.SABUN,B.SDATE) AS F_HRM_GET_ORD_DETAIL_NM_LIST,
+				              B.SDATE,
+				              NVL(B.EDATE,'99991231') AS EDATE,
+				              F_COM_GET_JIKWEE_NM(B.ENTER_CD, B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CURR_JIKWEE_NM,
+				              F_COM_GET_JIKCHAK_NM(B.ENTER_CD, B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CURR_JIKCHAK_NM,
+				              F_COM_GET_ORG_NM21(B.ENTER_CD, B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CURR_ORG_NM,
+				              F_COM_GET_JOB_NM(B.ENTER_CD, B.JOB_CD,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CURR_JOB_NM,
+				              F_COM_GET_STATUS_NM(B.ENTER_CD, B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CURR_STATUS_NM,
+				              C.EMP_YMD,
+				              C.RET_YMD,
+				              F_COM_GET_CURR_ORG_YMD(B.ENTER_CD,B.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS CURR_ORG_YMD
+				              ]]>
+<choose><when test='  (searchSdate != null and !searchSdate.equals("")) and (searchEdate != null and !searchEdate.equals("")) and searchSdate.equals(searchEdate)  '>
+				         FROM 	(   SELECT 	SUB1.*
+	        								FROM 	TORG101 SUB1,
+									        		(  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, ORG_CD
+									           			FROM 	TORG101
+									           			WHERE 	ENTER_CD = #{ssnEnterCd}
+									        			AND 	REPLACE( #{searchSdate}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+									           			GROUP BY ENTER_CD, ORG_CD) SUB2
+									        WHERE 	SUB1.ENTER_CD = #{ssnEnterCd}
+									        AND 	SUB1.ENTER_CD = SUB2.ENTER_CD
+									        AND 	SUB1.ORG_CD     = SUB2.ORG_CD
+									        AND 	SUB1.SDATE    = SUB2.SDATE		 ) A
+							,	(   SELECT 	SUB1.*
+									FROM 	THRM151 SUB1,
+											(  	SELECT 	MAX(SDATE) AS SDATE, ENTER_CD, SABUN
+									   			FROM 	THRM151
+								 	   			WHERE 	ENTER_CD = #{ssnEnterCd}
+												AND 	REPLACE( #{searchSdate}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+								 	   			GROUP BY ENTER_CD, SABUN) SUB2
+								    WHERE 	SUB1.ENTER_CD   = #{ssnEnterCd}
+									AND 	SUB1.ENTER_CD	= SUB2.ENTER_CD
+									AND 	SUB1.SABUN	    = SUB2.SABUN
+									AND 	SUB1.SDATE      = SUB2.SDATE		) B,
+		</when>
+				             <when test=' (searchSdate != null and !searchSdate.equals("")) and (searchEdate != null and !searchEdate.equals("")) != null and !searchSdate.equals(searchEdate)  '>
+				             <![CDATA[
+						FROM 	(  SELECT 	*
+									FROM 	TORG101
+									WHERE 	ENTER_CD = #{ssnEnterCd}
+									AND 	(
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') <= SDATE AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') >= SDATE )
+												 OR
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') <= NVL(EDATE,'99991231') AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') >= NVL(EDATE,'99991231') )
+												 OR
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') <= SDATE AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') >= NVL(EDATE,'99991231') )
+												 OR
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') >= SDATE AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') <= NVL(EDATE,'99991231') )
+											) ) A
+							,	(  SELECT 	*
+									FROM 	THRM151
+									WHERE 	ENTER_CD = #{ssnEnterCd}
+									AND 	(
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') <= SDATE AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') >= SDATE )
+												 OR
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') <= NVL(EDATE,'99991231') AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') >= NVL(EDATE,'99991231') )
+												 OR
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') <= SDATE AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') >= NVL(EDATE,'99991231') )
+												 OR
+									        	( NVL(REPLACE( #{searchSdate}, '-', ''),'11110101') >= SDATE AND NVL(REPLACE( #{searchEdate}, '-', ''),'99991231') <= NVL(EDATE,'99991231') )
+											) ) B,
+				             ]]>
+							 </when>
+<otherwise>
+							,	TORG101	A
+							,	THRM151	B
+</otherwise>
+</choose>
+				              THRM100 C
+				        WHERE A.ENTER_CD = B.ENTER_CD
+				              AND A.ENTER_CD = C.ENTER_CD
+				              AND B.ENTER_CD = C.ENTER_CD
+				              AND B.SABUN = C.SABUN
+				              AND A.ORG_CD = B.ORG_CD
+				              AND A.ENTER_CD = #{ssnEnterCd}
+				              <if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+				              AND	A.ORG_NM LIKE	'%'||TRIM(#{searchOrgNm})||'%'
+							  </if>
+				              <if test='searchNm != null and !searchNm.equals("")'>
+				              AND	(
+											C.NAME	LIKE	'%'||TRIM(#{searchNm})||'%'
+										OR	C.SABUN	=	TRIM(#{searchNm})
+									)
+							  </if>
+				       )
+				ORDER BY ORG_NM,
+				       SABUN , SDATE
+		</select>
+
+</mapper>

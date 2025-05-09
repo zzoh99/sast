@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="main.mainBox">
+		<select parameterType="map" resultType="cMap" id="getMainTFList">
+
+				<![CDATA[
+                SELECT ENTER_CD, GRP_CD, MENU_GRP_CD, NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys975', LANGUAGE_CD, #{ssnLocaleCd}),PRT_MENU_NM) AS PRT_MENU_NM, IMG_PATH, ORDER_NO
+                  FROM TSYS975
+                 WHERE ENTER_CD = #{ssnEnterCd}
+                   AND GRP_CD = #{ssnGrpCd}
+                 ORDER BY ORDER_NO
+				]]>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getMainMFList">
+
+				<![CDATA[
+                SELECT B.ENTER_CD, B.GRP_CD, B.SEQ_NO, B.MENU_GRP_CD, NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys973', B.LANGUAGE_CD, #{ssnLocaleCd}),B.PRT_MENU_NM) AS PRT_MENU_NM, B.IMG_CLASS
+                     , (SELECT COUNT(*) FROM TSYS974 WHERE ENTER_CD = B.ENTER_CD AND GRP_CD = B.GRP_CD AND SEQ_NO = B.SEQ_NO AND MENU_GRP_CD = B.MENU_GRP_CD AND USE_YN = 'Y') AS COUNT
+                  FROM TSYS975 A
+                     , TSYS973 B
+                 WHERE A.ENTER_CD = B.ENTER_CD
+                   AND A.GRP_CD = B.GRP_CD
+                   AND A.MENU_GRP_CD = B.MENU_GRP_CD
+                   AND A.ENTER_CD = #{ssnEnterCd}
+                   AND A.GRP_CD   = #{ssnGrpCd}
+                 ORDER BY A.ORDER_NO, B.ORDER_NO
+				]]>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getMainBFList">
+
+				<![CDATA[
+                SELECT A.ENTER_CD
+                     , A.SEQ_NO
+                     , A.MENU_GRP_CD
+                     , A.ORDER_NO    AS    ORDER_NO_MASTER
+                     , A.PRT_MENU_NM AS PRT_MENU_NM_MASTER
+                     , B.PRG_CD
+                     , B.ORDER_NO    AS    ORDER_NO_DETAIL
+                     , NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys974', B.LANGUAGE_CD, #{ssnLocaleCd}),B.PRT_MENU_NM) AS PRT_MENU_NM_DETAIL
+                     , B.STR_YN
+                FROM TSYS973 A
+                   , TSYS974 B
+                   , TSYS975 C
+                WHERE A.ENTER_CD = B.ENTER_CD(+)
+                AND   A.GRP_CD   = B.GRP_CD(+)
+                AND   A.SEQ_NO = B.SEQ_NO(+)
+                AND   A.MENU_GRP_CD = B.MENU_GRP_CD(+)
+                AND   A.ENTER_CD = C.ENTER_CD
+                AND   A.GRP_CD = C.GRP_CD
+                AND   A.MENU_GRP_CD = C.MENU_GRP_CD
+                AND   C.ENTER_CD = #{ssnEnterCd}
+                AND   C.GRP_CD   = #{ssnGrpCd}
+                AND   B.USE_YN(+)   = 'Y'
+                ORDER BY C.ORDER_NO, A.ORDER_NO, B.ORDER_NO
+				]]>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getHumanResourcesList">
+
+				<![CDATA[
+				SELECT SEQ, NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tsys985', LANGUAGE_CD1, #{ssnLocaleCd}),POSITION_NM) AS POSITION_NM, F_COM_GET_NAMES(#{ssnEnterCd}, SABUN, #{ssnLocaleCd}) AS NAME, OFFICE_TEL, SABUN, ROWNUM RNUM
+				FROM TSYS985
+				WHERE ENTER_CD = #{ssnEnterCd}
+				ORDER BY SEQ
+				]]>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getNoticeMainList">
+
+				<![CDATA[
+					SELECT * FROM (
+						SELECT TA.*, ROWNUM AS RNUM
+							FROM (SELECT RANK () OVER ( ORDER BY A.REG_DATE  DESC, A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ (A.ENTER_CD, A.BBS_CD, A.BBS_SEQ)) AS RK,
+													A.BBS_CD,
+													A.BBS_SEQ,
+													A.SABUN,
+													F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) || ' ' || F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.REG_DATE, #{ssnLocaleCd}) AS WRITER,
+													A.DEPTH,
+													(SUBSTR ('        ', 0, DEPTH * 2))|| DECODE (A.DEPTH, '0', '', '└RE:')|| A.TITLE AS TITLE,
+													TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYY.MM.DD ')
+															AS REG_DATE,
+													TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYYMMDD ')
+															AS REG_DATE_NEW,
+													A.ENTER_CD,
+													NVL((CASE WHEN TO_CHAR(sysdate, 'YYYYMMDD') BETWEEN A.NOTIFY_SDATE AND A.NOTIFY_EDATE
+																			AND A.POP_NOTIFY_YN = 'Y' THEN 'Y'
+																	ELSE 'N' END),'N'
+														) AS POP,
+													A.MASTER_BBS_SEQ
+											FROM TSYS710 A, TSYS700 B
+										WHERE A.ENTER_CD = B.ENTER_CD
+											AND A.BBS_CD = B.BBS_CD
+											AND A.ENTER_CD = TRIM (#{ssnEnterCd})
+											AND A.BBS_CD = TRIM ('10000')
+											AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.NOTIFY_SDATE AND A.NOTIFY_EDATE
+											AND 'Y' =  NVL ((SELECT 'N' AS BBS_CD
+																					FROM TSYS750
+																				WHERE SABUN = TRIM (#{ssnSabun})
+																					AND BBS_CD = A.BBS_CD),'Y')) TA
+					)
+					WHERE ROWNUM < 3
+					ORDER BY REG_DATE DESC
+
+				]]>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getAppCountMap">
+
+				<![CDATA[
+						SELECT	COUNT(*) AS CNT
+						FROM	(
+									SELECT	*
+									FROM	THRI103 A, THRI101 B
+									WHERE	1=1
+									AND		A.ENTER_CD 		= #{ssnEnterCd}
+									AND		A.APPL_SABUN  	= #{ssnSabun}
+									AND		A.ENTER_CD      = B.ENTER_CD
+									AND		A.APPL_CD    	= B.APPL_CD
+									AND		B.USE_YN    	= 'Y'
+									AND 	A.APPL_STATUS_CD = '21'
+									AND		A.APPL_YMD BETWEEN to_char(add_months(SYSDATE,-12),'YYYYMMDD') AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+								)
+				]]>
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getAprCountMap">
+
+				<![CDATA[
+
+
+			SELECT COUNT(1) AS CNT FROM (
+				 SELECT DISTINCT RANK() OVER (ORDER BY APPL_SEQ DESC ) AS RK
+				       , DETAIL
+				       , ENTER_CD
+				       , APPL_SEQ
+				       , APPL_CD
+				       , APPL_NM
+				       , APPL_YMD
+				       , APPL_YMD_A
+				       , APPL_SABUN
+				       , AGREE_SABUN
+				       , AGREE_NAME
+				       , APPL_IN_SABUN
+				       , APPL_IN_SABUN_NAME
+				       , AGREE_YMD
+				       , AGREE_STATUS_CD
+				       , MEMO
+				       , PATH_SEQ
+				       , APPL_STATUS_CD
+				       , APPL_STATUS_CD_NM
+				       , AGREE_SEQ
+				       , GUBUN
+				       , TITLE
+				      FROM (
+
+								SELECT '1' AS DETAIL
+									   , A.ENTER_CD
+								       , A.APPL_SEQ
+								       , B.APPL_CD
+								       , C.APPL_NM
+								       , B.APPL_YMD
+								       , TO_CHAR(TO_DATE(B.APPL_YMD,'YYYYMMDD'),'YYYY-MM-DD') 	AS APPL_YMD_A
+								       , B.APPL_SABUN
+								       , A.AGREE_SABUN
+								       , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN) AS AGREE_NAME
+								       , B.APPL_IN_SABUN
+								       , F_COM_GET_NAMES(A.ENTER_CD,B.APPL_IN_SABUN) AS APPL_IN_SABUN_NAME
+								       , B.AGREE_YMD
+								       , A.AGREE_STATUS_CD
+								       , A.MEMO
+								       , A.PATH_SEQ
+								       , B.APPL_STATUS_CD
+								       , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10010',B.APPL_STATUS_CD) APPL_STATUS_CD_NM
+								       , A.AGREE_SEQ
+								       , A.GUBUN
+								       --, B.TITLE || DECODE( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+								       , NULL AS TITLE
+			                        FROM THRI107 A
+			                       INNER JOIN THRI103 B
+			                          ON B.ENTER_CD = A.ENTER_CD
+			                         AND B.APPL_SEQ = A.APPL_SEQ
+			                       INNER JOIN THRI101 C
+			                          ON C.ENTER_CD = A.ENTER_CD
+			                         AND C.APPL_CD = B.APPL_CD
+			                         AND C.USE_YN = 'Y'
+			                        LEFT OUTER JOIN THRI120 D
+			                          ON A.ENTER_CD = D.ENTER_CD
+			                         AND A.AGREE_SABUN = D.AGREE_SABUN
+			                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+			                       WHERE A.ENTER_CD = #{ssnEnterCd}
+			                         AND A.AGREE_STATUS_CD = '10'
+			                         AND B.APPL_STATUS_CD IN ('21','31')
+			                         AND 'Y' = (CASE WHEN B.APPL_STATUS_CD = '31' AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+			                         AND ( A.AGREE_SABUN = #{ssnSabun} OR D.DEPUTY_SABUN = #{ssnSabun} )
+			                         AND NVL( A.ORG_APP_YN , 'N' ) = 'N'
+			                       UNION ALL
+			                    SELECT '1' AS DETAIL
+									   , A.ENTER_CD
+								       , A.APPL_SEQ
+								       , B.APPL_CD
+								       , C.APPL_NM
+								       , B.APPL_YMD
+								       , TO_CHAR(TO_DATE(B.APPL_YMD,'YYYYMMDD'),'YYYY-MM-DD') 	AS APPL_YMD_A
+								       , B.APPL_SABUN
+								       , A.AGREE_SABUN
+								       , F_COM_GET_NAMES(A.ENTER_CD,A.AGREE_SABUN) AS AGREE_NAME
+								       , B.APPL_IN_SABUN
+								       , F_COM_GET_NAMES(A.ENTER_CD,B.APPL_IN_SABUN) AS APPL_IN_SABUN_NAME
+								       , B.AGREE_YMD
+								       , A.AGREE_STATUS_CD
+								       , A.MEMO
+								       , A.PATH_SEQ
+								       , B.APPL_STATUS_CD
+								       , F_COM_GET_GRCODE_NAME(A.ENTER_CD,'R10010',B.APPL_STATUS_CD) APPL_STATUS_CD_NM
+								       , A.AGREE_SEQ
+								       , A.GUBUN
+								       --, B.TITLE || DECODE( B.APPL_CD, '22', ' - ' || F_TIM_GET_APPL_GNT_NM(A.ENTER_CD, A.APPL_SEQ), '') as TITLE
+								       , NULL AS TITLE
+			                        FROM THRI107 A
+			                       INNER JOIN THRI103 B
+			                          ON B.ENTER_CD = A.ENTER_CD
+			                         AND B.APPL_SEQ = A.APPL_SEQ
+			                       INNER JOIN THRI101 C
+			                          ON C.ENTER_CD = A.ENTER_CD
+			                         AND C.APPL_CD = B.APPL_CD
+			                         AND C.USE_YN = 'Y'
+			                        LEFT OUTER JOIN THRI120 D
+			                          ON A.ENTER_CD = D.ENTER_CD
+			                         AND A.AGREE_SABUN = D.AGREE_SABUN
+			                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE AND NVL( D.EDATE, '99991231')
+			                       WHERE A.ENTER_CD = #{ssnEnterCd}
+			                         AND A.AGREE_STATUS_CD = '10'
+			                         AND B.APPL_STATUS_CD IN ('21','31')
+			                         AND 'Y' = (CASE WHEN B.APPL_STATUS_CD = '31' AND VISUAL_YN = 'N' THEN 'N' ELSE 'Y' END)
+			                         AND ( A.AGREE_SABUN = F_COM_GET_ORG_CD(#{ssnEnterCd}, #{ssnSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD')) )
+			                         AND NVL( A.ORG_APP_YN , 'N' ) = 'Y'
+                        )
+                        WHERE APPL_YMD BETWEEN to_char(add_months(SYSDATE,-12),'YYYYMMDD') AND TO_CHAR(SYSDATE, 'YYYYMMDD')
+					 )
+
+				]]>
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getFaqMainList">
+
+				<![CDATA[
+					SELECT * FROM (
+						SELECT TA.*, ROWNUM AS RNUM
+							FROM (SELECT RANK () OVER ( ORDER BY A.REG_DATE  DESC, A.MASTER_BBS_SEQ DESC, F_SYS_BULLETIN_BOARD_LEVEL_SEQ (A.ENTER_CD, A.BBS_CD, A.BBS_SEQ)) AS RK,
+													A.BBS_CD,
+													A.BBS_SEQ,
+													A.SABUN,
+													F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) || ' ' || F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.REG_DATE, #{ssnLocaleCd}) AS WRITER,
+													A.DEPTH,
+													(SUBSTR ('        ', 0, DEPTH * 2))|| DECODE (A.DEPTH, '0', '', '└RE:')|| A.TITLE AS TITLE,
+													TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYY.MM.DD ')
+															AS REG_DATE,
+													TO_CHAR (TO_DATE (A.REG_DATE, 'YYYYMMDDHH24MISS'),'YYYYMMDD ')
+															AS REG_DATE_NEW,
+													A.ENTER_CD,
+													NVL((CASE WHEN TO_CHAR(sysdate, 'YYYYMMDD') BETWEEN A.NOTIFY_SDATE AND A.NOTIFY_EDATE
+																			AND A.POP_NOTIFY_YN = 'Y' THEN 'Y'
+																	ELSE 'N' END),'N'
+														) AS POP,
+													A.MASTER_BBS_SEQ
+											FROM TSYS710 A, TSYS700 B
+										WHERE A.ENTER_CD = B.ENTER_CD
+											AND A.BBS_CD = B.BBS_CD
+											AND A.ENTER_CD = TRIM (#{ssnEnterCd})
+											AND A.BBS_CD = TRIM ('30000')
+											AND 'Y' =  NVL ((SELECT 'N' AS BBS_CD
+																					FROM TSYS750
+																				WHERE SABUN = TRIM (#{ssnSabun})
+																					AND BBS_CD = A.BBS_CD),'Y')) TA
+					)
+					WHERE ROWNUM < 3
+					ORDER BY REG_DATE DESC
+
+			
+
+				]]>
+
+		</select>
+
+</mapper>

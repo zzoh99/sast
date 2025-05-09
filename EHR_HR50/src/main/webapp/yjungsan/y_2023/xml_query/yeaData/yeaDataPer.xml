@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    인적공제
+ -->
+<root>
+
+    <!-- 인적공제 자료 조회 -->
+    <query id="selectYeaDataPerList">
+        <![CDATA[
+            SELECT A.WORK_YY
+                 , A.ADJUST_TYPE
+                 , A.SABUN
+                 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                 , A.FAM_CD
+                 , A.ACA_CD
+                 , A.FAM_NM
+                 , A.WOMAN_YN
+                 , A.SPOUSE_YN
+                 , A.DPNDNT_YN
+                 , A.DPNDNT_YN AS DPNDNT_STS
+                 , A.SENIOR_YN
+                 , A.HNDCP_YN
+                 , A.HNDCP_TYPE
+                 , A.HNDCP_TYPE_NTS
+                 , A.BUSINESS_PLACE_CD
+                 , A.ONE_PARENT_YN
+                 , A.INSURANCE_YN
+                 , A.MEDICAL_YN
+                 , A.EDUCATION_YN
+                 , A.CREDIT_YN
+                 , A.ZIP
+                 , A.ADDR1
+                 , A.ADDR2
+                 , A.EXCEED_INCOME_YN
+                 , TO_CHAR(A.CHKDATE, 'yyyymmddHH24miss') AS CHKDATE
+                 , CASE WHEN A.FAM_CD='0' THEN ''  ELSE NVL(A.LAST_FAM_YN, 'N') END AS LAST_FAM_YN
+                 ,(SELECT COUNT(*)
+                     FROM TCPN825 -- 정산가족의료비내역
+                    WHERE ENTER_CD    = A.ENTER_CD
+                      AND WORK_YY     = A.WORK_YY
+                      AND ADJUST_TYPE = A.ADJUST_TYPE
+                      AND SABUN       = A.SABUN
+                      AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+                      AND APPL_MON > 0)
+                 + (SELECT COUNT(*)
+                      FROM TCPN829 -- 교육비내역
+                     WHERE ENTER_CD    = A.ENTER_CD
+                       AND WORK_YY     = A.WORK_YY
+                       AND ADJUST_TYPE = A.ADJUST_TYPE
+                       AND SABUN       = A.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+                       AND APPL_MON > 0)
+                  + (SELECT COUNT(*)
+                       FROM TCPN821 -- 연간카드사용내역
+                      WHERE ENTER_CD    = A.ENTER_CD
+                        AND WORK_YY     = A.WORK_YY
+                        AND ADJUST_TYPE = A.ADJUST_TYPE
+                        AND SABUN       = A.SABUN
+                        AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+                        AND USE_MON > 0) INCNT
+                  , DECODE((SELECT NVL(COUNT(*),0)
+                              FROM TCPN823
+                             WHERE ENTER_CD    = A.ENTER_CD
+                               AND WORK_YY     = A.WORK_YY-1
+                               AND ADJUST_TYPE = '1'
+                               AND DPNDNT_YN   = 'Y' /* 전년도의 기본공제 체크가 되어 있는사람만 해당 - 2020.01.29 */
+                               AND SABUN       = A.SABUN
+                               AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)), 0,'N','Y') AS PRE_EQUALS_YN
+                  , A.ADOPT_BORN_YN
+                  , A.CHILD_ORDER
+                  , NVL(C.INPUT_STATUS, '0') AS INPUT_STATUS
+                  , A.ADD_CHILD_YN /* 2019-11-11. 자녀세액공제 */
+              FROM TCPN823 A
+                 ,(
+                   SELECT *
+                   FROM   TSYS005
+                   WHERE  ENTER_CD = #ssnEnterCd#
+                   AND    GRCODE_CD='C00309'
+                  ) B
+                 , TCPN811 C
+             WHERE A.ENTER_CD       = #ssnEnterCd#
+               AND A.WORK_YY        = #searchWorkYy#
+               AND A.ADJUST_TYPE    = #searchAdjustType#
+               AND A.SABUN          = #searchSabun#
+               AND A.ENTER_CD       = B.ENTER_CD
+               AND A.FAM_CD         = B.CODE
+               AND A.ENTER_CD       = C.ENTER_CD
+               AND A.ENTER_CD       = C.ENTER_CD
+               AND A.WORK_YY        = C.WORK_YY
+               AND A.ADJUST_TYPE    = C.ADJUST_TYPE
+               AND A.SABUN          = C.SABUN
+             ORDER BY B.SEQ
+        ]]>
+    </query>
+
+    <!-- 과거인적공제현황 자료 조회 -->
+    <query id="selectPastYeaDataPerList">
+        <![CDATA[
+            SELECT A.WORK_YY
+                 , A.ADJUST_TYPE
+                 , A.SABUN
+                 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                 , A.FAM_CD
+                 , A.ACA_CD
+                 , A.FAM_NM
+                 , A.WOMAN_YN
+                 , A.SPOUSE_YN
+                 , A.DPNDNT_YN
+                 , A.DPNDNT_YN AS DPNDNT_STS
+                 , A.SENIOR_YN
+                 , A.HNDCP_YN
+                 , A.HNDCP_TYPE
+                 , A.BUSINESS_PLACE_CD
+                 , A.ONE_PARENT_YN
+                 , A.INSURANCE_YN
+                 , A.MEDICAL_YN
+                 , A.EDUCATION_YN
+                 , A.CREDIT_YN
+                 , A.ZIP
+                 , A.ADDR1
+                 , A.ADDR2
+                 , A.EXCEED_INCOME_YN
+                 , CASE WHEN A.FAM_CD='0' THEN ''  ELSE NVL(A.LAST_FAM_YN, 'N') END AS LAST_FAM_YN
+                 ,(SELECT COUNT(*)
+                     FROM TCPN825 -- 정산가족의료비내역
+                    WHERE ENTER_CD    = A.ENTER_CD
+                      AND WORK_YY     = A.WORK_YY
+                      AND ADJUST_TYPE = A.ADJUST_TYPE
+                      AND SABUN       = A.SABUN
+                      AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+                      AND APPL_MON > 0)
+                 + (SELECT COUNT(*)
+                      FROM TCPN829 -- 교육비내역
+                     WHERE ENTER_CD    = A.ENTER_CD
+                       AND WORK_YY     = A.WORK_YY
+                       AND ADJUST_TYPE = A.ADJUST_TYPE
+                       AND SABUN       = A.SABUN
+                       AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+                       AND APPL_MON > 0)
+                  + (SELECT COUNT(*)
+                       FROM TCPN821 -- 연간카드사용내역
+                      WHERE ENTER_CD    = A.ENTER_CD
+                        AND WORK_YY     = A.WORK_YY
+                        AND ADJUST_TYPE = A.ADJUST_TYPE
+                        AND SABUN       = A.SABUN
+                        AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)
+                        AND USE_MON > 0) INCNT
+                  , DECODE((SELECT NVL(COUNT(*),0)
+                              FROM TCPN823
+                             WHERE ENTER_CD    = A.ENTER_CD
+                               AND WORK_YY     = A.WORK_YY-1
+                               AND ADJUST_TYPE = '1'
+                               AND DPNDNT_YN   = 'Y' /* 전년도의 기본공제 체크가 되어 있는사람만 해당 - 2020.01.29 */
+                               AND SABUN       = A.SABUN
+                               AND F_YEA_GET_EX_DECRYPT(FAMRES, ENTER_CD) = F_YEA_GET_EX_DECRYPT(A.FAMRES, A.ENTER_CD)), 0,'N','Y') AS PRE_EQUALS_YN
+                  , A.ADOPT_BORN_YN
+                  , A.CHILD_ORDER
+                  , A.ADD_CHILD_YN /* 2019-11-11. 자녀세액공제 */
+              FROM TCPN823 A
+                 ,(
+                   SELECT *
+                   FROM   TSYS005
+                   WHERE  ENTER_CD = #ssnEnterCd#
+                   AND    GRCODE_CD='C00309'
+                  ) B
+             WHERE A.ENTER_CD       = #ssnEnterCd#
+               AND A.WORK_YY        = #searchBfYear#
+               AND A.ADJUST_TYPE    = #searchAdjustType#
+               AND A.SABUN          = #searchSabun#
+               AND A.ENTER_CD       = B.ENTER_CD
+               AND A.FAM_CD         = B.CODE
+             ORDER BY B.SEQ
+        ]]>
+    </query>
+
+        <!-- 소득공제자료등록(주소사항) 주소 저장 -->
+    <query id="updateYeaDataPerConfirm">
+        <![CDATA[
+            UPDATE TCPN811
+               SET INPUT_STATUS      = #input_status# || SUBSTR(INPUT_STATUS, 2, 1)
+             WHERE WORK_YY           = #work_yy#
+               AND ADJUST_TYPE       = #adjust_type#
+               AND SABUN             = #sabun#
+               AND ENTER_CD          = #ssnEnterCd#
+        ]]>
+    </query>
+
+    <!-- 장애인등록증 현황 조회 -->
+    <query id="selectYeaDataHndcpRegInfoList">
+        <![CDATA[
+			SELECT A.WORK_YY
+                 , A.ADJUST_TYPE
+                 , A.SABUN
+                 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                 , A.HNDCP_TYPE
+                 , A.FAM_NM
+                 , A.SDATE
+                 , A.EDATE
+                 , A.BIGO
+            FROM TCPN824 A
+            WHERE A.ENTER_CD       = #ssnEnterCd#
+               AND A.ADJUST_TYPE    = #searchAdjustType#
+               AND A.SABUN          = #searchSabun#
+               AND #searchWorkYy#||'1231' BETWEEN NVL(A.SDATE,#searchWorkYy#||'0101') AND NVL(A.EDATE,'29991231')
+             ORDER BY A.WORK_YY DESC, A.FAM_NM
+        ]]>
+    </query>
+
+    <!-- 장애인등록증 현황 조회 -->
+    <query id="selectYeaDataHndcpRegInfo">
+        <![CDATA[
+			SELECT T.WORK_YY
+				 , T.ADJUST_TYPE
+				 , T.SABUN
+				 , F_COM_DECRYPT(T.FAMRES, T.ENTER_CD) AS FAMRES
+				 , T.HNDCP_TYPE
+				 , T.FAM_NM
+				 , T.SDATE
+				 , T.EDATE
+				 , T.BIGO
+			FROM
+			(
+				SELECT A.*
+				FROM TCPN824 A
+				WHERE A.ENTER_CD       = #ssnEnterCd#
+				   AND A.ADJUST_TYPE   = #searchAdjustType#
+	               AND A.SABUN         = #searchSabun#
+	               AND F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) = #searchFamres#
+				   AND #searchWorkYy#||'1231' BETWEEN NVL(A.SDATE,#searchWorkYy#||'0101') AND NVL(A.EDATE,'29991231')
+				ORDER BY A.WORK_YY DESC
+			) T
+			WHERE ROWNUM = 1
+        ]]>
+    </query>
+
+    <!-- 장애인등록증 등록 -->
+    <query id="insertYeaDataHndcpRegInfo">
+        <![CDATA[
+            INSERT INTO TCPN824
+			(
+				  ENTER_CD         /* 회사구분(TORG900) */
+				, WORK_YY          /* 대상년도 */
+				, ADJUST_TYPE      /* 정산구분(C00303) */
+				, SABUN            /* 사원번호 */
+				, FAMRES           /* 가족주민번호 */
+				, HNDCP_TYPE       /* 장애코드(1:장애인복지법,2:국가유공자등,3:중증환자) */
+				, FAM_NM           /* 가족이름 */
+				, CHKDATE          /* 최종수정시간 */
+				, CHKID            /* 최종수정자 */
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, F_COM_ENCRYPT(#famres#, #ssnEnterCd#)
+				, #hndcp_type#
+				, #fam_nm#
+				, SYSDATE
+				, #ssnSabun#
+			)
+        ]]>
+    </query>
+
+    <!-- 장애인등록증 수정 -->
+    <query id="updateYeaDataHndcpRegInfo">
+        <![CDATA[
+            UPDATE TCPN824
+               SET HNDCP_TYPE        = #hndcp_type#
+                 , CHKDATE        	 = SYSDATE
+                 , CHKID        	 = #ssnSabun#
+             WHERE ENTER_CD          = #ssnEnterCd#
+               AND WORK_YY       	 = #work_yy#
+               AND ADJUST_TYPE       = #adjust_type#
+               AND SABUN             = #sabun#
+               AND F_COM_DECRYPT(FAMRES, ENTER_CD) = #famres#
+        ]]>
+    </query>
+
+    <!-- 장애인등록증 수정 -->
+    <query id="updateYeaDataHndcpRegDetail">
+        <![CDATA[
+            UPDATE TCPN824
+               SET SDATE        	 = #sdate#
+                 , EDATE        	 = #edate#
+                 , BIGO        	 	 = #bigo#
+                 , CHKDATE        	 = SYSDATE
+                 , CHKID        	 = #ssnSabun#
+             WHERE ENTER_CD          = #ssnEnterCd#
+               AND WORK_YY       	 = #work_yy#
+               AND ADJUST_TYPE       = #adjust_type#
+               AND SABUN             = #sabun#
+               AND F_COM_DECRYPT(FAMRES, ENTER_CD) = #famres#
+        ]]>
+    </query>
+
+    <!-- 장애인등록증 삭제 -->
+    <query id="deleteYeaDataHndcpRegDetail">
+        <![CDATA[
+            DELETE FROM TCPN824
+             WHERE ENTER_CD          = #ssnEnterCd#
+               AND WORK_YY       	 = #work_yy#
+               AND ADJUST_TYPE       = #adjust_type#
+               AND SABUN             = #sabun#
+               AND F_COM_DECRYPT(FAMRES, ENTER_CD) = #famres#
+        ]]>
+    </query>
+    <!-- 확정전 수정여부 확인 -->
+    <query id="selectAuthChk">
+        <![CDATA[
+            SELECT (SELECT TO_CHAR(MAX(CHKDATE),'YYYYMMDDHH24MISS') FROM TCPN823 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #work_yy#) AS CHK_823,
+                   (SELECT TO_CHAR(MAX(CHKDATE),'YYYYMMDDHH24MISS') FROM TCPN851 WHERE ENTER_CD = #ssnEnterCd# AND WORK_YY = #work_yy#) AS CHK_851
+            FROM DUAL
+        ]]>
+    </query>
+    <!-- 인적공제 본인정보 조회 -->
+    <query id="selectSelfInfo">
+        <![CDATA[
+             SELECT FAM_CD
+                   ,SABUN
+                   ,FAM_NM
+                   ,F_COM_DECRYPT(FAMRES, ENTER_CD) AS FAMRES
+                   ,CHKID
+                   ,CHKDATE
+             FROM TCPN823
+             WHERE ENTER_CD     = #ssnEnterCd#
+               AND WORK_YY      = #searchWorkYy#
+               AND ADJUST_TYPE  = #searchAdjustType#
+               AND SABUN        = #sabun#
+               AND FAM_CD       = #fam_cd#
+        ]]>
+    </query>
+    <!-- 인적공제 본인정보 변경 -->
+    <query id="saveSelfInfo">
+        <![CDATA[
+            UPDATE TCPN823
+               SET FAM_NM            = #fam_nm#
+                 , FAMRES            = F_COM_ENCRYPT(#famres#,#ssnEnterCd#)
+                 , CHKDATE           = SYSDATE
+                 , CHKID             = #ssnSabun#
+             WHERE ENTER_CD     = #ssnEnterCd#
+               AND WORK_YY      = #searchWorkYy#
+               AND ADJUST_TYPE  = #searchAdjustType#
+               AND SABUN        = #sabun#
+               AND FAM_CD       = #fam_cd#
+        ]]>
+    </query>
+    <!-- 자녀세액공제 해제 - 직계비속(자녀,입양자) -->
+    <query id="updateChildYn">
+        <![CDATA[
+            UPDATE TCPN823
+               SET ADD_CHILD_YN		 = 'N'
+                 , CHKDATE           = SYSDATE
+                 , CHKID             = #ssnSabun#
+             WHERE ENTER_CD     = #ssnEnterCd#
+               AND WORK_YY      = #searchWorkYy#
+               AND ADJUST_TYPE  = #searchAdjustType#
+               AND SABUN        = #sabun#
+               AND FAM_CD       = #fam_cd#
+               AND FAMRES		= F_COM_ENCRYPT(#famres#,#ssnEnterCd#)
+        ]]>
+    </query>
+</root>

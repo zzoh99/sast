@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.schGrpSta">
+			<select parameterType="map" resultType="cMap" id="getSchGrpStaList1">
+			
+				<![CDATA[
+				--대학교별 인원 셀렉트 및 그룹코드 업데이트 쿼리
+				SELECT Z.CODE, REPLACE(Z.CODE_NM, '대학교', '대') AS CODE_NM, Z.CNT, Z.PER_CNT
+					   , (CASE WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '서울대' THEN 1
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '한국과학기술원' THEN 2
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '포항공과대' THEN 3
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '연세대' THEN 4
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '고려대' THEN 5
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '서강대' THEN 6
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '한양대' THEN 7
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '성균관대' THEN 8
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '홍익대' THEN 9
+					   		   WHEN REPLACE(Z.CODE_NM, '대학교', '대') = '광운대' THEN 10
+					   		   ELSE 99 END) AS SEQ
+				  FROM(
+				   SELECT X.CODE,X.CODE_NM,X.NOTE2,Y.CNT, Y.PER_CNT
+				     FROM(
+				      SELECT *
+				        FROM TSYS005 
+				       WHERE ENTER_CD= #{ssnEnterCd} 
+				         AND GRCODE_CD ='H20145' 
+				         AND NOTE2 = '1'  
+				      ) X , 
+				      (SELECT ENTER_CD, ACA_SCH_CD , COUNT(*) AS CNT, ROUND((COUNT(*)/SUM(COUNT(*)) OVER())*100,1) AS PER_CNT
+				        FROM THRM115 A
+				       WHERE A.ENTER_CD= #{ssnEnterCd}
+				         AND A.ACA_CD IN ('11', '12', '21') --박사,석사,학사
+				         AND A.ACA_YN ='C'--졸업
+				         AND A.ACA_E_YM = ( SELECT MAX(AA.ACA_E_YM) FROM THRM115 AA WHERE AA.ENTER_CD = A.ENTER_CD AND AA.SABUN = A.SABUN )
+				         AND A.SABUN IN 
+				             (
+				               SELECT SABUN
+				                 FROM THRM151 X
+				                WHERE ENTER_CD = #{ssnEnterCd}
+				                  AND (X.ENTER_CD, X.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+				                                                          FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900) A
+				                                                       CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+				                  AND MANAGE_CD = '40'
+				                  AND JIKGUB_CD NOT IN ('D2', 'D8') --부회장 제외
+				                  AND REPLACE(#{searchYmd},'-','') BETWEEN SDATE AND NVL(EDATE,'99991231') 
+				                  AND ORG_CD IN (SELECT ORG_CD
+				                                   FROM ( SELECT T.ENTER_CD, T.SDATE, T.ORG_CD, T.PRIOR_ORG_CD
+				                                            FROM TORG105 T
+				                                           WHERE T.ENTER_CD = #{ssnEnterCd}
+				                                             AND T.SDATE = ( SELECT MAX(SDATE)
+				                                                               FROM TORG103
+				                                                              WHERE ENTER_CD = T.ENTER_CD
+                                                                                AND REPLACE(#{searchYmd},'-','') BETWEEN SDATE AND EDATE ) )
+				                                 START WITH ORG_CD = ( CASE #{searchOrgCd} WHEN '0' THEN ( SELECT X.ORG_CD FROM TORG105 X
+                                                                        WHERE X.ENTER_CD = #{ssnEnterCd}
+                                                                          AND X.SDATE  = (SELECT MAX(SDATE) FROM TORG103
+                                      				                                       WHERE ENTER_CD = #{ssnEnterCd}
+ 					                                                                         AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND EDATE)
+                                                                          AND X.PRIOR_ORG_CD = '0' )
+                                                      			 ELSE #{searchOrgCd} END )
+				                                 CONNECT BY PRIOR ENTER_CD = ENTER_CD
+				                                        AND PRIOR SDATE = SDATE
+				                                        AND PRIOR ORG_CD = PRIOR_ORG_CD )
+				             )
+				       GROUP BY ENTER_CD,ACA_SCH_CD 
+				      ) Y  
+				    WHERE X.ENTER_CD = Y.ENTER_CD
+				      AND X.CODE     = Y.ACA_SCH_CD
+				  ) Z
+				  ORDER BY SEQ
+				]]>
+		</select>
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchGrpStaList2">
+			
+				<![CDATA[
+				SELECT  (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = #{ssnEnterCd} AND GRCODE_CD = 'H20130' AND CODE = ACA_CD),  NVL(CNT,0) AS CNT , Y.CODE_NM AS CODE_NM, ROUND((CNT/SUM(CNT) OVER())*100,1) AS PER_CNT
+				  FROM  (
+				          -- 박사, 석사, 대졸, 전문대졸, 고졸
+							    SELECT A.ENTER_CD
+							          ,A.ACA_CD
+							          ,SUM(CASE WHEN A.ACA_CD='11' AND A.ACA_YN='C' THEN 1
+								                  WHEN A.ACA_CD='12' AND A.ACA_YN='C' THEN 1
+								                  WHEN A.ACA_CD='21' AND A.ACA_YN='C' THEN 1
+								                  WHEN A.ACA_CD='31' AND A.ACA_YN='C' THEN 1
+								                  WHEN A.ACA_CD='41' AND A.ACA_YN='C' THEN 1
+								                  ELSE 0 END) AS CNT
+							      FROM THRM115 A
+							     WHERE A.ENTER_CD = #{ssnEnterCd}
+							       AND A.ACA_YN = 'C'--졸업구분:졸업
+							       --졸업년월일:최대값( 즉 최종학력을 기준으로 데이터를 뽑아냄 by JSG and 차민주)
+                     			   AND A.ACA_E_YM = ( SELECT MAX(AA.ACA_E_YM) FROM THRM115 AA WHERE AA.ENTER_CD = A.ENTER_CD AND AA.SABUN = A.SABUN )
+							       AND A.SABUN IN (
+				 			                  SELECT P.SABUN
+							                    FROM THRM151 P
+							                   WHERE P.ENTER_CD = #{ssnEnterCd}
+							                     AND REPLACE(#{searchYmd}, '-', '') BETWEEN P.SDATE AND NVL(P.EDATE,'99991231')
+							                     AND P.STATUS_CD IN ('AA', 'CA')
+							                     AND P.MANAGE_CD = '40'
+							                     AND P.JIKGUB_CD NOT IN ('D2','D8') --부회장, 비상근 제외
+							                     AND P.ORG_CD IN ( SELECT Q.ORG_CD
+							                                         FROM ( SELECT T.ENTER_CD, T.SDATE, T.ORG_CD, T.PRIOR_ORG_CD
+							                                                  FROM TORG105 T
+																			 WHERE T.ENTER_CD = #{ssnEnterCd}
+																			   AND T.SDATE = ( SELECT MAX(SDATE)
+																			                     FROM TORG103
+																			                    WHERE ENTER_CD = T.ENTER_CD
+																			                      AND REPLACE(#{searchYmd}, '-', '') BETWEEN Z.SDATE AND Z.EDATE ) ) Q
+												                             START WITH Q.ORG_CD = ( CASE #{searchOrgCd} WHEN '0' THEN ( SELECT X.ORG_CD FROM TORG105 X
+																                                                                        WHERE X.ENTER_CD = #{ssnEnterCd}
+																                                                                          AND X.SDATE  = (SELECT MAX(SDATE) FROM TORG103
+																                                      				                                       WHERE ENTER_CD = #{ssnEnterCd}
+																 					                                                                         AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND EDATE)
+																                                                                          AND X.PRIOR_ORG_CD = '0' )
+																                                                      			 ELSE #{searchOrgCd} END )
+				                    								       CONNECT BY PRIOR Q.ENTER_CD = Q.ENTER_CD
+												                               AND PRIOR Q.SDATE = Q.SDATE
+												                               AND PRIOR Q.ORG_CD = Q.PRIOR_ORG_CD )
+							                    )
+							       AND A.ACA_CD IN ('11','12','21','31','41') --고졸~대학원 박사
+							     GROUP BY A.ENTER_CD, A.ACA_CD
+				           ORDER BY A.ACA_CD
+				      ) X , TSYS005 Y
+				WHERE Y.ENTER_CD = #{ssnEnterCd}
+				  AND Y.GRCODE_CD = 'H20130'
+				  AND Y.CODE IN ('11','12','21', '31', '41')
+				  AND Y.ENTER_CD = X.ENTER_CD(+)
+				  AND Y.CODE = X.ACA_CD(+)
+				ORDER BY Y.SEQ
+				]]>
+			
+			
+		</select>
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getSchGrpStaListEtc">
+			
+				<![CDATA[
+				SELECT COUNT(*) AS CNT, COUNT(*) - TO_NUMBER(#{searchCnt}) AS M_CNT, ROUND(( (COUNT(*) - TO_NUMBER(#{searchCnt})) /SUM(COUNT(*)) OVER())*100,1) AS PER_CNT
+				  FROM THRM151 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                   AND (A.ENTER_CD, A.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+                                                          FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900) A
+                                                       CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+				   AND A.JIKGUB_CD NOT IN ('D2', 'D8') --부회장 제외
+				   AND A.MANAGE_CD = '40'
+				   AND A.SABUN IN(SELECT B.SABUN
+					                FROM THRM115 B
+								   WHERE B.ENTER_CD = A.ENTER_CD
+							         AND B.ACA_CD IN ('11', '12', '21') --박사,석사,학사
+							         AND B.ACA_YN ='C'--졸업
+							         AND B.ACA_E_YM = ( SELECT MAX(AA.ACA_E_YM) FROM THRM115 AA WHERE AA.ENTER_CD = A.ENTER_CD AND AA.SABUN = A.SABUN )
+					             )
+				]]>
+			
+			
+		</select>
+</mapper>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.basis.empTraResultLst">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpTraResultLst">
+			
+				<![CDATA[
+						SELECT ENTER_CD,
+						       SABUN,
+						       F_COM_GET_NAMES(ENTER_CD,SABUN) AS NAME,
+						       ORG_NM,
+						       JIKGUB_NM,
+						       JIKWEE_NM,
+						       JIKCHAK_NM,
+						       EMP_YMD,
+						       JIKGUB_YEUNCHA,
+						       EDU_HOUR2,
+						       EDU_HOUR1,
+						       EDU_HOUR0
+						 FROM(
+						SELECT  B.ENTER_CD,  --회사코드
+								C.NAME, --성명
+								C.SABUN, --사번
+								F_COM_GET_ORG_NM(B.ENTER_CD,B.ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM,--소속명
+								B.JIKGUB_NM, --직급
+								B.JIKWEE_NM, --직위
+								B.JIKCHAK_NM, --직책
+								C.EMP_YMD,-- 입사일자
+								F_COM_GET_JIKGUB_YEUNCHA(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_YEUNCHA, --직급연차
+								(SELECT COUNT(1)
+								   FROM TTRA121 AA, TTRA301 BB
+                                  WHERE AA.ENTER_CD = B.ENTER_CD
+                                    AND BB.ENTER_CD = AA.ENTER_CD
+                                    AND BB.SABUN = C.SABUN
+                                    AND BB.EDU_SEQ = AA.EDU_SEQ
+                                    AND BB.EDU_EVENT_SEQ = AA.EDU_EVENT_SEQ
+                                    AND NVL(BB.EDU_CONFIRM_TYPE,'1') = '1'
+								    AND AA.EDU_S_YMD BETWEEN  (#{appraisalYy} -2)||'0101'  AND (#{appraisalYy} -2)||'1231' ) AS EDU_HOUR2,
+								(SELECT COUNT(1)
+								   FROM TTRA121 AA, TTRA301 BB
+                                  WHERE AA.ENTER_CD = B.ENTER_CD
+                                    AND BB.ENTER_CD = AA.ENTER_CD
+                                    AND BB.SABUN = C.SABUN
+                                    AND BB.EDU_SEQ = AA.EDU_SEQ
+                                    AND BB.EDU_EVENT_SEQ = AA.EDU_EVENT_SEQ
+                                    AND NVL(BB.EDU_CONFIRM_TYPE,'1') = '1'
+								    AND AA.EDU_S_YMD BETWEEN  (#{appraisalYy} -1)||'0101'  AND (#{appraisalYy} -1)||'1231' ) AS EDU_HOUR1,
+								(SELECT COUNT(1)
+								   FROM TTRA121 AA, TTRA301 BB
+                                  WHERE AA.ENTER_CD = B.ENTER_CD
+                                    AND BB.ENTER_CD = AA.ENTER_CD
+                                    AND BB.SABUN = C.SABUN
+                                    AND BB.EDU_SEQ = AA.EDU_SEQ
+                                    AND BB.EDU_EVENT_SEQ = AA.EDU_EVENT_SEQ
+                                    AND NVL(BB.EDU_CONFIRM_TYPE,'1') = '1'
+								    AND AA.EDU_S_YMD BETWEEN  (#{appraisalYy})||'0101'  AND (#{appraisalYy})||'1231' ) AS EDU_HOUR0,
+								B.JIKGUB_CD,
+								B.ORG_CD
+						  FROM THRM151 B, THRM100 C
+						 WHERE B.STATUS_CD <>'RA'
+						   AND TO_CHAR(SYSDATE,'YYYYMMDD')  BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+						   AND B.ENTER_CD = C.ENTER_CD
+						   AND B.SABUN = C.SABUN
+						   AND C.ENTER_CD = #{ssnEnterCd} ]]>
+						   <if test="searchNmSabun != null and searchNmSabun neq ''">
+						   	   AND (F_COM_GET_NAMES(C.ENTER_CD,C.SABUN) LIKE '%'||TRIM( #{searchNmSabun} )||'%' OR C.SABUN LIKE '%'||TRIM( #{searchNmSabun} )||'%')
+						   </if>
+						 )
+						 ORDER BY  F_COM_GET_ORG_SEQ(ENTER_CD, ORG_CD, TO_CHAR(SYSDATE,'YYYYMMDD')), F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20010', JIKGUB_CD )
+		</select>
+
+<!-- 평가결과 피드백 상세(업적) 팝업 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpTraResultPopList1">
+				<![CDATA[
+				SELECT  A.*
+					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'P00011', A.APP_INDEX_GUBUN_CD, #{ssnLocaleCd}) AS APP_INDEX_GUBUN_NM
+					, '0' AS DETAIL
+				FROM TPAP352 A
+				WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					AND A.SABUN = TRIM(#{searchSabun})
+					AND A.APP_ORG_CD = TRIM(#{searchAppOrgCd})
+				ORDER BY A.APP_INDEX_GUBUN_CD, A.SEQ
+				]]>
+			
+			
+		</select>
+
+<!-- 평가결과 피드백 상세(역량) 팝업 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpTraResultPopList2">
+			
+				<![CDATA[
+                    SELECT A.ENTER_CD
+                         , A.APPRAISAL_CD
+                         , A.SABUN
+                         , A.APP_ORG_CD
+                         , A.COMPETENCY_CD
+                         , A.COMPETENCY_NM
+                         , (SELECT PERFORMANCE_POINT
+                         	  FROM TPAP011 T
+                         	 WHERE T.ENTER_CD = A.ENTER_CD
+                               AND T.APP_TYPE_CD = 'B'
+                               AND T.APP_CLASS_CD = A.COMP_SELF_CLASS_CD) AS COMP_APP_SELF_POINT
+                         , (SELECT PERFORMANCE_POINT
+                         	  FROM TPAP011 T
+                         	 WHERE T.ENTER_CD = A.ENTER_CD
+                               AND T.APP_TYPE_CD = 'B'
+                               AND T.APP_CLASS_CD = A.COMP_1ST_CLASS_CD) AS COMP_APP_1ST_POINT
+                         , (SELECT PERFORMANCE_POINT
+                         	  FROM TPAP011 T
+                         	 WHERE T.ENTER_CD = A.ENTER_CD
+                               AND T.APP_TYPE_CD = 'B'
+                               AND T.APP_CLASS_CD = A.COMP_2ND_CLASS_CD) AS COMP_APP_2ND_POINT
+                         , F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'P00007', B.MAIN_APP_TYPE, #{ssnLocaleCd}) AS MAIN_APP_TYPE_NM
+                      FROM TPAP402 A
+                         , TORG051 B
+                     WHERE A.ENTER_CD = B.ENTER_CD
+                       AND A.COMPETENCY_CD = B.COMPETENCY_CD
+                       AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+                       AND A.SABUN = TRIM(#{searchSabun})
+                     ORDER BY A.COMPETENCY_CD
+				]]>
+			
+			
+		</select>
+
+<!-- 평가등급, 본인의견 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpTraResultPopMap">
+			
+				<![CDATA[
+					SELECT MBO_APP_1ST_MEMO
+						 , MBO_APP_2ND_MEMO
+						 , COMP_APP_1ST_MEMO
+						 , COMP_APP_2ND_MEMO
+					FROM TPAP350 A
+					WHERE APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+						AND SABUN = TRIM(#{searchSabun})
+						AND APP_ORG_CD = TRIM(#{searchAppOrgCd})
+				]]>
+			
+			
+		</select>
+
+</mapper>

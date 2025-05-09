@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appResultFradeMgr">
+
+<!-- 평가결과관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppResultGradeMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPRAISAL_CD
+					     , B.APPRAISAL_NM
+					     , A.SABUN
+					     , A.NAME
+					     , A.FINAL_GRADE
+					     , A.FINAL_TOTAL_CLASS_CD
+					     , A.FINAL_MBO_CLASS_CD
+					     , A.FINAL_COMP_CLASS_CD
+					     , A.FINAL_MUTUAL_CLASS_CD
+					     , A.FINAL_MUTUAL_POINT
+					     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ORG_NM
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+					     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+					     , A.CHKDATE
+					     , A.CHKID
+					     , F_COM_GET_NAMES(A.ENTER_CD, A.CHKID, NULL) AS CHKNAME
+					  FROM TPAP707 A
+					     , TPAP101 B
+					     , THRM100 C
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.SABUN = C.SABUN
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+	]]>
+					<if test='searchAppraisalCd != null and !searchAppraisalCd.equals("")'>
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					</if>
+
+					<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					   <![CDATA[
+					   AND A.SABUN IN (
+					       SELECT DISTINCT
+					              H.SABUN 
+					         FROM THRM151 H
+					        WHERE H.ENTER_CD = A.ENTER_CD
+					          AND H.SDATE = (
+					                  SELECT MAX(H1.SDATE)
+					                    FROM THRM151 H1
+					                   WHERE H1.ENTER_CD = H.ENTER_CD
+					                     AND H1.SABUN = H.SABUN
+					                     AND H1.SDATE <= TO_CHAR(SYSDATE, 'YYYYMMDD')
+					              )
+					          AND H.ORG_CD IN (
+					                  SELECT O.ORG_CD
+					                    FROM TORG101 O
+					                   WHERE O.ENTER_CD = H.ENTER_CD
+					                     AND O.ORG_NM LIKE '%' || #{searchOrgNm} ||'%'
+					                     AND O.SDATE = (
+					                             SELECT MAX(O1.SDATE)
+					                               FROM TORG101 O1
+					                              WHERE O1.ENTER_CD = O.ENTER_CD
+					                                AND O1.ORG_CD = O.ORG_CD
+					                                AND O1.SDATE <= TO_CHAR(SYSDATE, 'YYYYMMDD')
+					                         )
+					              )
+					       )
+					       ]]>
+					</if>
+					<if test='searchNm != null and !searchNm.equals("")'>
+					   AND (C.NAME LIKE '%' || #{searchNm} ||'%' OR A.SABUN LIKE #{searchNm} ||'%')
+					</if>
+		</select>
+
+<!-- 평가결과관리 저장 -->
+		<update parameterType="map" id="saveAppResultGradeMgr">
+
+					MERGE INTO TPAP707 T
+					USING (
+					           SELECT A.ENTER_CD
+					                , A.APPRAISAL_CD
+					                , A.SABUN
+					                , A.NAME
+					                , A.FINAL_GRADE
+					                , A.FINAL_TOTAL_CLASS_CD
+					                , A.FINAL_MBO_CLASS_CD
+					                , A.FINAL_COMP_CLASS_CD
+					                , A.FINAL_MUTUAL_CLASS_CD
+					                , A.FINAL_MUTUAL_POINT
+					             FROM (
+					                       SELECT NULL AS ENTER_CD
+					                            , NULL AS APPRAISAL_CD
+					                            , NULL AS SABUN
+					                            , NULL AS NAME
+					                            , NULL AS FINAL_GRADE
+					                            , NULL AS FINAL_TOTAL_CLASS_CD
+					                            , NULL AS FINAL_MBO_CLASS_CD
+					                            , NULL AS FINAL_COMP_CLASS_CD
+					                            , NULL AS FINAL_MUTUAL_CLASS_CD
+					                            , NULL AS FINAL_MUTUAL_POINT
+					                         FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+					                        UNION ALL
+					                       SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					                            , TRIM(#{rm.appraisalCd}) AS APPRAISAL_CD
+					                            , TRIM(#{rm.sabun}) AS SABUN
+					                            , TRIM(#{rm.name}) AS NAME
+					                            , TRIM(#{rm.finalGrade}) AS FINAL_GRADE
+					                            , TRIM(#{rm.finalTotalClassCd}) AS FINAL_TOTAL_CLASS_CD
+					                            , TRIM(#{rm.finalMboClassCd}) AS FINAL_MBO_CLASS_CD
+					                            , TRIM(#{rm.finalCompClassCd}) AS FINAL_COMP_CLASS_CD
+					                            , TRIM(#{rm.finalMutualClassCd}) AS FINAL_MUTUAL_CLASS_CD
+					                            , TRIM(#{rm.finalMutualPoint}) AS FINAL_MUTUAL_POINT
+					                         FROM DUAL
+</foreach>
+					                  ) A
+					            WHERE A.ENTER_CD IS NOT NULL
+					              AND A.APPRAISAL_CD IS NOT NULL
+					              AND A.SABUN IS NOT NULL
+					      ) S
+					   ON (
+					                  T.ENTER_CD     = S.ENTER_CD
+					              AND T.APPRAISAL_CD = S.APPRAISAL_CD
+					              AND T.SABUN        = S.SABUN
+					      )
+					WHEN MATCHED THEN
+					      UPDATE
+					         SET T.FINAL_GRADE           = S.FINAL_GRADE
+					           , T.FINAL_TOTAL_CLASS_CD  = S.FINAL_TOTAL_CLASS_CD
+					           , T.FINAL_MBO_CLASS_CD    = S.FINAL_MBO_CLASS_CD
+					           , T.FINAL_COMP_CLASS_CD   = S.FINAL_COMP_CLASS_CD
+					           , T.FINAL_MUTUAL_CLASS_CD = S.FINAL_MUTUAL_CLASS_CD
+					           , T.FINAL_MUTUAL_POINT    = S.FINAL_MUTUAL_POINT
+					           , T.NAME                  = S.NAME
+					           , T.CHKDATE               = SYSDATE
+					           , T.CHKID                 = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					             T.ENTER_CD
+					           , T.APPRAISAL_CD
+					           , T.SABUN
+					           , T.NAME
+					           , T.FINAL_GRADE
+					           , T.FINAL_TOTAL_CLASS_CD
+					           , T.FINAL_MBO_CLASS_CD
+					           , T.FINAL_COMP_CLASS_CD
+					           , T.FINAL_MUTUAL_CLASS_CD
+					           , T.FINAL_MUTUAL_POINT
+					           , T.CHKDATE
+					           , T.CHKID
+					     ) VALUES (
+					             S.ENTER_CD
+					           , S.APPRAISAL_CD
+					           , S.SABUN
+					           , S.NAME
+					           , S.FINAL_GRADE
+					           , S.FINAL_TOTAL_CLASS_CD
+					           , S.FINAL_MBO_CLASS_CD
+					           , S.FINAL_COMP_CLASS_CD
+					           , S.FINAL_MUTUAL_CLASS_CD
+					           , S.FINAL_MUTUAL_POINT
+					           , SYSDATE
+					           , #{ssnSabun}
+					     )
+		</update>
+
+<!-- 평가결과가관리 삭제 -->
+		<delete parameterType="map" id="deleteAppResultGradeMgr">
+
+					DELETE FROM TPAP707
+					 WHERE (ENTER_CD, APPRAISAL_CD, SABUN) IN (
+					              (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+	<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("") != null and rm.sabun != null and !rm.sabun.equals("")'>
+					            , (#{ssnEnterCd}, TRIM( #{rm.appraisalCd} ), TRIM( #{rm.sabun} ))
+	</if>
+</foreach>
+					       )
+		</delete>
+
+
+</mapper>

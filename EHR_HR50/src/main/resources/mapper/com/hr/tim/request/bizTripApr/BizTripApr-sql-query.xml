@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.bizTripApr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getBizTripAprList">
+
+				<![CDATA[
+				SELECT '0' AS IBS_IMAGE
+				   , A.APPL_SEQ AS APPL_SEQ
+				   , A.APPL_SABUN AS APPL_SABUN
+				   , B.APPL_YMD
+                   , B.APPL_STATUS_CD
+                   , B.AGREE_YMD
+                   , A.BTRIP_CD
+                   , A.BTRIP_NM
+                   , A.BTRIP_LOC
+                   , TO_CHAR(TO_DATE( A.BTRIP_SDATE,'YYYY-MM-DD'),'YYYY-MM-DD') ||' ~ '|| TO_CHAR(TO_DATE(A.BTRIP_EDATE,'YYYY-MM-DD'),'YYYY-MM-DD') AS BTRIP_DATE
+                   , F_HRM_GET_EMP_NAMES(A.ENTER_CD,A.APPL_SABUN) AS APPL_NM
+                   , CASE WHEN ((SELECT COUNT(B.SABUN)
+                                       FROM TTIM853 B
+                                      WHERE B.ENTER_CD = A.ENTER_CD
+                                        AND B.APPL_SEQ = A.APPL_SEQ) -1) = 0
+                              THEN F_HRM_GET_EMP_NAMES(A.ENTER_CD, (SELECT X.SABUN FROM TTIM853 X
+                                                                                       WHERE A.ENTER_CD = X.ENTER_CD
+                                                                                         AND A.APPL_SEQ = X.APPL_SEQ))
+                              ELSE F_HRM_GET_EMP_NAMES(A.ENTER_CD, (SELECT X.SABUN FROM TTIM853 X
+                                                                                       WHERE A.ENTER_CD = X.ENTER_CD
+                                                                                         AND A.APPL_SEQ = X.APPL_SEQ
+                                                                                         AND ROWNUM = 1)) ||' 외 '||
+                                   ((SELECT COUNT(B.SABUN)
+                                       FROM TTIM853 B
+                                      WHERE B.ENTER_CD = A.ENTER_CD
+                                        AND B.APPL_SEQ = A.APPL_SEQ) -1)||'명'  END  AS MEMBER
+				FROM TTIM851 A
+				   , THRI103 B
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+				          ]]>
+					<if test=' searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+						AND B.APPL_STATUS_CD LIKE '%' || #{searchApplStatusCd} || '%'
+					</if>
+					<if test=' searchBtripCd != null and !searchBtripCd.equals("")'>
+						AND A.BTRIP_CD LIKE '%' || #{searchBtripCd} || '%'
+					</if>
+					<if test=' searchOrgCd != null and !searchOrgCd.equals("")'>
+						AND (A.ENTER_CD, A.APPL_SEQ) IN (SELECT Y.ENTER_CD, Y.APPL_SEQ
+						                                   FROM TTIM853 Y
+						                                  WHERE Y.ENTER_CD = #{ssnEnterCd}
+						                                    AND Y.SABUN IN (SELECT SABUN
+																			  FROM THRM151 C
+																			 WHERE C.ENTER_CD = #{ssnEnterCd}
+																			   AND C.ORG_CD LIKE '%' || #{searchOrgCd} || '%'
+																			   AND C.SDATE = ( SELECT MAX(SDATE)
+														                                         FROM THRM151 X
+														                                        WHERE X.ENTER_CD = C.ENTER_CD
+															                                      AND X.SABUN = C.SABUN)))
+					</if>
+					<if test=' searchSabun != null and !searchSabun.equals("")'>
+						AND ( A.ENTER_CD, A.APPL_SEQ) IN (SELECT DISTINCT X.ENTER_CD, X.APPL_SEQ
+                                                 			FROM TTIM851 X
+                                                     			,TTIM853 Y
+                                                		   WHERE X.ENTER_CD 	= #{ssnEnterCd}
+                                                 			 AND X.ENTER_CD 	= Y.ENTER_CD
+                                                			 AND X.APPL_SEQ		= Y.APPL_SEQ
+                                                			 AND Y.SABUN = #{searchSabun} )
+					</if>
+				<![CDATA[
+					AND A.ENTER_CD = B.ENTER_CD
+                  	AND A.APPL_SEQ = B.APPL_SEQ
+                 	AND B.APPL_STATUS_CD <> '11'
+					AND B.APPL_YMD BETWEEN REPLACE(NVL( #{searchFrom}, '00000101'), '-', '') AND REPLACE(NVL( #{searchTo}, '99991231'), '-', '')
+					ORDER BY A.APPL_SEQ DESC
+				]]>
+
+
+		</select>
+
+
+</mapper>

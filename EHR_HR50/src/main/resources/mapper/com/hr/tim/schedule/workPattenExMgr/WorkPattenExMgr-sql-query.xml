@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.workPattenExMgr">
+
+<!-- 근무패턴예외관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkPattenExMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.WORK_ORG_CD
+						 , A.YMD
+						 , A.TIME_CD
+						 , A.MEMO
+					  FROM TTIM122 A
+					 WHERE A.ENTER_CD    = #{ssnEnterCd}
+					           ]]>
+					<if test='searchWorkOrgCd != null and !searchWorkOrgCd.equals("")'>
+					   AND A.WORK_ORG_CD = #{searchWorkOrgCd}
+					</if>
+					   AND A.YMD BETWEEN REPLACE( #{searchSymd},'-','') AND NVL(REPLACE( #{searchEymd},'-',''), '99991231')
+					 ORDER BY A.WORK_ORG_CD, A.YMD, A.TIME_CD
+
+
+
+		</select>
+
+<!-- 근무패턴예외관리 저장 -->
+		<update parameterType="map" id="saveWorkPattenExMgr">
+
+					MERGE INTO TTIM122 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.WORK_ORG_CD
+								 , A.YMD
+								 , A.TIME_CD
+								 , A.MEMO
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS WORK_ORG_CD
+										 , NULL AS YMD
+										 , NULL AS TIME_CD
+										 , NULL AS MEMO
+									FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.workOrgCd} )		AS  WORK_ORG_CD
+										 , TRIM( #{rm.ymd} )			AS  YMD
+										 , TRIM( #{rm.timeCd} )			AS  TIME_CD
+										 , TRIM( #{rm.memo} )			AS  MEMO
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD	IS NOT NULL
+										  AND A.WORK_ORG_CD	IS NOT NULL
+										  AND A.YMD			IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_ORG_CD = S.WORK_ORG_CD AND T.YMD = S.YMD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.TIME_CD			= S.TIME_CD
+									, T.MEMO			= S.MEMO
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_ORG_CD
+							, T.YMD
+							, T.TIME_CD
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.WORK_ORG_CD
+							, S.YMD
+							, S.TIME_CD
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+
+<!-- 근무패턴예외관리 삭제 -->
+		<delete parameterType="map" id="deleteWorkPattenExMgr">
+
+					DELETE FROM TTIM122
+					 WHERE (ENTER_CD, WORK_ORG_CD, YMD) IN (  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+							, ( TRIM( #{ssnEnterCd} ), TRIM( #{rm.workOrgCd} ), TRIM( #{rm.ymd} ))
+</foreach>
+										)
+		</delete>
+
+</mapper>

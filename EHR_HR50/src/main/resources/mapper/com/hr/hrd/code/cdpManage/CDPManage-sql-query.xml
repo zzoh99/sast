@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.code.cdpManage">
+        <select parameterType="map" resultType="cMap" id="getCDPManageList">
+
+					SELECT A.ACTIVE_YYYY, A.HALF_GUBUN_TYPE, A.ACTIVE_START_YMD, A.ACTIVE_END_YMD, A.ACTIVE_DESC
+					  FROM TCDPV000 A
+					 WHERE A.ENTER_CD    = #{ssnEnterCd}
+					<if test='searchActiveYyyy != null and !searchActiveYyyy.equals("")'>
+					   AND A.ACTIVE_YYYY LIKE #{searchActiveYyyy}
+                    </if>
+				     ORDER BY A.ACTIVE_YYYY DESC, A.HALF_GUBUN_TYPE DESC
+
+
+        </select>
+
+        <update parameterType="map" id="saveCDPManageList">
+
+					MERGE INTO TCDPV000 T
+					USING (
+							SELECT A.ENTER_CD
+								 , A.ACTIVE_YYYY
+								 , A.HALF_GUBUN_TYPE
+								 , A.ACTIVE_START_YMD
+								 , A.ACTIVE_END_YMD
+								 , A.ACTIVE_DESC
+								 , A.CHKDATE
+								 , A.CHKID
+							  FROM (
+									SELECT NULL AS ENTER_CD
+										 , NULL AS ACTIVE_YYYY
+										 , NULL AS HALF_GUBUN_TYPE
+										 , NULL AS ACTIVE_START_YMD
+										 , NULL AS ACTIVE_END_YMD
+										 , NULL AS ACTIVE_DESC
+										 , NULL AS CHKDATE
+										 , NULL AS CHKID
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									 UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )          AS ENTER_CD
+										 , TRIM( #{rm.activeYyyy})      AS ACTIVE_YYYY
+										 , TRIM( #{rm.halfGubunType})   AS HALF_GUBUN_TYPE
+										 , TRIM( #{rm.activeStartYmd})  AS ACTIVE_START_YMD
+										 , TRIM( #{rm.activeEndYmd})    AS ACTIVE_END_YMD
+										 , TRIM( #{rm.activeDesc})      AS ACTIVE_DESC
+										 , SYSDATE                      AS CHKDATE
+										 , #{ssnSabun}                    AS CHKID
+									  FROM DUAL
+</foreach>
+								  ) A WHERE A.ENTER_CD IS NOT NULL
+							  ) S
+						   ON ( T.ENTER_CD = S.ENTER_CD AND T.ACTIVE_YYYY = S.ACTIVE_YYYY AND T.HALF_GUBUN_TYPE = S.HALF_GUBUN_TYPE )
+					     WHEN MATCHED THEN
+							  UPDATE SET T.ACTIVE_START_YMD = S.ACTIVE_START_YMD
+									   , T.ACTIVE_END_YMD = S.ACTIVE_END_YMD
+								       , T.ACTIVE_DESC = S.ACTIVE_DESC
+									   , T.CHKDATE = S.CHKDATE
+									   , T.CHKID = S.CHKID
+					     WHEN NOT MATCHED THEN
+ 							  INSERT ( T.ENTER_CD     , T.ACTIVE_YYYY     , T.HALF_GUBUN_TYPE     , T.ACTIVE_START_YMD     , T.ACTIVE_END_YMD     , T.ACTIVE_DESC     , T.CHKDATE     , T.CHKID)
+ 							  VALUES ( S.ENTER_CD     , S.ACTIVE_YYYY     , S.HALF_GUBUN_TYPE     , S.ACTIVE_START_YMD     , S.ACTIVE_END_YMD     , S.ACTIVE_DESC     , S.CHKDATE     , S.CHKID)
+
+
+        </update>
+
+        <delete parameterType="map" id="deleteCDPManageList">
+
+                    DELETE FROM TCDPV000
+                    WHERE (ENTER_CD, ACTIVE_YYYY,HALF_GUBUN_TYPE) IN ( (NULL, NULL, NULL)
+                   <foreach item="rm" collection="deleteRows" >
+                     <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.activeYyyy != null and !rm.activeYyyy.equals("") and rm.halfGubunType != null and !rm.halfGubunType.equals("")'>
+                     	,(TRIM(#{ssnEnterCd}),TRIM(#{rm.activeYyyy}),TRIM(#{rm.halfGubunType}))
+                     </if>
+                   </foreach>
+                   )
+
+
+
+        </delete>
+
+
+</mapper>

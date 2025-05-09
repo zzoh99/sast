@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.quickMenuMgr">
+
+		<!-- 메뉴명 조회 COMBO LIST -->
+		<select parameterType="map" resultType="cMap" id="getQuickMuComboList">
+
+				<![CDATA[
+					SELECT A.MAIN_MENU_CD AS CODE, A.MAIN_MENU_NM AS CODE_NM, A.SEQ
+					FROM TSYS309 A
+					INNER JOIN (SELECT DISTINCT B.MAIN_MENU_CD AS MAIN_MENU_CD
+					            FROM TSYS303 B
+					            INNER JOIN TSYS311 C
+					               ON C.ENTER_CD = B.ENTER_CD
+					              AND C.MAIN_MENU_CD = B.MAIN_MENU_CD
+					              AND C.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+					              AND C.MENU_CD = B.MENU_CD
+					              AND C.MENU_SEQ = B.MENU_SEQ
+					            WHERE B.ENTER_CD = #{ssnEnterCd}
+					              AND C.GRP_CD = #{ssnGrpCd}
+					              AND C.USE_YN = '1') D
+					   ON D.MAIN_MENU_CD = A.MAIN_MENU_CD
+					WHERE 1=1
+					  AND A.USE_YN = '1'
+					  AND ENTER_CD = #{ssnEnterCd}
+					ORDER	BY	A.SEQ
+				]]>
+
+
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getQuickMuPrgList">
+
+				<![CDATA[
+
+					 SELECT T1.*
+                  FROM (
+                    SELECT    LEVEL AS "_level", ROWNUM AS rnum
+                            , AA.*
+                    FROM (    SELECT A.ENTER_CD
+                                , A.MAIN_MENU_CD
+                                , A.PRIOR_MENU_CD
+                                , A.MENU_CD
+                                , A.MENU_SEQ
+                                , nvl(B.MENU_NM, A.MENU_NM) AS MENU_NM
+                                , A.TYPE
+                                , A.PRG_CD
+                                , NVL(B.SEARCH_SEQ, A.SEARCH_SEQ) AS SEARCH_SEQ
+                                , NVL(B.CNT, A.CNT) AS CNT
+                                , NVL(B.SEQ, A.SEQ) AS SEQ
+                                , NVL(B.DATA_RW_TYPE, A.DATA_RW_TYPE) AS DATA_RW_TYPE
+                                , NVL(B.DATA_PRG_TYPE, A.DATA_PRG_TYPE) AS DATA_PRG_TYPE
+                                , NVL(B.GRP_CD , #{ssnGrpCd} ) AS GRP_CD
+                                , B.INQ_S_YMD
+                                , B.INQ_E_YMD
+                                , B.POPUP_USE_YN
+                                , B.USE_YN
+                                , B.USE_YN AS TMP_USE_YN
+                            FROM TSYS303 A, TSYS311 B
+                            WHERE A.ENTER_CD = #{ssnEnterCd}
+                            AND A.ENTER_CD = B.ENTER_CD(+)
+                            AND A.MAIN_MENU_CD = B.MAIN_MENU_CD(+)
+                            AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD(+)
+                            AND A.MENU_CD = B.MENU_CD(+)
+                            AND A.MENU_SEQ = B.MENU_SEQ(+)
+                            AND B.GRP_CD(+) = #{ssnGrpCd}
+                            AND A.MAIN_MENU_CD = #{mainMenuCd}
+                            AND B.USE_YN = '1')AA
+                    WHERE 1=1
+                    START WITH AA.PRIOR_MENU_CD = '0'
+                    CONNECT BY PRIOR AA.ENTER_CD = AA.ENTER_CD
+                    AND PRIOR AA.MAIN_MENU_CD = AA.MAIN_MENU_CD
+                    AND PRIOR AA.MENU_CD = AA.PRIOR_MENU_CD
+                    ORDER SIBLINGS BY AA.SEQ) T1
+              ORDER BY RNUM
+
+
+				]]>
+
+
+		</select>
+
+
+
+		<select parameterType="map" resultType="cMap" id="tsys333SelectMyQuickMenuList">
+
+				<![CDATA[
+					SELECT A.MAIN_MENU_CD, A.PRIOR_MENU_CD, A.MENU_CD, A.MENU_SEQ, A.GRP_CD,
+						   A.PRG_CD, A.MENU_NM, '0' AS DEL_IMG, B.SEQ AS MY_SEQ, B.SABUN
+					FROM TSYS311 A, TSYS333 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+					  AND A.MAIN_MENU_CD = B.MAIN_MENU_CD
+					  AND A.PRIOR_MENU_CD = B.PRIOR_MENU_CD
+					  AND A.MENU_CD = B.MENU_CD
+					  AND A.MENU_SEQ = B.MENU_SEQ
+					  AND A.GRP_CD = B.GRP_CD
+					  AND A.ENTER_CD = #{ssnEnterCd}
+					  AND A.GRP_CD = #{ssnGrpCd}
+					  AND B.SABUN = #{ssnSabun}
+					  AND (A.USE_YN = '1' OR A.USE_YN IS NULL)
+					ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+
+
+
+<!-- 		일정관리 저장 -->
+		<update parameterType="map" id="saveQuickMenu">
+
+
+					MERGE INTO TSYS333 T
+					USING	(
+							SELECT    A.ENTER_CD
+									, A.SABUN
+									, A.MAIN_MENU_CD
+									, A.PRIOR_MENU_CD
+									, A.MENU_CD
+									, A.MENU_SEQ
+									, A.GRP_CD
+									, A.PRG_CD
+									, A.SEQ
+
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS MAIN_MENU_CD
+											, NULL		AS PRIOR_MENU_CD
+											, NULL		AS MENU_CD
+											, NULL		AS MENU_SEQ
+											, NULL		AS GRP_CD
+											, NULL		AS PRG_CD
+											, NULL		AS SEQ
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											, TRIM( #{rm.sabun} )	AS SABUN
+											, TRIM( #{rm.mainMenuCd} )	AS MAIN_MENU_CD
+											, TRIM( #{rm.priorMenuCd} )	AS PRIOR_MENU_CD
+											, TRIM( #{rm.menuCd} )	AS MENU_CD
+											, TRIM( #{rm.menuSeq} )	AS MENU_SEQ
+											, TRIM( #{rm.grpCd} )	AS GRP_CD
+											, TRIM( #{rm.prgCd} )	AS PGR_CD
+											<choose><when test='rm.mySeq != null and !rm.mySeq.equals("")'>
+												, TRIM(#{rm.mySeq}) 			AS SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+											, (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM TSYS333 WHERE ENTER_CD=#{ssnEnterCd} AND SABUN = #{ssnSabun} ) AS SEQ
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD 	= S.ENTER_CD
+					 AND T.SABUN 		= S.SABUN
+					 AND T.MAIN_MENU_CD	= S.MAIN_MENU_CD
+					 AND T.PRIOR_MENU_CD= S.PRIOR_MENU_CD
+					 AND T.MENU_CD		= S.MENU_CD
+					 AND T.MENU_SEQ		= S.MENU_SEQ
+					 AND T.GRP_CD		= S.GRP_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PRG_CD	= S.PRG_CD
+									, T.SEQ		= S.SEQ
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(	  T.ENTER_CD
+							, T.SABUN
+							, T.MAIN_MENU_CD
+							, T.PRIOR_MENU_CD
+							, T.MENU_CD
+							, T.MENU_SEQ
+							, T.GRP_CD
+							, T.PRG_CD
+							, T.SEQ
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.MAIN_MENU_CD
+							, S.PRIOR_MENU_CD
+							, S.MENU_CD
+							, S.MENU_SEQ
+							, S.GRP_CD
+							, S.PRG_CD
+							, S.SEQ
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteQuickMenu">
+
+
+					DELETE FROM TSYS333
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND SABUN    = #{ssnSabun}
+					  AND SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.mySeq != null and !rm.mySeq.equals("")'>
+											TRIM( #{rm.mySeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+	<mapper namespace="sys.security.userMgr">
+		<select parameterType="map" resultType="cMap" id="userMgrList">
+
+				<![CDATA[
+					SELECT 	  A.ENTER_CD
+		 					, A.SABUN
+		 					, F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+		 					, F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+		 					, B.EMP_YMD
+		 					, F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+		 					, D.STATUS_NM
+		 					, D.JIKCHAK_NM
+		 					, D.JIKGUB_NM
+		 					, D.JIKWEE_NM
+		 					, A.ID
+		 					, '' AS PASSWORD
+		 					, A.PASSWORDRMK
+		 					, A.MAINPAGE_TYPE
+		 					, A.SEARCH_TYPE
+		 					, '0' AS PWD_CHANGE
+		 					, DECODE(A.ROCKING_YN,'Y',1,0) ROCKING_YN
+		 					, A.LOGIN_FAIL_CNT
+		 					, F_COM_GET_CONT_ADDRESS(A.ENTER_CD,A.SABUN,'IM') AS MAIL_ID
+		 					, A.SKIN_TYPE
+		 					, A.FONT_TYPE
+		 					, A.MAIN_TYPE
+		 					, A.GW_USE_TYPE
+		 					, A.FOC_TYPE
+		 					--, DECODE( (SELECT COUNT(*) FROM  TSYS308 WHERE ENTER_CD = A.ENTER_CD AND ID = A.SABUN), 0, '', 1) AS IP
+		 					, A.PSWD_CHG_YMD
+		 					, '0' AS DOWNLOAD_PWD_CHANGE
+					FROM TSYS305 A, THRM100 B , THRM151 D
+                	WHERE A.ENTER_CD= #{ssnEnterCd}
+                  	AND A.ENTER_CD 	= B.ENTER_CD
+                  	AND A.SABUN 	= B.SABUN
+	              	AND A.ENTER_CD = D.ENTER_CD
+	              	AND A.SABUN = D.SABUN
+	              	AND REPLACE(TRIM( #{basisYmd} ), '-', '') BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+	              	AND D.STATUS_CD <> 'RAA'
+	              	        ]]>
+              	<if test='srchName != null and !srchName.equals("")'>
+              		AND F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) LIKE '%'||trim(#{srchName})||'%'
+				</if>
+              	<if test='srchSabun != null and !srchSabun.equals("")'>
+               		AND UPPER(A.SABUN) 	= UPPER(trim(#{srchSabun}))
+				</if>
+              	<if test='statusCd != null and !statusCd.equals("")'>
+					   AND D.STATUS_CD != #{statusCd}
+				</if>
+              	<if test='gwUseType != null and !gwUseType.equals("")'>
+              		AND A.GW_USE_TYPE 	= trim(#{gwUseType})
+				</if>
+              	<if test='focType != null and !focType.equals("")'>
+              		AND A.FOC_TYPE 		= trim(#{focType})
+				</if>
+              	<if test='empYmdFrom != null and !empYmdFrom.equals("") and empYmdTo != null and !empYmdTo.equals("")'>
+              		AND B.EMP_YMD BETWEEN REPLACE(TRIM( #{empYmdFrom} ), '-', '') AND REPLACE(TRIM( #{empYmdTo} ), '-', '')
+				</if>
+					ORDER BY F_COM_JIKJE_SORT(D.ENTER_CD, D.SABUN, D.SDATE)
+
+
+		</select>
+
+
+		<update parameterType="map" id="userMgrPwdInit">
+ 				<![CDATA[
+     				UPDATE TSYS305 T
+					SET
+					(   PASSWORD , LOGIN_FAIL_CNT, CHKDATE  , CHKID  ) = (
+				 		SELECT
+				 				CRYPTIT.CRYPT( TRIM(#{newPwd}), ENTER_CD) AS PASSWORD
+				 			   , 0
+							   , SYSDATE
+				               , SABUN
+				          FROM THRM100
+				         WHERE 1=1
+				           AND ENTER_CD	= #{ssnEnterCd}
+				           AND UPPER(SABUN) = UPPER(TRIM(#{ssnSabun}))
+					)
+					WHERE EXISTS(
+					    SELECT *
+					      FROM THRM100 E
+					     WHERE 1=1
+					       AND E.ENTER_CD     = #{ssnEnterCd}
+						   AND UPPER(E.SABUN) = UPPER(TRIM(#{sabun}))
+					       AND E.ENTER_CD     = T.ENTER_CD
+					       AND E.SABUN        = T.SABUN
+					)
+				]]>
+
+
+		</update>
+
+		<update parameterType="map" id="saveUserMgr">
+
+   					MERGE INTO TSYS305 TARGETTABLE
+                  	USING (
+               				SELECT    A.SABUN			AS SABUN
+                                	, A.ID				AS ID
+                                	, A.PASSWORD		AS PASSWORD
+                                	, A.MAINPAGE_TYPE	AS MAINPAGE_TYPE
+                                	, A.SEARCH_TYPE		AS SEARCH_TYPE
+                                	, A.ROCKING_YN		AS ROCKING_YN
+                                	, A.LOGIN_FAIL_CNT		AS LOGIN_FAIL_CNT
+                                	, A.SKIN_TYPE		AS SKIN_TYPE
+                                	, A.FONT_TYPE		AS FONT_TYPE
+                                	, A.MAIN_TYPE		AS MAIN_TYPE
+                                	, A.GW_USE_TYPE     AS GW_USE_TYPE
+                                	, A.FOC_TYPE			AS FOC_TYPE
+                     		FROM   (
+                               		SELECT    NULL			AS SABUN
+                                			, NULL			AS ID
+                                			, NULL			AS PASSWORD
+                                			, NULL			AS MAINPAGE_TYPE
+                                			, NULL			AS SEARCH_TYPE
+                                			, NULL			AS ROCKING_YN
+                                			, NULL			AS LOGIN_FAIL_CNT
+                                			, NULL			AS SKIN_TYPE
+                                			, NULL			AS FONT_TYPE
+                                			, NULL			AS MAIN_TYPE
+                                			, NULL          AS GW_USE_TYPE
+                                			, NULL          AS FOC_TYPE
+                                	FROM   DUAL
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT    TRIM(#{rm.sabun})  		AS SABUN
+                                       		, TRIM(#{rm.id})			AS ID
+                                       		, ( SELECT UTL_ENCODE.TEXT_ENCODE(N_PWD,'WE8ISO8859P1',1)
+												FROM( SELECT SUBSTR(CRYPTIT.DECRYPT(RES_NO, ENTER_CD),7) AS N_PWD
+												      FROM THRM100
+												      WHERE SABUN = TRIM(#{rm.sabun})
+												)
+												WHERE ROWNUM = 1 )		AS PASSWORD
+                                       		, TRIM(#{rm.mainpageType})	AS MAINPAGE_TYPE
+                                       		, TRIM(#{rm.searchType})	AS SEARCH_TYPE
+                                       		<if test='rm.rockingYn.equals("0")'>
+                                       		, 'N'						AS ROCKING_YN
+											</if>
+                                       		<if test='rm.rockingYn.equals("1")'>
+                                       		, 'Y'						AS ROCKING_YN
+											</if>
+                                       		, TRIM(#{rm.loginFailCnt})		AS LOGIN_FAIL_CNT
+                                       		, TRIM(#{rm.skinType})		AS SKIN_TYPE
+                                       		, TRIM(#{rm.fontType})		AS FONT_TYPE
+                                       		, TRIM(#{rm.mainType})		AS MAIN_TYPE
+                                       		, TRIM(#{rm.gwUseType})		AS GW_USE_TYPE
+                                       		, TRIM(#{rm.focType})		AS FOC_TYPE
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.SABUN IS NOT NULL
+                           ) SOURCETABLE
+                        ON (		TARGETTABLE.ENTER_CD 	= #{ssnEnterCd}
+                               AND	TARGETTABLE.SABUN 		= SOURCETABLE.SABUN
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.ID				= SOURCETABLE.ID
+                                  	, TARGETTABLE.MAINPAGE_TYPE		= SOURCETABLE.MAINPAGE_TYPE
+                                  	, TARGETTABLE.SEARCH_TYPE		= SOURCETABLE.SEARCH_TYPE
+                                  	, TARGETTABLE.ROCKING_YN		= SOURCETABLE.ROCKING_YN
+                                  	, TARGETTABLE.LOGIN_FAIL_CNT	= SOURCETABLE.LOGIN_FAIL_CNT
+                                  	, TARGETTABLE.SKIN_TYPE			= SOURCETABLE.SKIN_TYPE
+                                  	, TARGETTABLE.FONT_TYPE			= SOURCETABLE.FONT_TYPE
+                                  	, TARGETTABLE.MAIN_TYPE			= SOURCETABLE.MAIN_TYPE
+                                  	, TARGETTABLE.GW_USE_TYPE		= SOURCETABLE.GW_USE_TYPE
+                                  	, TARGETTABLE.FOC_TYPE		= SOURCETABLE.FOC_TYPE
+                                  	, TARGETTABLE.CHKDATE			= SYSDATE
+                                  	, TARGETTABLE.CHKID				= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SABUN
+               				, TARGETTABLE.ID
+               				, TARGETTABLE.PASSWORD
+                          	, TARGETTABLE.MAINPAGE_TYPE
+                          	, TARGETTABLE.SEARCH_TYPE
+                          	, TARGETTABLE.ROCKING_YN
+                          	, TARGETTABLE.LOGIN_FAIL_CNT
+                          	, TARGETTABLE.SKIN_TYPE
+                          	, TARGETTABLE.FONT_TYPE
+                          	, TARGETTABLE.MAIN_TYPE
+                          	, TARGETTABLE.GW_USE_TYPE
+                          	, TARGETTABLE.FOC_TYPE
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, SOURCETABLE.SABUN
+               				, SOURCETABLE.ID
+               				, SOURCETABLE.PASSWORD
+               				, SOURCETABLE.MAINPAGE_TYPE
+               				, SOURCETABLE.SEARCH_TYPE
+               				, SOURCETABLE.ROCKING_YN
+               				, SOURCETABLE.LOGIN_FAIL_CNT
+               				, SOURCETABLE.SKIN_TYPE
+               				, SOURCETABLE.FONT_TYPE
+               				, SOURCETABLE.MAIN_TYPE
+               				, SOURCETABLE.GW_USE_TYPE
+               				, SOURCETABLE.FOC_TYPE
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+
+
+
+		</update>
+
+		<!-- 사용자 삭제  -->
+		<delete parameterType="map" id="deleteUserMgr">
+
+   					DELETE FROM TSYS305
+					WHERE ENTER_CD||'_'||SABUN
+							IN (  NULL
+					<foreach item="rm" collection="deleteRows" >
+					,
+		             	<if test='rm.sabun != null and !rm.sabun.equals("")'>
+		             		TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})
+						</if>
+					</foreach>
+					)
+		</delete>
+
+		<!-- 테마/폰트변경  -->
+		<select parameterType="map" resultType="cMap" id="userTheme">
+
+				<![CDATA[
+					UPDATE TSYS305 T
+					SET  SKIN_TYPE = #{subThemeType}
+						,FONT_TYPE = #{subFontType}
+						,MAIN_TYPE = #{subMainType}
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND SABUN 	   = #{ssnSabun}
+				]]>
+
+
+
+		</select>
+
+		<!-- 패스워드 확인  -->
+		<select parameterType="map" resultType="cMap" id="pwdConfirm">
+
+				<![CDATA[
+					SELECT COUNT(*) AS CNT
+					FROM TSYS305 A
+					WHERE A.ENTER_CD =#{ssnEnterCd}
+					AND A.SABUN = #{ssnSabun} ]]>
+<choose>
+<when test='type != null and !type.equals("")'>
+	<if test='type.equals("login")'>
+					AND A.PASSWORD = CRYPTIT.CRYPT(#{confirmPwd}, ENTER_CD)
+					AND DECODE(A.PASSWORD_DOWNLOAD, CRYPTIT.ENCRYPT(#{newPwd}, A.ENTER_CD), 'Y', 'N') = 'N'
+	</if>
+	<if test='type.equals("download")'>
+					AND NVL(A.PASSWORD_DOWNLOAD, A.SABUN) = DECODE(A.PASSWORD_DOWNLOAD, NULL, A.SABUN, CRYPTIT.ENCRYPT(#{confirmPwd}, ENTER_CD))
+					AND DECODE(A.PASSWORD, CRYPTIT.CRYPT(#{newPwd}, A.ENTER_CD), 'Y', 'N') = 'N'
+	</if>
+</when>
+		<otherwise>
+					AND A.PASSWORD = CRYPTIT.CRYPT(#{confirmPwd}, ENTER_CD)
+		</otherwise>
+</choose>
+					AND ROWNUM = 1
+
+
+
+		</select>
+
+		<!-- 패스워드 랜덤리턴  -->
+		<select parameterType="map" resultType="cMap" id="pwdRandom">
+
+				<![CDATA[
+					SELECT N_PWD, UTL_ENCODE.TEXT_ENCODE(N_PWD,'WE8ISO8859P1',1) AS ENC_PWD
+					FROM(SELECT DBMS_RANDOM.STRING('A', 6) AS N_PWD FROM DUAL)
+					WHERE ROWNUM = 1
+				]]>
+
+
+		</select>
+
+
+		<!-- 주민번호7자리 , 암호화 리턴  -->
+		<select parameterType="map" resultType="cMap" id="pwd7Jumin">
+
+				<![CDATA[
+					SELECT N_PWD, UTL_ENCODE.TEXT_ENCODE(N_PWD,'WE8ISO8859P1',1) AS ENC_PWD
+					FROM( SELECT SUBSTR(CRYPTIT.DECRYPT(RES_NO, ENTER_CD),7) AS N_PWD
+					      FROM THRM100
+					      WHERE SABUN = #{sabun}
+					)
+					WHERE ROWNUM = 1
+				]]>
+
+
+		</select>
+
+
+		<!-- 패스워드 변경  -->
+		<update parameterType="map"  id="pwdChfirm">
+
+				<![CDATA[
+					UPDATE TSYS305 A
+					SET  A.PASSWORD = CRYPTIT.CRYPT(TRIM(#{newPwd}), ENTER_CD)
+					   , A.PSWD_CHG_YMD = TO_CHAR(SYSDATE,'YYYYMMDD')
+					   , A.CHKDATE = SYSDATE
+					   , A.CHKID  = #{ssnSabun}
+					WHERE ENTER_CD||'_'||SABUN  =(
+						SELECT ENTER_CD ||'_'|| SABUN
+                    	FROM TSYS305 A
+                    	WHERE A.ENTER_CD = #{ssnEnterCd}
+                    	AND A.SABUN =  #{ssnSabun}
+                    	AND A.PASSWORD = CRYPTIT.CRYPT( TRIM(#{confirmPwd}), ENTER_CD)
+                    	AND ROWNUM = 1
+                    )
+				]]>
+
+
+		</update>
+
+<!-- 패스워드 보안 체크 -->
+        <select parameterType="map" resultType="cMap" id="pwdCheck">
+
+                <![CDATA[
+					SELECT F_SYS_GET_PWD_CHECK(#{ssnEnterCd}, #{ssnSabun}, #{newPwd}) AS PWD_CHECK
+					  FROM dual
+                ]]>
+
+
+        </select>
+
+
+		<insert parameterType="map" id="insert108">
+
+					INSERT INTO THRI108 (ENTER_CD, SEQ, RECEIVE_MAIL, SEND_SABUN, SEND_NAME,
+					                     SEND_MAIL, SEND_DATE, TITLE, CONTENTS, CHKDATE, CHKID
+					) VALUES (
+					                     #{enterCd},
+					                     MAIL_SEQ.NEXTVAL,
+					                     'dolmangi@gmail.com',
+					                     #{sabun},
+					                     #{name},
+					                     #{email},
+					                     SYSDATE,
+					                     '임시비밀번호',
+					                     #{newPwd},
+					                     SYSDATE,
+					                     #{sabun}
+					)
+		</insert>
+
+		<insert parameterType="map" id="insert109">
+
+				<![CDATA[
+
+					 INSERT INTO THRI109( MT_PR, DATE_CLIENT_REQ, CONTENT, CALLBACK, SERVICE_TYPE, BROADCAST_YN, MSG_STATUS, RECIPIENT_NUM, CHKID)
+					 VALUES ((SELECT MAX(NVL(MT_PR,0))+1 FROM THRI109)
+					         , SYSDATE,#{newPwd}, '01035937461','0', 'N', '1',#{phone}, #{sabun})
+
+				]]>
+
+
+		</insert>
+
+
+<!-- 패스워드 변경 이력 저장  -->
+        <insert parameterType="map" id="pwdChfirmHistory">
+
+                <![CDATA[
+                    INSERT INTO TSYS304 A
+                    (
+                       ENTER_CD
+                     , SABUN
+                     , SEQ
+                     , ID
+                     , PASSWORD
+                     , CHKID
+                    )
+                    VALUES
+                    (
+                       #{ssnEnterCd}
+                     , #{ssnSabun}
+                     , (SELECT NVL(MAX(SEQ),0) + 1 FROM TSYS304 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = #{ssnSabun} )
+                     , (SELECT ID FROM TSYS305 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = #{ssnSabun} )
+                     ,  CRYPTIT.CRYPT(TRIM(#{newPwd}), #{ssnEnterCd})
+                     , (SELECT DISTINCT ID FROM TSYS305 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = #{ssnSabun} )
+                    )
+                ]]>
+
+
+
+        </insert>
+
+		<!-- 다운로드 패스워드 변경  -->
+		<update parameterType="map" id="updateDownloadPassword">
+
+				<![CDATA[
+					UPDATE TSYS305 A
+					   SET A.PASSWORD_DOWNLOAD = CRYPTIT.ENCRYPT(TRIM(#{newPwd}), ENTER_CD)
+					     , A.CHKDATE = SYSDATE
+					     , A.CHKID  = #{ssnSabun}
+					 WHERE ENTER_CD||'_'||SABUN = (
+					           SELECT ENTER_CD ||'_'|| SABUN
+					             FROM TSYS305 A
+					            WHERE A.ENTER_CD = #{ssnEnterCd}
+					              AND A.SABUN =  #{ssnSabun}
+								  AND NVL(A.PASSWORD_DOWNLOAD, A.SABUN) = DECODE(A.PASSWORD_DOWNLOAD, NULL, A.SABUN, CRYPTIT.ENCRYPT(#{confirmPwd}, ENTER_CD))
+					              AND ROWNUM = 1
+					       )
+				]]>
+
+
+		</update>
+
+		<!-- 다운로드 패스워드 초기화  -->
+		<update parameterType="map" id="userMgrDownloadPwdInit">
+
+				<![CDATA[
+	 				UPDATE TSYS305 T SET
+					       (PASSWORD_DOWNLOAD, CHKDATE , CHKID) = (
+					           SELECT CRYPTIT.ENCRYPT( TRIM(#{newPwd}), ENTER_CD) AS PASSWORD_DOWNLOAD
+					                , SYSDATE
+					                , SABUN
+					             FROM THRM100
+					            WHERE 1=1
+					              AND ENTER_CD	= #{ssnEnterCd}
+					              AND UPPER(SABUN) = UPPER(TRIM(#{ssnSabun}))
+					       )
+					 WHERE EXISTS(
+					           SELECT *
+					             FROM THRM100 E
+					            WHERE 1=1
+					              AND E.ENTER_CD     = #{ssnEnterCd}
+					              AND UPPER(E.SABUN) = UPPER(TRIM(#{sabun}))
+					              AND E.ENTER_CD     = T.ENTER_CD
+					              AND E.SABUN        = T.SABUN
+					       )
+				]]>
+
+
+		</update>
+
+</mapper>

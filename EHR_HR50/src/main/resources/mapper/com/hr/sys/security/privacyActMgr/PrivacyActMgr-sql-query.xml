@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.security.privacyActMgr">
+<!-- 		개인정보보호법관리 sheet1 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPrivacyActMgrSheet1List">
+
+				<![CDATA[
+					SELECT INFO_SEQ, SDATE, EDATE
+						   , DECODE(NVL(SUBJECT,''),'','',SUBSTR(SUBJECT,0,20)||'...') AS SUBJECT_VIEW
+						   , SUBJECT, ADMIN_INFO
+					FROM TSYS621
+					WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					ORDER BY SDATE DESC, EDATE DESC
+				]]>
+
+
+		</select>
+
+<!-- 		개인정보보호법관리 sheet1 저장 -->
+		<update parameterType="map" id="savePrivacyActMgrSheet1">
+
+					MERGE INTO TSYS621 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.INFO_SEQ
+									, A.SDATE
+									, A.EDATE
+									, A.SUBJECT
+									, A.ADMIN_INFO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS INFO_SEQ
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS SUBJECT
+											, NULL		AS ADMIN_INFO
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" index="index">
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.infoSeq != null and !rm.infoSeq.equals("")'>
+												, TRIM(#{rm.infoSeq}) 			AS INFO_SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when>
+												<otherwise>
+												, TO_CHAR( ( SELECT (NVL(MAX(TO_NUMBER(INFO_SEQ)),0) + (${index} + 1)) FROM TSYS621 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) ) )	AS INFO_SEQ
+												--icnt 증가
+												</otherwise>
+											</choose>
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate})	AS EDATE
+											, TRIM( #{rm.subject} )	AS SUBJECT
+											, TRIM( #{rm.adminInfo} )	AS ADMIN_INFO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.INFO_SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.INFO_SEQ = S.INFO_SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SDATE	= S.SDATE
+									, T.EDATE	= S.EDATE
+									, T.SUBJECT	= S.SUBJECT
+									, T.ADMIN_INFO	= S.ADMIN_INFO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.INFO_SEQ
+							, T.SDATE
+							, T.EDATE
+							, T.SUBJECT
+							, T.ADMIN_INFO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.INFO_SEQ
+							, S.SDATE
+							, S.EDATE
+							, S.SUBJECT
+							, S.ADMIN_INFO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		개인정보보호법관리 sheet1 삭제 -->
+		<delete parameterType="map" id="deletePrivacyActMgrSheet1">
+
+					DELETE FROM TSYS621
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||INFO_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.infoSeq  != null and !rm.infoSeq.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.infoSeq})
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 		개인정보보호법관리 미리보기 팝업 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPrivacyPopupList">
+
+				<![CDATA[
+					SELECT B.INFO_SEQ,
+					       B.ELE_SEQ,
+					       B.ELE_SUMMARY,
+					       B.ELE_CONTENTS,
+					       B.ELE_TYPE,
+					       B.ORDER_SEQ ,
+	                       D.SUBJECT,
+	                       B.COL_SIZE,
+	                       B.UP_DOWN,
+	                       B.WHITE_SPACE,
+	                       B.AGREE_YN AS AGREE_YN623
+					  FROM TSYS623 B, TSYS621 D
+					 WHERE B.INFO_SEQ = #{infoSeq}
+					       AND B.ENTER_CD = D.ENTER_CD
+					       AND B.INFO_SEQ = D.INFO_SEQ
+					       AND B.ENTER_CD = #{ssnEnterCd}
+					       AND B.OPEN_YN = 'Y'
+					ORDER BY B.ORDER_SEQ
+				]]>
+
+
+		</select>
+
+<!-- 		개인정보보호법관리 sheet2 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPrivacyActMgrSheet2List">
+
+				<![CDATA[
+					SELECT A.INFO_SEQ, B.ELE_SEQ, B.ELE_SUMMARY, DECODE(NVL(B.ELE_CONTENTS,''),'','',SUBSTR(B.ELE_CONTENTS,0,20)||'...') AS ELE_CONTENTS_VIEW,
+					       B.ELE_CONTENTS, B.ELE_TYPE, B.OPEN_YN, B.ORDER_SEQ, B.COL_SIZE, B.UP_DOWN, B.WHITE_SPACE, B.AGREE_YN
+					  FROM TSYS621 A, TSYS623 B
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.INFO_SEQ = B.INFO_SEQ
+					   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.INFO_SEQ = TRIM(#{searchInfoSeq})
+					 ORDER BY B.ORDER_SEQ
+				]]>
+
+
+		</select>
+
+<!-- 		개인정보보호법관리 sheet2 저장 -->
+		<update parameterType="map" id="savePrivacyActMgrSheet2">
+
+					MERGE INTO TSYS623 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.INFO_SEQ
+									, A.ELE_SEQ
+									, A.ELE_SUMMARY
+									, A.ELE_CONTENTS
+									, A.ELE_TYPE
+									, A.OPEN_YN
+									, A.ORDER_SEQ
+									, A.COL_SIZE
+									, A.UP_DOWN
+									, A.WHITE_SPACE
+									, A.AGREE_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS INFO_SEQ
+											, NULL		AS ELE_SEQ
+											, NULL		AS ELE_SUMMARY
+											, NULL		AS ELE_CONTENTS
+											, NULL		AS ELE_TYPE
+											, NULL		AS OPEN_YN
+											, NULL      AS ORDER_SEQ
+											, NULL      AS COL_SIZE
+											, NULL      AS UP_DOWN
+											, NULL      AS WHITE_SPACE
+											, NULL      AS AGREE_YN
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" index="index">
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.infoSeq} )	AS INFO_SEQ
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.eleSeq != null and !rm.eleSeq.equals("")'>
+												, TRIM(#{rm.eleSeq}) 			AS ELE_SEQ
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when>
+											<otherwise>
+												, TO_CHAR( ( SELECT (NVL(MAX(TO_NUMBER(ELE_SEQ)),0) + (${index}+1)) FROM TSYS623  WHERE ENTER_CD = TRIM(#{ssnEnterCd}) AND INFO_SEQ = TRIM(#{rm.infoSeq}) ) )	AS ELE_SEQ
+											</otherwise>
+											</choose>
+											, TRIM( #{rm.eleSummary} )	AS ELE_SUMMARY
+											, TRIM( #{rm.eleContents} )	AS ELE_CONTENTS
+											, TRIM( #{rm.eleType} )	AS ELE_TYPE
+											, TRIM( #{rm.openYn} )	AS OPEN_YN
+											, TRIM( #{rm.orderSeq} )	AS ORDER_SEQ
+											, TRIM( #{rm.colSize} )		AS COL_SIZE
+											, TRIM( #{rm.upDown} )		AS UP_DOWN
+											, TRIM( #{rm.whiteSpace} )	AS WHITE_SPACE
+											, TRIM( #{rm.agreeYn} )	AS AGREE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ELE_SEQ IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.INFO_SEQ = S.INFO_SEQ AND T.ELE_SEQ	= S.ELE_SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.ELE_SUMMARY	= S.ELE_SUMMARY
+									, T.ELE_CONTENTS	= S.ELE_CONTENTS
+									, T.ELE_TYPE	= S.ELE_TYPE
+									, T.OPEN_YN	= S.OPEN_YN
+									, T.ORDER_SEQ = S.ORDER_SEQ
+									, T.COL_SIZE    = S.COL_SIZE
+									, T.UP_DOWN     = S.UP_DOWN
+									, T.WHITE_SPACE = S.WHITE_SPACE
+									, T.AGREE_YN = S.AGREE_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.INFO_SEQ
+							, T.ELE_SEQ
+							, T.ELE_SUMMARY
+							, T.ELE_CONTENTS
+							, T.ELE_TYPE
+							, T.OPEN_YN
+							, T.ORDER_SEQ
+							, T.CHKDATE
+							, T.CHKID
+							, T.COL_SIZE
+							, T.UP_DOWN
+							, T.WHITE_SPACE
+							, T.AGREE_YN
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.INFO_SEQ
+							, S.ELE_SEQ
+							, S.ELE_SUMMARY
+							, S.ELE_CONTENTS
+							, S.ELE_TYPE
+							, S.OPEN_YN
+							, S.ORDER_SEQ
+							, SYSDATE
+							, #{ssnSabun}
+							, S.COL_SIZE
+							, S.UP_DOWN
+							, S.WHITE_SPACE
+							, S.AGREE_YN
+						)
+		</update>
+<!-- 		개인정보보호법관리 sheet2 삭제 -->
+		<delete parameterType="map" id="deletePrivacyActMgrSheet2">
+
+					DELETE FROM TSYS623
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||INFO_SEQ||'_'||ELE_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.infoSeq})||'_'||TRIM(#{rm.eleSeq})
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

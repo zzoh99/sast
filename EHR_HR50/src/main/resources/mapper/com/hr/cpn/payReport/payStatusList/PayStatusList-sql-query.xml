@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 연봉현황리스트
+ * @author 
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payReport.payStatusList">
+		<select parameterType="map" resultType="cMap" id="getPayStatusListTitleList">
+
+				<![CDATA[
+				SELECT ENTER_CD, ORG_CD, F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, REPLACE(#{searchYmd}, '-', '')) AS ORG_NM
+					 , 'COL_' || ORG_CD AS COL_NAME
+				   FROM (SELECT LEVEL AS LVL,A.ENTER_CD, A.ORG_CD, A.ORDER_SEQ
+				          FROM (SELECT X.*
+				                 FROM TORG105 X,
+				                      (SELECT MAX(SDATE) AS SDATE,ENTER_CD
+				                        FROM TORG103
+				                        WHERE ENTER_CD  = #{ssnEnterCd}
+				                          AND SDATE    <= REPLACE(#{searchYmd}, '-', '')
+				                        GROUP BY ENTER_CD) Y
+				                WHERE X.ENTER_CD = Y.ENTER_CD
+				                  AND X.SDATE    = Y.SDATE
+				               ) A
+				        START WITH A.PRIOR_ORG_CD = '0'
+				        CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+				               AND PRIOR A.SDATE    = A.SDATE
+				               AND PRIOR A.ORG_CD   = A.PRIOR_ORG_CD
+				        ORDER SIBLINGS BY A.PRIOR_ORG_CD
+				        )
+				ORDER BY ORDER_SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayStatusListList">
+
+
+				SELECT TITLE
+				<foreach item="tCnt" collection="titles" >
+					 , F_CPN_PAY_EMP_LIST2(#{ssnEnterCd}, #{tCnt.orgCd}, F_MON, T_MON, REPLACE(#{searchYmd}, '-', '')) AS "${tCnt.colName}"
+				</foreach>
+			<![CDATA[
+				     ,F_MON,T_MON
+			  	FROM (SELECT TRIM(TO_CHAR(#{searchMaxVal},'999,999')) || ' ~' AS TITLE
+			              ,#{searchMaxVal} * 10000 AS F_MON
+			              ,999999999 AS T_MON
+			         FROM DUAL
+				        UNION ALL
+				        SELECT (CASE WHEN LVL = (#{searchRowVal} -1) THEN '~ ' || TRIM(TO_CHAR((TITLE + #{searchGapVal}),'999,999'))
+				                     ELSE TRIM(TO_CHAR((TITLE),'999,999')) || ' ~ ' || TRIM(TO_CHAR((TITLE + #{searchGapVal}),'999,999')) END) AS TITLE
+				               ,(CASE WHEN LVL = (#{searchRowVal} -1) THEN 0 ELSE TITLE * 10000 END) AS F_MON, (TITLE + #{searchGapVal}) * 10000 AS T_MON
+				          FROM (
+				                SELECT #{searchMaxVal} - (LEVEL*#{searchGapVal}) AS TITLE, LEVEL AS LVL
+				                  FROM DUAL
+				                CONNECT BY LEVEL <= (#{searchRowVal} -1)
+				               )
+				        )
+				 WHERE F_MON >= 0 AND T_MON >= 0
+				ORDER BY F_MON DESC
+			]]>
+
+
+		</select>
+	</mapper>

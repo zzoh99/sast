@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 개인별근속기간제외관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepWorkDayAddMgr">
+		<select parameterType="map" resultType="cMap" id="getSepWorkDayAddMgrList">
+
+
+					SELECT B.ORG_NM
+						 , B.WORK_TYPE
+						 , B.JIKCHAK_CD
+						 , B.JIKWEE_CD
+						 , B.SABUN
+						 , (SELECT F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME
+						 , B.MANAGE_CD
+						 , B.STATUS_CD
+						 , B.EMP_YMD
+						 , B.GEMP_YMD
+						 , B.RES_NO
+						 , A.SABUN
+						 , A.EX_WKP_SYMD
+						 , A.EX_WKP_EYMD
+						 , A.EX_WKP_DAY
+						 , A.EX_WKP_MTH
+						 , A.NOTE
+						 , A.BIGO
+					  FROM TCPN724 A
+						 , (
+							SELECT X.ENTER_CD
+								 , Y.ORG_CD
+								 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+								 , Y.WORK_TYPE
+								 , Y.JIKCHAK_CD
+								 , Y.JIKWEE_CD
+								 , Y.MANAGE_CD
+								 , Y.STATUS_CD
+								 , X.SABUN
+								 , X.EMP_YMD
+								 , X.GEMP_YMD
+								 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+								 , X.RET_YMD
+							  FROM THRM100 X
+								 , THRM151 Y
+							 WHERE X.ENTER_CD	= Y.ENTER_CD
+							   AND X.SABUN		= Y.SABUN
+							   AND X.ENTER_CD	= #{ssnEnterCd}
+							<if test='orgCd != null and !orgCd.equals("")'>
+							   AND Y.ORG_CD		= #{orgCd}
+							</if>
+							<if test='multiManageCd != null and !multiManageCd.equals("")'>
+							   AND Y.MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+							</if>
+							<if test='multiStatusCd != null and !multiStatusCd.equals("")'>
+							   AND Y.STATUS_CD	IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+							</if>
+							   AND Y.SDATE		= (	SELECT MAX(SDATE)
+													  FROM THRM151
+													 WHERE ENTER_CD	= Y.ENTER_CD
+													   AND SABUN	= Y.SABUN
+													   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+							) B
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+			<if test='sabunName != null and !sabunName.equals("")'>
+				       AND (UPPER(B.SABUN) LIKE '%' || UPPER(TRIM(#{sabunName})) || '%' OR UPPER((SELECT F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) FROM DUAL)) LIKE '%' || UPPER(TRIM(#{sabunName})) || '%')
+			</if>
+					   AND A.ENTER_CD		= B.ENTER_CD
+					   AND A.SABUN			= B.SABUN
+					ORDER BY B.ORG_NM,B.WORK_TYPE,B.JIKCHAK_CD,B.JIKWEE_CD,(SELECT F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, #{ssnLocaleCd}) FROM DUAL)
+
+
+
+		</select>
+		<update parameterType="map" id="saveSepWorkDayAddMgr">
+
+
+					MERGE INTO TCPN724 T
+					USING	(
+							SELECT A.SABUN
+								 , A.EX_WKP_SYMD
+								 , A.EX_WKP_EYMD
+								 , A.EX_WKP_DAY
+								 , A.EX_WKP_MTH
+								 , A.NOTE
+								 , A.BIGO
+							  FROM (
+									SELECT NULL		AS SABUN
+										 , NULL		AS EX_WKP_SYMD
+										 , NULL		AS EX_WKP_EYMD
+										 , NULL		AS EX_WKP_DAY
+										 , NULL		AS EX_WKP_MTH
+										 , NULL		AS NOTE
+										 , NULL		AS BIGO
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})				AS SABUN
+										 , TRIM(#{rm.exWkpSymd})			AS EX_WKP_SYMD
+										 , TRIM(#{rm.exWkpEymd})			AS EX_WKP_EYMD
+										 , TO_NUMBER(TRIM(#{rm.exWkpDay}))	AS EX_WKP_DAY
+										 , TO_NUMBER(TRIM(#{rm.exWkpMth}))	AS EX_WKP_MTH
+										 , TRIM(#{rm.note})					AS NOTE
+										 , TRIM(#{rm.bigo})					AS BIGO
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.SABUN			IS NOT NULL
+							   AND A.EX_WKP_SYMD	IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.SABUN			= S.SABUN
+						AND	T.EX_WKP_SYMD	= S.EX_WKP_SYMD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EX_WKP_EYMD= S.EX_WKP_EYMD
+								 , T.EX_WKP_DAY	= S.EX_WKP_DAY
+								 , T.EX_WKP_MTH	= S.EX_WKP_MTH
+								 , T.NOTE		= S.NOTE
+								 , T.BIGO		= S.BIGO
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.EX_WKP_SYMD
+							, T.EX_WKP_EYMD
+							, T.EX_WKP_DAY
+							, T.EX_WKP_MTH
+							, T.NOTE
+							, T.BIGO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.SABUN
+							, S.EX_WKP_SYMD
+							, S.EX_WKP_EYMD
+							, S.EX_WKP_DAY
+							, S.EX_WKP_MTH
+							, S.NOTE
+							, S.BIGO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepWorkDayAddMgr">
+
+
+					DELETE FROM TCPN724
+					 WHERE ENTER_CD||'_'||SABUN||'_'||EX_WKP_SYMD IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+							,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.exWkpSymd != null and !rm.exWkpSymd.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.exWkpSymd})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

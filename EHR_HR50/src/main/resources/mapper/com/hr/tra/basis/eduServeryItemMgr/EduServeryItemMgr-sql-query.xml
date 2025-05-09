@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.basis.eduServeryItemMgr">
+<!-- 		교육만족도항목관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduServeryItemMgrList">
+			
+				<![CDATA[
+					SELECT	  A.SURVEY_ITEM_CD
+							, A.SURVEY_ITEM_NM
+							, A.SURVEY_ITEM_DESC
+							, A.START_YMD
+							, A.END_YMD
+							, A.SEQ
+							, A.SURVEY_ITEM_TYPE
+							, A.DEF_YN
+							, 'I' AS TMP /*만족도조사 팝업에서 사용*/
+					FROM	TTRA005 A
+					WHERE	A.ENTER_CD = #{ssnEnterCd} ]]>
+					<if test="searchSurveyItemNm != null and searchSurveyItemNm neq ''">
+					  AND	A.SURVEY_ITEM_NM LIKE '%' || #{searchSurveyItemNm} || '%'
+					</if>
+					<if test="searchSurveyItemType != null and searchSurveyItemType neq ''">
+					  AND	A.SURVEY_ITEM_TYPE = #{searchSurveyItemType}
+					</if>
+					ORDER BY A.SEQ
+		</select>
+
+<!-- 		교육만족도항목관리 저장 -->
+		<update parameterType="map" id="saveEduServeryItemMgr">
+					MERGE INTO TTRA005 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SURVEY_ITEM_CD
+									, A.SURVEY_ITEM_NM
+									, A.SURVEY_ITEM_DESC
+									, A.SURVEY_ITEM_TYPE
+									, A.START_YMD
+									, A.END_YMD
+									, A.SEQ
+									, A.DEF_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SURVEY_ITEM_CD
+											, NULL		AS SURVEY_ITEM_NM
+											, NULL		AS SURVEY_ITEM_DESC
+											, NULL		AS SURVEY_ITEM_TYPE
+											, NULL		AS START_YMD
+											, NULL		AS END_YMD
+											, NULL      AS SEQ
+											, NULL      AS DEF_YN
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" index="idx">
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )			AS ENTER_CD
+											/* 증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입 */
+											<choose><when test="rm.surveyItemCd != null and rm.surveyItemCd neq ''">
+											,	TRIM(#{rm.surveyItemCd}) 			AS SURVEY_ITEM_CD
+											</when><otherwise>
+											/* 증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입 */
+											,	TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SURVEY_ITEM_CD)),0) + (#{idx} + 1)) FROM TTRA005) )	AS SURVEY_ITEM_CD
+											</otherwise></choose>
+											, TRIM( #{rm.surveyItemNm} )	AS SURVEY_ITEM_NM
+											, TRIM( #{rm.surveyItemDesc} )	AS SURVEY_ITEM_DESC
+											, TRIM( #{rm.surveyItemType} )	AS SURVEY_ITEM_TYPE
+											, TRIM( #{rm.startYmd} )		AS START_YMD
+											, TRIM( #{rm.endYmd} )			AS END_YMD
+											, TRIM( #{rm.seq} )				AS SEQ
+											, TRIM( #{rm.defYn} )			AS DEF_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SURVEY_ITEM_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.SURVEY_ITEM_CD = S.SURVEY_ITEM_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SURVEY_ITEM_NM  	= S.SURVEY_ITEM_NM
+									, T.SURVEY_ITEM_DESC	= S.SURVEY_ITEM_DESC
+									, T.SURVEY_ITEM_TYPE	= S.SURVEY_ITEM_TYPE
+									, T.START_YMD       	= S.START_YMD
+									, T.END_YMD         	= S.END_YMD
+									, T.SEQ             	= S.SEQ
+									, T.DEF_YN             	= S.DEF_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.SURVEY_ITEM_CD
+							, T.SURVEY_ITEM_NM
+							, T.SURVEY_ITEM_DESC
+							, T.SURVEY_ITEM_TYPE
+							, T.START_YMD
+							, T.END_YMD
+							, T.SEQ
+							, T.DEF_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SURVEY_ITEM_CD
+							, S.SURVEY_ITEM_NM
+							, S.SURVEY_ITEM_DESC
+							, S.SURVEY_ITEM_TYPE
+							, S.START_YMD
+							, S.END_YMD
+							, S.SEQ
+							, S.DEF_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		교육만족도항목관리 삭제 -->
+		<delete parameterType="map" id="deleteEduServeryItemMgr">
+			
+				<![CDATA[
+					DELETE FROM TTRA005
+					WHERE ENTER_CD = #{ssnEnterCd} ]]>
+					  AND ENTER_CD||'_'||SURVEY_ITEM_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows">
+						,
+							<if test="rm.surveyItemCd != null and rm.surveyItemCd neq ''">
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.surveyItemCd})
+							</if>
+</foreach>
+										)
+			
+		</delete>
+</mapper>

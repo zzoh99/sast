@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.schedule.workPattenMgr">
+
+<!-- 근무조 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkPattenMgrList">
+
+				<![CDATA[
+					    SELECT WORK_ORG_CD   /*TORG109의 MAP_CD와 동일함*/
+							 , SDATE
+					         , EDATE
+					         , MEMO
+                             , TO_CHAR(TO_DATE(SDATE, 'YYYYMMDD'), 'd')  AS SDATE_WEEK  /*(1:일, 2:월, 3:화, 4:수, 5:목, 6:금, 7:토)*/
+                             , SEQ
+                             , WORK_GRP_CD
+					      FROM TTIM118 A
+					     WHERE ENTER_CD = #{ssnEnterCd}
+					               ]]>
+<if test='searchDate != null and !searchDate.equals("")'>
+						   AND replace(#{searchDate}, '-', '') BETWEEN A.SDATE AND nvl(A.EDATE, '99991231')
+</if>
+	 				    ORDER BY F_COM_GET_GRCODE_SEQ( ENTER_CD, 'T11020', WORK_GRP_CD), SEQ, WORK_ORG_CD, SDATE DESC
+
+		</select>
+
+<!-- 근무패턴 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkPattenUserMgrList">
+
+				<![CDATA[
+				SELECT A.WORK_ORG_CD
+				     , A.SDATE
+				     , A.SEQ
+				     , A.TIME_CD
+				     , TO_CHAR(TO_DATE(B.SDATE, 'YYYYMMDD') + RANK() OVER(ORDER BY A.SEQ ) - 1, 'dy')  AS WEEK_NM
+				  FROM TTIM119 A
+				     , (SELECT SDATE FROM TTIM115 WHERE ENTER_CD = #{ssnEnterCd} AND WORK_GRP_CD = TRIM( #{searchWorkGrpCd} )) B
+				 WHERE A.ENTER_CD		= #{ssnEnterCd}
+				   AND A.WORK_ORG_CD	= #{searchWorkOrgCd}
+				   AND A.SDATE			= #{searchSdate}
+				 ORDER BY A.SEQ
+				]]>
+
+
+		</select>
+
+
+
+<!-- 근무조 저장 -->
+		<update parameterType="map" id="saveWorkPattenMgr">
+
+					MERGE INTO TTIM118 T
+					USING	(
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+								SELECT    TRIM( #{ssnEnterCd} )			AS ENTER_CD
+										, TRIM( #{rm.workOrgCd} )		AS WORK_ORG_CD
+										, TRIM( #{rm.sdate} )			AS SDATE
+										, TRIM( #{rm.memo} )			AS MEMO
+										, TRIM( #{rm.seq} )				AS SEQ
+										, TRIM( #{rm.workGrpCd} )		AS WORK_GRP_CD
+								FROM   DUAL
+</foreach>
+							) S
+					ON (  	  T.ENTER_CD	= S.ENTER_CD
+					      AND T.WORK_ORG_CD = S.WORK_ORG_CD
+					      AND T.SDATE       = S.SDATE   )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.MEMO				= S.MEMO
+									, T.SEQ					= S.SEQ
+									, T.WORK_GRP_CD			= S.WORK_GRP_CD
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_ORG_CD
+							, T.SDATE
+							, T.MEMO
+							, T.SEQ
+							, T.WORK_GRP_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.WORK_ORG_CD
+							, S.SDATE
+							, S.MEMO
+							, S.SEQ
+							, S.WORK_GRP_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 근무패턴 저장 -->
+		<update parameterType="map" id="saveWorkPattenUserMgr">
+
+					MERGE INTO TTIM119 T
+					USING	(
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+								SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+										, TRIM( #{rm.workOrgCd} )	AS WORK_ORG_CD
+										, TRIM( #{rm.sdate} )		AS SDATE
+										, TRIM( #{rm.seq} )			AS SEQ
+										, TRIM( #{rm.timeCd} )		AS TIME_CD
+								FROM   DUAL
+</foreach>
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.WORK_ORG_CD = S.WORK_ORG_CD AND T.SDATE = S.SDATE AND T.SEQ = S.SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.TIME_CD			= S.TIME_CD
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_ORG_CD
+							, T.SDATE
+							, T.SEQ
+							, T.TIME_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.WORK_ORG_CD
+							, S.SDATE
+							, S.SEQ
+							, S.TIME_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+
+<!-- 1 삭제 -->
+		<delete parameterType="map" id="deleteWorkPattenMgr">
+
+					DELETE FROM TTIM118
+					 WHERE (ENTER_CD, WORK_ORG_CD, SDATE) IN ( (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM(#{ssnEnterCd}), TRIM(#{rm.workOrgCd}), TRIM(#{rm.sdate}))
+</foreach>
+							)
+		</delete>
+
+
+<!-- 2 전체 삭제 -->
+		<delete parameterType="map" id="deleteWorkPattenUserMgrAll">
+
+					DELETE FROM TTIM119
+					 WHERE (ENTER_CD, WORK_ORG_CD, SDATE) IN (  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM(#{ssnEnterCd}), TRIM( #{rm.workOrgCd} ), TRIM(#{rm.sdate}))
+</foreach>
+										)
+		</delete>
+
+		<!-- 2 1개삭제 -->
+		<delete parameterType="map" id="deleteWorkPattenUserMgr">
+
+					DELETE FROM TTIM119
+					 WHERE (ENTER_CD, WORK_ORG_CD, SDATE, SEQ) IN (  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM(#{ssnEnterCd}), TRIM( #{rm.workOrgCd} ), TRIM(#{rm.sdate}), TRIM(#{rm.seq}))
+</foreach>
+										)
+		</delete>
+
+
+
+
+</mapper>

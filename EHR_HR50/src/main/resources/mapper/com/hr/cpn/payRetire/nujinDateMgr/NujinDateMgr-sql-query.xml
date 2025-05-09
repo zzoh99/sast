@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.nujinDateMgr">
+		<select parameterType="map" resultType="cMap" id="getNujinDateMgrList">
+
+
+					SELECT SABUN
+					     , NAME
+					     , CUMULATIVE_CNT
+					     , EXPIRE_PAYMENT_YMD
+					     , BIGO
+					  FROM (  
+					    SELECT ENTER_CD
+					         , SABUN
+					         , F_COM_GET_NAMES(ENTER_CD, SABUN) AS NAME
+					         , CUMULATIVE_CNT
+					         , EXPIRE_PAYMENT_YMD
+					         , BIGO
+					      FROM TCPN712
+					     WHERE ENTER_CD = #{ssnEnterCd}
+					  )
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					 <if test='searchSabunName != null and !searchSabunName.equals("")'>
+					   AND (SABUN LIKE '%' || #{searchSabunName} || '%' OR NAME LIKE '%' || #{searchSabunName} || '%')
+					 </if>
+
+
+
+		</select>
+		
+		<update parameterType="map" id="saveNujinDateMgr">
+
+
+					MERGE INTO TCPN712 T
+					USING	(
+							SELECT #{ssnEnterCd} AS ENTER_CD
+								 , A.SABUN
+								 , A.CUMULATIVE_CNT
+								 , A.EXPIRE_PAYMENT_YMD
+								 , A.BIGO
+								 , #{ssnSabun} AS CHKID
+							  FROM (
+									SELECT NULL	AS SABUN
+										 , NULL AS CUMULATIVE_CNT
+										 , NULL AS EXPIRE_PAYMENT_YMD
+										 , NULL AS BIGO
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})			AS SABUN
+										 , TRIM(#{rm.cumulativeCnt})	AS CUMULATIVE_CNT
+										 , TRIM(#{rm.expirePaymentYmd})	AS EXPIRE_PAYMENT_YMD
+										 , TRIM(#{rm.bigo})				AS BIGO
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.SABUN	IS NOT NULL
+							) S
+					ON	(
+							T.ENTER_CD	= S.ENTER_CD AND
+							T.SABUN		= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.CUMULATIVE_CNT		= S.CUMULATIVE_CNT
+								 , T.EXPIRE_PAYMENT_YMD	= S.EXPIRE_PAYMENT_YMD
+								 , T.BIGO				= S.BIGO
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= S.CHKID
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.SABUN
+						  , T.CUMULATIVE_CNT
+						  , T.EXPIRE_PAYMENT_YMD
+						  , T.BIGO
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							S.ENTER_CD
+						  , S.SABUN
+						  , S.CUMULATIVE_CNT
+						  , S.EXPIRE_PAYMENT_YMD
+						  , S.BIGO
+						  , SYSDATE
+						  , S.CHKID
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteNujinDateMgr">
+
+
+					DELETE FROM TCPN712
+					 WHERE ENTER_CD||'_'||SABUN IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

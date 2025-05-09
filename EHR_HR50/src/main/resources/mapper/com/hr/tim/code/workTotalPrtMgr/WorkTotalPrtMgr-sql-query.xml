@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.workTotalPrtMgr">
+
+<!-- 1 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTotalPrtMgrList">
+
+				<![CDATA[
+				  SELECT TYPE, SEQ, REPORT_NM, M_REPORT_NM, USE_YN, ELEMENT_NMS
+					FROM (
+							SELECT ROWNUM AS RNUM, TYPE, SEQ, REPORT_NM, M_REPORT_NM, USE_YN, ELEMENT_NMS
+							  FROM (
+									SELECT A.TYPE, A.SEQ, A.REPORT_NM, A.M_REPORT_NM, A.USE_YN
+									     ,(SELECT MAX(DECODE(ROWNUM,1,      (CASE WHEN Z.TYPE='T' THEN (SELECT WORK_NM FROM TTIM015 WHERE ENTER_CD=Z.ENTER_CD AND WORK_CD=Z.TIME_ELE_CD)
+					                                                              ELSE (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD=Z.ENTER_CD AND GNT_CD=Z.TIME_ELE_CD) END), NULL)) ||
+					                              MAX(DECODE(ROWNUM,2,', '||(CASE WHEN Z.TYPE='T' THEN (SELECT WORK_NM FROM TTIM015 WHERE ENTER_CD=Z.ENTER_CD AND WORK_CD=Z.TIME_ELE_CD)
+					                                                              ELSE (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD=Z.ENTER_CD AND GNT_CD=Z.TIME_ELE_CD) END), NULL)) ||
+					                              MAX(DECODE(ROWNUM,3,', '||(CASE WHEN Z.TYPE='T' THEN (SELECT WORK_NM FROM TTIM015 WHERE ENTER_CD=Z.ENTER_CD AND WORK_CD=Z.TIME_ELE_CD)
+					                                                              ELSE (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD=Z.ENTER_CD AND GNT_CD=Z.TIME_ELE_CD) END), NULL)) ||
+					                              MAX(DECODE(ROWNUM,4,', '||(CASE WHEN Z.TYPE='T' THEN (SELECT WORK_NM FROM TTIM015 WHERE ENTER_CD=Z.ENTER_CD AND WORK_CD=Z.TIME_ELE_CD)
+					                                                              ELSE (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD=Z.ENTER_CD AND GNT_CD=Z.TIME_ELE_CD) END), NULL)) ||
+					                              MAX(DECODE(ROWNUM,5,', '||(CASE WHEN Z.TYPE='T' THEN (SELECT WORK_NM FROM TTIM015 WHERE ENTER_CD=Z.ENTER_CD AND WORK_CD=Z.TIME_ELE_CD)
+					                                                              ELSE (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD=Z.ENTER_CD AND GNT_CD=Z.TIME_ELE_CD) END), NULL))
+					                   FROM TTIM994 Z --TTIM994 Z
+					                  WHERE Z.ENTER_CD = A.ENTER_CD
+					                    AND Z.TYPE     = A.TYPE
+					                    AND Z.SEQ      = A.SEQ) AS ELEMENT_NMS
+
+					              FROM TTIM993 A       --TTIM993 A
+					             WHERE A.ENTER_CD = #{ssnEnterCd}
+					               AND A.TYPE     = #{searchTypeList}
+					             ORDER BY A.TYPE, TO_NUMBER(A.SEQ)
+					            )
+					   )
+				]]>
+
+
+		</select>
+
+<!-- 2 조회 -->
+		<select parameterType="map" resultType="cMap" id="getWorkTotalPrtMgrUserMgrList">
+
+				<![CDATA[
+				SELECT A.TYPE AS TYPE, A.SEQ AS SEQ, A.TIME_ELE_CD AS TIME_ELE_CD, A.USE_YN AS USE_YN
+				  FROM TTIM994 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.TYPE = #{searchType}
+				   AND A.SEQ = #{searchSeq}
+				]]>
+
+
+		</select>
+
+<!-- 1 저장 -->
+		<update parameterType="map" id="saveWorkTotalPrtMgr">
+
+					MERGE INTO TTIM993 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.TYPE
+									, A.SEQ
+									, A.M_REPORT_NM
+									, A.REPORT_NM
+									, A.USE_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS TYPE
+											, NULL		AS SEQ
+											, NULL		AS M_REPORT_NM
+											, NULL		AS REPORT_NM
+											, NULL		AS USE_YN
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.type})		AS TYPE
+											, TRIM( #{rm.seq} )			AS SEQ
+											, TRIM( #{rm.mReportNm})	AS M_REPORT_NM
+											, TRIM( #{rm.reportNm})	AS REPORT_NM
+											, TRIM( #{rm.useYn} )		AS USE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.TYPE = S.TYPE AND T.SEQ = S.SEQ )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.M_REPORT_NM	= S.M_REPORT_NM
+									, T.REPORT_NM	= S.REPORT_NM
+									, T.USE_YN		= S.USE_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.TYPE
+							, T.SEQ
+							, T.M_REPORT_NM
+							, T.REPORT_NM
+							, T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.TYPE
+							, S.SEQ
+							, S.M_REPORT_NM
+							, S.REPORT_NM
+							, S.USE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 2 저장 -->
+		<update parameterType="map" id="saveWorkPrtUserMgr">
+
+					MERGE INTO TTIM994 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.TYPE
+									, A.SEQ
+									, A.TIME_ELE_CD
+									, A.USE_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS TYPE
+											, NULL		AS SEQ
+											, NULL		AS TIME_ELE_CD
+											, NULL		AS USE_YN
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{rm.type})		AS TYPE
+											, TRIM( #{rm.seq} )			AS SEQ
+											, TRIM( #{rm.timeEleCd})	AS TIME_ELE_CD
+											, TRIM( #{rm.useYn} )		AS USE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.TYPE = S.TYPE AND T.SEQ = S.SEQ AND T.TIME_ELE_CD = S.TIME_ELE_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.USE_YN			= S.USE_YN
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.TYPE
+							, T.SEQ
+							, T.TIME_ELE_CD
+							, T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.TYPE
+							, S.SEQ
+							, S.TIME_ELE_CD
+							, S.USE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 1 삭제 -->
+		<delete parameterType="map" id="deleteWorkTotalPrtMgr">
+
+					DELETE FROM TTIM993
+					 WHERE ENTER_CD||'_'||TYPE||'_'||SEQ IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.type})||'_'||TRIM(#{rm.seq})
+</foreach>
+										)
+		</delete>
+
+<!-- 2 삭제 -->
+		<delete parameterType="map" id="deleteWorkTotalPrtUserMgr">
+
+					DELETE FROM TTIM994
+					 WHERE ENTER_CD||'_'||TYPE||'_'||SEQ IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+											TRIM(#{ssnEnterCd})||'_'||TRIM( #{rm.type})||'_'||TRIM( #{rm.seq} )
+</foreach>
+										)
+		</delete>
+
+<!-- 2 삭제 -->
+		<delete parameterType="map" id="deleteWorkPrtUserMgr">
+
+					DELETE FROM TTIM994
+					 WHERE ENTER_CD||'_'||TYPE||'_'||SEQ||'_'||TIME_ELE_CD IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+											TRIM(#{ssnEnterCd})||'_'||TRIM( #{rm.type})||'_'||TRIM( #{rm.seq} )||'_'||TRIM( #{rm.timeEleCd})
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

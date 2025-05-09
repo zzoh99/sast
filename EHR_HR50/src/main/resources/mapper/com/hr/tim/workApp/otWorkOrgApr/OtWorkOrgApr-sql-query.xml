@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.otWorkOrgApr">
+
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAprList">
+
+				<![CDATA[
+
+					   SELECT A.ENTER_CD
+							, A.APPL_SEQ
+							, B.APPL_SABUN AS SABUN
+							, (SELECT F_COM_GET_NAMES(A.ENTER_CD, B.APPL_SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME -- 성명
+							, (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+							, F_COM_GET_JIKCHAK_NM(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							, F_COM_GET_JIKWEE_NM(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							, F_COM_GET_JIKGUB_NM(A.ENTER_CD, B.APPL_SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+
+							, A.APPL_GUBUN
+					   		, (SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.APPL_ORG_CD, A.YMD, #{ssnLocaleCd}) FROM DUAL) AS APPL_ORG_NM
+							, TO_CHAR(TO_DATE(A.YMD, 'YYYYMMDD'),'YYYY-MM-DD') ||' ('||C.DAY_NM||')' AS YMD
+							, A.EMP_CNT
+							, A.EMP_LIST
+							, A.REQUEST_HOUR
+							
+							, B.APPL_CD
+							, B.APPL_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+							, B.APPL_STATUS_CD
+							, '0' AS DETAIL
+
+							, CASE WHEN B.APPL_STATUS_CD = '99' THEN '1' ELSE '0' END AS SHTCOL_EDIT
+
+					     FROM (SELECT ENTER_CD, APPL_SEQ, APPL_GUBUN, APPL_ORG_CD, YMD
+						  	        , COUNT(SABUN) AS EMP_CNT
+									, LISTAGG(F_COM_GET_NAMES(ENTER_CD, SABUN, #{ssnLocaleCd})||'('||REQUEST_HOUR||')', ', ') WITHIN GROUP (ORDER BY SABUN) AS EMP_LIST
+                                    , LISTAGG(SABUN, ',') WITHIN GROUP (ORDER BY SABUN) AS SABUN_LIST
+						  	        , SUM(REQUEST_HOUR) AS REQUEST_HOUR
+						         FROM TTIM601
+						        WHERE ENTER_CD      = TRIM( #{ssnEnterCd} )
+						        GROUP BY ENTER_CD, APPL_SEQ, APPL_GUBUN, APPL_ORG_CD, YMD  
+						      ) A, THRI103 B
+						     , TSYS007 C 
+					    WHERE A.ENTER_CD   = #{ssnEnterCd}
+					      AND A.ENTER_CD   = B.ENTER_CD
+					      AND A.APPL_SEQ   = B.APPL_SEQ
+					      AND B.APPL_STATUS_CD NOT IN ('11')
+						  AND A.YMD = C.SUN_DATE
+						          ]]>
+<if test='searchFrom != null and !searchFrom.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD >= REPLACE(#{searchFrom}, '-','')
+	]]>
+</if>
+<if test='searchTo != null and !searchTo.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD <= REPLACE(#{searchTo}, '-','')
+	]]>
+</if>
+<if test='searchSYmd != null and !searchSYmd.equals("")'>
+	<![CDATA[
+						  AND A.YMD >= REPLACE( #{searchSYmd} ,'-','')
+	]]>
+</if>
+<if test='searchEYmd != null and !searchEYmd.equals("")'>
+	<![CDATA[
+						  AND A.YMD <= REPLACE( #{searchEYmd} ,'-','')
+	]]>
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchApplGubun != null and !searchApplGubun.equals("")'>
+					      AND A.APPL_GUBUN = TRIM(#{searchApplGubun})
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					      AND ( A.EMP_LIST LIKE '%'||TRIM( #{searchSabunName} )||'%'
+					                OR A.SABUN_LIST LIKE  '%'||TRIM( #{searchSabunName} )||'%' )
+</if>
+<if test='searchApplSabunName != null and searchApplSabunName neq ""'>
+					      AND ( B.APPL_SABUN LIKE '%'||TRIM( #{searchApplSabunName} )||'%'
+					                OR (SELECT F_COM_GET_NAMES(A.ENTER_CD, B.APPL_SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchApplSabunName} )||'%' )
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					     AND (SELECT F_COM_GET_ORG_NM(A.ENTER_CD, A.APPL_ORG_CD, A.YMD, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC
+
+
+		</select>
+
+</mapper>

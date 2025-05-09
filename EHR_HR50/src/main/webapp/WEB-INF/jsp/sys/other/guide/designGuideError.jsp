@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title><tit:txt mid='104100' mdef='이수시스템(주)'/></title>
+<link rel="stylesheet" href="/common/css/dotum.css" />
+<link rel="stylesheet" href="/common/theme1/css/style.css" />
+<body>
+<div class="error_main">
+	<div class="body">
+		<div class="bg"></div>
+		<div class="content">
+			<div class="header">Information - <span>Error</span></div>
+			<div class="title"><tit:txt mid='104543' mdef='에러내용'/></div>
+			<div class="contents">
+				aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+			</div>
+			<div class="bottom">
+				<b><tit:txt mid='104236' mdef='문의처'/></b><br /><br /><br />
+				02 - 123 - 1234
+			</div>
+		</div>
+	</div>
+</div>
+</body>
+</html>

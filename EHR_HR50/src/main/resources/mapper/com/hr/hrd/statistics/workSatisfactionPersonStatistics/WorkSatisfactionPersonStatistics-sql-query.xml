@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.statistics.workSatisfactionPersonStatistics">
+		<select parameterType="map" resultType="cMap" id="getWorkSatisfactionPersonStatisticsList">
+
+				<![CDATA[
+					WITH TBL1 AS (
+						SELECT A.ENTER_CD
+							 , 'SURVEY_ITEM_CD_' || A.SURVEY_ITEM_CD AS SURVEY_ITEM_CD
+							 , A.SURVEY_ITEM_NM
+							 , B.SABUN
+							 , B.ACTIVE_YYYY
+							 , B.HALF_GUBUN_TYPE
+							 , NVL(SUM(B.POINT), 0) AS POINT
+							 , (SELECT G.ACTIVE_END_YMD FROM TCDPV000 G WHERE G.ENTER_CD = B.ENTER_CD AND G.ACTIVE_YYYY = B.ACTIVE_YYYY AND G.HALF_GUBUN_TYPE = B.HALF_GUBUN_TYPE) AS BASE_YMD
+							 , (SELECT AVG(POINT) FROM TCDPV202 WHERE ENTER_CD=B.ENTER_CD AND  ACTIVE_YYYY=B.ACTIVE_YYYY AND HALF_GUBUN_TYPE=B.HALF_GUBUN_TYPE AND SABUN=B.SABUN) AS AVG_POINT
+						  FROM TCDPV100 A INNER JOIN TCDPV202 B
+							ON A.ENTER_CD = B.ENTER_CD
+						   AND A.SURVEY_ITEM_CD = B.SURVEY_ITEM_CD
+						 WHERE B.ACTIVE_YYYY     = #{searchActiveYyyy}
+						   AND B.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+						   AND B.ENTER_CD        = #{ssnEnterCd}
+						   AND F_COM_GET_NAMES(B.ENTER_CD, B.SABUN) LIKE '%' || #{searchName} || '%'
+						 GROUP BY A.ENTER_CD, A.SURVEY_ITEM_CD, A.SURVEY_ITEM_NM, B.ENTER_CD, B.ACTIVE_YYYY, B.HALF_GUBUN_TYPE, B.SABUN
+					)
+					SELECT *
+					  FROM ( SELECT ENTER_CD
+								  , SURVEY_ITEM_CD
+								  , SABUN
+								  , F_COM_GET_NAMES(ENTER_CD, SABUN) AS NAME
+								  , F_COM_GET_ORG_NM(ENTER_CD, F_COM_GET_ORG_CD(ENTER_CD, SABUN, BASE_YMD), BASE_YMD, #{ssnLocaleCd}) AS ORG_NM
+								  , ACTIVE_YYYY
+								  , HALF_GUBUN_TYPE
+								  , F_COM_GET_JIKWEE_NM(ENTER_CD, SABUN, BASE_YMD) AS JIKWEE_NM
+								  , F_COM_GET_JIKGUB_NM(ENTER_CD, SABUN, BASE_YMD) AS JIKGUB_NM
+								  , F_COM_GET_JIKCHAK_NM(ENTER_CD, SABUN, BASE_YMD) AS JIKCHAK_NM
+								  , POINT
+								  , AVG_POINT
+							   FROM TBL1 
+							  WHERE 1=1 ]]>
+						<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+								AND F_COM_GET_ORG_CD(ENTER_CD, SABUN, BASE_YMD) = TRIM(#{searchOrgCd})
+						</if>
+							   )
+					PIVOT
+					(
+						  MAX(POINT) FOR SURVEY_ITEM_CD IN
+		<foreach collection="conditions" item="item" index="index" open="(" close=")" separator=",">
+				'${item}'
+		</foreach>
+					)
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getWorkSatisfactionPersonStatisticsItem">
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , 'SURVEY_ITEM_CD_' || A.SURVEY_ITEM_CD AS SURVEY_ITEM_CD
+					     , A.SURVEY_ITEM_NM
+					     , A.SURVEY_ITEM_DESC
+					     , B.SABUN
+					     , B.ACTIVE_YYYY
+					     , B.HALF_GUBUN_TYPE
+					     , A.SEQ
+					     , NVL(B.POINT, 0) AS POINT
+					  FROM TCDPV100 A
+					     , TCDPV202 B
+					 WHERE A.ENTER_CD        = B.ENTER_CD
+					   AND A.SURVEY_ITEM_CD  = B.SURVEY_ITEM_CD
+					   AND B.ACTIVE_YYYY     = #{searchActiveYyyy}
+					   AND B.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+					   AND B.ENTER_CD        = #{ssnEnterCd}
+					   AND B.SABUN           = #{searchSabun}
+					 ORDER BY A.SEQ
+				]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getWorkSatisfactionPersonStatisticsSurveyItemList">
+
+				<![CDATA[
+					SELECT DISTINCT SURVEY_ITEM_CD, SURVEY_ITEM_NM, SEQ
+					  FROM (SELECT A.ENTER_CD
+								 , '''surveyItemCd' || A.SURVEY_ITEM_CD || '''' AS SURVEY_ITEM_CD
+								 , A.SURVEY_ITEM_NM
+								 , B.SABUN
+								 , A.SEQ
+								 , NVL(SUM(B.POINT), 0) AS POINT
+							  FROM TCDPV100 A INNER JOIN TCDPV202 B
+								ON A.ENTER_CD = B.ENTER_CD
+							   AND A.SURVEY_ITEM_CD = B.SURVEY_ITEM_CD
+							 WHERE B.ACTIVE_YYYY     = #{searchActiveYyyy}
+							   AND B.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+							   AND B.ENTER_CD        = #{ssnEnterCd}
+							   AND F_COM_GET_NAMES(B.ENTER_CD, B.SABUN) LIKE '%' || #{searchName} || '%' ]]>
+						<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+							   AND F_COM_GET_ORG_CD(B.ENTER_CD,B.SABUN,(SELECT G.ACTIVE_END_YMD FROM TCDPV000 G WHERE G.ENTER_CD = B.ENTER_CD AND G.ACTIVE_YYYY = B.ACTIVE_YYYY AND G.HALF_GUBUN_TYPE = B.HALF_GUBUN_TYPE)) = TRIM(#{searchOrgCd})
+						</if>
+							 GROUP BY A.ENTER_CD, A.SURVEY_ITEM_CD, A.SURVEY_ITEM_NM, B.SABUN, A.SEQ)
+					 ORDER BY SEQ
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getWorkSatisfactionPersonStatisticsSurveyItemStr">
+
+				<![CDATA[
+					SELECT LISTAGG(SURVEY_ITEM_CD, ',') WITHIN GROUP (ORDER BY SEQ) AS CONDITIONS
+					  FROM (SELECT DISTINCT 'SURVEY_ITEM_CD_' || SURVEY_ITEM_CD || '' AS SURVEY_ITEM_CD
+								 , SEQ
+										  FROM (SELECT A.ENTER_CD
+													 , A.SURVEY_ITEM_CD
+													 , A.SURVEY_ITEM_NM
+													 , B.SABUN
+													 , A.SEQ
+													 , NVL(SUM(B.POINT), 0) AS POINT
+												  FROM TCDPV100 A INNER JOIN TCDPV202 B
+													ON A.ENTER_CD = B.ENTER_CD
+												   AND A.SURVEY_ITEM_CD = B.SURVEY_ITEM_CD
+												 WHERE B.ACTIVE_YYYY     = #{searchActiveYyyy}
+												   AND B.HALF_GUBUN_TYPE = #{searchHalfGubunType}
+												   AND B.ENTER_CD        = #{ssnEnterCd}
+												   AND F_COM_GET_NAMES(B.ENTER_CD, B.SABUN, A.START_YMD) LIKE '%' || #{searchName} || '%'
+					    ]]>
+											<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+												   AND F_COM_GET_ORG_CD(B.ENTER_CD,B.SABUN,(SELECT G.ACTIVE_END_YMD FROM TCDPV000 G WHERE G.ENTER_CD = B.ENTER_CD AND G.ACTIVE_YYYY = B.ACTIVE_YYYY AND G.HALF_GUBUN_TYPE = B.HALF_GUBUN_TYPE)) = TRIM(#{searchOrgCd})
+											</if>
+												 GROUP BY A.ENTER_CD, A.SURVEY_ITEM_CD, A.SURVEY_ITEM_NM, B.SABUN, A.SEQ)
+										 ORDER BY SEQ)
+
+
+
+		</select>
+
+</mapper>

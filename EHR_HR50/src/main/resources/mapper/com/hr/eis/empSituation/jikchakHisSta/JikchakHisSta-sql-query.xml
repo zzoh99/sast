@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.jikchakHisSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getJikchakHisStaList2">
+				<![CDATA[
+				SELECT Y.CODE AS CODE
+				     , Y.CODE_NM AS CODE_NM
+				     , ROW_NUMBER() OVER (ORDER BY 1) AS SEQ
+				     , NVL(X.CNT,0) AS CNT
+				     , NVL(ROUND((X.CNT/SUM(X.CNT) OVER())*100,1),0) AS PER_CNT
+				     , REPLACE(#{searchYmd}, '-', '') AS SEARCH_YMD
+				  FROM (SELECT ENTER_CD, CODE, CODE_NM
+				          FROM TSYS005
+				         WHERE GRCODE_CD = 'H20020'
+				           AND ENTER_CD = #{groupEnterCd}
+				       ) Y
+				  LEFT OUTER JOIN
+				  	   (
+				        SELECT A.ENTER_CD, A.JIKCHAK_CD, COUNT(*) AS CNT
+				          FROM THRM151 A
+				          JOIN THRM100 B
+				            ON A.ENTER_CD = B.ENTER_CD
+				           AND A.SABUN = B.SABUN
+				         WHERE (A.ENTER_CD, A.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+				                                               FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900 WHERE ENTER_CD = #{groupEnterCd}) A
+				                                            CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+				           AND REPLACE(#{searchYmd}, '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231') ]]>
+			               AND (B.RET_YMD IS NULL OR B.RET_YMD >= REPLACE(#{searchYmd}, '-', ''))
+						   <if test="jikweeCd != null and jikweeCd neq ''">
+                           	   AND JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+              			   </if>
+                           <if test="jikgubCd != null and jikgubCd neq ''">
+                               AND JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+                           </if>
+                           <if test="workType != null and workType neq ''">
+                                 AND WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+                           </if>
+                           <if test="manageCd != null and manageCd neq ''">
+                                 AND MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+                           </if>
+                           <if test="searchOrgNm != null and searchOrgNm neq ''">
+                                 AND ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+			           	   </if>
+				         GROUP BY A.ENTER_CD, A.JIKCHAK_CD
+				        ) X
+				    ON X.ENTER_CD = Y.ENTER_CD
+				   AND X.JIKCHAK_CD = Y.CODE
+				 WHERE Y.ENTER_CD = #{groupEnterCd}
+				 ORDER BY F_COM_GET_GRCODE_SEQ(Y.ENTER_CD, 'H20020', Y.CODE)
+		</select>
+
+		<!-- 변동추이의 각 날짜구간 ymd를 조회 -->
+		<select parameterType="map" resultType="cMap" id="getMinusYmdHisSta">
+				<![CDATA[
+					SELECT
+					  TO_CHAR(ADD_MONTHS(TO_DATE(TRIM( #{stdDate} ), 'YYYY-MM-DD'), TO_NUMBER('-'||NVL(TRIM( #{stdMonths} ),'3'))), 'YYYY-MM-DD') AS MINUS_YMD1
+					, TO_CHAR(ADD_MONTHS(TO_DATE(TRIM( #{stdDate} ), 'YYYY-MM-DD'), TO_NUMBER('-'||NVL(TRIM( #{stdMonths} ),'3'))*2), 'YYYY-MM-DD') AS MINUS_YMD2
+					FROM DUAL
+				]]>
+		</select>
+		
+</mapper>

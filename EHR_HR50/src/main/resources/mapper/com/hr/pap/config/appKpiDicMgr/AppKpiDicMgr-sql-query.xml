@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appKpiDicMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppKpiDicMgrList">
+
+				<![CDATA[
+				SELECT YYYY
+					 , KPI_CD
+					 , KPI_NM
+					 , MEASURE_TYPE_CD
+					 , APP_INDEX_GUBUN_CD
+					 , KPI_DEF_NM
+					 , APP_INDEX_TYPE_CD
+					 , KPI_FORMULA_NM
+					 , APP_INDEX_CD
+					 , KPI_DATA_SOURCE_NM
+					 , MEASURE_SCOPE_CD
+					 , KPI_MIN_REPORT_CD
+					 , USE_YN
+				  FROM TPAP053 A
+				 WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+				   AND A.YYYY        = TRIM(#{appraisalYy})
+				   AND A.KPI_NM LIKE '%' || TRIM(#{searchKpiNm}) || '%'
+				   AND A.USE_YN = TRIM(#{searchUseYn})
+			  	ORDER BY YYYY, KPI_CD, KPI_NM, MEASURE_TYPE_CD, APP_INDEX_GUBUN_CD
+				]]>
+
+
+		</select>
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveAppKpiDicMgr">
+
+					MERGE INTO TPAP053 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.YYYY
+									, A.KPI_CD
+									, A.KPI_NM
+									, A.MEASURE_TYPE_CD
+									, A.APP_INDEX_GUBUN_CD
+									, A.KPI_DEF_NM
+									, A.APP_INDEX_TYPE_CD
+									, A.KPI_FORMULA_NM
+									, A.APP_INDEX_CD
+									, A.KPI_DATA_SOURCE_NM
+									, A.MEASURE_SCOPE_CD
+									, A.KPI_MIN_REPORT_CD
+									, A.USE_YN
+							FROM	(
+									SELECT	  NULL AS ENTER_CD
+											, NULL AS YYYY
+											, NULL AS KPI_CD
+											, NULL AS KPI_NM
+											, NULL AS MEASURE_TYPE_CD
+											, NULL AS APP_INDEX_GUBUN_CD
+											, NULL AS KPI_DEF_NM
+											, NULL AS APP_INDEX_TYPE_CD
+											, NULL AS KPI_FORMULA_NM
+											, NULL AS APP_INDEX_CD
+											, NULL AS KPI_DATA_SOURCE_NM
+											, NULL AS MEASURE_SCOPE_CD
+											, NULL AS KPI_MIN_REPORT_CD
+											, NULL AS USE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	                AS ENTER_CD
+											, TRIM(#{rm.yyyy}) AS YYYY
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test='rm.kpiCd != null and !rm.kpiCd.equals("")'>
+											, TRIM(#{rm.kpiCd}) AS APPRAISAL_CD
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+											, ((SELECT NVL(MAX(KPI_CD),0) + ${icnt} FROM TPAP053 WHERE ENTER_CD = #{ssnEnterCd} AND YYYY = #{rm.yyyy}))	AS KPI_CD
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+											, TRIM(#{rm.kpiNm}) AS KPI_NM
+											, TRIM(#{rm.measureTypeCd}) AS MEASURE_TYPE_CD
+											, TRIM(#{rm.appIndexGubunCd}) AS APP_INDEX_GUBUN_CD
+											, TRIM(#{rm.kpiDefNm}) AS KPI_DEF_NM
+											, TRIM(#{rm.appIndexTypeCd}) AS APP_INDEX_TYPE_CD
+											, TRIM(#{rm.kpiFormulaNm}) AS KPI_FORMULA_NM
+											, TRIM(#{rm.appIndexCd}) AS APP_INDEX_CD
+											, TRIM(#{rm.kpiDataSourceNm}) AS KPI_DATA_SOURCE_NM
+											, TRIM(#{rm.measureScopeCd}) AS MEASURE_SCOPE_CD
+											, TRIM(#{rm.kpiMinReportCd}) AS KPI_MIN_REPORT_CD
+											, NVL(TRIM(#{rm.useYn}),'Y') AS USE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		    = S.ENTER_CD
+						 AND  T.YYYY = S.YYYY
+						 AND T.KPI_CD = S.KPI_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	 
+									  T.KPI_NM = S.KPI_NM
+									, T.MEASURE_TYPE_CD = S.MEASURE_TYPE_CD
+									, T.APP_INDEX_GUBUN_CD = S.APP_INDEX_GUBUN_CD
+									, T.KPI_DEF_NM = S.KPI_DEF_NM
+									, T.APP_INDEX_TYPE_CD = S.APP_INDEX_TYPE_CD
+									, T.KPI_FORMULA_NM = S.KPI_FORMULA_NM
+									, T.APP_INDEX_CD = S.APP_INDEX_CD
+									, T.KPI_DATA_SOURCE_NM = S.KPI_DATA_SOURCE_NM
+									, T.MEASURE_SCOPE_CD = S.MEASURE_SCOPE_CD
+									, T.KPI_MIN_REPORT_CD = S.KPI_MIN_REPORT_CD
+									, T.USE_YN = S.USE_YN
+									, T.CHKDATE			    = SYSDATE
+									, T.CHKID			    = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.YYYY
+							, T.KPI_CD
+							, T.KPI_NM
+							, T.MEASURE_TYPE_CD
+							, T.APP_INDEX_GUBUN_CD
+							, T.KPI_DEF_NM
+							, T.APP_INDEX_TYPE_CD
+							, T.KPI_FORMULA_NM
+							, T.APP_INDEX_CD
+							, T.KPI_DATA_SOURCE_NM
+							, T.MEASURE_SCOPE_CD
+							, T.KPI_MIN_REPORT_CD
+							, T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+ 							  S.ENTER_CD        
+ 							, S.YYYY
+							, S.KPI_CD
+							, S.KPI_NM
+							, S.MEASURE_TYPE_CD
+							, S.APP_INDEX_GUBUN_CD
+							, S.KPI_DEF_NM
+							, S.APP_INDEX_TYPE_CD
+							, S.KPI_FORMULA_NM
+							, S.APP_INDEX_CD
+							, S.KPI_DATA_SOURCE_NM
+							, S.MEASURE_SCOPE_CD
+							, S.KPI_MIN_REPORT_CD
+							, S.USE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppKpiDicMgr">
+
+					DELETE FROM TPAP053 
+					WHERE 	(ENTER_CD,YYYY,KPI_CD ) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.yyyy != null and !rm.yyyy.equals("")'>
+										,	TRIM( #{rm.yyyy} )
+										</if>
+										<if test='rm.kpiCd  != null and !rm.kpiCd.equals("")'>
+										,	TRIM( #{rm.kpiCd} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+
+</mapper>

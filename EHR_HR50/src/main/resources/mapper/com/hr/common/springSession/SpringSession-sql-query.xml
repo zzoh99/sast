@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ 
+<mapper namespace="common.springSession">
+
+    <select id="getEnterCdSabunBySessionId" parameterType="map" resultType="cMap">
+        SELECT ATTRIBUTE_NAME, ATTRIBUTE_BYTES
+          FROM SPRING_SESSION_ATTRIBUTES sa
+          JOIN SPRING_SESSION s ON sa.SESSION_PRIMARY_ID = s.PRIMARY_ID
+         WHERE s.SESSION_ID = #{sessionId}
+           AND (ATTRIBUTE_NAME = 'ssnEnterCd' OR ATTRIBUTE_NAME = 'ssnSabun')
+    </select>
+
+    <select id="getPrimaryIdBySessionId" parameterType="map" resultType="cMap">
+        SELECT PRIMARY_ID
+        FROM SPRING_SESSION
+        WHERE SESSION_ID = #{sessionId}
+    </select>
+
+    <select id="getSessionIdsByEnterCdSabun" parameterType="map" resultType="string">
+        SELECT s1.SESSION_ID
+          FROM SPRING_SESSION s1
+          JOIN SPRING_SESSION_ATTRIBUTES sa1
+            ON s1.PRIMARY_ID = sa1.SESSION_PRIMARY_ID
+          JOIN SPRING_SESSION_ATTRIBUTES sa2
+            ON s1.PRIMARY_ID = sa2.SESSION_PRIMARY_ID
+         WHERE sa1.ATTRIBUTE_NAME = 'ssnEnterCd'
+           AND RAWTOHEX(DBMS_LOB.SUBSTR(sa1.ATTRIBUTE_BYTES, 100, 1)) = #{serializedEnterCd} -- HEX 비교
+           AND sa2.ATTRIBUTE_NAME = 'ssnSabun'
+           AND RAWTOHEX(DBMS_LOB.SUBSTR(sa2.ATTRIBUTE_BYTES, 100, 1)) = #{serializedSabun} -- HEX 비교
+    </select>
+
+	<select id="getSessionDataBySessionId" parameterType="map" resultType="cMap">
+		SELECT ATTRIBUTE_NAME, ATTRIBUTE_BYTES
+          FROM SPRING_SESSION_ATTRIBUTES
+         WHERE SESSION_PRIMARY_ID  = #{primaryId}
+           AND (
+        <foreach item="item" collection="attributeNames" separator=" OR ">
+                ATTRIBUTE_NAME = #{item}
+        </foreach>
+		        )
+    </select>
+
+	<delete parameterType="map" id="invalidateSession">
+        DELETE FROM SPRING_SESSION
+         WHERE SESSION_ID = #{sessionId}
+	</delete>
+
+	<delete parameterType="map" id="invalidateSessionsExcludeCurrent">
+        DELETE FROM SPRING_SESSION
+         WHERE PRIMARY_ID IN (
+                SELECT s1.PRIMARY_ID
+                  FROM SPRING_SESSION s1
+                  JOIN SPRING_SESSION_ATTRIBUTES sa1
+                    ON s1.PRIMARY_ID = sa1.SESSION_PRIMARY_ID
+                  JOIN SPRING_SESSION_ATTRIBUTES sa2
+                    ON s1.PRIMARY_ID = sa2.SESSION_PRIMARY_ID
+                 WHERE sa1.ATTRIBUTE_NAME = 'ssnEnterCd'
+                   AND RAWTOHEX(DBMS_LOB.SUBSTR(sa1.ATTRIBUTE_BYTES, 100, 1)) = #{serializedEnterCd} -- HEX 비교
+                   AND sa2.ATTRIBUTE_NAME = 'ssnSabun'
+                   AND RAWTOHEX(DBMS_LOB.SUBSTR(sa2.ATTRIBUTE_BYTES, 100, 1)) = #{serializedSabun} -- HEX 비교
+               )
+           AND SESSION_ID != #{currentSessionId}
+	</delete>
+</mapper>

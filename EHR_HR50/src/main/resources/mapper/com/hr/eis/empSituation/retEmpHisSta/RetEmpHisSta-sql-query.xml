@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.retEmpHisSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetEmpHisStaList1">
+			
+				<![CDATA[
+				SELECT CODE,CODE_NM
+						, NVL(SUM(CNT),0) AS CNT, NVL(SUM(PER_CNT), 0) AS PER_CNT
+				  FROM (
+				SELECT CODE,CODE_NM, SEQ, CNT, ROUND((CNT/SUM(CNT) OVER())*100,1) AS PER_CNT
+				  FROM (
+				  			   --부사장~상무보 까지는 1로 넘겨서 상단에서 임원으로 판단 by JSG
+				        SELECT NVL(C.RESIGN_REASON_CD, '999') AS RESIGN_REASON_CD, COUNT(A.SABUN) AS CNT
+				          FROM THRM151 A
+				              ,(SELECT MAX(A.SDATE) AS SDATE, A.ENTER_CD, A.SABUN, F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD,  #{searchYyyy} || '1231') AS ORG_NM
+                                  FROM THRM151 A
+                                 WHERE A.ENTER_CD = #{groupEnterCd}
+                                   AND A.STATUS_CD IN ('RA') ]]>
+<if test="jikgubCd != null and jikgubCd neq ''">
+	                               AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="workType != null and workType neq ''">
+				               	   AND A.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+                                   AND  #{searchYyyy} || '1231' BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                                GROUP BY A.ENTER_CD, A.SABUN, A.ORG_CD  ) B
+				              ,THRM100 C
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.SABUN    = B.SABUN
+				           AND A.SDATE    = B.SDATE
+				           AND A.ENTER_CD = C.ENTER_CD
+				           AND A.SABUN    = C.SABUN
+				           AND C.RET_YMD LIKE #{searchYyyy} || '%'
+<if test="sexType != null and sexType neq ''">
+			           	   AND C.SEX_TYPE IN
+		<foreach collection="sexType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="searchOrgNm != null and searchOrgNm neq ''">
+			           	   AND B.ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+</if>
+				         GROUP BY C.RESIGN_REASON_CD
+				       ) X
+				       ,(SELECT CODE, CODE_NM, SEQ
+		                  FROM TSYS005
+		                 WHERE ENTER_CD = #{groupEnterCd}
+		                   AND GRCODE_CD = 'H40100'
+		                   AND USE_YN = 'Y'
+		                   UNION ALL
+                           SELECT '999', '구분없음', 999 FROM DUAL
+		               ) D
+                WHERE X.RESIGN_REASON_CD = D.CODE (+)
+				ORDER BY SEQ, CODE
+				)
+				GROUP BY CODE,CODE_NM, SEQ
+				ORDER BY TO_NUMBER(NVL(SEQ, 0))
+			
+		</select>
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetEmpHisStaList2">
+			
+				<![CDATA[
+				SELECT T3.YYYY AS CODE_NM, NVL(T1.CNT, 0) AS CNT, NVL(T2.ENTER_CNT, 0) AS ENTER_CNT, ROUND(NVL(ENTER_CNT,0) / NVL(CNT,1) * 100, 0) AS PER_CNT
+				FROM (
+				            SELECT Y.DEF_YEAR AS YYYY, COUNT(DISTINCT X.SABUN) AS CNT
+				                FROM (
+				                            SELECT A.SABUN, A.EMP_YMD, B.SDATE, B.EDATE
+				                            FROM THRM100 A,                                                    -- 인사마스터
+				                              THRM151 B
+				                            WHERE A.ENTER_CD = B.ENTER_CD
+				                            AND A.SABUN    = B.SABUN
+				                            AND A.ENTER_CD = #{groupEnterCd} ]]>
+<if test="jikgubCd != null and jikgubCd neq ''">
+				                            AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="manageCd != null and manageCd neq ''">
+				                            AND A.MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="sexType != null and sexType neq ''">
+				                            AND A.SEX_TYPE IN
+		<foreach collection="sexType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="workType != null and workType neq ''">
+				                            AND B.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if> <![CDATA[
+				                            AND F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%' || #{searchOrgNm} || '%'
+				                            AND B.STATUS_CD NOT IN ('RAA', 'XA', 'RA')
+				                            ) X,
+				                            (
+				                                SELECT     LEVEL, ( #{searchYyyy} - LEVEL +1 ) AS DEF_YEAR
+				                                      FROM DUAL
+				                                CONNECT BY LEVEL <= 4
+				                                ORDER BY LEVEL DESC
+				                            ) Y
+				            WHERE 1=1
+				                AND Y.DEF_YEAR || '1231' BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+				            GROUP BY Y.DEF_YEAR
+				            ) T1,
+				            (
+				            SELECT Y.DEF_YEAR AS YYYY, COUNT(DISTINCT X.SABUN) AS ENTER_CNT
+				                FROM (
+				                            SELECT A.SABUN, A.RET_YMD, B.SDATE, B.EDATE
+				                            FROM THRM100 A,                                                    -- 인사마스터
+				                              THRM151 B
+				                            WHERE A.ENTER_CD = B.ENTER_CD
+				                            AND A.SABUN    = B.SABUN
+				                            AND A.ENTER_CD = #{groupEnterCd} ]]>
+<if test="jikgubCd != null and jikgubCd neq ''">
+				                            AND A.JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="manageCd != null and manageCd neq ''">
+				                            AND A.MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="sexType != null and sexType neq ''">
+				                            AND A.SEX_TYPE IN
+		<foreach collection="sexType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="workType != null and workType neq ''">
+				                            AND B.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if> <![CDATA[
+				                            AND F_COM_GET_ORG_NM(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%' || #{searchOrgNm} || '%'
+				                            AND B.STATUS_CD IN ('RA')
+				                            ) X,
+				                            (
+				                                SELECT     LEVEL, ( #{searchYyyy} - LEVEL +1 ) AS DEF_YEAR
+				                                      FROM DUAL
+				                                CONNECT BY LEVEL <= 4
+				                                ORDER BY LEVEL DESC
+				                            ) Y
+				            WHERE 1=1
+				                AND Y.DEF_YEAR || '1231' BETWEEN X.SDATE AND NVL(X.EDATE, '99991231')
+				                AND X.RET_YMD LIKE Y.DEF_YEAR || '%'
+				            GROUP BY Y.DEF_YEAR
+				            ) T2,
+				            (
+				                SELECT     LEVEL, ( #{searchYyyy} - LEVEL +1 ) AS YYYY
+				                      FROM DUAL
+				                CONNECT BY LEVEL <= 4
+				                ORDER BY LEVEL DESC
+				            ) T3
+				WHERE T3.YYYY = T2.YYYY(+)
+				     AND T3.YYYY = T1.YYYY(+)
+				ORDER BY T1.YYYY
+				]]>
+			
+			
+		</select>
+</mapper>

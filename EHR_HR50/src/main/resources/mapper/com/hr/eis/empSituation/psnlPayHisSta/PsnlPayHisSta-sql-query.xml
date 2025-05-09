@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.psnlPayHisSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlPayHisStaList">
+			
+				<![CDATA[
+					SELECT A.ORG_CD
+					     , A.ORG_NM
+					     , A.JIKCHAK_CD
+					     , A.JIKCHAK_NM
+						 , A.JIKWEE_NM
+					     , A.NAME
+					     , A.SABUN
+					     , #{searchYear} AS YEAR
+					     , TO_CHAR(TO_NUMBER(#{searchYear}) - 3) AS TITLE_MON1
+					     , TO_CHAR(TO_NUMBER(#{searchYear}) - 2) AS TITLE_MON2
+					     , TO_CHAR(TO_NUMBER(#{searchYear}) - 1) AS TITLE_MON3
+					     , TO_CHAR(TO_NUMBER(#{searchYear}) - 0) AS TITLE_MON4
+					     , F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 3) || '1231') * 12 AS MON1
+					     , F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 2) || '1231') * 12 AS MON2
+					     , F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 1) || '1231') * 12 AS MON3
+					     , F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 0) || '1231') * 12 AS MON4
+					  FROM (SELECT X.ENTER_CD
+					             , X.SABUN
+					             , F_COM_GET_NAMES(Y.ENTER_CD,Y.SABUN) NAME
+					             , X.JIKCHAK_CD
+					             , Z.CODE_NM AS JIKCHAK_NM
+					    		 , Z1.CODE_NM AS JIKWEE_NM
+					             , Z.SEQ
+					             , X.ORG_CD
+					             , F_COM_GET_ORG_NM(X.ENTER_CD, X.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+					          FROM THRM151 X, THRM100 Y, TSYS005 Z, TSYS005 Z1
+					         WHERE X.ENTER_CD  = Y.ENTER_CD
+					           AND X.SABUN     = Y.SABUN
+					           AND X.ENTER_CD  = Z.ENTER_CD
+					           AND X.ENTER_CD  = #{ssnEnterCd}
+					           AND Z.GRCODE_CD = 'H20020'
+					           AND X.JIKCHAK_CD = Z.CODE
+					           AND X.ENTER_CD  = Z1.ENTER_CD
+					           AND Z1.GRCODE_CD = 'H20030'
+					           AND X.JIKWEE_CD = Z1.CODE
+
+					  ]]>
+<if test="jikweeCd != null and jikweeCd neq ''">
+					           AND X.JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="jikchakCd != null and jikchakCd neq ''">
+					           AND X.JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+			<![CDATA[
+					           AND (Y.RET_YMD IS NULL OR Y.RET_YMD > TO_CHAR(SYSDATE, 'YYYYMMDD'))
+					           AND X.SDATE = (SELECT MAX(K.SDATE) FROM THRM151 K
+					                           WHERE K.ENTER_CD = X.ENTER_CD
+					                             AND K.SABUN    = X.SABUN
+					                             AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN K.SDATE AND K.EDATE)
+					           AND (X.ENTER_CD, X.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+					                                                   FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900) A
+					                                                CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+					       ) A
+			]]>
+					 WHERE 1=1
+<if test="searchOrgNm != null and searchOrgNm neq ''">
+					   AND A.ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+</if>
+					 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN,TO_CHAR(SYSDATE, 'YYYYMMDD'))
+		</select>
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlPayHisStaPopupList">
+			
+				<![CDATA[
+				SELECT   A.NAME
+					   , A.SABUN
+				       , TO_CHAR(TO_NUMBER(#{searchYear}) - 3) AS TITLE_MON1
+				       , TO_CHAR(TO_NUMBER(#{searchYear}) - 2) AS TITLE_MON2
+				       , TO_CHAR(TO_NUMBER(#{searchYear}) - 1) AS TITLE_MON3
+				       , TO_CHAR(TO_NUMBER(#{searchYear}) - 0) AS TITLE_MON4
+				       , NVL(F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 3) || '1231'),0) / 10000 AS MON1
+				       , NVL(F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 2) || '1231'),0) / 10000 AS MON2
+				       , NVL(F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 1) || '1231'),0) / 10000 AS MON3
+				       , NVL(F_CPN_YY_YEAR_MON(A.ENTER_CD, A.SABUN, TO_CHAR(TO_NUMBER(#{searchYear}) - 0) || '1231'),0) / 10000 AS MON4
+			        FROM (SELECT X.ENTER_CD, X.SABUN, F_COM_GET_NAMES(Y.ENTER_CD,Y.SABUN) NAME
+			                 FROM THRM151 X, THRM100 Y,
+			                     (SELECT #{searchOrgCd} AS ORG_CD
+			                        FROM DUAL
+			                      UNION ALL
+			                      SELECT A.ORG_CD
+			                       FROM (SELECT X.*
+			                              FROM TORG105 X,
+			                                   (SELECT MAX(SDATE) AS SDATE,ENTER_CD
+			                                     FROM TORG103
+			                                     WHERE ENTER_CD = #{ssnEnterCd}
+			                                       AND SDATE <= TO_CHAR(SYSDATE, 'YYYYMMDD')
+			                                     GROUP BY ENTER_CD) Y
+			                             WHERE X.ENTER_CD = Y.ENTER_CD
+			                               AND X.SDATE    = Y.SDATE
+			                            ) A
+			                       -- 하위 소속코드 가져오기
+			                       START WITH A.PRIOR_ORG_CD = #{searchOrgCd}
+			                         CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+			                                AND PRIOR A.SDATE    = A.SDATE
+			                                AND PRIOR A.ORG_CD   = A.PRIOR_ORG_CD
+			                      ) Z
+			                WHERE X.ENTER_CD = Y.ENTER_CD
+			                  AND X.SABUN    = Y.SABUN
+			                  AND X.ORG_CD   = Z.ORG_CD
+			                  AND X.ENTER_CD  = #{ssnEnterCd}
+			                  AND X.JIKWEE_CD = #{searchJikweeCd}
+			                  AND (Y.RET_YMD IS NULL OR Y.RET_YMD > TO_CHAR(SYSDATE, 'YYYYMMDD'))
+			                  AND X.SDATE = (SELECT MAX(K.SDATE) FROM THRM151 K
+			                                  WHERE K.ENTER_CD = X.ENTER_CD
+			                                    AND K.SABUN    = X.SABUN
+			                                    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN K.SDATE AND K.EDATE)
+			             ) A
+			ORDER BY A.NAME
+
+				]]>
+		</select>
+
+</mapper>

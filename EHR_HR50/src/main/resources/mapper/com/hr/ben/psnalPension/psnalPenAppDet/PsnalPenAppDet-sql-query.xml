@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.psnalPension.psnalPenAppDet">
+	
+	<!-- 신청내역 조회 -->
+	<select id="getPsnalPenAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT JIKGUB_CD
+	         , JIKGUB_NM
+		     , PENS_CD
+		     , COMP_MON
+		     , PSNL_MON
+		     , NVL(TO_NUMBER(COMP_MON),0) + NVL(TO_NUMBER(PSNL_MON),0) AS TOT_MON
+		     , PAY_YM
+		     , NOTE
+			 , F_BEN_GET_PENSION_MON( #{ssnEnterCd}, TRIM(#{searchApplSabun}), '2', TO_CHAR(SYSDATE, 'yyyymmdd') ) AS CHK
+		 FROM ( SELECT F_COM_GET_JIKGUB_CD(#{ssnEnterCd}, TRIM(#{searchApplSabun}), TO_CHAR(SYSDATE, 'yyyymmdd') ) AS JIKGUB_CD
+				     , F_COM_GET_JIKGUB_NM(#{ssnEnterCd}, TRIM(#{searchApplSabun}), TO_CHAR(SYSDATE, 'yyyymmdd') ) AS JIKGUB_NM
+				     , F_BEN_GET_PENSION_MON( #{ssnEnterCd}, TRIM(#{searchApplSabun}), '2', TO_CHAR(SYSDATE, 'yyyymmdd') ) AS PENS_CD
+				     , F_BEN_GET_PENSION_MON( #{ssnEnterCd}, TRIM(#{searchApplSabun}), '0', TO_CHAR(SYSDATE, 'yyyymmdd') ) AS COMP_MON
+					 , F_BEN_GET_PENSION_MON( #{ssnEnterCd}, TRIM(#{searchApplSabun}), '1', TO_CHAR(SYSDATE, 'yyyymmdd') ) AS PSNL_MON
+					 , TO_CHAR(ADD_MONTHS(SYSDATE, 1),'yyyymm') AS PAY_YM
+					 , '' NOTE
+				  FROM DUAL
+				 WHERE NOT EXISTS ( SELECT 1 FROM TBEN651 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_SEQ = TRIM( #{searchApplSeq} ))
+				UNION ALL
+			    SELECT A.JIKGUB_CD
+			         , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010' , A.JIKGUB_CD) AS JIKGUB_NM
+				     , A.PENS_CD
+				     , TO_CHAR(A.COMP_MON)
+				     , TO_CHAR(A.PSNL_MON)
+				     , A.PAY_YM
+				     , A.NOTE
+			     FROM TBEN651 A
+			    WHERE A.ENTER_CD   = #{ssnEnterCd}
+                     AND A.APPL_SEQ   = TRIM( #{searchApplSeq} )
+                    )
+	]]>
+	</select>
+		
+	<!-- 중복신청 조회 -->
+	<select id="getPsnalPenAppDupChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+           SELECT COUNT(1) AS CNT
+             FROM TBEN651 A
+            WHERE A.ENTER_CD   = #{ssnEnterCd}
+              AND A.APPL_SEQ   <> TRIM(#{searchApplSeq})
+              AND A.SABUN   	= TRIM(#{searchApplSabun})   
+              AND A.PAY_YM    	= TRIM(#{payYm}) 
+              AND EXISTS ( SELECT 1 FROM THRI103 X
+                            WHERE X.ENTER_CD = A.ENTER_CD
+                              AND X.APPL_SEQ = A.APPL_SEQ
+                              AND X.APPL_STATUS_CD IN ('21','31','99') ) -- 신청중인 대상도 체크
+	]]>
+	</select>
+		
+	<!--  세부내역 저장 -->
+	<update id="savePsnalPenAppDet" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN651 T 
+		 USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+		       SELECT TRIM(#{ssnEnterCd})  			AS  ENTER_CD 
+		            , TRIM(#{rm.searchApplSeq} )  	AS  APPL_SEQ
+		            , TRIM(#{rm.searchApplSabun} ) 	AS  SABUN
+		            , TRIM(#{rm.jikgubCd})  		AS  JIKGUB_CD
+		            , TRIM(#{rm.pensCd})  			AS  PENS_CD
+		            , TRIM(#{rm.compMon})  			AS  COMP_MON
+		            , REPLACE(TRIM(#{rm.psnlMon}),',','') AS  PSNL_MON
+		            , TRIM(#{rm.payYm})  			AS  PAY_YM
+		            , TRIM(#{rm.note})  			AS  NOTE
+		        FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD = S.ENTER_CD 
+		     AND  T.APPL_SEQ = S.APPL_SEQ 
+		     AND  T.SABUN = S.SABUN 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE		= sysdate 
+		            , T.CHKID		= #{ssnSabun} 
+		            , T.JIKGUB_CD 	= S.JIKGUB_CD 
+		            , T.PENS_CD 	= S.PENS_CD 
+		            , T.COMP_MON 	= S.COMP_MON 
+		            , T.PSNL_MON 	= S.PSNL_MON 
+		            , T.NOTE 		= S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.APPL_SEQ
+		            , T.SABUN
+		            , T.JIKGUB_CD
+		            , T.PENS_CD
+		            , T.COMP_MON
+		            , T.PSNL_MON
+		            , T.PAY_YM
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.APPL_SEQ
+		            , S.SABUN
+		            , S.JIKGUB_CD
+		            , S.PENS_CD
+		            , S.COMP_MON
+		            , S.PSNL_MON
+		            , S.PAY_YM
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+
+	]]>
+	</update>
+</mapper>

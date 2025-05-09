@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.medical.medApp">
+	
+	<!-- 조회 -->
+	<select id="getMedAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT A.ENTER_CD
+		     , A.APPL_SEQ
+		     , A.SABUN
+		     , A.FAM_CD
+		     , A.FAM_NM
+		     , A.FAM_RES_NO
+		     , A.MED_CODE
+		     , A.MED_NAME
+		     , A.MED_S_YM
+		     , A.APPL_MON
+		     , A.NOTE
+		     , DECODE(B.APPL_STATUS_CD, '99', DECODE(UPPER(A.CLOSE_YN), 'Y', A.PAY_MON, ''), '') AS PAY_MON_VIEW
+		     , DECODE(B.APPL_STATUS_CD, '99', DECODE(UPPER(A.CLOSE_YN), 'Y', A.PAY_YM, ''), '') AS PAY_YM_VIEW
+		     , A.PAY_MON
+		     , A.PAY_YM
+		     , A.PAY_NOTE
+		     , A.CLOSE_YN
+		     , B.APPL_YMD
+			 , B.APPL_STATUS_CD
+			 , B.AGREE_YMD
+			 , B.APPL_SABUN
+			 , B.APPL_IN_SABUN
+			 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+			 , 0 AS DETAIL
+			 , A.FAM_YMD
+			 , CASE WHEN SUBSTR(CRYPTIT.DECRYPT(A.FAM_RES_NO, A.ENTER_CD), 7, 1) IN ('1', '3', '5', '7', '9')
+			 	THEN '남' 
+			 	WHEN SUBSTR(CRYPTIT.DECRYPT(A.FAM_RES_NO, A.ENTER_CD), 7, 1) IN ('2', '4', '6', '8', '0') 
+			 	THEN '여'
+			 	ELSE '' END AS SEX_TYPE_NM
+		  FROM TBEN703 A, THRI103 B
+		 WHERE A.ENTER_CD = #{ssnEnterCd}
+		   AND A.SABUN    = #{searchSabun}
+		   AND A.ENTER_CD = B.ENTER_CD
+		   AND A.APPL_SEQ = B.APPL_SEQ ]]>
+		<if test="searchDateYear != null and searchDateYear neq ''">
+		   AND SUBSTR( B.APPL_YMD, 1, 4) = REPLACE(#{searchDateYear}, '-', '')
+		</if>
+		 ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+	</select>
+		
+	<!-- TBEN703 삭제 -->
+	<delete id="deleteMedApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN703
+		 WHERE ENTER_CD = #{ssnEnterCd}	
+		   AND APPL_SEQ IN 	(  NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.applSeq and rm.applSeq neq ''">
+				,TRIM(#{rm.applSeq}) 
+			</if>
+		</foreach>
+			)
+	</delete>
+	
+</mapper>

@@ -1,0 +1,116 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ include file="/WEB-INF/jsp/common/include/taglibs.jsp"%>
+<!DOCTYPE html> <html class="hidden"> <head> <title><tit:txt mid='113135' mdef='대상일자'/></title>
+<%@ include file="/WEB-INF/jsp/common/include/meta.jsp"%>
+<%--<%@ include file="/WEB-INF/jsp/common/include/jqueryScript.jsp"%>--%>
+
+<!--
+ * 소급예외수당관리
+ * @author JM
+-->
+<script type="text/javascript">
+var p = eval("${popUpStatus}");
+$(function() {
+
+	createIBSheet3(document.getElementById('sheet1-wrap'), "sheet1", "100%", "100%", "${ssnLocaleCd}");
+
+	const modal = window.top.document.LayerModalUtility.getModal('retroAllowPayActionLayer');
+	let payActionCd = modal.parameters.payActionCd || '';
+
+	// var payActionCd = "";
+	// var arg = p.window.dialogArguments;
+	//
+	// if( arg != undefined ) {
+	// 	payActionCd = arg["payActionCd"];
+	// }else{
+	//     if(p.popDialogArgument("payActionCd")!=null)		payActionCd  	= p.popDialogArgument("payActionCd");
+    // }
+
+	$("#payActionCd").val(payActionCd);
+
+	var initdata1 = {};
+	initdata1.Cfg = {SearchMode:smLazyLoad, Page:22, AutoFitColWidth:'init|search|resize|rowtransaction'};
+	initdata1.HeaderMode = {Sort:1, ColMove:1, ColResize:1, HeaderCheck:1};
+	initdata1.Cols = [
+		{Header:"<sht:txt mid='sNo' mdef='No'/>",			Type:"${sNoTy}",	Hidden:Number("${sNoHdn}"),	Width:"${sNoWdt}",	Align:"Center",	ColMerge:0,	SaveName:"sNo" },
+		{Header:"<sht:txt mid='sDelete V5' mdef='삭제'/>",			Type:"${sDelTy}",	Hidden:1,					Width:"${sDelWdt}",	Align:"Center",	ColMerge:0,	SaveName:"sDelete",			Sort:0 },
+		{Header:"<sht:txt mid='sStatus' mdef='상태'/>",			Type:"${sSttTy}",	Hidden:1,					Width:"${sSttWdt}",	Align:"Center",	ColMerge:0,	SaveName:"sStatus",			Sort:0 },
+		{Header:"<sht:txt mid='payActionCdV6' mdef='소급일자코드'/>",		Type:"Text",		Hidden:1,					Width:50,			Align:"Left",	ColMerge:0,	SaveName:"payActionCd",		KeyField:0,	Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:10 },
+		{Header:"<sht:txt mid='payActionNmV3' mdef='소급일자'/>",			Type:"Text",		Hidden:1,					Width:100,			Align:"Left",	ColMerge:0,	SaveName:"payActionNm",		KeyField:0,	Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:100 },
+		{Header:"<sht:txt mid='rtrPayActionCd' mdef='소급대상급여계산코드'/>",	Type:"Text",		Hidden:1,					Width:100,			Align:"Left",	ColMerge:0,	SaveName:"rtrPayActionCd",	KeyField:0,	Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:10 },
+		{Header:"<sht:txt mid='rtrPayActionNmV1' mdef='소급대상급여명'/>",		Type:"Text",		Hidden:0,					Width:130,			Align:"Left",	ColMerge:0,	SaveName:"rtrPayActionNm",	KeyField:0,	Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:100 },
+		{Header:"<sht:txt mid='payYmV3' mdef='대상년월'/>",			Type:"Date",		Hidden:0,					Width:80,			Align:"Center",	ColMerge:0,	SaveName:"payYm",			KeyField:0,	Format:"Ym",	PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:7 },
+		{Header:"<sht:txt mid='payCdV5' mdef='급여구분코드'/>",		Type:"Text",		Hidden:1,					Width:50,			Align:"Center",	ColMerge:0,	SaveName:"payCd",			KeyField:0,	Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:10 },
+		{Header:"<sht:txt mid='payCd' mdef='급여구분'/>",			Type:"Text",		Hidden:0,					Width:100,			Align:"Center",	ColMerge:0,	SaveName:"payNm",			KeyField:0,	Format:"",		PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:100 },
+		{Header:"<sht:txt mid='incomeAnnualPaymentYmd' mdef='지급일자'/>",			Type:"Date",		Hidden:0,					Width:90,			Align:"Center",	ColMerge:0,	SaveName:"paymentYmd",		KeyField:0,	Format:"Ymd",	PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:10 },
+		{Header:"<sht:txt mid='timeYmV1' mdef='근태기준연월'/>",		Type:"Date",		Hidden:0,					Width:80,			Align:"Center",	ColMerge:0,	SaveName:"timeYm",			KeyField:0,	Format:"Ym",	PointCount:0,	UpdateEdit:0,	InsertEdit:0,	EditLen:7 }
+	]; IBS_InitSheet(sheet1, initdata1); sheet1.SetCountPosition(0);
+
+	$(window).smartresize(sheetResize);
+	sheetInit();
+
+	// $(".close").click(function() {
+	// 	p.self.close();
+	// });
+
+	doAction1("Search");
+});
+
+function doAction1(sAction) {
+	switch (sAction) {
+		case "Search":
+			sheet1.DoSearch("/RetroExceAllowDedMgr.do?cmd=getRetroExceAllowDedMgrRtrPayActionList", $("#sheet1Form").serialize());
+			break;
+
+		case "Down2Excel":
+			//삭제/상태/hidden 지우고 엑셀내려받기
+			var downcol = makeHiddenSkipCol(sheet1);
+			var param = {DownCols:downcol, SheetDesign:1, Merge:1};
+			sheet1.Down2Excel(param);
+			break;
+	}
+}
+
+//조회 후 에러 메시지
+function sheet1_OnSearchEnd(Code, Msg, StCode, StMsg) {
+	try { if (Msg != "") { alert(Msg); } sheetResize(); } catch (ex) { alert("OnSearchEnd Event Error : " + ex); }
+}
+
+function sheet1_OnDblClick(Row, Col, CellX, CellY, CellW, CellH) {
+	const modal = window.top.document.LayerModalUtility.getModal('retroAllowPayActionLayer');
+	modal.fire('retroAllowPayActionTrigger', {
+		payActionCd : sheet1.GetCellValue(Row, "payActionCd")
+		, payActionNm : sheet1.GetCellValue(Row, "payActionNm")
+		, rtrPayActionCd : sheet1.GetCellValue(Row, "rtrPayActionCd")
+		, rtrPayActionNm : sheet1.GetCellValue(Row, "rtrPayActionNm")
+		, payCd : sheet1.GetCellValue(Row, "payCd")
+		, payNm : sheet1.GetCellValue(Row, "payNm")
+	}).hide();
+}
+</script>
+</head>
+<body class="hidden bodywrap">
+	<div class="wrapper">
+		<div class="popup_main">
+			<form id="sheet1Form" name="sheet1Form">
+				<input type="hidden" id="payActionCd" name="payActionCd" value="" />
+			</form>
+			<table border="0" cellspacing="0" cellpadding="0" class="sheet_main">
+				<tr>
+					<td>
+						<div id="sheet1-wrap"></div>
+<%--					<script type="text/javascript">createIBSheet("sheet1", "100%", "100%", "${ssnLocaleCd}"); </script>--%>
+					</td>
+				</tr>
+			</table>
+			<div class="popup_button outer">
+				<ul>
+					<li>
+						<btn:a href="javascript:closeCommonLayer('retroAllowPayActionLayer');" css="gray large" mid='110881' mdef="닫기"/>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

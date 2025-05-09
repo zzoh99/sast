@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.annual.annualPlanApp">
+
+<!-- 연차휴가계획신청 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanAppList">
+
+				<![CDATA[
+				SELECT
+					 A.ENTER_CD
+				    ,'0' AS IBS_IMAGE
+					,'0' AS IBS_IMAGE_APR
+					,'0' AS IBS_IMAGE_NOTIFY
+				   	,B.APPL_YMD
+				   	,B.APPL_STATUS_CD
+				   	,B.APPL_SEQ
+		     		,A.VAC_PLAN_NM
+		     		,A.VAC_STD_SYMD
+					,A.SEQ
+		     		,C.DAYS
+		     		,C.SABUN
+		     		, DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+				FROM
+					 TTIM541 A
+					,THRI103 B
+					,(
+					SELECT
+						ENTER_CD,SEQ,SABUN,APPL_SEQ,SUM(DAYS) DAYS
+					FROM
+						TTIM542
+					GROUP BY
+						ENTER_CD,SEQ,SABUN,APPL_SEQ
+					 )C
+				WHERE
+					A.ENTER_CD = C.ENTER_CD
+				AND A.SEQ = C.SEQ
+				AND	B.ENTER_CD = C.ENTER_CD
+				AND B.APPL_SEQ = C.APPL_SEQ
+				AND A.ENTER_CD = #{ssnEnterCd}
+				AND C.SABUN=#{sabun}
+				ORDER BY B.APPL_STATUS_CD,B.CHKDATE DESC
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAnnualPlanStandard">
+
+				<![CDATA[
+					SELECT
+						 VACATION_STD_YMD CODE
+						,VACATION_PLAN_NM CODE_NM
+					FROM
+						TTIM541
+					WHERE
+						ENTER_CD=#{ssnEnterCd}
+				]]>
+
+
+		</select>
+
+
+<!-- 연차휴가계획신청 삭제 -->
+		<delete parameterType="map" id="deleteAnnualPlanApp">
+
+					DELETE FROM TTIM542
+					 WHERE (ENTER_CD, SABUN, APPL_SEQ )IN 	(  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (TRIM( #{ssnEnterCd} ), TRIM( #{rm.sabun} ), TRIM( #{rm.applSeq} ) )
+</foreach>
+										)
+		</delete>
+
+			<!-- 지역별 지원금액 -->
+		<select parameterType="map" resultType="cMap" id="getAbleAnnualPlanCount">
+
+		   <![CDATA[
+			   SELECT COUNT(*) AS CNT
+			     FROM TTIM541
+				WHERE TO_DATE(TO_CHAR(SYSDATE,'YYYYMMDD'), 'YYYYMMDD') BETWEEN TO_DATE(vac_receive_symd,'yyyymmdd') AND TO_DATE(vac_receive_eymd,'yyyymmdd')
+  				  AND CLOSE_YN = 'N'
+  				  AND ENTER_CD = #{ssnEnterCd}
+			]]>
+
+
+		</select>
+
+
+</mapper>

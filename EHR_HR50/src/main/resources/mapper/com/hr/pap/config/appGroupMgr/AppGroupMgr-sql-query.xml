@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appGroupMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrList">
+
+				<![CDATA[
+						SELECT '0' AS BTN_SET, T1.APPRAISAL_CD, T1.APP_GROUP_CD, T1.APP_GROUP_NM, '0' AS DETAIL,
+						       (SELECT DECODE(COUNT(*),0,'N','Y') FROM TSYS991 WHERE ENTER_CD = T1.ENTER_CD AND USE_GUBUN = 'G' AND ITEM_VALUE1 = T1.APPRAISAL_CD AND ITEM_VALUE2 = T1.APP_GROUP_CD AND ITEM_VALUE3 = '0') AS DETAIL_YN,
+						       T1.SEQ,   T1.APP_SHEET_TYPE, T1.APP_1ST_YN, T1.ORG_GRADE_CD,
+						      (SELECT LISTAGG(B. AUTH_SCOPE_NM, ', ') WITHIN GROUP (ORDER BY B.AUTH_SCOPE_NM)
+						      FROM (
+						              SELECT ENTER_CD, SCOPE_CD, ITEM_VALUE1, ITEM_VALUE2, ITEM_VALUE3
+						                FROM  TSYS991
+						               WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						                 AND USE_GUBUN = 'G'
+						                 --AND ITEM_VALUE3 = '0'
+						              GROUP BY ENTER_CD,SCOPE_CD, ITEM_VALUE1, ITEM_VALUE2, ITEM_VALUE3
+						            ) A, TSYS315 B
+						     WHERE A.ENTER_CD = B.ENTER_CD
+						       AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+						       AND ITEM_VALUE1 =  T1.APPRAISAL_CD
+						       AND ITEM_VALUE2 =  T1.APP_GROUP_CD
+						       AND ITEM_VALUE3 =  '0') AS NOTE,
+						       T1.APP_METHOD_CD,
+						       T1.APP_SEQ_CD,
+						       T1.GRP_ID
+						  FROM TPAP133 T1
+						 WHERE T1.ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND T1.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+						 ]]>
+					   <if test='searchAppGroupNm != null and !searchAppGroupNm.equals("")'>
+					       AND T1.APP_GROUP_NM LIKE '%'||TRIM(#{searchAppGroupNm}) || '%'
+					   </if>
+					   <if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+					       AND T1.APP_SEQ_CD LIKE TRIM(#{searchAppSeqCd}) || '%'
+					   </if>
+					   <if test='searchOrgGradeCd != null and !searchOrgGradeCd.equals("")'>
+					       AND T1.ORG_GRADE_CD LIKE TRIM(#{searchOrgGradeCd}) || '%'
+					   </if>
+					ORDER BY T1.APP_GROUP_NM
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrTblNm">
+
+				<![CDATA[
+				SELECT A.SCOPE_CD, B. AUTH_SCOPE_NM, B.TABLE_NM
+				  FROM (
+						SELECT ENTER_CD, SCOPE_CD
+						FROM  TSYS991
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND USE_GUBUN = 'G' 
+						AND ITEM_VALUE1 =  TRIM(#{searchAppraisalCd})
+						AND ITEM_VALUE2 =  TRIM(#{appGroupCd})
+						AND ITEM_VALUE3 =  TRIM('0')
+						GROUP BY ENTER_CD,SCOPE_CD
+						) A, TSYS315 B
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrScopeCd">
+
+				<![CDATA[
+				SELECT A.SCOPE_CD, A.SCOPE_VALUE, A.SCOPE_VALUE_NM
+				  FROM TSYS991 A
+				 WHERE ENTER_CD =TRIM(#{ssnEnterCd})
+				   AND USE_GUBUN = 'G'
+				   AND ITEM_VALUE1 = TRIM(#{searchAppraisalCd})
+				   AND ITEM_VALUE2 = TRIM(#{appGroupCd})
+				   AND ITEM_VALUE3 = TRIM('0')
+				   AND SCOPE_CD = TRIM(#{scopeCd})
+				ORDER BY 1,2,3
+				]]>
+
+
+		</select>
+		
+
+<!--
+appCompItemMgr.jsp	역량평가항목정의
+appRateTab1.jsp		평가반영비율
+ -->
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrOrgSchemeList">
+
+				<![CDATA[
+					SELECT LEVEL AS "_level"
+						 , A.PRIOR_ORG_CD   AS SCOPE_VALUE_TOP
+					     , A.APP_ORG_CD     AS SCOPE_VALUE
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.APP_ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS SCOPE_VALUE_NM
+					     , DECODE((SELECT COUNT(1)
+		                             FROM TSYS991
+		                            WHERE ENTER_CD = A.ENTER_CD
+		                              AND SCOPE_VALUE = A.APP_ORG_CD
+		                              AND USE_GUBUN = #{searchUseGubun}
+		                              AND ITEM_VALUE1 = #{searchItemValue1}
+		                              AND ITEM_VALUE2 = #{searchItemValue2}
+		                              AND ITEM_VALUE3 = #{searchItemValue3}
+		                              AND SCOPE_CD = 'W10' ), 0, 0, 1) AS CHK
+					  FROM TPAP160 A
+					 WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.APP_STEP_CD  = '5'
+					 START WITH A.PRIOR_ORG_CD = '0'
+					CONNECT BY PRIOR A.ENTER_CD  = A.ENTER_CD
+					    AND PRIOR A.APPRAISAL_CD = A.APPRAISAL_CD
+					    AND PRIOR A.APP_STEP_CD  = A.APP_STEP_CD
+					    AND PRIOR A.APP_ORG_CD   = A.PRIOR_ORG_CD
+					ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+				]]>
+
+
+		</select>
+
+
+<!-- 		조회
+appCompItemMgr.jsp	역량평가항목정의
+appRateTab1.jsp		평가반영비율 평가차수
+appRateTab2.jsp		평가반영비율 종합평가
+appElementMgrTab1.jsp	평가요소관리 평가방법
+appElementMgrTab2.jsp	평가요소관리 평가sheet
+ -->
+ 		<select parameterType="map" resultType="cMap" id="getAppGroupMgrScopeList">
+
+				<![CDATA[
+					SELECT 	  AUTH_SCOPE_CD
+							, AUTH_SCOPE_NM
+							, SCOPE_TYPE
+							, PRG_URL
+							, SQL_SYNTAX
+							, TABLE_NM
+							, DECODE( (SELECT COUNT(1)
+									     FROM TSYS991 X
+									    WHERE X.ENTER_CD = #{ssnEnterCd}
+									      AND X.USE_GUBUN = #{searchUseGubun}
+									      AND X.ITEM_VALUE1 = #{searchItemValue1}
+									      AND X.ITEM_VALUE2 = #{searchItemValue2}
+									      AND X.ITEM_VALUE3 = #{searchItemValue3}
+                                          AND X.SCOPE_CD = A.AUTH_SCOPE_CD), 0, 'N', 'Y') AS USE_YN
+					FROM      TSYS315 A
+					WHERE     ENTER_CD = #{ssnEnterCd}
+					  AND     AUTH_SCOPE_CD NOT IN ( 'C10', 'H30', 'W10') --W10:조직은 따로 등록
+					ORDER BY  AUTH_SCOPE_CD
+				]]>
+
+
+		</select>
+		
+ 		<select parameterType="map" resultType="cMap" id="getAppGroupMgrScopeList2">
+
+				<![CDATA[
+					SELECT 	  AUTH_SCOPE_CD
+							, AUTH_SCOPE_NM
+							, SCOPE_TYPE
+							, PRG_URL
+							, SQL_SYNTAX
+							, TABLE_NM
+							, DECODE( (SELECT COUNT(1)
+									     FROM TSYS991 X
+									    WHERE X.ENTER_CD = #{ssnEnterCd}
+									      AND X.USE_GUBUN = #{searchUseGubun}
+									      AND X.ITEM_VALUE1 = #{searchItemValue1}
+									      AND X.ITEM_VALUE2 = #{searchItemValue2}
+									      AND X.ITEM_VALUE3 = #{searchItemValue3}
+                                          AND X.SCOPE_CD = A.AUTH_SCOPE_CD), 0, 'N', 'Y') AS USE_YN
+					FROM      TSYS315 A
+					WHERE     ENTER_CD = #{ssnEnterCd}
+					  --AND     AUTH_SCOPE_CD NOT IN ( 'C10', 'H30', 'W10') --W10:조직은 따로 등록
+					  AND     AUTH_SCOPE_CD = 'W20'
+					ORDER BY  AUTH_SCOPE_CD
+				]]>
+
+
+		</select>
+
+<!-- 		조회(사람)
+appCompItemMgr.jsp 역량평가항목정의 화면에서도 사용
+ -->
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrScopeEmpList">
+
+				<![CDATA[
+					SELECT 	  A.SCOPE_VALUE
+							, F_COM_GET_NAMES(A.ENTER_CD, A.SCOPE_VALUE) AS SCOPE_VALUE_NM
+							, DECODE(A.ENTER_CD, '', '0', '1') AS CHK
+					FROM   TSYS991 A
+					WHERE  A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SCOPE_CD = #{searchAuthScopeCd}
+					   AND A.USE_GUBUN = #{searchUseGubun}
+					   AND A.ITEM_VALUE1 = #{searchItemValue1}
+					   AND A.ITEM_VALUE2 = #{searchItemValue2}
+					   AND A.ITEM_VALUE3 = #{searchItemValue3}
+					 ORDER BY A.SCOPE_VALUE
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrTempQueryMap">
+
+				<![CDATA[
+					 SELECT F_COM_GET_SQL_AUTH_SCOPE(#{ssnEnterCd},#{searchAuthScopeCd}) AS query FROM DUAL
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrCreateChk">
+
+				<![CDATA[
+					SELECT NVL(CLOSE_YN, 'N') AS CLOSE_YN
+					  FROM TPAP101
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPRAISAL_CD = #{searchAppraisalCd}
+				]]>
+
+
+		</select>
+
+
+<!-- 		조회
+appCompItemMgr.jsp 역량평가항목정의 화면에서도 사용
+
+-->
+		<select parameterType="map" resultType="cMap" id="getAppGroupMgrScopeCodeList">
+
+				<![CDATA[
+					SELECT 	  B.SCOPE_VALUE
+							, B.SCOPE_VALUE_NM
+							, DECODE(A.ENTER_CD, '', '0', '1') AS CHK
+					FROM   TSYS991 A, (${query}) B
+					WHERE  A.ENTER_CD(+) = #{ssnEnterCd}
+					   AND A.SCOPE_CD(+) = #{searchAuthScopeCd}
+					   AND A.USE_GUBUN(+) = #{searchUseGubun}
+					   AND A.ITEM_VALUE1(+) = #{searchItemValue1}
+					   AND A.ITEM_VALUE2(+) = #{searchItemValue2}
+					   AND A.ITEM_VALUE3(+) = #{searchItemValue3}
+					   AND A.SCOPE_VALUE(+) = B.SCOPE_VALUE
+					 ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppGroupMgr">
+
+					MERGE INTO TPAP133 T
+					USING	(
+							SELECT	A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.APP_GROUP_CD
+									, A.APP_GROUP_NM
+									, A.SEQ
+									, A.NOTE
+									, A.APP_SHEET_TYPE
+									, A.APP_SEQ_CD
+									, A.GRP_ID
+									, A.APP_METHOD_CD
+									, A.APP_1ST_YN
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD
+											, NULL	AS APPRAISAL_CD
+											, NULL	AS APP_GROUP_CD
+											, NULL	AS APP_GROUP_NM
+											, NULL	AS SEQ
+											, NULL	AS NOTE
+											, NULL	AS APP_SHEET_TYPE
+											, NULL	AS APP_SEQ_CD
+											, NULL	AS GRP_ID
+											, NULL	AS APP_METHOD_CD
+											, NULL	AS APP_1ST_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}            	AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	AS APPRAISAL_CD
+
+											<choose><when test='rm.appGroupCd != null and !rm.appGroupCd.equals("")'>
+												--증가가 되는 키인경우 키가 공백이 아니면 들어온 값을 삽입
+												, TRIM(#{rm.appGroupCd}) 			AS APP_GROUP_CD
+											</when><otherwise>
+												--증가가 되는 키인경우 키가 공백이면 증가된 값을 삽입
+												, TO_CHAR(NVL((SELECT MAX(TO_NUMBER(APP_GROUP_CD)) FROM TPAP133 WHERE ENTER_CD = #{ssnEnterCd} AND APPRAISAL_CD = TRIM( #{rm.appraisalCd} )), 0) + ${icnt}) AS APP_GROUP_CD
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+
+											, TRIM( #{rm.appGroupNm} )	AS APP_GROUP_NM
+											, TRIM( #{rm.seq} )	        AS SEQ
+											, TRIM( #{rm.note})	    AS NOTE
+											, TRIM( #{rm.appSheetType})    AS APP_SHEET_TYPE
+											, TRIM( #{rm.appSeqCd})	    AS APP_SEQ_CD
+											, TRIM( #{rm.grpId})	    	AS GRP_ID
+											, TRIM( #{rm.appMethodCd})	    AS APP_METHOD_CD
+											, TRIM( #{rm.app1stYn})	    AS APP_1ST_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.APPRAISAL_CD = S.APPRAISAL_CD
+					AND  T.APP_GROUP_CD = S.APP_GROUP_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.APP_GROUP_NM    	= S.APP_GROUP_NM
+									, T.SEQ             	= S.SEQ
+			                      	, T.NOTE            	= S.NOTE
+									, T.APP_SHEET_TYPE      = S.APP_SHEET_TYPE
+									, T.APP_SEQ_CD         	= S.APP_SEQ_CD
+									, T.APP_1ST_YN          = S.APP_1ST_YN
+									, T.GRP_ID          	= S.GRP_ID
+									, T.CHKDATE				= SYSDATE
+									, T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.APP_GROUP_CD
+							, T.APP_GROUP_NM
+							, T.SEQ
+							, T.NOTE
+							, T.APP_SHEET_TYPE
+							, T.APP_SEQ_CD
+							, T.CHKDATE
+							, T.CHKID
+							, T.GRP_ID
+							, T.APP_METHOD_CD
+							, T.APP_1ST_YN
+						)
+						VALUES
+						(
+							S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.APP_GROUP_CD
+							, S.APP_GROUP_NM
+							, S.SEQ
+							, S.NOTE
+							, S.APP_SHEET_TYPE
+							, S.APP_SEQ_CD
+							, SYSDATE
+							, #{ssnSabun}
+							, S.GRP_ID
+							, S.APP_METHOD_CD
+							, S.APP_1ST_YN
+						)
+		</update>
+
+<!-- 	범위(조직) 삭제 -->
+		<delete parameterType="map" id="deleteAppGroupMgrOrgScheme">
+
+				<![CDATA[
+					DELETE FROM TSYS991
+					 WHERE ENTER_CD    =  #{ssnEnterCd}
+					   AND USE_GUBUN   = #{searchUseGubun}
+					   AND ITEM_VALUE1 = #{searchItemValue1}
+					   AND ITEM_VALUE2 = #{searchItemValue2}
+					   AND ITEM_VALUE3 = #{searchItemValue3}
+					   AND SCOPE_CD    = #{searchAuthScopeCd}
+				]]>
+
+		</delete>
+
+
+<!-- 	범위 삭제 -->
+		<delete parameterType="map" id="deleteAppGroupMgrScope">
+
+				<![CDATA[
+					DELETE FROM TSYS991
+					 WHERE ENTER_CD    =  #{ssnEnterCd}
+					   AND USE_GUBUN   = #{searchUseGubun}
+					   AND ITEM_VALUE1 = #{searchItemValue1}
+					   AND ITEM_VALUE2 = #{searchItemValue2}
+					   AND ITEM_VALUE3 = #{searchItemValue3}
+					   AND SCOPE_CD    = #{searchAuthScopeCd}
+
+				]]>
+
+		</delete>
+
+<!-- 	범위 전체 삭제 : ITEM_VALUE2 까지 key로 삭제
+ -->
+		<delete parameterType="map" id="deleteAppGroupMgrScopeAll">
+
+				<![CDATA[
+					DELETE FROM TSYS991
+					 WHERE ENTER_CD    =  #{ssnEnterCd}
+					   AND USE_GUBUN   = #{searchUseGubun}
+					   AND ITEM_VALUE1 = #{searchItemValue1}
+					   AND ITEM_VALUE2 = #{searchItemValue2}
+				]]>
+		</delete>
+
+<!-- 	범위 전체 삭제 : ITEM_VALUE3 까지 key로 삭제
+appCompItemMgr.jsp 역량평가항목정의 화면에서 사용
+ -->
+		<delete parameterType="map" id="deleteAppGroupMgrScopeAll3">
+
+				<![CDATA[
+					DELETE FROM TSYS991
+					 WHERE ENTER_CD    =  #{ssnEnterCd}
+					   AND USE_GUBUN   = #{searchUseGubun}
+					   AND ITEM_VALUE1 = #{searchItemValue1}
+					   AND ITEM_VALUE2 = #{searchItemValue2}
+					   AND ITEM_VALUE3 = #{searchItemValue3}
+				]]>
+
+		</delete>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppGroupMgr">
+
+					DELETE	FROM TPAP133
+					WHERE	(ENTER_CD, APPRAISAL_CD, APP_GROUP_CD) IN ((NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+										<if test='rm.appGroupCd != null and !rm.appGroupCd.equals("")'>
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.appraisalCd} ) , TRIM( #{rm.appGroupCd} ) )
+										</if>
+										</if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<delete parameterType="map" id="deleteAppGroupMgr991">
+
+					DELETE FROM TSYS991
+					WHERE 	(ENTER_CD,USE_GUBUN,ITEM_VALUE1,ITEM_VALUE2,ITEM_VALUE3) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,	(	  #{ssnEnterCd}
+								, 'G'
+								, TRIM( #{rm.appraisalCd} )
+								, TRIM( #{rm.appGroupCd} )
+								, '0'
+						)
+</foreach>
+					)
+		</delete>
+
+
+<!-- 		저장
+appCompItemMgr.jsp 역량평가항목정의 화면에서도 사용
+ -->
+		<update parameterType="map" id="saveAppGroupMgrScope">
+
+					MERGE INTO TSYS991 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.USE_GUBUN
+									, A.ITEM_VALUE1
+									, A.ITEM_VALUE2
+									, A.ITEM_VALUE3
+									, A.SCOPE_CD
+									, A.SCOPE_VALUE
+									, A.SCOPE_VALUE_NM
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS USE_GUBUN
+											, NULL		AS ITEM_VALUE1
+											, NULL		AS ITEM_VALUE2
+											, NULL		AS ITEM_VALUE3
+											, NULL		AS SCOPE_CD
+											, NULL		AS SCOPE_VALUE
+											, NULL		AS SCOPE_VALUE_NM
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}                 AS ENTER_CD
+											, #{searchUseGubun}	    	AS USE_GUBUN
+											, #{searchItemValue1}	    	AS ITEM_VALUE1
+											, #{searchItemValue2}	    	AS ITEM_VALUE2
+											, #{searchItemValue3}	        AS ITEM_VALUE3
+											, #{searchAuthScopeCd}	    AS SCOPE_CD
+											, TRIM( #{rm.scopeValue})	AS SCOPE_VALUE
+											, TRIM(#{rm.scopeValueNm}) AS SCOPE_VALUE_NM
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON (    T.ENTER_CD   		= S.ENTER_CD
+					AND     T.USE_GUBUN        = S.USE_GUBUN
+					AND     T.ITEM_VALUE1      = S.ITEM_VALUE1
+					AND     T.ITEM_VALUE2      = S.ITEM_VALUE2
+					AND     T.ITEM_VALUE3      = S.ITEM_VALUE3
+					AND     T.SCOPE_CD         = S.SCOPE_CD
+					AND     T.SCOPE_VALUE      = S.SCOPE_VALUE
+					)
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.USE_GUBUN
+							, T.ITEM_VALUE1
+							, T.ITEM_VALUE2
+							, T.ITEM_VALUE3
+							, T.SCOPE_CD
+							, T.SCOPE_VALUE
+							, T.SCOPE_VALUE_NM
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.USE_GUBUN
+							, S.ITEM_VALUE1
+							, S.ITEM_VALUE2
+							, S.ITEM_VALUE3
+							, S.SCOPE_CD
+							, S.SCOPE_VALUE
+							, S.SCOPE_VALUE_NM
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<update parameterType="map" id="prcAppGroupMgr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_APPGROUP_BASIC_INS(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppSeqCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+		<update parameterType="map" id="prcAppGroupMgrCopyPop" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAP_APP_GROUP_COPY(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{appraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{orgnAppStepCd,mode=IN,jdbcType=VARCHAR},
+				#{tgtAppStepCd,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppGroupMgr">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  PRG_CD
+							, PRG_NM
+							, PRG_ENG_NM
+							, PRG_PATH
+							, USE
+							, VERSION
+							, MEMO
+							, DATE_TRACK_YN
+							, LOG_SAVE_YN
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.PRG_CD
+								, S.PRG_NM
+								, S.PRG_ENG_NM
+								, S.PRG_PATH
+								, S.USE
+								, S.VERSION
+								, S.MEMO
+								, S.DATE_TRACK_YN
+								, S.LOG_SAVE_YN
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS PRG_CD
+										, NULL 	AS PRG_NM
+										, NULL 	AS PRG_ENG_NM
+										, NULL 	AS PRG_PATH
+										, NULL 	AS USE
+										, NULL 	AS VERSION
+										, NULL 	AS MEMO
+										, NULL 	AS DATE_TRACK_YN
+										, NULL 	AS LOG_SAVE_YN
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TRIM( #{rm.prgCd})	AS PRG_CD
+										, TRIM( #{rm.prgNm})	AS PRG_NM
+										, TRIM( #{rm.prgEngNm})	AS PRG_ENG_NM
+										, TRIM( #{rm.prgPath})	AS PRG_PATH
+										, TRIM( #{rm.use})	AS USE
+										, TRIM( #{rm.version})	AS VERSION
+										, TRIM( #{rm.memo})	AS MEMO
+										, TRIM( #{rm.dateTrackYn})	AS DATE_TRACK_Y
+										, TRIM( #{rm.logSaveYn})	AS LOG_SAVE_YN
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.PRG_CD IS NOT NULL
+		</insert>
+
+</mapper>

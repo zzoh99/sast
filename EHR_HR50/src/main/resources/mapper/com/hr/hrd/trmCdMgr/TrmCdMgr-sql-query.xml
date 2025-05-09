@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.trmCdMgr">
+
+
+        <select parameterType="map" resultType="cMap" id="getTrmCdMgrList">
+
+                <![CDATA[
+                    SELECT ENTER_CD
+                         , TRM_GUBUN_CD
+                         , TRM_GUBUN_NM
+                         , SKILL_KNOWLEDGE_GUBUN
+                         , CHKDATE
+                         , CHKID
+                      FROM TCDPW200
+                     WHERE ENTER_CD = #{ssnEnterCd}
+                       AND TRM_GUBUN_CD IN ('S','T')
+                               ]]>
+					 <if test='searchTrmGubunNm != null and !searchTrmGubunNm.equals("")'>
+                         AND LOWER(TRM_GUBUN_NM) LIKE '%' || LOWER(TRIM( #{searchTrmGubunNm} )) || '%'
+                     </if>
+                     ORDER BY SEQ
+
+
+        </select>
+        
+        <update parameterType="map" id="saveTrmCdMgrList">
+
+                    MERGE INTO TCDPW200 T
+                    USING (
+                            SELECT A.ENTER_CD
+								 , A.TRM_GUBUN_CD
+								 , A.TRM_GUBUN_NM
+								 , A.SKILL_KNOWLEDGE_GUBUN
+								 , A.CHKDATE
+								 , A.CHKID
+                              FROM (
+                                    SELECT NULL AS ENTER_CD
+                                         , NULL AS TRM_GUBUN_CD
+                                         , NULL AS TRM_GUBUN_NM
+                                         , NULL AS SKILL_KNOWLEDGE_GUBUN
+                                         , NULL AS CHKDATE
+                                         , NULL AS CHKID
+                                      FROM DUAL
+                                    <foreach item="rm" collection="mergeRows" >
+                                     UNION ALL
+                                    SELECT TRIM( #{ssnEnterCd}     ) AS ENTER_CD
+										 , TRIM( #{rm.trmGubunCd} ) AS TRM_GUBUN_CD
+                                         , TRIM( #{rm.trmGubunNm} ) AS TRM_GUBUN_NM
+                                         , TRIM( #{rm.skillKnowledgeGubun} ) AS SKILL_KNOWLEDGE_GUBUN
+                                         , SYSDATE AS CHKDATE
+                                         , #{ssnSabun} AS CHKID
+                                      FROM DUAL
+                                    </foreach>
+                                  ) A WHERE A.ENTER_CD IS NOT NULL
+                          ) S
+                           ON ( T.ENTER_CD = S.ENTER_CD AND T.TRM_GUBUN_CD = S.TRM_GUBUN_CD)
+                      WHEN MATCHED THEN
+                           UPDATE SET T.TRM_GUBUN_NM = S.TRM_GUBUN_NM
+                                    , T.CHKDATE = S.CHKDATE
+                                    , T.CHKID = S.CHKID
+                      WHEN NOT MATCHED THEN
+                           INSERT ( T.ENTER_CD
+								  , T.TRM_GUBUN_CD
+								  , T.TRM_GUBUN_NM
+								  , T.SKILL_KNOWLEDGE_GUBUN
+								  , T.CHKDATE
+								  , T.CHKID)
+						   VALUES ( S.ENTER_CD
+								  , S.TRM_GUBUN_CD
+								  , S.TRM_GUBUN_NM
+								  , S.SKILL_KNOWLEDGE_GUBUN
+								  , S.CHKDATE
+								  , S.CHKID)
+        </update>
+        
+        <select parameterType="map" resultType="cMap" id="getTrmCdList">
+
+                <![CDATA[
+                    SELECT TRM_GUBUN_CD AS CODE
+                         , TRM_GUBUN_NM AS CODE_NM
+                      FROM TCDPW200
+                     WHERE ENTER_CD = #{ssnEnterCd}
+                       AND TRM_GUBUN_CD IN ('S','T')
+                     ORDER BY SEQ
+                ]]>
+
+
+        </select>
+
+
+</mapper>

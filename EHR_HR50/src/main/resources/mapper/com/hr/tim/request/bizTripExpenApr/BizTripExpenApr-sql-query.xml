@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.bizTripExpenApr">
+
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAprApplCd">
+
+				<![CDATA[
+					SELECT APPL_CD  	AS CODE
+					     , NOTE1		AS CODE_NM
+					  FROM THRI101
+					 WHERE ENTER_CD =  #{ssnEnterCd}
+					   AND APPL_CD IN ('126', '127', '128') 
+					 ORDER BY SEQ 
+					 
+				]]>
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getBizTripExpenAprList">
+
+				<![CDATA[
+
+					    SELECT A.ENTER_CD
+							 , A.APPL_SEQ
+							 , A.SABUN
+							 , (SELECT F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME -- 성명
+							 , (SELECT F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+							 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					 		 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+						 	 , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, B.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+						     , A.BIZ_SDATE
+						     , A.BIZ_EDATE
+						     , A.BIZ_DAYS
+						     , A.BIZ_PURPOSE
+						     , A.BIZ_ON_REASON
+						     , A.BIZ_CONTENTS
+						     , A.BIZ_NOTE
+						     , A.EXCHG_RATE
+						     
+                             , (    SELECT LISTAGG(F_COM_GET_NAMES(ENTER_CD, EMP_SABUN), ',') WITHIN GROUP (ORDER BY F_COM_JIKJE_SORT(ENTER_CD, EMP_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+							          FROM TTIM852
+							         WHERE ENTER_CD   = A.ENTER_CD
+							           AND APPL_SEQ   = A.APPL_SEQ
+							  ) AS BIZ_SABUNS
+							  
+							 , B.APPL_CD
+							 , B.APPL_YMD
+							 , B.APPL_SABUN
+							 , B.APPL_IN_SABUN
+							 , B.APPL_STATUS_CD
+							 , '0' AS DETAIL
+							 
+							 , C.PAY_GUBUN_CD
+							 , C.PAY_MON
+							 , C.PAY_MON_US
+							 , C.PAY_SABUN
+							 , (SELECT F_COM_GET_NAMES(C.ENTER_CD, C.PAY_SABUN, #{ssnLocaleCd}) FROM DUAL) AS PAY_NAME
+					     FROM TTIM851 A, THRI103 B
+					       ]]>
+<choose><when test='searchGubun != null and searchGubun.equals("0")'>
+					     	  ,(	SELECT ENTER_CD
+					     	  	         , APPL_SEQ
+					     	  	         , PAY_SABUN
+					     	  	         , PAY_GUBUN_CD
+					     	  	         , PAY_MON_US
+					     	  	         , PAY_MON
+					     	  		  FROM TTIM854
+					     	  		 WHERE ENTER_CD   = #{ssnEnterCd}
+	<if test='searchOilCard != null and !searchOilCard.equals("")'>
+					     	  		   AND OIL_CARD_YN = TRIM(#{searchOilCard})
+	</if>
+					     	  		
+					     	    ) C
+		</when>
+<when test='searchGubun != null and searchGubun.equals("1")'>
+					     	  ,(	SELECT ENTER_CD
+					     	  	         , APPL_SEQ
+					     	  	         , PAY_SABUN
+					     	  	         , NULL AS PAY_GUBUN_CD
+					     	  	         , SUM(PAY_MON_US) AS PAY_MON_US
+					     	  	         , SUM(PAY_MON) AS PAY_MON
+					     	  		  FROM TTIM854
+					     	  		 WHERE ENTER_CD   = #{ssnEnterCd}
+	<if test='searchOilCard != null and !searchOilCard.equals("")'>
+					     	  		   AND OIL_CARD_YN = TRIM(#{searchOilCard})
+	</if>
+					     	  		 GROUP BY ENTER_CD, APPL_SEQ, PAY_SABUN
+					     	    ) C
+</when><otherwise>
+					     	  ,(	SELECT ENTER_CD
+					     	  	         , APPL_SEQ
+					     	  	         , NULL AS PAY_SABUN
+					     	  	         , PAY_GUBUN_CD
+					     	  	         , SUM(PAY_MON_US) AS PAY_MON_US
+					     	  	         , SUM(PAY_MON) AS PAY_MON
+					     	  		  FROM TTIM854
+					     	  		 WHERE ENTER_CD   = #{ssnEnterCd}
+	<if test='searchOilCard != null and !searchOilCard.equals("")'>
+					     	  		   AND OIL_CARD_YN = TRIM(#{searchOilCard})
+	</if>
+					     	  		 GROUP BY ENTER_CD, APPL_SEQ, PAY_GUBUN_CD		
+					     	    ) C
+	</otherwise>
+</choose>
+					    WHERE A.ENTER_CD   = #{ssnEnterCd}
+					      AND A.ENTER_CD   = B.ENTER_CD 
+					      AND A.ENTER_CD   = C.ENTER_CD(+)
+					      AND A.APPL_SEQ   = B.APPL_SEQ
+					      AND A.APPL_SEQ   = C.APPL_SEQ(+)
+					      AND B.APPL_STATUS_CD NOT IN ('11')
+					      
+<if test='searchFrom != null and !searchFrom.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD >= REPLACE(#{searchFrom}, '-','')
+	]]>
+</if>
+<if test='searchTo != null and !searchTo.equals("")'>
+	<![CDATA[
+					      AND B.APPL_YMD <= REPLACE(#{searchTo}, '-','')
+	]]>
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					      AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchApplCd != null and !searchApplCd.equals("")'>
+					      AND B.APPL_CD = #{searchApplCd}
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					      AND EXISTS ( SELECT 1
+					                     FROM TTIM852 X
+					                    WHERE X.ENTER_CD = A.ENTER_CD
+					                      AND X.APPL_SEQ = A.APPL_SEQ 
+					                      AND (   X.EMP_SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%'
+					                           OR (SELECT F_COM_GET_NAMES(X.ENTER_CD, X.EMP_SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+					                  )         
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					      AND EXISTS ( SELECT 1
+					                     FROM TTIM852 X
+					                    WHERE X.ENTER_CD = A.ENTER_CD
+					                      AND X.APPL_SEQ = A.APPL_SEQ 
+					                      AND (SELECT F_COM_GET_ORG_NM2(X.ENTER_CD, X.EMP_SABUN, B.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+					                  )         
+</if>
+<if test='searchApplsCd != null and !searchApplsCd.equals("")'>
+					      AND B.APPL_CD = TRIM(#{searchApplsCd})
+</if>
+					    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC 
+					           , DECODE(C.PAY_SABUN, NULL, '1', F_COM_JIKJE_SORT(C.ENTER_CD, C.PAY_SABUN, B.APPL_YMD))
+					           , DECODE(C.PAY_GUBUN_CD, NULL, 1, F_COM_GET_GRCODE_SEQ( C.ENTER_CD, 'T85101', C.PAY_GUBUN_CD))
+					           
+					        
+
+		</select>
+
+</mapper>

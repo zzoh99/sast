@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.yearEduPlan.yearEduApp">
+	
+		<!-- 기준년도 콤보 -->		
+		<select parameterType="map" resultType="cMap" id="getYearEduAppYearCode">
+				<![CDATA[
+					SELECT YEAR AS CODE, YEAR AS CODE_NM
+					     , SDATE , EDATE
+					  FROM TTRA500
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE
+					 ORDER BY YEAR DESC, SDATE DESC
+				]]>
+		</select>
+		
+		<!-- 계획상태 조회 -->
+		<select parameterType="map" resultType="cMap" id="getYearEduAppStatus">
+				<![CDATA[
+                       SELECT CASE WHEN CNT = 1 AND ( APPL_STATUS_CD IS NULL OR APPL_STATUS_CD = '11' ) THEN '작성가능'  
+						            WHEN CNT = 0 AND APPL_STATUS_CD IS NULL THEN '작성기간이 아닙니다'  
+						            WHEN APPL_STATUS_CD = '99' THEN '마감'
+						            ELSE '신청처리중' END AS STATUS
+						FROM (
+						    SELECT  ( SELECT COUNT(1)
+						                FROM TTRA500
+						               WHERE ENTER_CD = #{ssnEnterCd}
+						                 AND YEAR = #{searchYear}
+						                 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND EDATE
+						            ) AS CNT,
+						            ( SELECT MAX(B.APPL_STATUS_CD)
+						                FROM TTRA501 A, THRI103 B
+						               WHERE A.ENTER_CD = #{ssnEnterCd}
+						                 AND A.YEAR = #{searchYear}
+						                 AND A.ORG_CD = F_COM_GET_ORG_CD ( #{ssnEnterCd}, #{searchSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+						                 AND A.ENTER_CD = B.ENTER_CD
+						                 AND A.APPL_SEQ = B.APPL_SEQ     
+						                 AND B.APPL_STATUS_CD IN ( '11','21','31','99')
+						            ) AS APPL_STATUS_CD
+						    FROM DUAL 
+						)
+				]]>
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getYearEduAppList">
+			
+				<![CDATA[
+				SELECT A.ENTER_CD
+				     , A.SABUN
+				     , A.YEAR
+				     , A.SEQ
+				     , A.ORG_CD
+				     , A.EDU_COURSE_NM
+				     , A.IN_OUT_TYPE
+				     , A.PRIORITY_CD
+				     , A.MON01
+				     , A.MON02
+				     , A.MON03
+				     , A.MON04
+				     , A.MON05
+				     , A.MON06
+				     , A.MON07
+				     , A.MON08
+				     , A.MON09
+				     , A.MON10
+				     , A.MON11
+				     , A.MON12
+				     , A.TOT_MON
+				     , A.NOTE
+				  FROM TTRA503 A 
+				 WHERE A.ENTER_CD	= TRIM(#{ssnEnterCd})
+				   AND A.SABUN 		= TRIM(#{searchSabun}) ]]>
+<if test="searchYear != null and searchYear neq ''">
+			       AND A.YEAR 		= TRIM(#{searchYear})
+</if>
+				ORDER BY YEAR DESC, SEQ
+		</select>
+		
+		<update parameterType="map" id="saveYearEduApp">
+			
+                    		 MERGE INTO TTRA503 T 
+							 USING 
+							( 
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+							   SELECT TRIM(#{ssnEnterCd})  		AS ENTER_CD 
+					                , TRIM(#{searchSabun})		AS SABUN
+						            , TRIM(#{rm.year}) 			AS YEAR
+						            , TRIM(#{rm.seq})			AS SEQ
+<choose><when test="rm.orgCd != null and rm.orgCd neq ''">
+									, TRIM(#{rm.orgCd}) 		AS ORG_CD
+</when><otherwise>
+						            , F_COM_GET_ORG_CD ( #{ssnEnterCd}, #{searchSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD')) 		AS ORG_CD
+</otherwise></choose>
+						            , TRIM(#{rm.eduCourseNm}) 	AS EDU_COURSE_NM
+						            , TRIM(#{rm.inOutType}) 	AS IN_OUT_TYPE
+						            , TRIM(#{rm.priorityCd}) 	AS PRIORITY_CD
+						            , REPLACE(TRIM(#{rm.mon01}),',','') 		AS MON01
+						            , REPLACE(TRIM(#{rm.mon02}),',','') 		AS MON02
+						            , REPLACE(TRIM(#{rm.mon03}),',','') 		AS MON03
+						            , REPLACE(TRIM(#{rm.mon04}),',','') 		AS MON04
+						            , REPLACE(TRIM(#{rm.mon05}),',','') 		AS MON05
+						            , REPLACE(TRIM(#{rm.mon06}),',','') 		AS MON06
+						            , REPLACE(TRIM(#{rm.mon07}),',','') 		AS MON07
+						            , REPLACE(TRIM(#{rm.mon08}),',','') 		AS MON08
+						            , REPLACE(TRIM(#{rm.mon09}),',','') 		AS MON09
+						            , REPLACE(TRIM(#{rm.mon10}),',','') 		AS MON10
+						            , REPLACE(TRIM(#{rm.mon11}),',','') 		AS MON11
+						            , REPLACE(TRIM(#{rm.mon12}),',','') 		AS MON12
+						            , REPLACE(TRIM(#{rm.totMon}),',','') 		AS TOT_MON
+						        FROM DUAL
+</foreach>
+						) S 
+						ON ( 
+						        	 T.ENTER_CD = S.ENTER_CD 
+					     		AND  T.SABUN = S.SABUN 
+	     						AND  T.YEAR = S.YEAR
+	     						AND  T.SEQ = S.SEQ 
+						) 
+						WHEN MATCHED THEN 
+						   UPDATE SET T.CHKDATE	= sysdate 
+						            , T.CHKID	= #{ssnSabun} 
+						            , T.ORG_CD = S.ORG_CD 
+						            , T.EDU_COURSE_NM = S.EDU_COURSE_NM 
+						            , T.IN_OUT_TYPE = S.IN_OUT_TYPE 
+						            , T.PRIORITY_CD = S.PRIORITY_CD 
+						            , T.MON01 = S.MON01 
+						            , T.MON02 = S.MON02 
+						            , T.MON03 = S.MON03 
+						            , T.MON04 = S.MON04 
+						            , T.MON05 = S.MON05 
+						            , T.MON06 = S.MON06 
+						            , T.MON07 = S.MON07 
+						            , T.MON08 = S.MON08 
+						            , T.MON09 = S.MON09 
+						            , T.MON10 = S.MON10 
+						            , T.MON11 = S.MON11 
+						            , T.MON12 = S.MON12 
+						            , T.TOT_MON = S.TOT_MON 
+						WHEN NOT MATCHED THEN 
+						   INSERT 
+						   ( 
+						              T.ENTER_CD
+						            , T.SABUN
+						            , T.YEAR
+						            , T.SEQ
+						            , T.ORG_CD
+						            , T.EDU_COURSE_NM
+						            , T.IN_OUT_TYPE
+						            , T.PRIORITY_CD
+						            , T.MON01
+						            , T.MON02
+						            , T.MON03
+						            , T.MON04
+						            , T.MON05
+						            , T.MON06
+						            , T.MON07
+						            , T.MON08
+						            , T.MON09
+						            , T.MON10
+						            , T.MON11
+						            , T.MON12
+						            , T.TOT_MON
+						            , T.CHKDATE
+						            , T.CHKID
+						   ) 
+						   VALUES 
+						   ( 
+						              S.ENTER_CD
+						            , S.SABUN
+						            , S.YEAR
+						            , S.SEQ
+						            , S.ORG_CD
+						            , S.EDU_COURSE_NM
+						            , S.IN_OUT_TYPE
+						            , S.PRIORITY_CD
+						            , S.MON01
+						            , S.MON02
+						            , S.MON03
+						            , S.MON04
+						            , S.MON05
+						            , S.MON06
+						            , S.MON07
+						            , S.MON08
+						            , S.MON09
+						            , S.MON10
+						            , S.MON11
+						            , S.MON12
+						            , S.TOT_MON
+						            , sysdate
+						            , #{ssnSabun}
+						   ) 
+		</update>
+		
+		<delete parameterType="map" id="deleteYearEduApp">
+			
+				<![CDATA[
+					DELETE FROM	 TTRA503
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND SABUN	= TRIM(#{searchSabun})
+					   AND YEAR		= TRIM(#{searchYear})
+				]]>
+			
+			
+		</delete>
+		
+</mapper>

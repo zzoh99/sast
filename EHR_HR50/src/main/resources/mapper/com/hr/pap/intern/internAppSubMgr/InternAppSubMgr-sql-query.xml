@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.intern.internAppSubMgr">
+
+<!-- 인사소위원회관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getInternAppSubMgrList">
+
+				<![CDATA[
+					SELECT	/*	InternAppSubMgr-mapping-query.getInternAppSubMgrList	*/
+							A.ENTER_CD				/*회사구분(TORG900)*/
+						,	A.APPRAISAL_CD			/*평가ID코드(TPAP101)*/
+						,	A.SABUN					/*사원번호*/
+						,	F_COM_GET_NAMES(#{ssnEnterCd},	A.SABUN)	AS	NAME
+       				    ,   F_COM_GET_ORG_NM(#{ssnEnterCd},F_COM_GET_ORG_CD('JJA',A.SABUN,TO_CHAR(A.chkdate,'YYYYMMDD')),TO_CHAR(A.chkdate,'YYYYMMDD')) AS ORG_NM				/*조직명*/
+            			,	F_COM_GET_JIKWEE_NM(#{ssnEnterCd},A.SABUN,TO_CHAR(A.chkdate,'YYYYMMDD')) AS JIKWEE_NM
+	          			,   F_COM_GET_JIKGUB_NM(#{ssnEnterCd},A.SABUN,TO_CHAR(A.chkdate,'YYYYMMDD')) AS JIKGUB_NM
+            			,   F_COM_GET_JIKCHAK_NM(#{ssnEnterCd},A.SABUN,TO_CHAR(A.chkdate,'YYYYMMDD')) AS JIKCHAK_NM
+           				,   F_COM_GET_JOB_NM(#{ssnEnterCd},A.SABUN,TO_CHAR(A.chkdate,'YYYYMMDD')) AS JOB_NM
+           				,   D.EMP_YMD
+           				,   C.CONTRACT_SYMD
+           				,   C.CONTRACT_EYMD
+           				,  (SELECT LAST_CLASS_CD FROM tpap571 
+							  WHERE ENTER_CD = #{ssnEnterCd}
+								AND SABUN=A.SABUN
+								AND APPRAISAL_CD=(SELECT APPRAISAL_CD FROM TPAP101 
+								                                  WHERE APPRAISAL_YY= (TO_CHAR(SYSDATE,'YYYY') -1)
+								                                   AND APP_TYPE_CD='C')) AS APP_1_POINT
+						,   (SELECT LAST_CLASS_CD FROM tpap571 
+							  WHERE ENTER_CD = #{ssnEnterCd}
+								AND SABUN=A.SABUN
+								AND APPRAISAL_CD=(SELECT APPRAISAL_CD FROM TPAP101 
+								                                  WHERE APPRAISAL_YY=(TO_CHAR(SYSDATE,'YYYY') -2)
+								                                   AND APP_TYPE_CD='C'))  AS APP_2_POINT
+           				,   (SELECT LAST_CLASS_CD FROM tpap571 
+							  WHERE ENTER_CD = #{ssnEnterCd}
+								AND SABUN=A.SABUN
+								AND APPRAISAL_CD=(SELECT APPRAISAL_CD FROM TPAP101 
+								                                  WHERE APPRAISAL_YY=(TO_CHAR(SYSDATE,'YYYY') -3)
+								                                   AND APP_TYPE_CD='C'))   AS APP_3_POINT								                                   
+          				,	A.APP_POINT  AS SELF_APP_POINT
+           				,	A.APP_CLASS_CD
+           				,   E.APP_POINT  AS APP_POINT1
+           				,   A.CONTRACT_YN
+           				,   A.MEMO
+					FROM	TPAP600	A
+						,	TPAP101 B  
+						,	THRM151	C
+            			,	THRM100 D
+            			,   TPAP202 E
+					WHERE	A.ENTER_CD		=	B.ENTER_CD
+					AND		A.APPRAISAL_CD	=	B.APPRAISAL_CD
+         			AND		A.ENTER_CD		=	D.ENTER_CD
+					AND		A.SABUN			=	D.SABUN
+					AND		A.ENTER_CD		=	C.ENTER_CD
+					AND		A.SABUN			=	C.SABUN
+          			AND     C.MANAGE_CD IN ('50','60','100','120')--50 촉탁, 60 기간제, 100 파견, 120 현지계약
+					AND		C.SDATE = (
+										SELECT	MAX(D.SDATE)
+										FROM	THRM151 D
+										WHERE	D.ENTER_CD	= C.ENTER_CD
+										AND		D.SABUN		= C.SABUN
+										AND		B.APP_E_YMD BETWEEN D.SDATE AND NVL(D.EDATE,'99991231')
+									)
+					AND     A.ENTER_CD      =   E.ENTER_CD
+					AND     A.APPRAISAL_CD	=	E.APPRAISAL_CD	
+					AND     A.SABUN         =   E.SABUN
+					AND     E.APP_STEP_CD   =   '5'     --최종평가
+					AND     E.APP_SEQ_CD    =	'1'		--1차평가
+					AND		A.ENTER_CD		=	#{ssnEnterCd}
+					AND		A.APPRAISAL_CD	=	#{searchAppraisalCd}
+			       ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD,A.SABUN,C.SDATE)
+				]]>
+
+
+		</select>
+
+<!-- 인사소위원회관리 저장 -->
+		<update parameterType="map" id="saveInternAppSubMgr">
+
+				<![CDATA[
+					MERGE INTO	/*	InternAppSubMgr-mapping-query.saveInternAppSubMgr	*/
+								TPAP600 T
+					USING	(
+							SELECT	A.ENTER_CD
+								,	A.APPRAISAL_CD
+								,	A.SABUN
+								,	A.APP_CLASS_CD
+								,	A.APP_POINT
+								,	A.APPRAISAL_YN
+								,	A.CONTRACT_YN
+								,	A.MEMO
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS APPRAISAL_CD
+										 , NULL AS SABUN
+									     , NULL AS APP_CLASS_CD
+									     , NULL AS APP_POINT
+									     , NULL AS APPRAISAL_YN
+									     , NULL AS CONTRACT_YN
+									     , NULL AS MEMO
+									FROM DUAL
+									]]>
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}						AS	ENTER_CD
+										,	TRIM(#{rm.appraisalCd}		)	AS	APPRAISAL_CD
+										,	TRIM(#{rm.sabun}			)	AS	SABUN
+										,	TRIM(#{rm.appClassCd}		)	AS	APP_CLASS_CD
+										,	TRIM(#{rm.selfAppPoint})	AS	APP_POINT
+										,	TRIM(#{rm.appraisalYn})	AS	APPRAISAL_YN
+										,	TRIM(#{rm.contractYn})	AS	CONTRACT_YN
+										,	TRIM(#{rm.memo}				)	AS	MEMO
+									FROM	DUAL
+</foreach>
+									) A WHERE A.ENTER_CD		IS NOT NULL
+										  AND A.APPRAISAL_CD	IS NOT NULL
+										  AND A.SABUN			IS NOT NULL
+							) S
+					ON (
+								T.ENTER_CD		=	S.ENTER_CD
+							AND	T.APPRAISAL_CD	=	S.APPRAISAL_CD
+							AND	T.SABUN			=	S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.APP_CLASS_CD	=	S.APP_CLASS_CD
+									, T.APP_POINT		=	S.APP_POINT
+									, T.APPRAISAL_YN	=	S.APPRAISAL_YN
+									, T.CONTRACT_YN		=	S.CONTRACT_YN
+									, T.MEMO			=	S.MEMO
+									, T.CHKDATE			=	SYSDATE
+									, T.CHKID			=	#{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.SABUN
+							, T.APP_CLASS_CD
+							, T.APP_POINT
+							, T.APPRAISAL_YN
+							, T.CONTRACT_YN
+							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.SABUN
+							, S.APP_CLASS_CD
+							, S.APP_POINT
+							, S.APPRAISAL_YN
+							, S.CONTRACT_YN
+							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 인사소위원회관리 삭제 -->
+		<delete parameterType="map" id="deleteInternAppSubMgr">
+
+					DELETE FROM THRM600
+					 WHERE ENTER_CD||'_'||APPRAISAL_CD||'_'||SABUN IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("") != null and rm.appraisalCd != null and !rm.appraisalCd.equals("") != null and rm.sabun != null and !rm.sabun.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.appraisalCd} )||'_'||TRIM( #{rm.sabun} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+
+</mapper>

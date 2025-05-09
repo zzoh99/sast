@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="api.self.certi">
+
+	<!-- 제증명신청 조회 -->
+	<select parameterType="map" resultType="cMap" id="getSelfCertiAppList">
+		<![CDATA[
+					SELECT C.PUBLISH_ORG_NM
+					     , (SELECT APPL_TITLE FROM THRI101 WHERE ENTER_CD = #{ssnEnterCd} AND APPL_CD = A.APPL_CD) AS APPL_TITLE
+					     , B.APPL_YMD
+					     , B.APPL_STATUS_CD
+					     , A.APPL_SEQ
+					     , A.APPL_CD
+					     , A.REQ_YY
+					     , A.S_YMD
+					     , A.E_YMD
+					     , A.PURPOSE
+					     , A.SUBMIT_OFFICE
+					     , A.ORG_YN
+					     , A.RES_NO_YN
+					     , A.SUBMIT_OFFICE
+					     , C.SIGN_PRT_YN
+					     , (SELECT B.PRT_RSC FROM THRI101 B WHERE B.ENTER_CD = A.ENTER_CD AND B.APPL_CD = A.APPL_CD) AS PRT_RSC
+					  FROM TBEN401 A, THRI103 B, TBEN405 C
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.APPL_CD  = C.APPL_CD
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SABUN    = #{searchSabun}
+					           ]]>
+		<if test='searchApplCd != null and !searchApplCd.equals("")'>
+			AND A.APPL_CD = #{searchApplCd}
+		</if>
+		<if test=' searchApplStatusCd != null and !searchApplStatusCd.equals("") '>
+			AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+		</if>
+		<if test='searchApplSeq != null and !searchApplSeq.equals("")'>
+			AND A.APPL_SEQ = #{searchApplSeq}
+		</if>
+		ORDER BY A.APPL_YMD DESC,  A.APPL_SEQ DESC
+
+
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getCertiEmpHisList">
+		SELECT A.ENTER_CD
+			 ,F_COM_GET_ENTER_NM(#{ssnEnterCd}) AS ENTER_NM
+			 , A.EMP_YMD --입사일
+			 , DECODE(A.RET_YMD, A.RET_YMD, TO_CHAR(SYSDATE,'YYYYMMDD')) AS RET_YMD
+			 , (SELECT E.LOCATION_NM
+				FROM TSYS015 E WHERE E.ENTER_CD = A.ENTER_CD
+								 AND E.LOCATION_CD = D.LOCATION_CD) AS LOCATION_NM -- 근무지주소
+			 , C.JIKWEE_NM
+-- 			 , A.SABUN
+-- 			 , A.GEMP_YMD
+-- 			 , C.MANAGE_CD --고용형태
+-- 			 , D.LOCATION_CD		-- 근무지코드
+
+		FROM THRM100 A,
+			 THRM151 C,
+			 TORG101 D
+		WHERE A.ENTER_CD = C.ENTER_CD
+		  AND A.SABUN    = C.SABUN
+		  AND A.ENTER_CD = D.ENTER_CD
+		  AND C.ORG_CD   = D.ORG_CD
+		  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+		  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+		  AND A.ENTER_CD = #{ssnEnterCd}
+		  AND A.SABUN = #{ssnSabun}
+	</select>
+
+
+	<!-- 증명서신청 세부내역 조회 -->
+	<select parameterType="map" resultType="cMap" id="getSelfCertiAppDetList">
+				<![CDATA[
+		SELECT NVL(A.GEMP_YMD,A.EMP_YMD) AS EMP_YMD
+			 , CASE WHEN #{applCd} IN ('13', '14') THEN A.RET_YMD ELSE TO_CHAR(SYSDATE,'YYYYMMDD') END AS CURR_YMD
+			 , DECODE(NVL(B.ADDRESS,''),NULL, A.ADDR, B.ADDRESS) AS ADDRESS
+			 , NVL(B.PRT_CNT,0) AS PRT_CNT
+			 , B.APPL_CD
+			 , B.APPL_STATUS_CD
+		FROM
+			(
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, A.GEMP_YMD
+				, A.EMP_YMD --입사일
+				, A.RET_YMD --퇴사일
+				, DECODE(F_COM_GET_GRCODE_NOTE_VAL( A.ENTER_CD, 'H20185', NVL(B.APPLY_ADDRESS_CD, '3'), 1 )
+				, 'KOR'
+				, (SELECT D.ZIP||' '||D.ADDR1||' '||D.ADDR2 FROM THRM123 D WHERE D.ENTER_CD = A.ENTER_CD
+			AND D.SABUN = A.SABUN AND D.ADD_TYPE = NVL(B.APPLY_ADDRESS_CD, '3')) -- 한글주소인 경우, 주소||상세주소
+				, (SELECT D.ADDR2||', '||D.ADDR1||' '||D.ZIP FROM THRM123 D WHERE D.ENTER_CD = A.ENTER_CD
+			AND D.SABUN = A.SABUN AND D.ADD_TYPE = NVL(B.APPLY_ADDRESS_CD, '3')) -- 그외주소인 경우, 상세주소||주소
+			) AS ADDR
+				, C.MANAGE_CD --고용형태
+				, D.LOCATION_CD		-- 근무지코드
+				, (SELECT E.ADDR || E.DETAIL_ADDR
+			FROM TSYS015 E WHERE 1=1
+			AND E.ENTER_CD = A.ENTER_CD
+			AND E.LOCATION_CD = D.LOCATION_CD) AS LOCATION_NM -- 근무지주소
+			FROM THRM100 A,
+			THRM151 C,
+			THRI101 B,
+			TORG101 D
+			WHERE A.ENTER_CD = C.ENTER_CD
+			AND A.SABUN    = C.SABUN
+			AND B.ENTER_CD = C.ENTER_CD
+			AND A.ENTER_CD = D.ENTER_CD(+)
+			AND C.ORG_CD   = D.ORG_CD
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+			AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+			AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+			AND A.SABUN    = TRIM( #{ssnSabun} )
+			AND B.APPL_CD  = TRIM( #{applCd} )
+			) A,
+			(
+			SELECT A.ENTER_CD
+				, A.SABUN
+				, A.APPL_YMD
+				, A.APPL_SEQ
+				, A.APPL_CD
+				, A.REQ_SABUN
+				, A.REQ_YY
+				, A.S_YMD
+				, A.E_YMD
+				, A.ADDRESS
+				, A.PURPOSE
+				, A.ETC
+				, A.SUBMIT_OFFICE
+				, A.PM_TIME
+				, A.NIGHT_PM_TIME
+				, A.RES_NO_YN
+				, A.PRT_CNT
+				, A.PRT_YN
+				, A.ORG_YN
+				, B.APPL_SABUN
+				, B.APPL_IN_SABUN
+				, B.APPL_STATUS_CD
+				, C.SELF_PRT_LIMIT_CNT
+				, A.LOCATION_CD
+				, A.LOCATION_NM
+			FROM TBEN401 A
+				, THRI103 B
+				, TBEN405 C
+			WHERE A.ENTER_CD = B.ENTER_CD
+			AND A.APPL_SEQ = B.APPL_SEQ
+			AND A.APPL_CD = B.APPL_CD
+			AND A.ENTER_CD = C.ENTER_CD
+			AND A.APPL_CD = C.APPL_CD
+			AND A.ENTER_CD = #{ssnEnterCd}
+			AND A.SABUN = TRIM( #{ssnSabun} )
+			) B
+		WHERE A.ENTER_CD = B.ENTER_CD(+)
+		  AND A.SABUN = B.SABUN(+)
+		  AND B.APPL_SEQ(+) = TRIM( #{applSeq} )
+		  AND B.APPL_CD(+) = TRIM( #{applCd} )
+		]]>
+
+
+		</select>
+
+	<update parameterType="map" id="updateSelfCerti">
+		UPDATE THRI103 A
+		SET A.APPL_STATUS_CD	= TRIM( #{applStatusCd} )
+		  , A.CHKDATE			= SYSDATE
+		  , A.CHKID			= #{ssnSabun}
+		WHERE A.ENTER_CD = #{ssnEnterCd}
+		  AND A.APPL_SEQ = TRIM( #{applSeq} )
+	</update>
+</mapper>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobRegApp">
+	
+		<!-- 담당직무신청 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobRegAppList">
+
+				<![CDATA[
+						SELECT A.*
+                             , B.APPL_YMD
+                             , B.APPL_STATUS_CD
+                             , B.AGREE_YMD
+                             , B.APPL_SABUN
+                             , B.APPL_IN_SABUN
+                             , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+                             , 0 AS DETAIL
+                          FROM (
+                                SELECT A.ENTER_CD
+                                     , A.APPL_SEQ
+                                     , A.SABUN
+                                     , MAX(A.ORG_CD) AS ORG_CD
+                                     , MAX(A.APPL_YN) AS APPL_YN
+                                     , MAX(A.APPL_YMD) AS APPL_YMD
+                                     , MAX(A.APPLY_YMD) AS APPLY_YMD
+                                     , MAX(A.TITLE_YN) AS TITLE_YN
+                                     , MAX(A.JOB_D_TYPE) AS JOB_D_TYPE
+                                     , MAX(A.JOB_M_TYPE) AS JOB_M_TYPE
+                                     , MAX(A.TASK_CD) AS TASK_CD
+                                     , MAX(A.JOB_CD) AS JOB_CD
+                                  FROM (
+                                        SELECT A.ENTER_CD
+                                             , A.APPL_SEQ
+                                             , A.SABUN
+                                             , A.ORG_CD
+                                             , A.APPL_YN
+                                             , A.APPL_YMD
+                                             , A.APPLY_YMD
+                                             , B.TITLE_YN
+                                             , B.JOB_D_TYPE
+                                             , B.JOB_M_TYPE
+                                             , B.TASK_CD
+                                             , (CASE WHEN B.TITLE_YN = 'Y' THEN B.JOB_CD END) AS JOB_CD
+                                          FROM THRM171 A
+                                          LEFT JOIN THRM173 B
+                                            ON A.ENTER_CD = B.ENTER_CD
+                                           AND A.SABUN = B.SABUN
+                                           AND A.APPL_SEQ = B.APPL_SEQ
+                                  ) A
+                                GROUP BY A.ENTER_CD, A.APPL_SEQ, A.SABUN
+                          ) A
+                         INNER JOIN THRI103 B
+                            ON A.ENTER_CD = B.ENTER_CD
+                           AND A.APPL_SEQ = B.APPL_SEQ
+                         WHERE 1=1
+                           AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+                                   ]]>
+                    <if test='searchFromApplYmd != null and !searchFromApplYmd.equals("")'>
+                          AND SUBSTR(REPLACE(TRIM(A.APPL_YMD),'-'),1,4) BETWEEN #{searchFromApplYmd} AND #{searchToApplYmd}
+					</if>
+                    <if test='searchSabun != null and !searchSabun.equals("")'>
+                    	  AND A.SABUN = #{searchSabun}
+					</if>
+                    ORDER BY B.APPL_YMD DESC,  A.APPL_SEQ DESC
+
+		</select>
+		
+		<!-- 담당직무신청 삭제 -->
+		<delete parameterType="map" id="deleteJobRegApp">
+
+						DELETE 
+						  FROM THRM171
+						 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND ( APPL_SEQ ) IN ( ( NULL) 
+				<foreach item="rm" collection="deleteRows" >
+				    <if test='  rm.applSeq != null and !rm.applSeq.equals("") '>
+						     , ( TRIM( #{rm.applSeq} ) )
+					</if>
+				</foreach>
+						       )
+		</delete>
+		
+		<!-- 담당직무신청 삭제 -->
+		<delete parameterType="map" id="deleteJobRegAppGrid">
+
+						DELETE 
+						  FROM THRM173
+						 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND ( APPL_SEQ,SABUN,ORG_CD,JOB_M_TYPE,JOB_D_TYPE,JOB_CD,TASK_CD ) IN ( ( NULL,NULL,NULL,NULL,NULL,NULL,NULL) 
+				<foreach item="rm" collection="deleteRows" >
+				    <if test='  rm.applSeq != null and !rm.applSeq.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.orgCd != null and !rm.orgCd.equals("") and rm.jobMType != null and !rm.jobMType.equals("") and rm.jobDType != null and !rm.jobDType.equals("") and rm.jobCd != null and !rm.jobCd.equals("") and rm.taskCd != null and !rm.taskCd.equals("") '>
+						     , ( TRIM( #{rm.applSeq} ),TRIM( #{rm.sabun} ),TRIM( #{rm.orgCd}),TRIM( #{rm.jobMType}),TRIM( #{rm.jobDType}),TRIM( #{rm.jobCd} ),TRIM( #{rm.taskCd}) )
+					</if>
+				</foreach>
+						       )
+		</delete>
+
+
+</mapper>

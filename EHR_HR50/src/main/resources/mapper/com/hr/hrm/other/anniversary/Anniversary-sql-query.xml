@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 기념일조회
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.">
+		<select parameterType="map" resultType="cMap" id="getAnniversaryList">
+
+				<![CDATA[
+				SELECT ENTER_CD
+				     , SABUN
+				     , F_COM_GET_NAMES(ENTER_CD,SABUN, #{ssnLocaleCd}) AS NAME
+				     , F_COM_GET_NAMES (ENTER_CD, SABUN, 'ALIAS') AS ALIAS
+				     , F_COM_GET_ORG_NM2(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				     , F_COM_GET_JIKCHAK_NM (ENTER_CD, SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+				     , F_COM_GET_JIKGUB_NM (ENTER_CD, SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+				     , F_COM_GET_JIKWEE_NM (ENTER_CD, SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+				     , DIV
+				     , TO_CHAR(TO_DATE(SUN_DATE, 'YYYYMMDD'), 'YYYY.MM.DD') AS SUN_DATE, DECODE(LUN_TYPE, '2', BIR_YMD, '') AS LUN_DAY
+				     , MARK
+				     , '/EmpPhotoOut.do'|| CHR (63)|| 'enterCd='|| ENTER_CD|| CHR (38)|| 'searchKeyword='|| SABUN|| CHR (38)|| 'type=1' AS PHOTO
+				  FROM (
+				        SELECT A.ENTER_CD
+				             , A.SABUN
+				             , A.NAME
+				             , DECODE(#{ssnLocaleCd}, NULL, '생일', 'ko_KR', '생일', 'Birth Day') AS DIV
+				             , NVL(A.LUN_TYPE, '1') AS LUN_TYPE
+				             , B.SUN_DATE
+				             , TO_CHAR(TO_DATE(#{searchYm}, 'YYYY-MM'), 'YYYY') || SUBSTR(A.BIR_YMD, 5,4) AS BIR_YMD
+				             , DECODE(B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'), '1', '3') AS MARK
+				             , '1' AS SEARCH_DIV
+				          FROM THRM100 A
+				         INNER JOIN (SELECT SUN_DATE, MOON_DATE
+				                       FROM TSYS007
+				                      WHERE (SUN_DATE, MOON_DATE) NOT IN (SELECT MAX(SUN_DATE), MOON_DATE
+				                                                            FROM TSYS007
+				                                                           GROUP BY MOON_DATE
+				                                                           HAVING COUNT(*) > 1)
+				                    ) B
+				            ON B.SUN_DATE = TO_CHAR(TO_DATE(#{searchYm}, 'YYYY-MM'), 'YYYY') || SUBSTR(A.BIR_YMD,5,4)
+				         WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+				           AND SUBSTR(B.SUN_DATE,1,6) = REPLACE( #{searchYm}, '-', '' )
+				           AND NVL(A.LUN_TYPE,'1') = '1'
+				         UNION
+				        SELECT A.ENTER_CD
+				             , A.SABUN
+				             , A.NAME
+				             , DECODE(#{ssnLocaleCd}, NULL, '생일', 'ko_KR', '생일', 'Birth Day') AS DIV
+				             , A.LUN_TYPE
+				             , B.SUN_DATE
+				             , TO_CHAR(TO_DATE(#{searchYm}, 'YYYY-MM'), 'YYYY') || SUBSTR(A.BIR_YMD, 5,4) AS BIR_YMD
+				             , DECODE(B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'), '1', '3') AS MARK
+				             ,'1' AS SEARCH_DIV
+				          FROM THRM100 A
+				         INNER JOIN (SELECT SUN_DATE, MOON_DATE
+				                       FROM TSYS007
+				                      WHERE (SUN_DATE, MOON_DATE) NOT IN (SELECT MAX(SUN_DATE), MOON_DATE
+				                                                            FROM TSYS007
+				                                                           GROUP BY MOON_DATE
+				                                                          HAVING COUNT(*) > 1)
+				                    ) B
+				            ON B.MOON_DATE = TO_CHAR(TO_DATE(#{searchYm}, 'YYYY-MM'), 'YYYY') || SUBSTR(A.BIR_YMD,5,4)
+				         WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+				           AND SUBSTR(B.SUN_DATE,1,6) = REPLACE( #{searchYm}, '-', '' )
+				           AND NVL(A.LUN_TYPE,'1') = '2'
+				         UNION
+				        SELECT A.ENTER_CD
+				             , A.SABUN
+				             , A.NAME
+				             , DECODE(#{ssnLocaleCd}, NULL, '결혼기념일', 'ko_KR', '결혼기념일', 'Wedding Anniversary') AS DIV
+				             , '1' AS LUN_TYPE
+				             , SUBSTR( REPLACE( #{searchYm}, '-', '' ), 1, 4 ) ||SUBSTR(A.WED_YMD,5,4) AS SUN_DATE
+				             , '' AS BIR_YMD
+				             , DECODE(B.SUN_DATE, TO_CHAR(SYSDATE, 'YYYYMMDD'), '1', '3') AS MARK
+				             , '2' AS SEARCH_DIV
+				          FROM THRM100 A
+				         INNER JOIN (SELECT SUN_DATE, MOON_DATE
+				                       FROM TSYS007
+				                      WHERE (SUN_DATE, MOON_DATE) NOT IN (SELECT MAX(SUN_DATE), MOON_DATE
+				                                                            FROM TSYS007
+				                                                           GROUP BY MOON_DATE
+				                                                          HAVING COUNT(*) > 1)
+				                    ) B
+				            ON B.SUN_DATE = TO_CHAR(TO_DATE(#{searchYm}, 'YYYY-MM'), 'YYYY') || SUBSTR(A.WED_YMD,5,4)
+				         WHERE (A.RET_YMD IS NULL OR A.RET_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+				           AND SUBSTR(B.SUN_DATE,1,6) = REPLACE( #{searchYm}, '-', '' )
+				       )
+				 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+<if test='searchYm != null and !searchYm.equals("")'>
+				   AND SUBSTR( SUN_DATE, 1, 6) = REPLACE( #{searchYm}, '-', '' )
+</if>
+<if test='searchDiv != null and !searchDiv.equals("")'>
+				   AND SEARCH_DIV = #{searchDiv}
+</if>
+				 ORDER BY MARK, SUN_DATE
+
+
+		</select>
+
+</mapper>

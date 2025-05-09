@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appCompetency.compAppPeopleMngdUpload">
+<!-- 		리더십진단평가자Upload 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCompAppPeopleMngdUploadList">
+
+				<![CDATA[
+				
+					SELECT B.COMP_APPRAISAL_CD
+						, B.W_ENTER_CD
+						, B.SABUN
+						, F_COM_GET_NAMES(B.W_ENTER_CD, B.SABUN) AS NAME
+						, F_COM_GET_NAMES(B.W_ENTER_CD, B.SABUN, 'ALIAS') AS ALIAS
+						, B.ORG_NM
+						, B.JIKGUB_NM
+						, B.JIKWEE_NM
+						, B.JIKCHAK_NM
+						, A.APP_ENTER_CD
+						, A.APP_SEQ_CD
+						, A.APP_SABUN
+						, F_COM_GET_NAMES(A.APP_ENTER_CD, A.APP_SABUN) AS APP_NAME
+						, F_COM_GET_NAMES(A.APP_ENTER_CD, A.APP_SABUN, 'ALIAS') AS APP_ALIAS
+						, A.ORG_NM AS APP_ORG_NM
+						, A.JIKGUB_NM AS APP_JIKGUB_NM
+						, A.JIKWEE_NM AS APP_JIKWEE_NM
+						, A.JIKCHAK_NM AS APP_JIKCHAK_NM
+						, A.APP_GROUP
+					FROM TPAP527 A, TPAP525 B
+					WHERE A.ENTER_CD(+) = B.ENTER_CD
+						AND A.COMP_APPRAISAL_CD(+) = B.COMP_APPRAISAL_CD
+						AND A.W_ENTER_CD(+) = B.W_ENTER_CD
+						AND A.SABUN(+) = B.SABUN
+						AND B.ENTER_CD = #{ssnEnterCd}
+						AND B.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+						]]>
+						<if test='searchName  != null and !searchName.equals("") ' >
+						AND F_COM_GET_NAMES(B.W_ENTER_CD, B.SABUN) LIKE '%'|| #{searchName} ||'%'
+						</if>
+						
+						<if test='searchAppName  != null and !searchAppName.equals("") ' >
+						AND F_COM_GET_NAMES(A.APP_ENTER_CD, A.APP_SABUN) LIKE '%'|| #{searchAppName} ||'%'
+						</if>
+					ORDER BY B.JIKGUB_CD, A.SABUN
+
+
+		</select>
+		
+<!-- 		리더십진단대상자Upload 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCompAppPeopleMngdUploadList2">
+
+				<![CDATA[
+				
+					SELECT B.COMP_APPRAISAL_CD
+						, B.W_ENTER_CD
+						, B.SABUN
+						, F_COM_GET_NAMES(B.W_ENTER_CD, B.SABUN) AS NAME
+						, F_COM_GET_NAMES(B.W_ENTER_CD, B.SABUN, 'ALIAS') AS ALIAS
+						, B.ORG_NM
+						, B.JIKGUB_NM
+						, B.JIKWEE_NM
+						, B.JIKCHAK_NM
+						, B.APP_YN
+					FROM TPAP525 B
+					WHERE  B.ENTER_CD = #{ssnEnterCd}
+					AND B.COMP_APPRAISAL_CD = #{searchCompAppraisalCd}
+]]>
+						<if test='searchName  != null and !searchName.equals("") ' >
+						AND F_COM_GET_NAMES(B.W_ENTER_CD, B.SABUN) LIKE '%'|| #{searchName} ||'%'
+						</if>
+					ORDER BY B.JIKGUB_CD, B.SABUN
+
+
+		</select>
+		
+		
+<!-- 		리더십진단대상자관리 저장 -->	
+		<update parameterType="map" id="saveCompAppPeopleMngdUpload1">
+
+				<![CDATA[
+					MERGE INTO TPAP525 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.COMP_APPRAISAL_CD
+									, A.W_ENTER_CD
+									, A.SABUN
+									, A.ORG_CD
+									, A.ORG_NM
+									, A.JIKGUB_CD
+									, A.JIKGUB_NM
+									, A.JIKCHAK_CD
+									, A.JIKCHAK_NM
+							FROM	(
+									SELECT	X.ENTER_CD
+										, X.COMP_APPRAISAL_CD
+										, X.W_ENTER_CD
+										, X.SABUN
+										, Y.ORG_CD
+										, F_COM_GET_ORG_NM(Y.ENTER_CD, Y.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+										, Y.JIKGUB_CD
+										, F_COM_GET_JIKGUB_NM(Y.ENTER_CD, Y.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))  AS JIKGUB_NM
+										, Y.JIKCHAK_CD
+										, F_COM_GET_JIKCHAK_NM(Y.ENTER_CD, Y.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS JIKCHAK_NM
+									 FROM 
+                                    (
+                                    SELECT
+                                             NULL AS ENTER_CD
+                                            , NULL AS COMP_APPRAISAL_CD
+                                            , NULL AS W_ENTER_CD
+                                            , NULL AS SABUN
+                                     FROM DUAL
+                                     ]]>
+<bind name='icnt' value='1' />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )				AS ENTER_CD
+											, TRIM(  #{rm.compAppraisalCd} )		AS COMP_APPRAISAL_CD
+											, TRIM(  #{rm.wEnterCd} )			AS W_ENTER_CD
+											, TRIM(  #{rm.sabun} )				AS SABUN
+									FROM   DUAL
+</foreach>
+									<![CDATA[
+                                        ) X
+                                        , THRM151 Y
+                                    WHERE X.ENTER_CD = Y.ENTER_CD
+                                        AND X.SABUN = Y.SABUN
+                                        AND Y.SDATE        = (SELECT MAX(E.SDATE)
+							                                   FROM THRM151 E
+							                                  WHERE E.ENTER_CD      = #{ssnEnterCd}
+							                                    AND E.SABUN         =  #{rm.sabun}
+							                                    AND E.SDATE         <= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                                    ]]>
+                                ) A
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.COMP_APPRAISAL_CD = S.COMP_APPRAISAL_CD AND T.W_ENTER_CD = S.W_ENTER_CD AND T.SABUN = S.SABUN)
+					WHEN MATCHED THEN
+						UPDATE SET	T.ORG_CD              =  S.ORG_CD
+									, T.ORG_NM            =  S.ORG_NM
+									, T.JIKGUB_CD         =  S.JIKGUB_CD
+									, T.JIKGUB_NM         =  S.JIKGUB_NM
+									, T.JIKCHAK_CD        =  S.JIKCHAK_CD
+									, T.JIKCHAK_NM        =  S.JIKCHAK_NM
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						     	T.ENTER_CD
+							, T.COMP_APPRAISAL_CD
+							, T.W_ENTER_CD
+							, T.SABUN
+							, T.ORG_CD
+							, T.ORG_NM
+							, T.JIKGUB_CD
+							, T.JIKGUB_NM
+							, T.JIKCHAK_CD
+							, T.JIKCHAK_NM
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+						     	S.ENTER_CD
+							, S.COMP_APPRAISAL_CD
+							, S.W_ENTER_CD
+							, S.SABUN
+							, S.ORG_CD
+							, S.ORG_NM
+							, S.JIKGUB_CD
+							, S.JIKGUB_NM
+							, S.JIKCHAK_CD
+							, S.JIKCHAK_NM   
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+
+<!-- 		리더십진단대상자Upload 저장 -->	
+		<update parameterType="map" id="saveCompAppPeopleMngdUpload">
+
+				<![CDATA[
+					MERGE INTO TPAP527 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.W_ENTER_CD
+									, A.SABUN
+									, A.COMP_APPRAISAL_CD
+									, A.APP_ENTER_CD
+									, A.APP_SABUN
+									, A.APP_SEQ_CD
+									, A.ORG_CD
+									, A.ORG_NM
+									, A.JIKWEE_CD
+									, A.JIKWEE_NM
+									, A.JIKCHAK_CD
+									, A.JIKCHAK_NM
+									, A.APP_GROUP
+							FROM	(
+									SELECT X.ENTER_CD
+										, X.W_ENTER_CD
+										, X.SABUN
+										, X.COMP_APPRAISAL_CD
+										, X.APP_ENTER_CD
+										, X.APP_SABUN
+										, X.APP_SEQ_CD
+										, Y.ORG_CD
+										, F_COM_GET_ORG_NM(Y.ENTER_CD, Y.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD'))		AS ORG_NM
+										, Y.JIKWEE_CD
+										, F_COM_GET_JIKWEE_NM(Y.ENTER_CD, Y.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))	AS JIKWEE_NM
+										, Y.JIKCHAK_CD
+										, F_COM_GET_JIKCHAK_NM(Y.ENTER_CD, Y.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))	AS JIKCHAK_NM
+										, X.APP_GROUP
+									FROM (
+											SELECT	  NULL		AS ENTER_CD
+												, NULL		AS W_ENTER_CD
+												, NULL		AS SABUN
+												, NULL		AS COMP_APPRAISAL_CD
+												, NULL		AS APP_ENTER_CD
+												, NULL		AS APP_SABUN
+												, NULL		AS APP_SEQ_CD
+												, NULL		AS APP_GROUP
+											FROM	DUAL
+											]]>
+<bind name='icnt' value='1' />
+<foreach item="rm" collection="mergeRows" >
+											UNION ALL
+											SELECT	
+													  TRIM( #{ssnEnterCd} )			AS ENTER_CD
+													, TRIM(  #{rm.wEnterCd} )		AS W_ENTER_CD
+													, TRIM(  #{rm.sabun} )			AS SABUN
+													, TRIM(  #{rm.compAppraisalCd} )	AS COMP_APPRAISAL_CD
+													, TRIM(  #{rm.appEnterCd} )		AS APP_ENTER_CD
+													, TRIM(  #{rm.appSabun} )		AS APP_SABUN
+													, TRIM(  #{rm.appSeqCd} )		AS APP_SEQ_CD
+													, TRIM(  #{rm.appGroup} )		AS APP_GROUP
+											FROM DUAL
+</foreach>
+										) X
+										, THRM151 Y
+									WHERE X.ENTER_CD = Y.ENTER_CD
+										AND X.SABUN = Y.SABUN
+										AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Y.SDATE AND Y.EDATE
+								) A
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD 
+						AND T.W_ENTER_CD = S.W_ENTER_CD 
+						AND T.SABUN = S.SABUN 
+						AND T.COMP_APPRAISAL_CD = S.COMP_APPRAISAL_CD 
+						AND T.APP_ENTER_CD = S.APP_ENTER_CD 
+						AND T.APP_SABUN = S.APP_SABUN
+					)
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD
+							, T.W_ENTER_CD
+							, T.SABUN
+							, T.COMP_APPRAISAL_CD
+							, T.APP_ENTER_CD
+							, T.APP_SABUN
+							, T.APP_SEQ_CD
+							, T.ORG_CD
+							, T.ORG_NM
+							, T.JIKWEE_CD
+							, T.JIKWEE_NM
+							, T.JIKCHAK_CD
+							, T.JIKCHAK_NM
+							, T.APP_GROUP
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+						      S.ENTER_CD
+							, S.W_ENTER_CD
+							, S.SABUN
+							, S.COMP_APPRAISAL_CD
+							, S.APP_ENTER_CD
+							, S.APP_SABUN
+							, S.APP_SEQ_CD
+							, S.ORG_CD
+							, S.ORG_NM
+							, S.JIKWEE_CD
+							, S.JIKWEE_NM
+							, S.JIKCHAK_CD
+							, S.JIKCHAK_NM
+							, S.APP_GROUP     
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 리더십진단대상자관리 삭제 -->
+		<delete parameterType="map" id="deleteCompAppPeopleMngdUpload1">
+
+				<![CDATA[
+					DELETE FROM TPAP525 
+					WHERE (ENTER_CD, COMP_APPRAISAL_CD, W_ENTER_CD, SABUN) IN 	(  (NULL, NULL,NULL, NULL)
+					]]>
+<foreach item="rm" collection="deleteRows" >
+							, (#{ssnEnterCd},  #{rm.compAppraisalCd),  #{rm.wEnterCd),  #{rm.sabun})
+</foreach>
+						)
+		</delete>
+		
+<!-- 		리더십진단대상자Upload 삭제 -->
+		<delete parameterType="map" id="deleteCompAppPeopleMngdUpload">
+
+				<![CDATA[
+					DELETE FROM TPAP527
+					WHERE (ENTER_CD, W_ENTER_CD, SABUN, COMP_APPRAISAL_CD, APP_ENTER_CD, APP_SABUN) IN 	(  (NULL, NULL, NULL, NULL, NULL, NULL)
+					    ]]>
+						<choose>
+							<when test='deleteType != null and deleteType.equals("I")'>
+							<foreach item="rm" collection="mergeRows" >
+								, (#{ssnEnterCd},  #{rm.wEnterCd},  #{rm.sabun},  #{rm.compAppraisalCd},  #{rm.appEnterCd},  #{rm.appSabun})
+							</foreach>
+							</when>
+							<otherwise>
+							<foreach item="rm" collection="deleteRows" >
+								, (#{ssnEnterCd},  #{rm.wEnterCd},  #{rm.sabun},  #{rm.compAppraisalCd},  #{rm.appEnterCd},  #{rm.appSabun})
+							</foreach>
+							</otherwise>
+						</choose>
+
+						)
+		</delete>
+</mapper>

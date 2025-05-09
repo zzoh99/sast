@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    인적공제
+ -->
+<root>
+
+    <!-- 인적공제 자료 조회 -->
+    <query id="selectYeaDataPerList">
+        <![CDATA[
+            SELECT A.WORK_YY
+                 , A.ADJUST_TYPE
+                 , A.SABUN
+                 , F_COM_DECRYPT(A.FAMRES, A.ENTER_CD) AS FAMRES
+                 , A.FAM_CD
+                 , A.ACA_CD
+                 , A.FAM_NM
+                 , A.WOMAN_YN
+                 , A.SPOUSE_YN
+                 , A.DPNDNT_YN
+                 , A.SENIOR_YN
+                 , A.HNDCP_YN         
+                 , A.HNDCP_TYPE
+                 , A.WOMAN_YN
+                 , A.BUSINESS_PLACE_CD
+                 , A.ONE_PARENT_YN
+                 , A.INSURANCE_YN
+                 , A.MEDICAL_YN
+                 , A.EDUCATION_YN
+                 , A.CREDIT_YN
+                 , A.ZIP
+                 , A.ADDR1
+                 , A.ADDR2
+                 , NVL(A.LAST_FAM_YN, 'N') AS LAST_FAM_YN
+                 , CASE WHEN A.FAM_CD='0' THEN ''  ELSE NVL(A.LAST_FAM_YN, 'N') END AS LAST_FAM_YN
+                 ,(SELECT COUNT(*)
+                     FROM TCPN825 -- 정산가족의료비내역
+                    WHERE ENTER_CD    = A.ENTER_CD
+                      AND WORK_YY     = A.WORK_YY
+                      AND ADJUST_TYPE = A.ADJUST_TYPE
+                      AND SABUN       = A.SABUN
+                      AND FAMRES      = A.FAMRES
+                      AND APPL_MON > 0)
+                 + (SELECT COUNT(*)
+                      FROM TCPN829 -- 교육비내역
+                     WHERE ENTER_CD    = A.ENTER_CD
+                       AND WORK_YY     = A.WORK_YY
+                       AND ADJUST_TYPE = A.ADJUST_TYPE
+                       AND SABUN       = A.SABUN
+                       AND FAMRES      = A.FAMRES
+                       AND APPL_MON > 0)
+                  + (SELECT COUNT(*)
+                       FROM TCPN821 -- 연간카드사용내역
+                      WHERE ENTER_CD    = A.ENTER_CD
+                        AND WORK_YY     = A.WORK_YY
+                        AND ADJUST_TYPE = A.ADJUST_TYPE
+                        AND SABUN       = A.SABUN
+                        AND NAME        = A.FAMRES
+                        AND USE_MON > 0) INCNT
+                  , DECODE((SELECT NVL(COUNT(*),0)
+                              FROM TCPN823
+                             WHERE ENTER_CD    = A.ENTER_CD
+                               AND WORK_YY     = A.WORK_YY-1
+                               AND ADJUST_TYPE = '1'
+                               AND SABUN       = A.SABUN
+                               AND FAMRES      = A.FAMRES), 0,'N','Y') AS PRE_EQUALS_YN
+                  , A.CHILD_YN
+                  , A.ADOPT_BORN_YN    
+              FROM TCPN823 A 
+                 ,(
+                   SELECT * 
+                   FROM   TSYS005 
+                   WHERE  ENTER_CD = #ssnEnterCd# 
+                   AND    GRCODE_CD='C00309'
+                  ) B
+             WHERE A.ENTER_CD       = #ssnEnterCd#
+               AND A.WORK_YY        = #searchWorkYy#
+               AND A.ADJUST_TYPE    = #searchAdjustType#
+               AND A.SABUN          = #searchSabun#
+               AND A.ENTER_CD       = B.ENTER_CD
+               AND A.FAM_CD         = B.CODE
+             ORDER BY B.SEQ
+        ]]> 
+    </query>
+
+</root>

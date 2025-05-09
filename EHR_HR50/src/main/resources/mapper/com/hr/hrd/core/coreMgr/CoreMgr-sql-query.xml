@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.core.coreMgr">
+
+<!-- 연도코드목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCoreMgrBaseYearCdList">
+
+				<![CDATA[
+					SELECT C.YYYY AS CODE
+					     , C.YYYY AS CODE_NM
+					  FROM (
+					        SELECT SUBSTR(BASIC_YMD, 1, 4) AS YYYY
+					          FROM TCDP900
+					         WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					         GROUP BY SUBSTR(BASIC_YMD, 1, 4)
+					       ) C
+					 ORDER BY C.YYYY DESC
+				]]>
+
+
+		</select>
+
+<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCoreMgrList">
+
+				<![CDATA[
+					SELECT A.SABUN
+					     , A.ENTER_CD
+					     , A.GRP_WORK
+					     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+					     , F_COM_GET_ORG_NM(A.ENTER_CD,F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, A.BASIC_YMD), A.BASIC_YMD) AS ORG_NM
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, A.BASIC_YMD) AS JIKGUB_NM
+					     , A.BASIC_YMD
+					     , (SELECT SUBSTR(
+					                     XMLAGG(
+					                         XMLELEMENT(
+					                               COL
+					                             , ','
+					                             , D.ENTER_CD
+					                             , '^^' || D.SABUN
+					                             , '^^' || D.INCOM_ID
+					                             , '^^' || D.INCOM_SEQ
+					                             , '^^' || D.EXT_INCOM_YN
+					                             , '^^' || DECODE(D.EXT_INCOM_YN, 'Y', 'EXT_INCOM', DECODE(D.INCOM_ID, NULL, NULL, F_COM_GET_NAMES(D.ENTER_CD, D.INCOM_ID, #{ssnLocaleCd}) || '(' || F_COM_GET_ORG_NM2(D.ENTER_CD, D.INCOM_ID, A.BASIC_YMD, #{ssnLocaleCd}) || ')'))
+					                         ) ORDER BY D.INCOM_SEQ
+					                     ).EXTRACT('//text()').GETSTRINGVAL()
+					                   , 2
+					                 ) AS INCOM
+					            FROM TCDP800 D
+					           WHERE D.ENTER_CD  = A.ENTER_CD
+					             AND D.SABUN     = A.SABUN
+					             AND D.INCOM_SEQ = 1
+					           GROUP BY D.INCOM_ID
+					       ) AS INCOM1
+					     , (SELECT SUBSTR(
+					                     XMLAGG(
+					                         XMLELEMENT(
+					                               COL
+					                             , ','
+					                             , D.ENTER_CD
+					                             , '^^' || D.SABUN
+					                             , '^^' || D.INCOM_ID
+					                             , '^^' || D.INCOM_SEQ
+					                             , '^^' || D.EXT_INCOM_YN
+					                             , '^^' || DECODE(D.EXT_INCOM_YN, 'Y', 'EXT_INCOM', DECODE(D.INCOM_ID, NULL, NULL, F_COM_GET_NAMES(D.ENTER_CD, D.INCOM_ID, #{ssnLocaleCd}) || '(' || F_COM_GET_ORG_NM2(D.ENTER_CD, D.INCOM_ID, A.BASIC_YMD, #{ssnLocaleCd}) || ')'))
+					                         ) ORDER BY D.INCOM_SEQ
+					                     ).EXTRACT('//text()').GETSTRINGVAL()
+					                   , 2
+					                 ) AS INCOM
+					            FROM TCDP800 D
+					           WHERE D.ENTER_CD  = A.ENTER_CD
+					             AND D.SABUN     = A.SABUN
+					             AND D.INCOM_SEQ = 2
+					           GROUP BY D.INCOM_ID
+					       ) AS INCOM2
+					     , (SELECT SUBSTR(
+					                     XMLAGG(
+					                         XMLELEMENT(
+					                               COL
+					                             , ','
+					                             , D.ENTER_CD
+					                             , '^^' || D.SABUN
+					                             , '^^' || D.INCOM_ID
+					                             , '^^' || D.INCOM_SEQ
+					                             , '^^' || D.EXT_INCOM_YN
+					                             , '^^' || DECODE(D.EXT_INCOM_YN, 'Y', 'EXT_INCOM', DECODE(D.INCOM_ID, NULL, NULL, F_COM_GET_NAMES(D.ENTER_CD, D.INCOM_ID, #{ssnLocaleCd}) || '(' || F_COM_GET_ORG_NM2(D.ENTER_CD, D.INCOM_ID, A.BASIC_YMD, #{ssnLocaleCd}) || ')'))
+					                         ) ORDER BY D.INCOM_SEQ
+					                     ).EXTRACT('//text()').GETSTRINGVAL()
+					                   , 2
+					                 ) AS INCOM
+					            FROM TCDP800 D
+					           WHERE D.ENTER_CD  = A.ENTER_CD
+					             AND D.SABUN     = A.SABUN
+					             AND D.INCOM_SEQ = 3
+					           GROUP BY D.INCOM_ID
+					       ) AS INCOM3
+					  FROM TCDP900 A
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					           ]]>
+<if test='searchGrpWork != null and !searchGrpWork.equals("")' >
+					   AND A.GRP_WORK = TRIM(#{searchGrpWork})
+</if>
+<if test='searchYyyy != null and !searchYyyy.equals("")' >
+					   AND SUBSTR(A.BASIC_YMD,1,4) = TRIM(#{searchYyyy})
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")' >
+					   <![CDATA[
+					   AND (
+					             INSTR(A.SABUN, TRIM( #{searchSabunName} )) > 0
+					          OR INSTR(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}), TRIM( #{searchSabunName} )) > 0
+					       )
+					       ]]>
+</if>
+					 ORDER BY A.BASIC_YMD DESC, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, A.BASIC_YMD)
+
+
+		</select>
+
+<!-- 저장 -->
+		<update parameterType="map" id="saveCoreMgr">
+
+				<![CDATA[
+					MERGE INTO TCDP900 T
+					USING (
+					    SELECT A.SABUN
+					         , A.GRP_WORK
+					         , A.BASIC_YMD
+					      FROM (
+					            SELECT NULL AS SABUN
+					                 , NULL AS GRP_WORK
+					                 , NULL AS BASIC_YMD
+					              FROM DUAL
+					                  ]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					             UNION ALL
+					            SELECT TRIM(#{rm.sabun}) AS SABUN
+					                 , TRIM(#{rm.grpWork}) AS GRP_WORK
+					                 , TRIM(#{rm.basicYmd}) AS BASIC_YMD
+					              FROM DUAL
+</foreach>
+					           ) A
+					     WHERE A.GRP_WORK IS NOT NULL
+					) S
+					ON (
+					            T.ENTER_CD  = #{ssnEnterCd}
+					        AND T.SABUN     = S.SABUN
+					        AND T.BASIC_YMD = S.BASIC_YMD
+					)
+					WHEN MATCHED THEN
+					     UPDATE
+					        SET T.CHKDATE  = SYSDATE
+					          , T.CHKID    = #{ssnSabun}
+					          , T.GRP_WORK = S.GRP_WORK
+					WHEN NOT MATCHED THEN
+					     INSERT (
+					            T.ENTER_CD
+					          , T.GRP_WORK
+					          , T.SABUN
+					          , T.BASIC_YMD
+					          , T.CHKDATE
+					          , T.CHKID
+					     ) VALUES (
+					            #{ssnEnterCd}
+					          , S.GRP_WORK
+					          , S.SABUN
+					          , S.BASIC_YMD
+					          , SYSDATE
+					          , #{ssnSabun}
+					     )
+		</update>
+		
+<!-- 삭제  -->
+		<delete parameterType="map" id="deleteCoreMgr">
+
+				<![CDATA[	   
+				   DELETE FROM TCDP900
+				    WHERE (ENTER_CD, SABUN, BASIC_YMD) IN ( (NULL,NULL,NULL)
+				        ]]>
+<foreach item="rm" collection="deleteRows" >
+	<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and rm.basicYmd != null and !rm.basicYmd.equals("")' >
+			              , (TRIM( #{ssnEnterCd} ), TRIM( #{rm.sabun} ), TRIM( #{rm.basicYmd} ))
+	</if>
+</foreach>
+					      )
+		</delete>
+
+</mapper>

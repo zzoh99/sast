@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.security.privacyAcySta">
+<!-- 		개인정보보호법현황 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPrivacyActStaList">
+
+				<![CDATA[
+				SELECT '3' AS DETAIL
+					,X.NAME
+					,X.SABUN
+					,X.ORG_NM
+					,X.JIKCHAK_NM
+					,X.JIKWEE_NM
+					,X.JIKGUB_NM
+					,X.STATUS_CD
+					,X.INFO_SEQ
+					,TO_CHAR(X.CHKDATE,'YYYYMMDDHH24MI') AS CHKDATE
+                    ,F_COM_GET_NAMES(X.ENTER_CD, X.CHKID) AS NAMES
+                    
+					${eleYn}
+
+				FROM
+					(
+						SELECT   '3' AS DETAIL
+							,A.NAME
+							,A.SABUN
+							,F_COM_GET_ORG_NM(B.ENTER_CD, B.ORG_CD, B.SDATE, #{ssnLocaleCd}) AS ORG_NM
+							,F_COM_JIKJE_SORT( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_SORT
+							,B.JIKCHAK_NM
+							,B.JIKWEE_NM
+							,B.JIKGUB_NM
+							,B.STATUS_CD
+							,C.INFO_SEQ
+							,D.ELE_SEQ
+							,DECODE((SELECT AGREE_YN FROM TSYS625 WHERE ENTER_CD = D.ENTER_CD AND INFO_SEQ = D.INFO_SEQ AND ELE_SEQ = D.ELE_SEQ AND SABUN = A.SABUN), 'Y', '1', '0') AS ELE_YN
+							,(SELECT CHKDATE FROM TSYS625 WHERE ENTER_CD = D.ENTER_CD AND INFO_SEQ = D.INFO_SEQ AND SABUN = A.SABUN 
+			                  GROUP BY CHKDATE) AS CHKDATE
+			                ,(SELECT CHKID FROM TSYS625 WHERE ENTER_CD = D.ENTER_CD AND INFO_SEQ = D.INFO_SEQ AND SABUN = A.SABUN 
+			                  GROUP BY CHKID) AS CHKID
+			                ,A.ENTER_CD
+						FROM THRM100 A, THRM151 B, TSYS621 C, TSYS623 D
+						WHERE A.ENTER_CD = B.ENTER_CD
+							AND A.SABUN = B.SABUN
+							AND B.SDATE = ( SELECT MAX(X.SDATE) FROM THRM151 X WHERE X.ENTER_CD = B.ENTER_CD AND X.SABUN = B.SABUN AND C.SDATE BETWEEN X.SDATE AND NVL(X.EDATE, '99991231') )
+							AND A.ENTER_CD = C.ENTER_CD
+							AND C.ENTER_CD = D.ENTER_CD(+)
+							AND C.INFO_SEQ = D.INFO_SEQ(+)
+							AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+							AND C.INFO_SEQ = TRIM( #{searchInfoSeq} )
+							AND A.NAME LIKE '%'||TRIM(#{searchName})||'%'
+							AND B.STATUS_CD <> 'RAA'
+							]]>
+							<if test='searchStatusCd != null and !searchStatusCd.equals("")'>
+								<![CDATA[ AND B.STATUS_CD <> TRIM(#{searchStatusCd}) ]]>
+							</if>
+					) X
+				WHERE 1=1
+					AND X.ORG_NM LIKE '%'||TRIM(#{searchOrgNm})||'%'
+
+				<if test='searchYn != null and !searchYn.equals("")'>
+					AND X.ELE_YN = #{searchYn}
+				</if>
+
+				GROUP BY  X.NAME
+					,X.SABUN
+					,X.ORG_NM
+					,X.JIKCHAK_NM
+					,X.JIKWEE_NM
+					,X.JIKGUB_NM
+					,X.STATUS_CD
+					,X.INFO_SEQ
+					,X.ORG_SORT
+					,X.CHKDATE
+                    ,X.ENTER_CD
+                    ,X.CHKID
+				ORDER BY X.ORG_SORT, X.ORG_NM, X.SABUN, X.NAME
+
+
+
+		</select>
+
+<!-- 		개인정보보호법현황 저장 -->
+		<update parameterType="map" id="savePrivacyActSta">
+
+					MERGE INTO TSYS955 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.STD_CD
+									, A.STD_NM
+									, A.STD_CD_DESC
+									, A.DATA_TYPE
+									, A.STD_CD_VALUE
+									, A.BIZ_CD
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS STD_CD
+											, NULL		AS STD_NM
+											, NULL		AS STD_CD_DESC
+											, NULL		AS DATA_TYPE
+											, NULL		AS STD_CD_VALUE
+											, NULL		AS BIZ_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.stdCd} )	AS STD_CD
+											, TRIM( #{rm.stdNm} )	AS STD_NM
+											, TRIM( #{rm.stdCdDesc} )	AS STD_CD_DESC
+											, TRIM( #{rm.dataType} )	AS DATA_TYPE
+											, TRIM( #{rm.stdCdValue} )	AS STD_CD_VALUE
+											, TRIM( #{rm.bizCd} )	AS BIZ_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.STD_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.STD_CD = S.STD_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.STD_NM	= S.STD_NM
+									, T.STD_CD_DESC	= S.STD_CD_DESC
+									, T.DATA_TYPE	= S.DATA_TYPE
+									, T.STD_CD_VALUE	= S.STD_CD_VALUE
+									, T.BIZ_CD	= S.BIZ_CD
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.STD_CD
+							, T.STD_NM
+							, T.STD_CD_DESC
+							, T.DATA_TYPE
+							, T.STD_CD_VALUE
+							, T.BIZ_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.STD_CD
+							, S.STD_NM
+							, S.STD_CD_DESC
+							, S.DATA_TYPE
+							, S.STD_CD_VALUE
+							, S.BIZ_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		개인정보보호법현황 삭제 -->
+		<delete parameterType="map" id="deletePrivacyActSta">
+
+					DELETE FROM TSYS955
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||STD_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.stdCd != null and !rm.stdCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.stdCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!-- 개인정보보호법 -->
+		<select parameterType="map" resultType="cMap" id="getInfoSeqList">
+
+		   <![CDATA[
+				SELECT INFO_SEQ AS CODE
+					 , DECODE(NVL(SUBJECT,''),'','',SUBSTR(SUBJECT,0,20)||'...')  AS CODE_NM
+				FROM TSYS621
+				WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+				ORDER BY SDATE DESC, EDATE DESC
+	 	   ]]>
+
+
+		</select>
+
+
+</mapper>

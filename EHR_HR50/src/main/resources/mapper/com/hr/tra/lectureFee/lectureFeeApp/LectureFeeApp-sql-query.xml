@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.lectureFee.lectureFeeApp">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getLectureFeeAppList">
+			
+				<![CDATA[
+						SELECT T1.*
+							    , DECODE(SELECT_IMG, 2, BTN_APP1, '') AS BTN_APP
+								,(
+									SELECT LISTAGG(Z.SUBJECT_LECTURE, ', ') WITHIN GROUP (ORDER BY Z.SEQ)
+									  FROM TTRA122 Z, TTRA002 Y
+									 WHERE Z.ENTER_CD 	= T1.ENTER_CD
+									   AND Z.ENTER_CD	= Y.ENTER_CD
+									   AND Z.TEACHER_SEQ = Y.TEACHER_SEQ
+									   AND Z.EDU_SEQ	     = T1.EDU_SEQ
+								 	   AND Z.EDU_EVENT_SEQ = T1.EDU_EVENT_SEQ
+									   AND Y.TEACHER_GB 	= 'IN'
+									   AND Y.TEACHER_NO 	= TRIM( #{searchSabun} )
+									 GROUP BY Z.EDU_SEQ, Z.EDU_EVENT_SEQ
+								) AS SUBJECT_LECTURE
+								,NVL(FEE, (
+									SELECT SUM(NVL(Z.LECTURE_FEE,0))
+									  FROM TTRA122 Z, TTRA002 Y
+									 WHERE Z.ENTER_CD 	= T1.ENTER_CD
+									   AND Z.ENTER_CD	= Y.ENTER_CD
+									   AND Z.TEACHER_SEQ = Y.TEACHER_SEQ
+									   AND Z.EDU_SEQ	     = T1.EDU_SEQ
+								 	   AND Z.EDU_EVENT_SEQ = T1.EDU_EVENT_SEQ
+									   AND Y.TEACHER_GB 	= 'IN'
+									   AND Y.TEACHER_NO 	= TRIM( #{searchSabun} )
+									 GROUP BY Z.EDU_SEQ, Z.EDU_EVENT_SEQ
+								)) AS LECTURE_FEE
+						FROM (
+							   SELECT C.EDU_SEQ
+									, C.ENTER_CD
+									, D.EDU_EVENT_SEQ
+									, C.EDU_COURSE_NM
+									, C.EDU_METHOD_CD
+									, D.EDU_S_YMD
+									, D.EDU_E_YMD
+									, E.APPL_SEQ
+									, E.APPL_YMD
+									, E.APPL_SABUN
+									, E.APPL_IN_SABUN
+									, E.APPL_STATUS_CD
+								    , E.LECTURE_FEE AS FEE
+									, DECODE((E.APPL_STATUS_CD), '11', '<a class="basic">삭제</a>', '') AS BTN_DEL
+							 		, CASE WHEN E.APPL_SEQ IS NULL THEN '' ELSE '0' END AS DETAIL
+							 		, CASE WHEN E.APPL_STATUS_CD = '11' THEN '<a class="basic">삭제</a>'
+							 			   WHEN E.RNUM <> 1 THEN ''
+								           WHEN D.EDU_E_YMD < TO_CHAR(SYSDATE,'YYYYMMDD') AND (E.APPL_SEQ IS NULL OR E.APPL_STATUS_CD IN ('23', '33')) THEN '<a class="basic">신청</a>'
+										   ELSE '' END 
+									  AS BTN_APP1
+									, ( SELECT DECODE(COUNT(DISTINCT X.EDU_SEQ), 1, '2', '1')
+							              FROM TTRA531 X, THRI103 Y
+							             WHERE X.ENTER_CD     	= #{ssnEnterCd}
+							               AND X.ENTER_CD     	= Y.ENTER_CD
+							               AND X.APPL_SEQ     	= Y.APPL_SEQ
+							               AND X.EDU_SEQ        = A.EDU_SEQ
+					 			  		   AND X.EDU_EVENT_SEQ  = A.EDU_EVENT_SEQ
+					 			  		   AND Y.APPL_STATUS_CD = '99'
+							          ) AS SELECT_IMG
+								 FROM TTRA122 A, TTRA002 B, TTRA101 C, TTRA121 D
+								 , ( SELECT X.*, Y.APPL_YMD, Y.APPL_SABUN, Y.APPL_IN_SABUN, Y.APPL_STATUS_CD --사내 강사료 신청
+								 			, ROW_NUMBER()OVER(PARTITION BY X.ENTER_CD, X.EDU_SEQ, X.EDU_EVENT_SEQ ORDER BY Y.APPL_SEQ DESC ) AS RNUM
+							              FROM TTRA521 X, THRI103 Y
+							             WHERE X.ENTER_CD     = #{ssnEnterCd}
+							               AND X.ENTER_CD     = Y.ENTER_CD
+							               AND X.APPL_SEQ     = Y.APPL_SEQ
+							               AND X.SABUN        = TRIM( #{searchSabun} )
+							          ) E
+								WHERE A.ENTER_CD 	= #{ssnEnterCd}
+								  AND A.ENTER_CD	= B.ENTER_CD
+								  AND A.TEACHER_SEQ = B.TEACHER_SEQ
+								  AND B.TEACHER_GB 	= 'IN'
+								  AND B.TEACHER_NO 	= TRIM( #{searchSabun} )
+								   -- 교육과정
+					 			  AND A.ENTER_CD       = C.ENTER_CD
+					 			  AND A.EDU_SEQ        = C.EDU_SEQ
+								  -- 교육회차
+					 			  AND A.ENTER_CD       = D.ENTER_CD
+					 			  AND A.EDU_SEQ        = D.EDU_SEQ
+					 			  AND A.EDU_EVENT_SEQ  = D.EDU_EVENT_SEQ
+								  -- 사내강사료신청
+								  AND A.ENTER_CD      = E.ENTER_CD(+)
+			                      AND A.EDU_SEQ       = E.EDU_SEQ(+)
+			                      AND A.EDU_EVENT_SEQ = E.EDU_EVENT_SEQ(+)
+	                      )T1
+	                      ORDER BY T1.EDU_SEQ DESC, T1.EDU_EVENT_SEQ DESC, T1.APPL_YMD DESC, T1.APPL_SEQ DESC
+				]]>
+			
+			
+		</select>
+
+<!-- 	사내강사료신청(TTRA521) 삭제 -->
+		<delete parameterType="map" id="deleteLectureFeeApp">
+			
+					DELETE FROM TTRA521
+					 WHERE ENTER_CD = #{ssnEnterCd}	
+					   AND ( APPL_SEQ ) IN ( ( NULL) 
+<foreach item="rm" collection="deleteRows"> 
+    <if test="rm.applSeq != null and rm.applSeq neq ''">
+					     , ( TRIM( #{rm.applSeq} ) ) 
+    </if>
+</foreach>
+					       )
+
+		</delete>
+		
+</mapper>

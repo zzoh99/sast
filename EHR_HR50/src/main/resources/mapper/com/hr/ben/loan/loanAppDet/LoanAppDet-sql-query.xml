@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.loan.loanAppDet">
+	
+	<!-- 대출구분 콤보 조회 -->
+	<select id="getLoanAppDetLoanCd" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT T.LOAN_CD AS CODE
+		     , F_COM_GET_GRCODE_NAME(T.ENTER_CD, 'B50010' , T.LOAN_CD, #{ssnLocaleCd}) AS CODE_NM
+		     , T.LOAN_ORG_NM
+		     , STD_LOAN_LMT_MON AS LOAN_LMT_MON
+		     , T.LOAN_DOC
+		     , T.LOAN_NOTE
+		     , T.EMP_WORK_MONTH
+		     , T.STD_MONTH
+		     , T.MIN_WORK_MONTH
+		     , NVL(B.LOAN_LMT_RATE, 0) AS LOAN_LMT_RATE
+		     , NVL(B.INT_RATE, 0) AS INT_RATE
+		     , NVL(B.LOAN_PERIOD, 0) AS LOAN_PERIOD
+		  FROM (
+		        SELECT A.ENTER_CD
+		             , A.LOAN_CD
+		             , A.SDATE
+		             , A.LOAN_ORG_NM
+		             , A.LOAN_LMT_MON AS STD_LOAN_LMT_MON
+		             , A.LOAN_DOC
+		             , A.LOAN_NOTE
+		             , TRIM(#{loanReqYmd}) AS LOAN_REQ_YMD
+		             , FLOOR(F_COM_GET_WORK_YM(TRIM(#{ssnEnterCd}), TRIM(#{searchApplSabun}), TRIM(#{loanReqYmd}))) AS EMP_WORK_MONTH
+		             , F_BEN_LOAN_STD_MM(A.ENTER_CD, A.LOAN_CD, FLOOR(F_COM_GET_WORK_YM(A.ENTER_CD, #{searchApplSabun}, #{loanReqYmd})), #{loanReqYmd}) AS STD_MONTH
+		             , (
+		                SELECT MIN(WORK_MONTH)
+		                  FROM TBEN622
+		                 WHERE ENTER_CD = A.ENTER_CD
+		                   AND LOAN_CD  = A.LOAN_CD
+		                   AND SDATE    = A.SDATE
+		                   AND USE_YN   = 'Y'
+		                   AND NVL(#{loanReqYmd}, TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN USE_S_YMD AND NVL(USE_E_YMD, '29991231')
+		               ) AS MIN_WORK_MONTH
+		          FROM TBEN621 A
+		         WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		           AND A.USE_YN   = 'Y'
+		           AND NVL(#{loanReqYmd}, TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN A.SDATE AND NVL(A.EDATE, '29991231')
+		       ) T
+		     , (
+		        SELECT *
+		          FROM TBEN622
+		         WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		           AND USE_YN   = 'Y'
+		           AND NVL(#{loanReqYmd}, TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN USE_S_YMD AND NVL(USE_E_YMD, '29991231')
+		       ) B
+		 WHERE T.ENTER_CD  = B.ENTER_CD(+)
+		   AND T.LOAN_CD   = B.LOAN_CD(+)
+		   AND T.SDATE     = B.SDATE(+)
+		   AND T.STD_MONTH = B.WORK_MONTH(+)
+		 ORDER BY F_COM_GET_GRCODE_SEQ( T.ENTER_CD, 'B50010', T.LOAN_CD )
+	]]>
+	</select>
+
+	<!-- 신청자정보 조회 -->
+	<select id="getLoanAppDetUseInfo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT BANK_CD
+		     , CRYPTIT.DECRYPT(ACCOUNT_NO,ENTER_CD) AS ACC_NO
+		     , ACC_NAME AS ACC_HOLDER
+		  FROM TCPN180      
+		 WHERE ENTER_CD     = #{ssnEnterCd} 
+		   AND ACCOUNT_TYPE = '01'
+		   AND SABUN        = TRIM( #{searchApplSabun} )
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'29991231')
+	]]>
+	</select>
+
+	<!-- 월상환금 조회 -->
+	<select id="getLoanAppDetMon" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT DECODE(B.ELEMENT_CD1, NULL, 0, F_BEN_LOAN_MONTH_MON( A.ENTER_CD , A.SABUN, A.LOAN_MON, A.LOAN_PERIOD )) AS MON
+		  FROM TBEN623 A
+		     , TBEN621 B
+		 WHERE A.ENTER_CD = B.ENTER_CD
+		   AND A.LOAN_CD  = B.LOAN_CD
+		   AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+		   AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+		   AND A.SABUN    = TRIM( #{searchApplSabun} )
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '29991231')
+	]]>
+	</select>
+
+	<!-- 대출 정보 조회 MAP -->
+	<select id="getLoanAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT R.ENTER_CD
+		     , R.APPL_SEQ
+		     , R.SABUN
+		     , R.LOAN_CD
+		     , R.LOAN_PERIOD
+		     , R.INT_RATE
+		     , R.LOAN_REQ_YMD
+		     , R.LOAN_REQ_MON
+		     , R.BANK_CD
+		     , R.ACC_HOLDER
+		     , R.ACC_NO
+		     , R.LOAN_YMD
+		     , R.LOAN_MON
+		     , R.REP_MON
+		     , R.NOTE
+		     , R.LOAN_REQ_PERIOD
+		     , R.REQ_INT_RATE
+		     , R.LOAN_ORG_NM
+		     , R.STD_LOAN_LMT_MON AS LOAN_LMT_MON
+		     , R.STD_LOAN_PERIOD
+		     , R.LOAN_DOC
+		     , R.LOAN_NOTE
+		     , R.WORK_MONTH
+		  FROM (
+		            SELECT A.ENTER_CD
+		                 , A.APPL_SEQ
+		                 , A.SABUN
+		                 , A.LOAN_CD
+		                 , A.LOAN_PERIOD
+		                 , A.INT_RATE
+		                 , A.LOAN_REQ_YMD
+		                 , A.LOAN_REQ_MON
+		                 , A.BANK_CD
+		                 , A.ACC_HOLDER
+		                 , A.ACC_NO
+		                 , A.LOAN_YMD
+		                 , A.LOAN_MON
+		                 , A.REP_MON
+		                 , A.NOTE
+		                 , A.LOAN_REQ_PERIOD
+		                 , A.REQ_INT_RATE
+		                 , B.LOAN_ORG_NM
+		                 , B.LOAN_LMT_MON AS STD_LOAN_LMT_MON
+		                 , B.LOAN_PERIOD AS STD_LOAN_PERIOD
+		                 , B.LOAN_DOC
+		                 , B.LOAN_NOTE
+		                 , FLOOR(F_COM_GET_WORK_YM(A.ENTER_CD, A.SABUN, A.LOAN_REQ_YMD)) AS WORK_MONTH
+		                 , F_BEN_LOAN_LMT_RATE(A.ENTER_CD, A.LOAN_CD, FLOOR(F_COM_GET_WORK_YM(A.ENTER_CD, A.SABUN, A.LOAN_REQ_YMD)), A.LOAN_REQ_YMD) AS LOAN_LMT_RATE 
+		              FROM TBEN623 A
+		                 , TBEN621 B
+		             WHERE A.ENTER_CD  = #{ssnEnterCd}
+		               AND A.APPL_SEQ  = TRIM( #{searchApplSeq} )
+		               AND A.ENTER_CD  = B.ENTER_CD
+		               AND A.LOAN_CD   = B.LOAN_CD
+		               AND A.LOAN_REQ_YMD BETWEEN B.SDATE(+) AND NVL(B.EDATE(+), '99991231')
+		       ) R
+	]]>
+	</select>
+
+	<!-- 대출 신청 중복신청 -->
+	<select id="getLoanAppDetDupChk" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT MIN(NVL(B.LOAN_REM_MON, -999)) AS LOAN_REM_MON
+		  FROM TBEN623 A, TBEN625 B
+		 WHERE A.ENTER_CD =  TRIM( #{ssnEnterCd} )
+		   AND A.APPL_SEQ <> TRIM( #{searchApplSeq} )
+		   AND A.SABUN    =  TRIM( #{searchApplSabun} )
+		   AND A.LOAN_CD  =  TRIM( #{loanCd} )
+		   AND EXISTS ( SELECT 1
+		                  FROM THRI103 X
+		                 WHERE X.ENTER_CD = A.ENTER_Cd
+		                   AND X.APPL_SEQ = A.APPL_SEQ
+		                   AND X.APPL_STATUS_CD IN ( '21', '31', '99' ) )
+		   AND A.ENTER_CD =  B.ENTER_CD(+)
+		   AND A.APPL_SEQ =  B.APPL_SEQ(+)
+		 GROUP BY A.ENTER_CD, A.APPL_SEQ  
+	]]>
+	</select>
+
+	<!-- 대출 신청 세부내역 저장 -->
+	<update id="saveLoanAppDet" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN623 T 
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			   SELECT TRIM(#{ssnEnterCd}) 						AS ENTER_CD 
+		            , TRIM(#{rm.searchApplSeq}) 				AS APPL_SEQ
+		            , TRIM(#{rm.searchApplSabun}) 				AS SABUN
+		            , TRIM(#{rm.loanCd}) 						AS LOAN_CD
+		            , TRIM(#{rm.loanReqPeriod}) 				AS LOAN_REQ_PERIOD
+		            , TRIM(#{rm.reqIntRate}) 					AS REQ_INT_RATE
+		            , REPLACE(TRIM(#{rm.loanReqYmd}),'-','') 	AS LOAN_REQ_YMD
+		            , REPLACE(TRIM(#{rm.loanReqMon}),',','') 	AS LOAN_REQ_MON
+		            , TRIM(#{rm.bankCd}) 						AS BANK_CD
+		            , TRIM(#{rm.accHolder}) 					AS ACC_HOLDER
+		            , TRIM(#{rm.accNo}) 						AS ACC_NO
+		            , TRIM(#{rm.note}) 							AS NOTE
+		        FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+		     AND  T.SABUN 		= S.SABUN 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE			= sysdate 
+		            , T.CHKID	    	= #{ssnSabun} 
+		            , T.LOAN_CD 		= S.LOAN_CD 
+		            , T.LOAN_REQ_PERIOD = S.LOAN_REQ_PERIOD 
+		            , T.REQ_INT_RATE 	= S.REQ_INT_RATE 
+		            , T.LOAN_REQ_YMD 	= S.LOAN_REQ_YMD 
+		            , T.LOAN_REQ_MON 	= S.LOAN_REQ_MON 
+		            , T.BANK_CD 		= S.BANK_CD 
+		            , T.ACC_HOLDER 		= S.ACC_HOLDER 
+		            , T.ACC_NO 			= S.ACC_NO 
+		            , T.NOTE 			= S.NOTE 
+		WHEN NOT MATCHED THEN 
+		   INSERT 
+		   ( 
+		              T.ENTER_CD
+		            , T.APPL_SEQ
+		            , T.SABUN
+		            , T.LOAN_CD
+		            , T.LOAN_REQ_PERIOD
+		            , T.REQ_INT_RATE
+		            , T.LOAN_REQ_YMD
+		            , T.LOAN_REQ_MON
+		            , T.BANK_CD
+		            , T.ACC_HOLDER
+		            , T.ACC_NO
+		            , T.NOTE
+		            , T.CHKDATE
+		            , T.CHKID
+		   ) 
+		   VALUES 
+		   ( 
+		              S.ENTER_CD
+		            , S.APPL_SEQ
+		            , S.SABUN
+		            , S.LOAN_CD
+		            , S.LOAN_REQ_PERIOD
+		            , S.REQ_INT_RATE
+		            , S.LOAN_REQ_YMD
+		            , S.LOAN_REQ_MON
+		            , S.BANK_CD
+		            , S.ACC_HOLDER
+		            , S.ACC_NO
+		            , S.NOTE
+		            , sysdate
+		            , #{ssnSabun}
+		   ) 
+	]]>
+	</update>
+
+	<!-- 대출 신청 세부내역 저장 -->
+	<update id="saveLoanAppDetAdmin" parameterType="map">
+	<![CDATA[
+		 MERGE INTO TBEN623 T 
+		 USING ( ]]>
+		 <foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+		 		SELECT TRIM(#{ssnEnterCd}) 					AS ENTER_CD 
+		            , TRIM(#{rm.searchApplSeq}) 			AS APPL_SEQ
+		            , TRIM(#{rm.searchApplSabun}) 			AS SABUN
+		            , REPLACE(TRIM(#{rm.loanYmd}),'-','') 	AS LOAN_YMD
+		            , REPLACE(TRIM(#{rm.loanMon}),',','') 	AS LOAN_MON
+		            , REPLACE(TRIM(#{rm.repMon}),',','') 	AS REP_MON
+		            , TRIM(#{rm.loanPeriod}) 				AS LOAN_PERIOD
+		            , TRIM(#{rm.intRate}) 					AS INT_RATE
+		        FROM DUAL
+		 </foreach>
+	<![CDATA[ 
+		) S 
+		ON ( 
+		          T.ENTER_CD 	= S.ENTER_CD 
+		     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+		     AND  T.SABUN 		= S.SABUN 
+		) 
+		WHEN MATCHED THEN 
+		   UPDATE SET T.CHKDATE			= sysdate 
+		            , T.CHKID	    	= #{ssnSabun} 
+		            , T.LOAN_YMD 		= S.LOAN_YMD 
+		            , T.LOAN_MON 		= S.LOAN_MON 
+		            , T.REP_MON 		= S.REP_MON 
+		            , T.LOAN_PERIOD 	= S.LOAN_PERIOD 
+		            , T.INT_RATE 		= S.INT_RATE 
+	]]>
+	</update>
+</mapper>

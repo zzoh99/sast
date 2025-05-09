@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrd.incoming.incomingStats">
+		
+<!-- 후임자현황 후임자 조회 -->
+		<select parameterType="map" resultType="cMap" id="getIncomingStatsListIncomList">
+
+				<![CDATA[
+					SELECT CASE WHEN LISTPID IS NOT NULL THEN COUNT(*) OVER (PARTITION BY LISTPID)
+					            ELSE 0 END LISTCOUNT
+					     , LVL AS "_level"
+					     , LVL2 AS DEPTLEVEL
+					     , F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, #{searchSdate}, #{ssnLocaleCd}) AS DEPTNM
+					     , F_ORG_GET_EMP_CNT2(ENTER_CD, ORG_CD, #{baseDate}) AS DEPT_USE_CNT
+					     , F_COM_GET_CONT_ADDRESS(ENTER_CD, SABUN, 'OT') AS INLINE
+					     , F_COM_GET_CONT_ADDRESS(ENTER_CD, SABUN, 'HP') AS HP
+					     , F_COM_GET_CONT_ADDRESS(ENTER_CD, SABUN, 'IM') AS EMAIL
+					     , ENTER_CD AS ENTERCD
+					     , SDATE
+					     , PRIOR_ORG_CD AS UPDEPTCD
+					     , ORG_CD AS DEPTCD
+					     , SEQ
+					     , DIRECT AS SUPPORTSLOT
+					     , SABUN AS EMPCD
+					     , '4D8FBB' AS LINKCOLOR
+					     , JIKGUB_NM AS POSITION
+					     , JIKCHAK_NM AS TITLE
+					     , NAME AS EMPNM
+					     , EMP_YMD
+					     , BIR_YMD
+					     , NODEDESIGN
+					     , LISTPID
+					     , NODEID
+					     , HIDDENCOL AS "_hidden"
+					     , DUALEMP
+					  FROM (
+					        SELECT DISTINCT A.LVL
+					             , A.LVL2
+					             , A.ENTER_CD
+					             , A.SDATE
+					             , A.PRIOR_ORG_CD
+					             , A.ORG_CD
+					             , A.SEQ
+					             , A.DIRECT
+					             , A.SABUN
+					             , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, #{baseDate}, #{ssnLocaleCd}) AS JIKGUB_NM
+					             , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020', A.JIKCHAK_CD, #{ssnLocaleCd}) AS JIKCHAK_NM
+					             , '' AS FILENAME
+					             , A.NAME AS NAME
+					             , TO_CHAR(TO_DATE(B.EMP_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS EMP_YMD
+					             , TO_CHAR(TO_DATE(B.BIR_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS BIR_YMD
+					             , '' AS LISTPID
+					             , ORG_CD AS NODEID
+					             , 'GridList' AS NODEDESIGN
+					             , 0 AS HIDDENCOL
+					             , DUALEMP
+					             , GUBUN
+					             , F_ORG_NM
+					             , DUAL_SEQ
+					          FROM (
+					                SELECT T.*
+					                     , ROWNUM AS SEQ
+					                     , F_COM_GET_DISPATCH_NAMES(T.ENTER_CD, T.ORG_CD, T.SABUN, '02', #{baseDate}, #{ssnLocaleCd}) AS NAME
+					                  FROM (
+					                        SELECT LEVEL AS LVL
+					                             , LVL2
+					                             , ENTER_CD
+					                             , SDATE
+					                             , PRIOR_ORG_CD
+					                             , ORG_CD
+					                             , DIRECT
+					                             , NODEDESIGN
+					                             , ORG_NM
+					                             , SABUN
+					                             , JIKCHAK_CD
+					                             , DUALEMP
+					                             , DUAL_SEQ
+					                             , '' AS GUBUN
+					                             , '' AS F_ORG_NM
+					                          FROM (
+				                                      SELECT DISTINCT A.ORG_LEVEL AS LVL2
+							                                 , A.ENTER_CD
+							                                 , A.SDATE
+							                                 , A.PRIOR_ORG_CD
+							                                 , A.ORG_CD
+							                                 , NVL(DECODE(A.DIRECT_YN, 'Y', A.ORG_LEVEL, ''), '') AS DIRECT
+							                                 , DECODE(A.DIRECT_YN, 'Y', 10, A.ORG_LEVEL) AS NODEDESIGN
+							                                 , ' ' || REPLACE(F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, #{baseDate}), F_COM_GET_ORG_NM(A.ENTER_CD, A.PRIOR_ORG_CD, #{baseDate}) || '-', '') AS ORG_NM
+							                                 , CASE WHEN ( SELECT SUM(COUNT(DISTINCT SABUN))
+							                                                 FROM TORG115
+							                                                WHERE ENTER_CD = A.ENTER_CD
+							                                                  AND ORG_CD = A.ORG_CD
+							                                                  AND #{baseDate} BETWEEN SDATE AND NVL(EDATE,'99991231')
+							                                                GROUP BY SABUN ) > 0 THEN 'Y'
+							                                        ELSE 'N' END AS DUALEMP
+							                                 , 1 AS DUAL_SEQ
+							                                 , F_ORG_GET_CHIEF_SABUN_HWASANG(A.ENTER_CD, A.ORG_CD, #{baseDate}) AS SABUN
+							                                 , F_ORG_GET_CHIEF_JIKCHAK_CD(A.ENTER_CD, A.ORG_CD, #{baseDate}) AS JIKCHAK_CD
+							                                 , A.SEQ
+							                          FROM TORG105 A
+						                                 , TCDP800 B
+						                                 , THRM151 C 
+							                          WHERE A.ENTER_CD = B.ENTER_CD
+							                          AND B.ENTER_CD = C.ENTER_CD
+							                          AND B.SABUN= C.SABUN
+							                          AND INSTR(F_ORG_GET_LEVEL(A.ENTER_CD, C.ORG_CD, A.SDATE), A.ORG_CD) > 0
+							                          AND C.STATUS_CD NOT IN ('RA', 'RAA')
+							                          AND #{baseDate} BETWEEN C.SDATE AND NVL (C.EDATE, '99991231')
+							                          AND A.ENTER_CD = #{ssnEnterCd}
+							                          AND A.SDATE = #{searchSdate}
+							                          AND A.ORG_DISP_YN = 'Y'
+							                          ORDER BY A.ORG_LEVEL
+					                             )
+				                             START WITH PRIOR_ORG_CD = '0'
+				                             CONNECT BY PRIOR ENTER_CD = ENTER_CD
+				                                AND PRIOR SDATE = SDATE
+				                                AND PRIOR ORG_CD = PRIOR_ORG_CD
+				                              ORDER SIBLINGS BY PRIOR_ORG_CD, SEQ      	
+					                     ) T
+					             ) A
+					             , THRM100 B
+					         WHERE A.SABUN = B.SABUN(+)
+					           AND A.ENTER_CD = B.ENTER_CD(+)
+					        
+					        UNION ALL
+					        
+					        SELECT 1 AS LVL
+					             , D.ORG_LEVEL AS LVL2
+					             , C.ENTER_CD
+					             , D.SDATE
+					             , D.PRIOR_ORG_CD
+					             , C.ORG_CD
+					             , 99999 + A.INCOM_SEQ AS SEQ
+					             , NVL(DECODE(D.DIRECT_YN, 'Y', D.ORG_LEVEL, ''), '') AS DIRECT
+					             , A.INCOM_ID AS SABUN
+				                 , A.INCOM_SEQ || '순위' AS JIKGUB_NM
+				                 , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.INCOM_ID,  #{baseDate}) AS JIKCHAK_NM
+				                 , '' FILENAME
+				                 , DECODE(A.EXT_INCOM_YN, 'Y', '외부영입', F_COM_GET_NAMES(A.ENTER_CD, A.INCOM_ID, '')) AS NAME
+					             , E.EMP_YMD
+					             , E.BIR_YMD
+					             , C.ORG_CD AS LISTPID
+					             , A.ENTER_CD || '_' || A.SABUN || '_' || A.INCOM_ID || '_' || A.INCOM_SEQ AS NODEID
+					             , 'Member' AS NODEDESIGN
+					             , 1 AS HIDDENCOL
+					             , 'N' AS DUALEMP
+					             , '' AS GUBUN
+					             , '' AS F_ORG_NM
+					             , 3 AS DUAL_SEQ
+					          FROM TCDP800 A 
+					          	 , THRM151 C
+					             , TORG105 D
+					             , THRM100 E
+					         WHERE A.ENTER_CD = C.ENTER_CD
+               				   AND A.SABUN = C.SABUN  
+					           AND C.ENTER_CD = D.ENTER_CD
+					           AND C.ENTER_CD = E.ENTER_CD
+					           AND C.SABUN = E.SABUN
+					           AND C.ORG_CD= D.ORG_CD
+					           AND D.SDATE = #{searchSdate}
+					           AND C.ENTER_CD = #{ssnEnterCd}
+					           AND C.STATUS_CD NOT IN ('RA', 'RAA')
+					           AND #{baseDate} BETWEEN C.SDATE AND NVL (C.EDATE, '99991231')
+					     )
+					 ORDER BY SEQ, F_COM_JIKJE_SORT(ENTER_CD, SABUN, #{baseDate})
+				]]>
+
+
+		</select>
+				
+
+</mapper>
+

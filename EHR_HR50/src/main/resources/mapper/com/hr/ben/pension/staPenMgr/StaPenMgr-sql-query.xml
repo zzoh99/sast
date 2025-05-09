@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 국민연금기본사항
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.pension.staPenMgr">
+
+	<select id="getStaPenMgrBasicMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.SABUN
+			 , TO_CHAR(TO_DATE(A.ACQ_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS ACQ_YMD
+			 , TO_CHAR(TO_DATE(A.LOSS_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS LOSS_YMD
+			 , TRIM(TO_CHAR(NVL(A.RETIRE_REMAIN_MON,0),'999,999,999,990')) AS RETIRE_REMAIN_MON
+			 , A.RETIRE_REMAIN_YN
+		  FROM TBEN101 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+		   AND A.SABUN		= #{sabun}
+	]]>
+	</select>
+		
+	<select id="getStaPenMgrChangeList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.SABUN
+			 , A.SEQ
+			 , A.SDATE
+			 , A.EDATE
+			 , A.SOC_CHANGE_CD
+			 , A.SOC_STATE_CD
+			 , A.GRADE
+			 , DECODE(A.REWARD_TOT_MON,0,'',A.REWARD_TOT_MON) AS REWARD_TOT_MON
+			 , NVL(MON1,F_CPN_GET_UPDOWN_MON('3', '-1', A.REWARD_TOT_MON * F_BEN_INSURENCE_RATE( #{ssnEnterCd}, '10', TO_CHAR(SYSDATE, 'YYYYMMDD')))) AS SELF_MON
+		  FROM TBEN103 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+		   AND A.SABUN		= #{sabun}
+		ORDER BY A.SDATE DESC
+	]]>
+	</select>
+		
+	<select id="getStaPenMgrPaymentList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+			 , B.SABUN
+			 , (SELECT PAY_NM FROM TCPN051 WHERE ENTER_CD = A.ENTER_CD AND PAY_CD = A.PAY_CD) AS PAY_NM
+			 , A.PAYMENT_YMD
+			 , '10' AS SOC_DEDUCT_CD
+			 , NULL AS GRADE
+			 ,(SELECT RESULT_MON
+		        FROM TCPN205
+		        WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = '1000') AS SELF_MON
+		      ,(SELECT RESULT_MON
+		        FROM TCPN205
+		        WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = 'DA107') AS ADD_SELF_MON
+		      ,0 AS RETIRE_MON
+		      ,(SELECT SUM(RESULT_MON)
+		        FROM TCPN205
+		        WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD IN ('1000','DA107')) AS TOT_MON
+		  FROM TCPN201 A, TCPN203 B
+		 WHERE A.ENTER_CD = B.ENTER_CD
+		   AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+		   AND A.ENTER_CD	= #{ssnEnterCd}
+		   AND B.SABUN		= #{sabun}
+		   AND A.PAY_CD = '01' ]]>
+		<if test="year != null and year neq ''">
+		   AND SUBSTR(A.PAY_YM,1,4) LIKE trim(#{year})||'%'
+		</if>
+		ORDER BY A.PAY_ACTION_CD DESC
+	</select>
+		
+	<select id="getF_CPN_GET_UPDOWN_MON" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT '' AS GRADE, 0 AS STA_MON, F_BEN_NP_SELF_MON(#{ssnEnterCd}, REPLACE( #{searchYmd} , '-',''), #{searchRewardTotMon}) AS SELF_MON
+		  FROM DUAL
+	]]>
+	</select>
+		
+	<select id="getStaPenMgrF_BEN_NP_SELF_MON" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_BEN_INSURENCE_BASE_MON( #{ssnEnterCd}, '10', #{searchRewardTotMon}, TO_CHAR(SYSDATE, 'YYYYMMDD'), '0', '0' ) AS SELF_MON
+		  FROM DUAL
+	]]>
+	</select>
+		
+	<update id="saveStaPenMgrBasic" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN101 T
+		USING	(
+				SELECT A.SABUN
+					 , A.ACQ_YMD
+					 , A.LOSS_YMD
+					 , A.RETIRE_REMAIN_MON
+					 , A.RETIRE_REMAIN_YN
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS ACQ_YMD
+							 , NULL	AS LOSS_YMD
+							 , NULL	AS RETIRE_REMAIN_MON
+							 , NULL	AS RETIRE_REMAIN_YN
+						  FROM DUAL
+						UNION ALL
+						SELECT TRIM(#{sabun})								AS SABUN
+							 , TRIM(REPLACE(#{acqYmd},'-',''))			AS ACQ_YMD
+							 , TRIM(REPLACE(#{lossYmd},'-',''))			AS LOSS_YMD
+							 , TRIM(REPLACE(#{retireRemainMon},',',''))	AS RETIRE_REMAIN_MON
+							 , TRIM(#{retireRemainYn})					AS RETIRE_REMAIN_YN
+						  FROM DUAL
+						) A
+				WHERE A.SABUN IS NOT NULL
+				) S
+		ON	(	T.ENTER_CD	= #{ssnEnterCd}
+			AND	T.SABUN		= S.SABUN
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.ACQ_YMD			= S.ACQ_YMD
+					 , T.LOSS_YMD			= S.LOSS_YMD
+					 , T.RETIRE_REMAIN_MON	= S.RETIRE_REMAIN_MON
+					 , T.RETIRE_REMAIN_YN	= S.RETIRE_REMAIN_YN
+					 , T.CHKDATE			= SYSDATE
+					 , T.CHKID				= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				T.ENTER_CD
+			  , T.SABUN
+			  , T.ACQ_YMD
+			  , T.LOSS_YMD
+			  , T.RETIRE_REMAIN_MON
+			  , T.RETIRE_REMAIN_YN
+			  , T.CHKDATE
+			  , T.CHKID
+			)
+			VALUES
+			(
+				#{ssnEnterCd}
+			  , S.SABUN
+			  , S.ACQ_YMD
+			  , S.LOSS_YMD
+			  , S.RETIRE_REMAIN_MON
+			  , S.RETIRE_REMAIN_YN
+			  , SYSDATE
+			  , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<update id="saveStaPenMgrChange" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN103 T
+		USING	(
+				SELECT A.SABUN
+					 , A.SEQ
+					 , A.SDATE
+					 , A.EDATE
+					 , A.SOC_CHANGE_CD
+					 , A.SOC_STATE_CD
+					 , A.GRADE
+					 , A.REWARD_TOT_MON
+					 , A.MON1
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS SEQ
+							 , NULL	AS SDATE
+							 , NULL	AS EDATE
+							 , NULL	AS SOC_CHANGE_CD
+							 , NULL	AS SOC_STATE_CD
+							 , NULL	AS GRADE
+							 , NULL	AS REWARD_TOT_MON
+							 , NULL	AS MON1
+						  FROM DUAL ]]>
+				<foreach item="rm" collection="mergeRows" index="idx">
+						UNION ALL
+						SELECT TRIM(#{rm.sabun})					AS SABUN
+							 , CASE WHEN TRIM(#{rm.seq}) IS NULL OR TRIM(#{rm.seq}) = '0' THEN
+							 			(SELECT (NVL(MAX(SEQ),0) + (#{idx} + 1)) FROM TBEN103 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun}))
+							 		ELSE TO_NUMBER(#{rm.seq}) END 	SEQ
+							 , TRIM(#{rm.sdate})					AS SDATE
+							 , TRIM(#{rm.edate})					AS EDATE
+							 , TRIM(#{rm.socChangeCd})				AS SOC_CHANGE_CD
+							 , TRIM(#{rm.socStateCd})				AS SOC_STATE_CD
+							 , TRIM(#{rm.grade})					AS GRADE
+							 , TO_NUMBER(TRIM(#{rm.rewardTotMon}))	AS REWARD_TOT_MON
+							 , TO_NUMBER(TRIM(#{rm.selfMon}))		AS MON1
+						  FROM DUAL
+				</foreach>
+	<![CDATA[
+						) A
+				WHERE A.SABUN IS NOT NULL
+				  AND A.SEQ IS NOT NULL
+				  AND A.SDATE IS NOT NULL
+				) S
+		ON	(	T.ENTER_CD	= #{ssnEnterCd}
+			AND	T.SABUN		= S.SABUN
+			AND	T.SEQ		= S.SEQ
+			AND	T.SDATE		= S.SDATE
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.EDATE				= S.EDATE
+					 , T.SOC_CHANGE_CD		= S.SOC_CHANGE_CD
+					 , T.SOC_STATE_CD		= S.SOC_STATE_CD
+					 , T.GRADE				= S.GRADE
+					 , T.REWARD_TOT_MON		= S.REWARD_TOT_MON
+					 , T.MON1				= S.MON1
+					 , T.CHKDATE			= SYSDATE
+					 , T.CHKID				= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+			  T.ENTER_CD
+			, T.SABUN
+			, T.SEQ
+			, T.SDATE
+			, T.EDATE
+			, T.SOC_CHANGE_CD
+			, T.SOC_STATE_CD
+			, T.GRADE
+			, T.REWARD_TOT_MON
+			, T.MON1
+			, T.CHKDATE
+			, T.CHKID
+			)
+			VALUES
+			(
+			  #{ssnEnterCd}
+			, S.SABUN
+			, S.SEQ
+			, S.SDATE
+			, S.EDATE
+			, S.SOC_CHANGE_CD
+			, S.SOC_STATE_CD
+			, S.GRADE
+			, S.REWARD_TOT_MON
+			, S.MON1
+			, SYSDATE
+			, #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<update id="saveStaPenMgrPayment" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN105 T
+		USING	(
+				SELECT A.SABUN
+					 , A.PAY_ACTION_CD
+					 , A.SOC_DEDUCT_CD
+					 , A.GRADE
+					 , A.SELF_MON
+					 , A.COMP_MON
+					 , A.ADD_SELF_MON
+					 , A.ADD_COMP_MON
+					 , A.BUSINESS_PLACE_CD
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS PAY_ACTION_CD
+							 , NULL	AS SOC_DEDUCT_CD
+							 , NULL	AS GRADE
+							 , NULL	AS SELF_MON
+							 , NULL	AS COMP_MON
+							 , NULL	AS ADD_SELF_MON
+							 , NULL	AS ADD_COMP_MON
+							 , NULL	AS BUSINESS_PLACE_CD
+						  FROM DUAL ]]>
+				<foreach item="rm" collection="mergeRows" >
+						UNION ALL
+						SELECT TRIM(#{rm.sabun})					AS SABUN
+							 , TRIM(#{rm.payActionCd})				AS PAY_ACTION_CD
+							 , TRIM(#{rm.socDeductCd})				AS SOC_DEDUCT_CD
+							 , TRIM(#{rm.grade})					AS GRADE
+							 , TO_NUMBER(TRIM(#{rm.selfMon}))		AS SELF_MON
+							 , TO_NUMBER(TRIM(#{rm.compMon}))		AS COMP_MON
+							 , TO_NUMBER(TRIM(#{rm.addSelfMon}))	AS ADD_SELF_MON
+							 , TO_NUMBER(TRIM(#{rm.addCompMon}))	AS ADD_COMP_MON
+							 , TRIM(#{rm.businessPlaceCd})			AS BUSINESS_PLACE_CD
+						  FROM DUAL
+				</foreach>
+	<![CDATA[
+						) A
+				WHERE A.SABUN IS NOT NULL
+				  AND A.PAY_ACTION_CD IS NOT NULL
+				) S
+		ON	(	T.ENTER_CD			= #{ssnEnterCd}
+			AND	T.SABUN				= S.SABUN
+			AND	T.PAY_ACTION_CD		= S.PAY_ACTION_CD
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.SOC_DEDUCT_CD		= S.SOC_DEDUCT_CD
+					 , T.GRADE				= S.GRADE
+					 , T.SELF_MON			= S.SELF_MON
+					 , T.ADD_SELF_MON		= S.ADD_SELF_MON
+					 , T.CHKDATE			= SYSDATE
+					 , T.CHKID				= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				T.ENTER_CD
+			  , T.SABUN
+			  , T.PAY_ACTION_CD
+			  , T.SOC_DEDUCT_CD
+			  , T.GRADE
+			  , T.SELF_MON
+			  , T.COMP_MON
+			  , T.ADD_SELF_MON
+			  , T.ADD_COMP_MON
+			  , T.BUSINESS_PLACE_CD
+			  , T.CHKDATE
+			  , T.CHKID
+			)
+			VALUES
+			(
+				#{ssnEnterCd}
+			  , S.SABUN
+			  , S.PAY_ACTION_CD
+			  , S.SOC_DEDUCT_CD
+			  , S.GRADE
+			  , S.SELF_MON
+			  , S.COMP_MON
+			  , S.ADD_SELF_MON
+			  , S.ADD_COMP_MON
+			  , S.BUSINESS_PLACE_CD
+			  , SYSDATE
+			  , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<delete id="deleteStaPenMgrChange" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN103
+		 WHERE ENTER_CD||'_'||SABUN||'_'||SDATE||'_'||TO_CHAR(SEQ) IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq ''
+				and rm.sdate != null and rm.sdate neq '' and rm.seq != null and rm.seq neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.sdate})||'_'||TRIM(#{rm.seq})
+			</if>
+		</foreach>
+				)
+	</delete>
+		
+	<delete id="deleteStaPenMgrPayment" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN105
+		 WHERE ENTER_CD||'_'||SABUN||'_'||PAY_ACTION_CD IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq '' and rm.payActionCd != null and rm.payActionCd neq ''">
+			TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.payActionCd})
+			</if>
+		</foreach>
+				)
+	</delete>
+</mapper>

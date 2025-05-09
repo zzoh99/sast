@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.extenWorkApp">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppList">
+
+				<![CDATA[
+
+					    SELECT A.ENTER_CD
+						     , A.APPL_SEQ
+						     , A.SABUN
+						     , A.YMD
+						     , A.REQ_S_HM
+						     , A.REQ_E_HM
+						     , ( SELECT SUM(NVL(REQUEST_HOUR,0))
+						           FROM TTIM612 X, TTIM015 Y
+						          WHERE X.ENTER_CD = A.ENTER_CD
+						            AND X.APPL_SEQ = A.APPL_SEQ
+						            AND X.ENTER_CD = Y.ENTER_CD
+						            AND X.WORK_CD  = Y.WORK_CD
+						            AND Y.WORK_CD_TYPE = '2'
+						       ) AS REQUEST_HOUR
+						     , A.REASON
+						     , A.NOTE
+							
+							 , B.APPL_YMD
+							 , B.APPL_STATUS_CD
+							 , B.AGREE_YMD
+							 , B.AGREE_YMD
+							 , B.APPL_SABUN
+							 , B.APPL_IN_SABUN
+						 	
+						 	 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">' || NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', '113460', #{ssnLocaleCd}), '삭제') || '</a>', '') AS BTN_DEL
+					 		 , 0 AS DETAIL
+						  FROM TTIM611 A, THRI103 B
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+						   AND A.SABUN    = #{searchSabun}
+						   AND A.ENTER_CD = B.ENTER_CD
+						   AND A.APPL_SEQ = B.APPL_SEQ
+				]]>
+<if test='searchAppSYmd != null and searchAppSYmd neq ""'>
+	<![CDATA[
+					      AND A.YMD >= REPLACE(#{searchAppSYmd}, '-','')
+	]]>
+</if>
+<if test='searchAppEYmd != null and searchAppEYmd neq ""'>
+	<![CDATA[
+					      AND A.YMD <= REPLACE(#{searchAppEYmd}, '-','')
+	]]>
+</if>
+				<![CDATA[
+						 ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+				]]>
+
+
+		</select>
+
+
+<!-- 	신청자정보	조회 -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppUserInfo">
+
+				<![CDATA[
+				    -- F_COM_GET_WORKTYPE 함수로 취득하는 직군코드(H10050) 값이 A(사무직), B(생산직)의 형태로 셋팅되어 있지 않음. 따라서 직군코드(H10050)의 NOTE1 값이 'A'면 사무직, 'B'면 생산직으로 처리하도록 변경
+				    SELECT F_COM_GET_GRCODE_NOTE_VAL(#{ssnEnterCd}, 'H10050', F_COM_GET_WORKTYPE(#{ssnEnterCd}, #{searchSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD')), 1) AS WORK_TYPE
+					  FROM DUAL
+				]]>
+
+
+		</select>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteExtenWorkApp">
+
+					DELETE FROM TTIM611
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test=' rm.applSeq != null and !rm.applSeq.equals("")'>
+									     , TRIM(#{rm.applSeq})
+	</if>
+</foreach>
+									   )				
+		</delete>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteExtenWorkApp2">
+
+					DELETE FROM TTIM612
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+	<if test=' rm.applSeq != null and !rm.applSeq.equals("")'>
+									     , TRIM(#{rm.applSeq})
+	</if>
+</foreach>
+									   )				
+		</delete>
+				
+
+</mapper>

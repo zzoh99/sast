@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.resort.resortMgr">
+
+	<select id="getResortMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT SEQ
+		     , COMPANY_CD
+		     , AREA_CD
+             , RESORT_NM
+             , ADDR
+             , HOME_PAGE
+             , USE_YN
+             , NOTE
+		  FROM TBEN490
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+		<if test="searchCompanyCd != null and searchCompanyCd neq ''">
+		   AND COMPANY_CD =  TRIM( #{searchCompanyCd} )
+		</if>
+		<if test="searchAreaCd != null and searchAreaCd neq ''">
+		   AND AREA_CD =  TRIM( #{searchAreaCd} )
+		</if>
+		<if test="searchResortNm != null and searchResortNm neq ''">
+		   AND RESORT_NM	LIKE	'%' || #{searchResortNm} || '%'
+		</if>
+		ORDER BY F_COM_GET_GRCODE_SEQ( ENTER_CD, 'B49530', COMPANY_CD)
+		       , F_COM_GET_GRCODE_SEQ( ENTER_CD, 'B49510', AREA_CD)
+		       , RESORT_NM
+	</select>
+		
+	<select id="getResortMgrRoomList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT RESORT_SEQ
+             , SEQ
+             , ROOM_TYPE
+             , USE_YN
+             , ORDER_SEQ
+		  FROM TBEN497
+		 WHERE ENTER_CD = #{ssnEnterCd}
+                    AND RESORT_SEQ =  TRIM( #{searchResortSeq} )
+		ORDER BY DECODE(NVL(USE_YN,'N'), 'N', 1, 0), ORDER_SEQ, SEQ
+	]]>
+	</select>
+		
+	<update id="saveResortMgr" parameterType="map">
+	<![CDATA[					
+        MERGE INTO TBEN490	T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL " index="idx">
+				    SELECT TRIM(#{ssnEnterCd}) AS	ENTER_CD
+				    <choose>
+				    	<when test="rm.seq != null and rm.seq neq ''">
+				    	 , TRIM(#{rm.seq})     AS SEQ
+				    	</when>
+				    	<otherwise>
+				    	 , TO_CHAR( (SELECT (NVL(MAX(SEQ),0) + (#{idx} + 1)) FROM TBEN490 WHERE ENTER_CD = #{ssnEnterCd} ))  AS SEQ
+				    	</otherwise>
+				    </choose>
+						 , TRIM(#{rm.companyCd})		AS	COMPANY_CD
+						 , TRIM(#{rm.areaCd})			AS	AREA_CD
+						 , TRIM(#{rm.resortNm})			AS	RESORT_NM
+						 , TRIM(#{rm.addr})				AS	ADDR
+						 , TRIM(#{rm.homePage})			AS	HOME_PAGE
+						 , TRIM(#{rm.useYn})			AS	USE_YN
+						 , TRIM(#{rm.note})				AS	NOTE
+				      FROM DUAL
+		</foreach>
+		<![CDATA[
+			) S
+			ON	(
+					T.ENTER_CD		=	S.ENTER_CD
+				AND	T.SEQ		    =	S.SEQ
+			)
+			
+			WHEN MATCHED THEN
+				UPDATE SET
+						T.COMPANY_CD	=	S.COMPANY_CD
+					,	T.AREA_CD		=	S.AREA_CD
+					,	T.RESORT_NM		=	S.RESORT_NM
+					,	T.ADDR			=	S.ADDR
+					,	T.HOME_PAGE		=	S.HOME_PAGE
+					,	T.USE_YN		=	S.USE_YN
+					,	T.NOTE			=	S.NOTE
+					,	T.CHKDATE		=	sysdate
+					,	T.CHKID			=	#{ssnSabun}
+				
+			WHEN NOT MATCHED THEN
+			INSERT
+			(
+					T.ENTER_CD
+				  , T.SEQ
+				  , T.COMPANY_CD
+				  , T.AREA_CD
+                  , T.RESORT_NM
+                  , T.ADDR
+                  , T.HOME_PAGE
+                  , T.USE_YN
+                  , T.NOTE
+				  , T.CHKDATE
+				  , T.CHKID
+			)
+			VALUES
+			(
+					S.ENTER_CD
+				  , S.SEQ
+				  , S.COMPANY_CD
+				  , S.AREA_CD
+                  , S.RESORT_NM
+                  , S.ADDR
+                  , S.HOME_PAGE
+                  , S.USE_YN
+                  , S.NOTE
+				  , sysdate
+				  , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<delete id="deleteResortMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM	 TBEN490
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		   AND (SEQ ) IN (  NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.seq != null and rm.seq neq ''">
+				, TRIM( #{rm.seq} )
+			</if>
+		</foreach>
+			)
+	</delete>
+</mapper>

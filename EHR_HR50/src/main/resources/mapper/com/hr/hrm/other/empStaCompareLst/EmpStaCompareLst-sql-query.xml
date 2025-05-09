@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.empStaCompareLst">
+
+		<!-- 인원현황비교표 프로시저 생성 테이블 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpStaCompareLst">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SEQ
+					     , A.BASE_ORG_CD
+					     , A.BASE_NAME
+					     , A.BASE_COUNT
+					     , A.CHANGE_NM
+					     , A.COMPARE_ORG_CD
+					     , A.COMPARE_NAME
+					     , A.COMPARE_COUNT
+					  FROM THRM989 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				]]>
+
+
+		</select>
+
+		<!-- 인원현황비교표 조인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpStaCompareLst2">
+
+				<![CDATA[
+					WITH BASE_ORG AS (
+						SELECT
+							  A.SEQ
+							, A.PRIOR_ORG_CD
+							, A.ORG_LEVEL
+							, B.ENTER_CD
+							, B.ORG_CD
+							, B.ORG_NM
+							, ROWNUM AS NUM
+							FROM TORG105 A, TORG101 B, TORG103 C
+						 WHERE A.ENTER_CD = B.ENTER_CD
+							 AND A.ORG_CD = B.ORG_CD
+							 AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+							 AND A.ENTER_CD = #{ssnEnterCd}
+							 AND A.ENTER_CD = C.ENTER_CD
+							 AND A.SDATE = C.SDATE
+							 AND TRIM(REPLACE(#{searchBaseYmd}, '-', '')) BETWEEN C.SDATE AND NVL( C.EDATE, '99991231' )
+						 START WITH A.PRIOR_ORG_CD = '0'
+						 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+							 AND PRIOR A.SDATE = A.SDATE
+							 AND A.PRIOR_ORG_CD = PRIOR A.ORG_CD
+						 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+					), OTHER_ORG AS (
+						 SELECT
+							  A.SEQ
+							, A.PRIOR_ORG_CD
+							, A.ORG_LEVEL
+							, B.ENTER_CD
+							, B.ORG_CD
+							, B.ORG_NM
+							, ROWNUM AS NUM
+							FROM TORG105 A, TORG101 B, TORG103 C
+						 WHERE A.ENTER_CD = B.ENTER_CD
+							 AND A.ORG_CD = B.ORG_CD
+							 AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+							 AND A.ENTER_CD = #{ssnEnterCd}
+							 AND A.ENTER_CD = C.ENTER_CD
+							 AND A.SDATE = C.SDATE
+							 AND TRIM(REPLACE(#{searchCompareYmd}, '-', '')) BETWEEN C.SDATE AND NVL( C.EDATE, '99991231' )
+						 START WITH A.PRIOR_ORG_CD = '0'
+						 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+							 AND PRIOR A.SDATE = A.SDATE
+							 AND A.PRIOR_ORG_CD = PRIOR A.ORG_CD
+						 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+					)
+					SELECT ROWNUM AS SEQ, X.*
+					FROM (
+						SELECT
+							A.ORG_CD AS BASE_ORG_CD
+							, A.ORG_LEVEL
+							, LPAD(' ', A.ORG_LEVEL, ' ') || A.ORG_NM AS BASE_NAME
+							, F_HRM_GET_ELEMENT_EMP_CNT(#{ssnEnterCd}, NVL(A.ORG_CD, '^'), NULL, NULL,	REPLACE(#{searchBaseYmd}, '-' ,''), NULL ) AS BASE_COUNT
+							, CASE WHEN A.ORG_CD IS NULL THEN '신설'
+							       WHEN B.ORG_CD IS NULL THEN '폐지'
+							       WHEN A.ORG_NM != B.ORG_NM THEN '명칭변경'
+							       ELSE NULL
+							  END AS CHANGE_NM
+							, B.ORG_CD AS COMPARE_ORG_CD
+							, B.ORG_LEVEL AS C_ORG_LEVEL
+							, LPAD(' ', B.ORG_LEVEL, ' ') || B.ORG_NM AS COMPARE_NAME
+							, F_HRM_GET_ELEMENT_EMP_CNT(#{ssnEnterCd}, NVL(B.ORG_CD, '^'), NULL, NULL,	REPLACE(#{searchCompareYmd}, '-' ,''), NULL ) AS COMPARE_COUNT
+							, B.NUM
+						  FROM BASE_ORG A
+						  FULL OUTER JOIN OTHER_ORG B
+						    ON A.ENTER_CD = B.ENTER_CD
+						   AND A.ORG_CD = B.ORG_CD
+						 ORDER BY A.NUM, B.NUM
+					) X
+				]]>
+
+
+		</select>
+		
+		<!-- 인원현황비교표 저장 -->
+		<update parameterType="map" id="saveEmpStaCompareLst">
+
+				<![CDATA[
+				]]>
+
+
+		</update>
+		
+		<!-- 인원현황비교표 삭제 -->
+		<delete parameterType="map" id="deleteEmpStaCompareLst">
+
+				<![CDATA[
+				
+				]]>
+
+
+		</delete>
+		
+		<update id="callP_HRM_ORG_COMPARE" parameterType="map" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_HRM_ORG_COMPARE(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchBaseYmd,mode=IN,jdbcType=VARCHAR},
+				#{searchCompareYmd,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+
+</mapper>

@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.selfDevelopment.selfDevelopmentAdminStat">
+        <select parameterType="map" resultType="cMap" id="getSelfDevelopmentAdminStat">
+
+                <![CDATA[
+
+                    SELECT A.MAIN_ORG_CD, C.MAIN_ORG_NM, B.ORG_CD, NVL(D.ORG_NM, '파트미발령') AS ORG_NM -- , B.JIKGUB_NM
+                            , F_COM_GET_PRIOR_ORG_NM(A.ENTER_CD, B.ORG_CD,  TO_CHAR(SYSDATE, 'YYYYMMDD')) AS PRIOR_ORG_NM
+                            , A.NAME
+                            , DECODE(E.SABUN, '', '0', '1') AS APPROVAL_NOTE
+                            , DECODE(E.PLAN_TIME,'',0,E.PLAN_TIME) AS PLAN_TIME
+                            , DECODE(E.SIL_TIME,'',0,E.SIL_TIME) AS SIL_TIME
+                            , ROUND((NVL(E.SIL_TIME,0) / DECODE(NVL(E.PLAN_TIME,1),0,1,NVL(E.PLAN_TIME,1))) * 100)  AS ACHIEVE
+                            , A.SABUN
+                            , DECODE(( SELECT  SABUN
+                                        FROM TCDPW111
+                                        WHERE ENTER_CD = A.ENTER_CD
+                                              AND SABUN = A.SABUN
+                                              AND ORG_CD = B.ORG_CD
+                                              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                     ) ,'',G.SEQ,'0') AS JIGKUB_SEQ
+                             , DECODE((  SELECT  SABUN
+                                        FROM TCDPW111
+                                        WHERE ENTER_CD = A.ENTER_CD
+                                              AND SABUN = A.SABUN
+                                              AND ORG_CD = B.ORG_CD
+                                              AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+                                  ) ,'',B.JIKGUB_NM,'팀장') AS JIKGUB_NM
+                        FROM  THRM100 A,  THRM151 B,  TCDPW909 C,  TORG101 D  -- TCDPW909(본부부점정보)를 관리하지 않아 OUTER JOIN 하도록 변경 (추후 사용하게 될 수도 있으니 쿼리에서 테이블을 걷어내진 않음)
+
+
+                               , (SELECT AA.ENTER_CD , AA.SABUN, SUM(PLAN_TIME) AS PLAN_TIME , SUM(SIL_TIME) AS SIL_TIME
+                                 FROM
+                                      (SELECT  AA.ENTER_CD, AA.SABUN, BB.EDUCATION, SUM(DD.TIME)  AS PLAN_TIME
+                                        FROM TCDPV301 AA, TCDPV302 BB ,  TCDPT501 CC ,
+                                                  (
+                                                    SELECT ENTER_CD, EDUCATION, EDUCATIONNM, TIME, NUM
+                                                    FROM (
+                                                        SELECT ENTER_CD, TO_CHAR(NUM) AS EDUCATION, EDUCATIONNM, NVL(TIME,0) AS TIME, EDUCATION AS NUM
+                                                        FROM TCDPT101_V
+                                                        UNION
+                                                        SELECT ENTER_CD, TO_CHAR(SEQ) AS EDUCATION, EDUCATIONNM, NVL(TOTAL_TIME,0) AS TIME, '' AS NUM
+                                                        FROM TCDPT201_V
+                                                        UNION
+                                                        SELECT ENTER_CD, ACT_VER_ID  AS EDUCATION , EDUCATIONNM,  TIME, '' AS NUM  FROM  TCDPT309 AAA
+                                                        WHERE  SDATE = (SELECT MAX(SDATE) FROM  TCDPT309  WHERE ENTER_CD = AAA.ENTER_CD AND ACT_VER_ID = AAA.ACT_VER_ID  GROUP BY ACT_VER_ID)
+                                                    ) XX
+                                                   ) DD
+                                        WHERE AA.ENTER_CD = BB.ENTER_CD
+                                              AND AA.ACTIVE_YYYY =  BB.ACTIVE_YYYY
+                                              AND AA.HALF_GUBUN_TYPE = BB.HALF_GUBUN_TYPE
+                                              AND AA.SABUN = BB.SABUN
+                                              AND BB.ENTER_CD = CC.ENTER_CD
+                                              AND BB.TRM_CD = CC.TRM_CD
+                                              AND BB.EDUCATION = CC.EDUCATION
+                                              AND CC.ENTER_CD = DD.ENTER_CD
+                                              AND CC.EDUCATION = DD.EDUCATION
+                                              AND AA.ENTER_CD = #{ssnEnterCd}
+                                              AND AA.ACTIVE_YYYY = #{sYear}
+                                              AND AA.HALF_GUBUN_TYPE = #{searchHalfGubunTypeCd}
+                                              AND AA.APPROVAL_STATUS = '3'
+                                              AND BB.CONFIRM_STATUS = '1'
+                                        GROUP BY 	AA.ENTER_CD, AA.SABUN, BB.EDUCATION
+                                       ) AA
+                                      ,
+                                      (SELECT 	ENTER_CD, SABUN, EDUCATION, SIL_TIME
+                                        FROM (
+                                            SELECT  ENTER_CD, SABUN, EDUCATION, SIL_TIME
+                                            FROM(
+                                                SELECT A.ENTER_CD, A.SABUN , A.EDUCATION ,  SUM((NVL(B.SANGBAN_TOTAL_TIME,0) + NVL(B.HABAN_TOTAL_TIME,0))) AS SIL_TIME
+                                                FROM TCDPT303 A, TCDPT109 B, TCDPT101_V C
+                                                WHERE A.ENTER_CD = #{ssnEnterCd}
+                                                    AND A.GUBUN='내부'
+                                                    AND A.STATUS = '11'
+                                                    AND A.USE = 'Y'
+                                                    AND A.ENTER_CD = B.ENTER_CD
+                                                    AND A.EDUCATION = B.EDUCATION
+                                                    AND A.SEQ = B.SEQ
+                                                    AND A.NUM = B.NUM
+                                                    AND B.ENTER_CD = C.ENTER_CD
+                                                    AND B.EDUCATION = C.EDUCATION
+                                                    AND B.NUM = C.NUM
+                                                    AND B.SDATE  BETWEEN  #{sYear} || '0101' AND #{sYear} || '1231'
+                                                GROUP BY A.ENTER_CD, A.SABUN, A.EDUCATION
+                                                UNION ALL
+                                                SELECT A.ENTER_CD, A.SABUN, A.EDUCATION , SUM((NVL(B.SANGBAN_TOTAL_TIME,0) + NVL(B.HABAN_TOTAL_TIME,0))) AS SIL_TIME
+                                                FROM TCDPT303 A, TCDPT201_V B, TCDPT101_V C
+                                                WHERE A.ENTER_CD = #{ssnEnterCd}
+                                                    AND A.GUBUN='외부'
+                                                    AND A.STATUS = '11'
+                                                    AND A.USE = 'Y'
+                                                    AND A.ENTER_CD = B.ENTER_CD
+                                                    AND A.EDUCATION = B.EDUCATION
+                                                    AND A.SEQ = B.SEQ
+                                                    AND A.NUM = B.NUM
+                                                    AND B.ENTER_CD = C.ENTER_CD
+                                                    AND B.EDUCATION = C.EDUCATION
+                                                    AND B.NUM = C.NUM
+                                                    AND B.SDATE  BETWEEN  #{sYear} ||'0101' AND #{sYear} ||'1231'
+                                                GROUP BY A.ENTER_CD, A.SABUN, A.EDUCATION
+                                            )
+                                            UNION ALL
+                                            SELECT ENTER_CD, SABUN, ACT_VER_ID, SUM(TIME) AS SIL_TIME
+                                            FROM TCDPT307
+                                            WHERE ENTER_CD= #{ssnEnterCd}
+                                                AND STATUS = '수강완료'
+                                                AND SDATE BETWEEN #{sYear} ||'0101' AND #{sYear} ||'1231'
+                                            GROUP BY ENTER_CD, SABUN, ACT_VER_ID
+                                )) BB
+
+                                WHERE AA.ENTER_CD = BB.ENTER_CD(+)
+                                    AND AA.SABUN = BB.SABUN(+)
+                                    AND AA.EDUCATION = BB.EDUCATION	(+)
+                                GROUP BY  AA.ENTER_CD , AA.SABUN
+                               ) E
+                               , ( SELECT ENTER_CD, CODE, SEQ
+                                    FROM TSYS005
+                                    WHERE ENTER_CD = #{ssnEnterCd}
+                                        AND GRCODE_CD = 'H20010' AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+                                    ORDER BY SEQ ) G
+                      WHERE A.ENTER_CD = #{ssnEnterCd}
+                           AND A.ENTER_CD = B.ENTER_CD
+                           AND A.SABUN = B.SABUN
+                           AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+                           AND A.ENTER_CD    = C.ENTER_CD(+)
+                           AND A.MAIN_ORG_CD = C.MAIN_ORG_CD(+)
+                           AND B.ENTER_CD = D.ENTER_CD(+)
+                           AND B.ORG_CD = D.ORG_CD(+)
+                           AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN D.SDATE(+) AND NVL(D.EDATE(+), '99991231')
+                           AND A.ENTER_CD = E.ENTER_CD(+)
+                           AND A.SABUN = E.SABUN(+)
+                           AND B.ENTER_CD = G.ENTER_CD(+)
+                           AND B.JIKGUB_CD = G.CODE(+)
+                           AND B.STATUS_CD <> 'RA'
+                           AND SUBSTR(A.SABUN, 1, 1) <> '0'
+                           AND C.IT_YN(+) = 'Y'
+                           AND (A.IT_MOVE_OUT_YMD IS NULL OR A.IT_MOVE_OUT_YMD >= TO_CHAR(SYSDATE, 'YYYYMMDD'))
+                           AND F_ORG_GET_DIRECT_YN(A.ENTER_CD, B.ORG_CD) NOT IN ('B', 'T')
+                           AND B.JIKWEE_CD <> 'B02'
+]]>
+<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+                           AND (A.MAIN_ORG_CD LIKE #{searchOrgCd} OR B.ORG_CD LIKE #{searchOrgCd})
+</if>
+
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+                        AND A.SABUN ||A.NAME LIKE '%' || #{searchSabunName} || '%'
+</if>
+                       ORDER BY F_COM_GET_ORG_SEQ(A.ENTER_CD, B.ORG_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')), JIGKUB_SEQ, A.NAME
+        </select>
+
+
+</mapper>

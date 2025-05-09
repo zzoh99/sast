@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="hrm.promotion.promStdMgr.promStdStayTy">
+	<!-- 승진년차 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPromStdStayTyList">
+
+			<![CDATA[
+				SELECT	ENTER_CD
+					 ,	JIKWEE_CD
+					 ,	RISE_JIKWEE_CD
+					 ,	MEMO
+					 ,	YEAR_NUM
+					 ,	CUTLINE_NUM
+					 ,	JIKGUB_CD
+				FROM THRM427
+				WHERE ENTER_CD = #{ssnEnterCd}
+				ORDER BY JIKWEE_CD
+			]]>
+
+
+	</select>
+
+	<!-- 승진년차 저장 -->
+	<update parameterType="map" id="savePromStdStayTy">
+
+		MERGE INTO THRM427 T
+		USING	(
+			SELECT	ENTER_CD
+			,	JIKWEE_CD
+			,	RISE_JIKWEE_CD
+			,	MEMO
+			,	YEAR_NUM
+			,	CUTLINE_NUM
+			,	JIKGUB_CD
+			FROM	(
+				SELECT	NULL		AS	ENTER_CD
+				,	NULL		AS	JIKWEE_CD
+				,	NULL		AS	RISE_JIKWEE_CD
+				,	NULL		AS	MEMO
+				,	NULL		AS	YEAR_NUM
+				,	NULL		AS	CUTLINE_NUM
+				,	NULL		AS	JIKGUB_CD
+				FROM	DUAL
+			<foreach item="rm" collection="mergeRows" >
+					UNION ALL
+					SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+					,	TRIM(#{rm.jikweeCd})			AS	JIKWEE_CD
+					,	TRIM(#{rm.riseJikweeCd})		AS	RISE_JIKWEE_CD
+					,	TRIM(#{rm.memo})				AS	MEMO
+					,	TRIM(#{rm.yearNum})				AS	YEAR_NUM
+					,	TRIM(#{rm.cutlineNum})			AS	CUTLINE_NUM
+					,	TRIM(#{rm.jikgubCd})			AS	JIKGUB_CD
+					FROM	DUAL
+			</foreach>
+			) A WHERE	ENTER_CD IS NOT NULL
+			AND	JIKWEE_CD IS NOT NULL
+		) S
+		ON (
+			T.ENTER_CD	=	S.ENTER_CD
+			AND	T.JIKWEE_CD	=	S.JIKWEE_CD
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+			T.RISE_JIKWEE_CD	=	S.RISE_JIKWEE_CD
+			,	T.MEMO				=	S.MEMO
+			,	T.CHKDATE			=	SYSDATE
+			,	T.CHKID				=	#{ssnSabun}
+			,	T.YEAR_NUM			=	S.YEAR_NUM
+			,	T.CUTLINE_NUM		=	S.CUTLINE_NUM
+			,	T.JIKGUB_CD			=	S.JIKGUB_CD
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+			T.ENTER_CD
+			,	T.JIKWEE_CD
+			,	T.RISE_JIKWEE_CD
+			,	T.MEMO
+			,	T.CHKDATE
+			,	T.CHKID
+			,	T.YEAR_NUM
+			,	T.CUTLINE_NUM
+			,	T.JIKGUB_CD
+			)
+			VALUES
+			(
+			S.ENTER_CD
+			,	S.JIKWEE_CD
+			,	S.RISE_JIKWEE_CD
+			,	S.MEMO
+			,	SYSDATE
+			,	#{ssnSabun}
+			,	S.YEAR_NUM
+			,	S.CUTLINE_NUM
+			,	S.JIKGUB_CD
+			)
+	</update>
+
+	<!-- 승진년차 삭제 -->
+	<delete parameterType="map" id="deletePromStdStayTy">
+
+		DELETE FROM THRM427
+		WHERE (ENTER_CD, JIKWEE_CD) IN ((NULL, NULL)
+		<foreach item="rm" collection="deleteRows" >
+			,
+			<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.jikweeCd != null and ! rm.jikweeCd.equals("")'>
+				(TRIM(#{ssnEnterCd}), TRIM(#{rm.jikweeCd}))
+			</if>
+		</foreach>
+		)
+	</delete>
+
+	<!-- 포상 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPromStdStayTyPrizeList">
+		<![CDATA[
+			SELECT '10년근속포상' AS PRIZE_CD, 10 AS PLUS_POINT
+			  FROM DUAL
+			UNION ALL
+			SELECT '15년근속포상' AS PRIZE_CD, 15 AS PLUS_POINT
+			  FROM DUAL
+			UNION ALL
+			SELECT '20년근속포상' AS PRIZE_CD, 20 AS PLUS_POINT
+			  FROM DUAL
+		]]>
+	</select>
+
+	<!-- 징계 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPromStdStayTyPunishList">
+		<![CDATA[
+			SELECT '경고' AS PUNISH_CD, 2 AS MINUS_POINT
+			  FROM DUAL
+			UNION ALL
+			SELECT '견책' AS PUNISH_CD, 5 AS MINUS_POINT
+			  FROM DUAL
+			UNION ALL
+			SELECT '강등' AS PUNISH_CD, 8 AS MINUS_POINT
+			  FROM DUAL
+		]]>
+	</select>
+
+	<!-- 자격 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPromStdStayTyLicenseList">
+		<![CDATA[
+			SELECT '회계사' AS LICENSE_CD, 5 AS PLUS_POINT
+			  FROM DUAL
+			UNION ALL
+			SELECT '노무사' AS LICENSE_CD, 10 AS PLUS_POINT
+			  FROM DUAL
+			UNION ALL
+			SELECT '세무사' AS LICENSE_CD, 15 AS PLUS_POINT
+			  FROM DUAL
+		]]>
+	</select>
+
+	<!-- 근태 조회 -->
+	<select parameterType="map" resultType="cMap" id="getPromStdStayTyGntList">
+		<![CDATA[
+			SELECT '지각' AS GNT_CD, 5 AS MINUS_POINT
+			  FROM DUAL
+			UNION ALL
+			SELECT '결근' AS GNT_CD, 10 AS MINUS_POINT
+			  FROM DUAL
+		]]>
+	</select>
+
+</mapper>

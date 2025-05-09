@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	사업장예외관리(연말정산)
+ -->
+<root>
+	<!--	 조회		 -->
+	<query id="getYeaExBpCdMgr">
+		<![CDATA[
+				SELECT   A.ENTER_CD
+					   , A.WORK_YY
+                       , A.ADJUST_TYPE
+                       , A.SABUN
+                       , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+				       , B.EMP_YMD
+				       , B.RET_YMD                       
+				       , A.STD_BP_CD		
+				       , A.CHG_BP_CD
+				       , A.CHG_CHK
+				       , A.CANCEL_CHK
+      				   , A.STATUS_CD                                 
+				       , A.BIGO
+				       , A.ATTR1
+				       , A.ATTR2
+				       , A.ATTR3
+				       , A.ATTR4
+				       , CASE WHEN A.STATUS_CD = '0' THEN '적용전'
+				              WHEN A.STATUS_CD = '1' THEN '변경완료'
+				              WHEN A.STATUS_CD = '2' THEN '취소완료'
+				              ELSE ''
+				         END AS STATUS_CDNM       					   
+				  FROM TYEA815 A,
+				       THRM100 B
+			     WHERE A.ENTER_CD = B.ENTER_CD(+)
+				   AND A.SABUN = B.SABUN(+)
+				   AND A.ENTER_CD = #ssnEnterCd#
+			   	   $query$
+				 ORDER BY A.CHG_CHK, A.SABUN
+			]]>
+	</query>	
+	<!--	 저장		 -->
+	<query id="saveYeaExBpCdMgr">
+			<![CDATA[
+				MERGE INTO TYEA815 T
+				USING	(
+				        SELECT	  WORK_YY
+				                , ADJUST_TYPE
+				                , SABUN
+				                , STD_BP_CD
+				                , CHG_BP_CD
+				                , CHG_CHK
+				                , BIGO
+				                , ATTR1
+				                , ATTR2
+				                , ATTR3
+				                , ATTR4
+				                , CANCEL_CHK
+				                , STATUS_CD
+				        FROM	(
+				        		$setQuery$
+								)
+				        ) S
+				ON ( T.ENTER_CD        	= #ssnEnterCd#
+				 AND T.WORK_YY  		= S.WORK_YY
+				 AND T.ADJUST_TYPE		= S.ADJUST_TYPE
+				 AND T.SABUN			= S.SABUN
+				 )
+				WHEN MATCHED THEN
+				    UPDATE SET				
+				                 T.STD_BP_CD			= S.STD_BP_CD	
+				               , T.CHG_BP_CD			= S.CHG_BP_CD			
+				               , T.CHG_CHK			    = S.CHG_CHK		
+				               , T.BIGO			        = S.BIGO	
+				               , T.ATTR1				= S.ATTR1		
+				               , T.ATTR2				= S.ATTR2
+				               , T.ATTR3				= S.ATTR3
+				               , T.ATTR4				= S.ATTR4
+				               , T.CHKDATE	    		= SYSDATE
+				               , T.CHKID    			= #ssnSabun#
+				               , T.CANCEL_CHK			= S.CANCEL_CHK
+				               , T.STATUS_CD			= S.STATUS_CD
+				WHEN NOT MATCHED THEN
+				    INSERT 
+				    (
+				          T.ENTER_CD
+				        , T.WORK_YY
+				        , T.ADJUST_TYPE
+				        , T.SABUN
+				        , T.STD_BP_CD
+				        , T.CHG_BP_CD
+				        , T.CHG_CHK
+				        , T.BIGO
+				        , T.ATTR1
+				        , T.ATTR2
+				        , T.ATTR3
+				        , T.ATTR4
+				        , T.CANCEL_CHK
+				        , T.STATUS_CD
+				        , T.CHKDATE
+				        , T.CHKID
+				    ) 
+				    VALUES 
+				    (
+				          #ssnEnterCd#
+				        , S.WORK_YY
+				        , S.ADJUST_TYPE
+				        , S.SABUN
+				        , S.STD_BP_CD
+				        , S.CHG_BP_CD
+				        , S.CHG_CHK
+				        , S.BIGO
+				        , S.ATTR1
+				        , S.ATTR2
+				        , S.ATTR3
+				        , S.ATTR4
+				        , S.CANCEL_CHK
+				        , S.STATUS_CD
+				        , SYSDATE
+				        , #ssnSabun#
+				    )
+			]]>
+	</query>
+<!--	 저장		 -->
+<!-- 사업장예외관리 저장(2022.12.01_수정전)
+	<query id="saveYeaExBpCdMgr">
+			<![CDATA[
+				MERGE INTO TYEA815 T
+				USING	(
+				        SELECT	  WORK_YY
+				                , ADJUST_TYPE
+				                , SABUN
+				                , STD_BP_CD
+				                , CHG_BP_CD
+				                , CHG_CHK
+				                , BIGO
+				                , ATTR1
+				                , ATTR2
+				                , ATTR3
+				                , ATTR4
+				                , CANCEL_CHK
+				                , STATUS_CD
+				        FROM	(
+				                SELECT    TRIM(#ssnEnterCd#)  								AS ENTER_CD			      
+				                        , TRIM(#searchWorkYy#)  							AS WORK_YY			 
+				                        , TRIM(#searchAdjustType#)  						AS ADJUST_TYPE			 
+				                        , TRIM(#sabun#)     								AS SABUN				       
+										, NVL(TRIM(#std_bp_cd#),(SELECT MAX(BUSINESS_PLACE_CD) FROM TCPN811 WHERE ENTER_CD = TRIM(#ssnEnterCd#) AND WORK_YY = TRIM(#searchWorkYy#)AND SABUN = TRIM(#sabun#))) AS STD_BP_CD				                          
+				                        , TRIM(#chg_bp_cd#) 								AS CHG_BP_CD
+				                        , TRIM(#chg_chk#)									AS CHG_CHK	
+				                        , TRIM(#bigo#)										AS BIGO
+				                        , TRIM(#attr1#)										AS ATTR1
+				                        , TRIM(#attr2#)										AS ATTR2
+				                        , TRIM(#attr3#)										AS ATTR3
+				                        , TRIM(#attr4#)										AS ATTR4
+				                        , TRIM(#cancel_chk#)								AS CANCEL_CHK
+				                        , NVL(TRIM(#status_cd#),0)							AS STATUS_CD
+				                        FROM   DUAL
+				                )  WHERE ENTER_CD 		IS NOT NULL 
+				                     AND WORK_YY 		IS NOT NULL 
+				                     AND ADJUST_TYPE	IS NOT NULL
+				                     AND SABUN 			IS NOT NULL
+				        ) S
+				ON ( T.ENTER_CD        	= #ssnEnterCd#
+				 AND T.WORK_YY  		= S.WORK_YY
+				 AND T.ADJUST_TYPE		= S.ADJUST_TYPE
+				 AND T.SABUN			= S.SABUN
+				 )
+				WHEN MATCHED THEN
+				    UPDATE SET				
+				                 T.STD_BP_CD			= S.STD_BP_CD	
+				               , T.CHG_BP_CD			= S.CHG_BP_CD			
+				               , T.CHG_CHK				= S.CHG_CHK		
+				               , T.BIGO				    = S.BIGO	
+				               , T.ATTR1				= S.ATTR1		
+				               , T.ATTR2				= S.ATTR2
+				               , T.ATTR3				= S.ATTR3
+				               , T.ATTR4				= S.ATTR4
+				               , T.CHKDATE	    		= SYSDATE
+				               , T.CHKID    			= #ssnSabun#
+				               , T.CANCEL_CHK			= S.CANCEL_CHK
+				               , T.STATUS_CD			= S.STATUS_CD
+				WHEN NOT MATCHED THEN
+				    INSERT 
+				    (
+				          T.ENTER_CD
+				        , T.WORK_YY
+				        , T.ADJUST_TYPE
+				        , T.SABUN
+				        , T.STD_BP_CD
+				        , T.CHG_BP_CD
+				        , T.CHG_CHK
+				        , T.BIGO
+				        , T.ATTR1
+				        , T.ATTR2
+				        , T.ATTR3
+				        , T.ATTR4
+				        , T.CANCEL_CHK
+				        , T.STATUS_CD
+				        , T.CHKDATE
+				        , T.CHKID
+				    ) 
+				    VALUES 
+				    (
+				          #ssnEnterCd#
+				        , S.WORK_YY
+				        , S.ADJUST_TYPE
+				        , S.SABUN
+				        , S.STD_BP_CD
+				        , S.CHG_BP_CD
+				        , S.CHG_CHK
+				        , S.BIGO
+				        , S.ATTR1
+				        , S.ATTR2
+				        , S.ATTR3
+				        , S.ATTR4
+				        , S.CANCEL_CHK
+				        , S.STATUS_CD
+				        , SYSDATE
+				        , #ssnSabun#
+				    )
+			]]>
+	</query> -->
+ 
+	<!-- 		삭제 -->	
+	<query id="deleteYeaExBpCdMgr">
+			<![CDATA[
+				DELETE FROM TYEA815
+				 WHERE ENTER_CD||'_'||WORK_YY||'_'||ADJUST_TYPE||'_'||SABUN IN
+				 	(
+						TRIM( #ssnEnterCd# )||'_'||
+						TRIM( #work_yy# )||'_'||
+						TRIM( #adjust_type# )||'_'||
+						TRIM( #sabun# )
+					)
+			]]>
+	</query>	
+</root>

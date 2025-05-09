@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.jikjeExceptionUpd">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getJikjeExceptionUpdList">
+
+				SELECT ENTER_CD, SABUN, F_COM_GET_NAMES(ENTER_CD,SABUN) AS NAME, F_COM_GET_NAMES(ENTER_CD,SABUN,'ALIAS') AS ALIAS, JIKGUB_NM, JIKWEE_NM, ORG_NM,
+       				   EX_JIKJE_SORT, BIGO, SDATE, EDATE
+  				  FROM (
+        					SELECT A.ENTER_CD, A.SABUN, F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+        					 <choose>
+								 <when test='searchDate != null and !searchDate.equals("")'>
+        					      , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, REPLACE(#{searchDate},'-',''), #{ssnLocaleCd}) AS ORG_NM
+               					  , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, REPLACE(#{searchDate},'-',''), #{ssnLocaleCd}) AS JIKGUB_NM
+               					  , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, REPLACE(#{searchDate},'-',''), #{ssnLocaleCd}) AS JIKWEE_NM
+								 </when>
+								 <otherwise>
+        					      , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+               					  , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+               					  , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+								 </otherwise>
+							 </choose>
+               					  , A.SDATE, A.EDATE, A.JIKJE_SORT AS EX_JIKJE_SORT, A.BIGO
+               			      FROM THRM691 A
+               			     WHERE A.ENTER_CD = #{ssnEnterCd}
+						   <if test='searchSabun != null and !searchSabun.equals("")'>
+							   AND (F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'|| #{searchSabun} ||'%' OR A.SABUN LIKE '%'|| #{searchSabun} ||'%' )
+						   </if>
+						   <if test='searchOrg != null and !searchOrg.equals("")'>
+						   		<choose><when test='searchDate != null and !searchDate.equals("")'>
+						   			AND F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, REPLACE(#{searchDate},'-',''), #{ssnLocaleCd}) LIKE '%' || #{searchOrg} || '%'
+								</when>
+									<otherwise>
+						   			AND F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%' || #{searchOrg} || '%'
+									</otherwise>
+								</choose>
+						   </if>
+						   <if test='searchDate != null and !searchDate.equals("")'>
+							   AND REPLACE(#{searchDate},'-','') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+						   </if>
+        				)
+        				<choose><when test='searchDate != null and !searchDate.equals("")'>
+        					ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, REPLACE(#{searchDate},'-','')), SDATE
+						</when>
+						<otherwise>
+        					ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(SYSDATE,'YYYYMMDD')), SDATE
+						</otherwise>
+						</choose>
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveJikjeExceptionUpd">
+
+					MERGE INTO THRM691 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.SABUN
+									, A.SDATE
+									, A.EDATE
+									, A.JIKJE_SORT
+									, A.BIGO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS SDATE
+											, NULL		AS EDATE
+											, NULL		AS JIKJE_SORT
+											, NULL      AS BIGO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}             AS ENTER_CD
+											, TRIM( #{rm.sabun} )	AS SABUN
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											, TRIM( #{rm.exJikjeSort} )	AS JIKJE_SORT
+											, TRIM( #{rm.bigo} )    AS BIGO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON (    T.ENTER_CD		= S.ENTER_CD
+					AND     T.SABUN        = S.SABUN
+					AND     T.SDATE         = S.SDATE
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE		= S.EDATE
+									, T.JIKJE_SORT	= S.JIKJE_SORT
+									, T.BIGO	= S.BIGO
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SDATE
+							, T.EDATE
+							, T.JIKJE_SORT
+							, T.BIGO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SDATE
+							, S.EDATE
+							, S.JIKJE_SORT
+							, S.BIGO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+<!-- 		삭제 -->
+	<delete parameterType="map" id="deleteJikjeExceptionUpd">
+					DELETE FROM THRM691
+					WHERE 	(ENTER_CD, SABUN, SDATE) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											<if test='rm.sdate != null and !rm.sdate.equals("")'>
+												(	#{ssnEnterCd} , TRIM( #{rm.sabun} ), TRIM( #{rm.sdate} ) )
+											</if>
+										</if>
+</foreach>
+										)
+
+	</delete>
+
+
+</mapper>

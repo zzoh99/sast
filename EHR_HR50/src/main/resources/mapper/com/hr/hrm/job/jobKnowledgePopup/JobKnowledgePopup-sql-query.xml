@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.job.jobKnowledgePopup">
+
+		<!-- 필요지식 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobKnowledgePopupList">
+
+				<![CDATA[
+						SELECT A.ENTER_CD				
+						     , A.JOB_CD				
+						     , A.ORG_CD				
+						     , A.SEQ				
+						     , A.KNOWLEDGE				
+						     , A.DOC_INFO				
+						     , A.STORAGE_TYPE				
+						     , A.ACCESS_AUTH_ALL				
+						     , A.ACCESS_AUTH_COMP				
+						     , A.ACCESS_AUTH_HQ				
+						     , A.ACCESS_AUTH_TEAM				
+						     , A.ACCESS_AUTH_RELATE				
+						     , A.ACCESS_AUTH_CHARGE				
+						     , A.INFO_PLAN				
+						  FROM TORG217 A, TORG201 B
+						 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					       AND A.ENTER_CD = B.ENTER_CD
+					       AND A.JOB_CD = B.JOB_CD
+					               ]]>
+					    <if test='jobCd != null and !jobCd.equals("")'>
+				       AND A.JOB_CD IN (
+				       		 SELECT DISTINCT REGEXP_SUBSTR(A.TXT, '[^,]+', 1, LEVEL) TXT
+						       FROM (SELECT #{jobCd} TXT FROM DUAL) A
+						  <![CDATA[  CONNECT BY LEVEL <= LENGTH(REGEXP_REPLACE(A.TXT, '[^,]+',''))+1 ]]>
+				       )
+						</if>
+
+		</select>
+		
+		<!-- 필요지식 저장 -->
+		<update parameterType="map" id="saveJobKnowledgePopup">
+
+			MERGE INTO TORG217 T 	
+			 USING 	
+			( 	
+	<bind name="icnt" value="1" />
+	<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+			       SELECT TRIM(#{ssnEnterCd})  AS  ENTER_CD
+			<choose><when test=' rm.seq != null and !rm.seq.equals("") '>
+			               , TRIM(#{rm.seq})     AS SEQ
+			</when>
+				<otherwise>
+	               , TO_CHAR( (SELECT (NVL(MAX(SEQ),0) + ${icnt}) FROM TORG217 WHERE ENTER_CD = #{ssnEnterCd} ))  AS SEQ
+	<bind name="icnt" value="icnt + 1" />
+				</otherwise>
+			</choose>
+			            , TRIM(#{jobCd})  AS  JOB_CD
+			            , TRIM(#{orgCd})  AS  ORG_CD
+			            , TRIM(#{rm.knowledge})  AS  KNOWLEDGE
+			            , TRIM(#{rm.docInfo})  AS  DOC_INFO
+			            , TRIM(#{rm.storageType})  AS  STORAGE_TYPE
+			            , TRIM(#{rm.accessAuthAll})  AS  ACCESS_AUTH_ALL
+			            , TRIM(#{rm.accessAuthComp})  AS  ACCESS_AUTH_COMP
+			            , TRIM(#{rm.accessAuthHq})  AS  ACCESS_AUTH_HQ
+			            , TRIM(#{rm.accessAuthTeam})  AS  ACCESS_AUTH_TEAM
+			            , TRIM(#{rm.accessAuthRelate})  AS  ACCESS_AUTH_RELATE
+			            , TRIM(#{rm.accessAuthCharge})  AS  ACCESS_AUTH_CHARGE
+			            , TRIM(#{rm.infoPlan})  AS  INFO_PLAN
+			        FROM DUAL	
+	</foreach>
+			) S 	
+			ON ( 	
+			          T.ENTER_CD = S.ENTER_CD
+			      AND T.JOB_CD = S.JOB_CD
+                  AND T.SEQ = S.SEQ 	
+			) 	
+			WHEN MATCHED THEN 	
+			   UPDATE SET T.CHKDATE	= sysdate
+			            , T.CHKID	= #{ssnSabun}
+			            , T.ORG_CD = S.ORG_CD 	
+			            , T.KNOWLEDGE = S.KNOWLEDGE 	
+			            , T.DOC_INFO = S.DOC_INFO 	
+			            , T.STORAGE_TYPE = S.STORAGE_TYPE 	
+			            , T.ACCESS_AUTH_ALL = S.ACCESS_AUTH_ALL 	
+			            , T.ACCESS_AUTH_COMP = S.ACCESS_AUTH_COMP 	
+			            , T.ACCESS_AUTH_HQ = S.ACCESS_AUTH_HQ 	
+			            , T.ACCESS_AUTH_TEAM = S.ACCESS_AUTH_TEAM 	
+			            , T.ACCESS_AUTH_RELATE = S.ACCESS_AUTH_RELATE 	
+			            , T.ACCESS_AUTH_CHARGE = S.ACCESS_AUTH_CHARGE 	
+			            , T.INFO_PLAN = S.INFO_PLAN 	
+			WHEN NOT MATCHED THEN 	
+			   INSERT 	
+			   ( 	
+			              T.ENTER_CD	
+			            , T.JOB_CD	
+			            , T.ORG_CD	
+			            , T.SEQ	
+			            , T.KNOWLEDGE	
+			            , T.DOC_INFO	
+			            , T.STORAGE_TYPE	
+			            , T.ACCESS_AUTH_ALL	
+			            , T.ACCESS_AUTH_COMP	
+			            , T.ACCESS_AUTH_HQ	
+			            , T.ACCESS_AUTH_TEAM	
+			            , T.ACCESS_AUTH_RELATE	
+			            , T.ACCESS_AUTH_CHARGE	
+			            , T.INFO_PLAN	
+			            , T.CHKDATE	
+			            , T.CHKID	
+			   ) 	
+			   VALUES 	
+			   ( 	
+			              S.ENTER_CD	
+			            , S.JOB_CD	
+			            , S.ORG_CD	
+			            , S.SEQ	
+			            , S.KNOWLEDGE	
+			            , S.DOC_INFO	
+			            , S.STORAGE_TYPE	
+			            , S.ACCESS_AUTH_ALL	
+			            , S.ACCESS_AUTH_COMP	
+			            , S.ACCESS_AUTH_HQ	
+			            , S.ACCESS_AUTH_TEAM	
+			            , S.ACCESS_AUTH_RELATE	
+			            , S.ACCESS_AUTH_CHARGE	
+			            , S.INFO_PLAN	
+			            , sysdate	
+			            , #{ssnSabun}
+			   ) 
+		</update>
+		
+		<!-- 필요지식 삭제 -->
+		<delete parameterType="map" id="deleteJobKnowledgePopup">
+
+				   DELETE FROM TORG217
+					WHERE ENTER_CD = #{ssnEnterCd}
+                      AND JOB_CD||'_'||SEQ IN 	(  NULL
+                        <foreach item="rm" collection="deleteRows" >
+						,
+                            <if test='jobCd != null and !jobCd.equals("")
+                                and rm.seq != null and !rm.seq.equals("")
+                                '>
+
+                                TRIM( #{jobCd} )||'_'||TRIM( #{rm.seq} )
+							</if>
+						</foreach>
+                            )
+		</delete>
+
+</mapper>

@@ -1,0 +1,99 @@
+<?xml	version="1.0"	encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appPeopelRateMgr">
+
+<!-- 대상자 조회	-->
+		<select parameterType="map" resultType="cMap" id="getAppPeopleRateMgrList1">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.APPRAISAL_CD
+						 , A.APP_STEP_CD
+						 , A.SABUN
+						 , A.NAME
+                         , B.APPRAISAL_YY
+					  FROM TPAP201 A, TPAP101 B
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.APP_STEP_CD = '5'
+					   AND A.APP_YN ='Y'
+                       AND A.ENTER_CD = B.ENTER_CD
+                       AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					 GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_STEP_CD, A.SABUN, A.NAME, B.APPRAISAL_YY
+					HAVING SUM(CASE WHEN A.APP_YN = 'Y' THEN 1 ELSE 0 END) >= 2
+				]]>
+
+
+		</select>
+
+<!-- 반영비율 -->
+		<select parameterType="map" resultType="cMap" id="getAppPeopleRateMgrList2">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.APPRAISAL_CD
+						 , A.APP_STEP_CD
+						 , A.SABUN
+						 , A.APP_ORG_CD
+						 , A.APP_ORG_NM
+						 , A.APP_M_RATE
+					  FROM TPAP201 A
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					   AND A.SABUN = TRIM(#{searchSabun})
+					   AND A.APP_STEP_CD = '5'
+					 ORDER BY A.APP_ORG_CD
+				]]>
+
+
+		</select>
+
+<!-- 반영비율 저장 -->
+		<update parameterType="map" id="saveAppPeopleRateMgr2">
+
+					MERGE INTO TPAP201 T
+					USING (
+							SELECT A.ENTER_CD
+								, A.APPRAISAL_CD
+								, A.SABUN
+								, A.APP_ORG_CD
+								, A.APP_STEP_CD
+								, A.APP_M_RATE
+							FROM (
+									SELECT NULL	AS	ENTER_CD
+										, NULL	AS	APPRAISAL_CD
+										, NULL	AS	SABUN
+										, NULL	AS	APP_ORG_CD
+										, NULL	AS	APP_STEP_CD
+										, NULL	AS	APP_M_RATE
+									FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+										SELECT #{ssnEnterCd}				AS	ENTER_CD
+											, TRIM(	#{rm.appraisalCd} )	AS	APPRAISAL_CD
+											, TRIM(	#{rm.sabun} )		AS	SABUN
+											, TRIM(	#{rm.appOrgCd} )	AS	APP_ORG_CD
+											, TRIM(	#{rm.appStepCd} )	AS	APP_STEP_CD
+											, TRIM(	#{rm.appMRate} )	AS	APP_M_RATE
+										FROM DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		=	S.ENTER_CD
+					AND		T.APPRAISAL_CD	=	S.APPRAISAL_CD
+					AND		T.SABUN			=	S.SABUN
+					AND		T.APP_ORG_CD	=	S.APP_ORG_CD
+					AND		T.APP_STEP_CD	=	S.APP_STEP_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE
+						SET	T.APP_M_RATE 	=	S.APP_M_RATE
+							, T.CHKDATE		=	SYSDATE
+							, T.CHKID		=	#{ssnSabun}
+		</update>
+
+
+</mapper>

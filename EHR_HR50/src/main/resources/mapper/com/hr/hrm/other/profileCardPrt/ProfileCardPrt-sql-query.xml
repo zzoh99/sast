@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.profileCardPrt">
+
+<!-- 프로필카드출력 조회 -->
+		<select parameterType="map" resultType="cMap" id="getProfileCardPrtList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.SABUN
+						 , A.NAME
+					     , B.ORG_CD
+					     , C.ORG_NM
+					     , B.MANAGE_CD
+					     , B.WORK_TYPE
+					     , B.JIKWEE_CD
+					     , B.JIKGUB_CD
+					     , B.STATUS_CD
+					  FROM THRM100 A, THRM151 B, TORG101 C
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN = B.SABUN
+					   AND (B.ENTER_CD, B.SABUN, B.SDATE)
+					        =
+					       (
+					         SELECT /*+ INDEX_DESC(THRM151 PK_HRM151)*/ ENTER_CD, SABUN, SDATE
+					           FROM THRM151
+					          WHERE ENTER_CD = A.ENTER_CD
+					            AND SABUN = A.SABUN
+					            AND SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD')
+					            AND STATUS_CD <> 'RAA'
+					            AND ROWNUM = 1
+					       )
+					   AND B.ENTER_CD = C.ENTER_CD(+)
+					   AND B.ORG_CD = C.ORG_CD(+)
+					   AND NVL(C.SDATE,TO_CHAR(SYSDATE,'YYYYMMDD'))
+					        =
+					       (
+					         SELECT NVL(MAX(SDATE),TO_CHAR(SYSDATE,'YYYYMMDD'))
+					           FROM TORG101
+					          WHERE ENTER_CD = B.ENTER_CD
+					            AND ORG_CD = B.ORG_CD
+					            AND SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD')
+					       )
+					   /* 권한있는 회사만 조회 */
+					   AND A.ENTER_CD IN (
+							SELECT #{ssnEnterCd} FROM DUAL
+							UNION
+							SELECT A.AUTH_ENTER_CD
+							FROM TSYS318 A, TSYS307 B
+							WHERE A.ENTER_CD = B.ENTER_CD
+								AND A.GRP_CD = B.GRP_CD
+								AND B.ENTER_ALL_YN = 'Y'
+								AND A.ENTER_CD = #{ssnEnterCd} AND A.GRP_CD = #{ssnGrpCd}
+					   ) ]]>
+				<if test='searchEnterCd != null and !searchEnterCd.equals("")'>
+					   AND A.ENTER_CD = #{searchEnterCd}
+				</if>
+
+				<if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+					   AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%' || #{searchOrgNm} || '%'
+				</if>
+				<if test='searchWorkType != null and !searchWorkType.equals("")'>
+					   AND B.WORK_TYPE = #{searchWorkType}
+				</if>
+				<if test='searchJikweeCd != null and !searchJikweeCd.equals("")'>
+					   AND B.JIKWEE_CD = #{searchJikweeCd}
+				</if>
+				<choose><when test='searchStatusCd != null and !searchStatusCd.equals("")'>
+					   AND B.STATUS_CD != #{searchStatusCd}
+					</when>
+					<otherwise>
+					   AND (B.STATUS_CD != 'RA'
+					   			OR (B.STATUS_CD = 'RA'
+					   					AND A.RET_YMD BETWEEN REPLACE(NVL(TRIM( #{searchRetSYmd} ), '00000101'),'-','') AND REPLACE(NVL(TRIM( #{searchRetEYmd} ), '99991231'),'-','')
+					   				)
+					   		)
+					</otherwise>
+				</choose>
+				<if test='searchName != null and !searchName.equals("")'>
+					   AND (LOWER(A.SABUN) LIKE '%'||LOWER(TRIM( #{searchName} ))||'%' OR LOWER(A.NAME) LIKE '%'||LOWER(TRIM( #{searchName} ))||'%')
+				</if>
+					ORDER BY F_COM_JIKJE_SORT(B.ENTER_CD, B.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+
+		</select>
+
+<!-- 프로필카드출력 조회 -->
+		<select parameterType="map" resultType="cMap" id="getProfileCardPrtAuthList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 , A.SABUN
+						 , A.NAME
+					     , B.ORG_CD
+					     , C.ORG_NM
+					     , B.MANAGE_CD
+					     , B.WORK_TYPE
+					     , B.JIKWEE_CD
+					     , B.JIKGUB_CD
+					     , B.STATUS_CD
+					FROM THRM100 A, THRM151 B, ${query} C
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.SABUN = B.SABUN
+					   AND (B.ENTER_CD, B.SABUN, B.SDATE)
+					        =
+					       (
+					         SELECT /*+ INDEX_DESC(THRM151 PK_HRM151)*/ ENTER_CD, SABUN, SDATE
+					           FROM THRM151
+					          WHERE ENTER_CD = A.ENTER_CD
+					            AND SABUN = A.SABUN
+					            AND SDATE <= TO_CHAR(SYSDATE,'YYYYMMDD')
+					            AND ROWNUM = 1
+					       )
+					   AND B.ENTER_CD = C.ENTER_CD
+					   AND B.ORG_CD = C.ORG_CD
+
+					   /* 권한있는 회사만 조회 */
+					   AND A.ENTER_CD IN (
+							SELECT #{ssnEnterCd} FROM DUAL
+							UNION
+							SELECT A.AUTH_ENTER_CD
+							FROM TSYS318 A, TSYS307 B
+							WHERE A.ENTER_CD = B.ENTER_CD
+								AND A.GRP_CD = B.GRP_CD
+								AND B.ENTER_ALL_YN = 'Y'
+								AND A.ENTER_CD = #{ssnEnterCd} AND A.GRP_CD = #{ssnGrpCd}
+					   )
+					           ]]>
+				<if test='searchEnterCd != null and !searchEnterCd.equals("")'>
+					   AND A.ENTER_CD = #{searchEnterCd}
+				</if>
+
+				<if test='searchOrgNm !=null and !searchOrgNm.equals("")'>
+					   AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%' || #{searchOrgNm} || '%'
+				</if>
+				<if test='searchWorkType != null and !searchWorkType.equals("")'>
+					   AND B.WORK_TYPE = #{searchWorkType}
+				</if>
+				<if test='searchJikweeCd != null and !searchJikweeCd.equals("")'>
+					   AND B.JIKWEE_CD = #{searchJikweeCd}
+				</if>
+				<if test='searchStatusCd != null and !searchStatusCd.equals("")'>
+					   AND B.STATUS_CD != #{searchStatusCd}
+				</if>
+				<if test='searchName != null and !searchName.equals("")'>
+					   AND (LOWER(A.SABUN) LIKE '%'||LOWER(TRIM( #{searchName} ))||'%' OR LOWER(A.NAME) LIKE '%'||LOWER(TRIM( #{searchName} ))||'%')
+				</if>
+					ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+		</select>
+
+
+</mapper>

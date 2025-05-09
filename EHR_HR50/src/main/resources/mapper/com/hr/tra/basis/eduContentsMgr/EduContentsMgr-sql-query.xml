@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.basis.eduContentsMgr">
+	<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduContentsMgr">
+			
+				<![CDATA[
+					SELECT	 A.ENTER_CD
+							,A.FILE_SEQ
+							,A.EDU_M_BRANCH_CD
+							,CASE WHEN B.FILE_SEQ IS NOT NULL THEN '<img src="/common/images/icon/icon_o.png"/>'
+								  ELSE '<img src="/common/images/icon/icon_x.png"/>'
+								  END AS FILE_YN
+							,'0' AS DETAIL
+							,A.FILE_TYPE
+							,A.S_YMD
+							,A.E_YMD
+							,A.SEARCH_SEQ
+							,(SELECT SEARCH_DESC FROM THRI201 WHERE ENTER_CD = A.ENTER_CD AND SEARCH_SEQ = A.SEARCH_SEQ) AS SEARCH_SEQ_NM
+							,A.NOTE
+							,'0' AS NOTE2
+							,B.R_FILE_NM	AS FILE_NM
+							,A.TITLE
+							,A.URL_LINK
+							,A.EDU_LINK
+					 FROM  TTRA541 A ,(SELECT ENTER_CD, FILE_SEQ,LISTAGG(S_FILE_NM,', ') WITHIN GROUP (ORDER BY SEQ_NO) AS S_FILE_NM, LISTAGG(R_FILE_NM,', ') WITHIN GROUP (ORDER BY SEQ_NO) AS R_FILE_NM FROM TSYS201 GROUP  BY ENTER_CD, FILE_SEQ) B
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.FILE_SEQ = B.FILE_SEQ(+) ]]>
+					 <if test="searchSYmd != null and searchSYmd neq ''">
+                       AND S_YMD >= REPLACE(TRIM(#{searchSYmd}),'-','')
+					 </if>
+					 <if test="searchEYmd != null and searchEYmd neq ''">
+					 <![CDATA[
+                       AND S_YMD <= REPLACE(TRIM(#{searchEYmd}),'-','') ]]>
+					 </if>
+					 <if test="searchEduMBranchCd != null and searchEduMBranchCd neq ''">
+                       AND EDU_M_BRANCH_CD = TRIM(#{searchEduMBranchCd})
+					 </if>
+					 <if test="searchEduTitle != null and searchEduTitle neq ''">
+                       AND TITLE LIKE '%'||TRIM( #{searchEduTitle} )||'%'
+					 </if>
+					 <if test="searchFileNm != null and searchFileNm neq ''">
+                       AND B.R_FILE_NM LIKE '%'||TRIM( #{searchFileNm} )||'%'
+					 </if>
+					 ORDER BY S_YMD DESC
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getVedioContentsMgr">
+				<![CDATA[
+					SELECT A.FILE_SEQ
+        				  ,A.FILE_PATH
+        				  ,B.R_FILE_NM
+        				  ,B.S_FILE_NM
+					  FROM TSYS200 A, TSYS201 B, TTRA541 C
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND B.ENTER_CD = C.ENTER_CD
+					   AND A.FILE_SEQ = B.FILE_SEQ
+					   AND B.FILE_SEQ = C.FILE_SEQ ]]>
+					  <if test="fileSeq != null and fileSeq neq ''">
+                       AND A.FILE_SEQ = TRIM( #{fileSeq} )
+                      </if>
+		</select>
+		
+		
+		
+		
+		<!-- 		교육자료관리 저장 -->
+		<update parameterType="map" id="saveEduContentsMgr">
+			
+				<![CDATA[
+				MERGE INTO TTRA541 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.FILE_SEQ
+									, A.EDU_M_BRANCH_CD
+									, A.S_YMD
+									, A.E_YMD
+									, A.SEARCH_SEQ
+									, A.NOTE
+									, A.TITLE
+									, A.URL_LINK
+									, A.EDU_LINK
+									
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS FILE_SEQ
+											, NULL		AS EDU_M_BRANCH_CD
+											, NULL		AS S_YMD
+											, NULL		AS E_YMD
+											, NULL		AS SEARCH_SEQ
+											, NULL		AS NOTE
+											, NULL		AS TITLE
+											, NULL		AS URL_LINK
+											, NULL      AS EDU_LINK
+									FROM	DUAL ]]>
+<bind name="idx" value="1" />
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT	  
+											#{ssnEnterCd} 			AS ENTER_CD
+										<choose>
+											<when test="rm.fileSeq != null and rm.fileSeq neq ''">
+											, TRIM( #{rm.fileSeq} )			AS FILE_SEQ
+											</when>
+											<otherwise>
+											,(SELECT F_COM_GET_SEQ('FILE') AS SEQ FROM DUAL) AS FILE_SEQ
+											</otherwise>
+										</choose>
+											, TRIM( #{rm.eduMBranchCd} ) 	AS EDU_M_BRANCH_CD
+											, TRIM( #{rm.sYmd} )			AS S_YMD
+											, TRIM( #{rm.eYmd} ) 			AS E_YMD
+											, TRIM( #{rm.searchSeq} )		AS SEARCH_SEQ
+											, TRIM( #{rm.note} )			AS NOTE
+											, TRIM( #{rm.title} )			AS TITLE
+											, TRIM( #{rm.urlLink} )			AS URL_LINK
+											, TRIM( #{rm.eduLink} )			AS EDU_LINK
+											FROM   DUAL
+</foreach>
+									) A WHERE 1=1
+									 	  AND A.ENTER_CD IS NOT NULL
+									 	  AND A.FILE_SEQ IS NOT NULL
+							) S
+					ON ( 
+								T.ENTER_CD		 	= S.ENTER_CD
+							AND T.FILE_SEQ			= S.FILE_SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDU_M_BRANCH_CD	= S.EDU_M_BRANCH_CD
+									, T.S_YMD			= S.S_YMD
+									, T.E_YMD			= S.E_YMD
+									, T.SEARCH_SEQ		= S.SEARCH_SEQ
+									, T.NOTE			= S.NOTE
+									, T.TITLE			= S.TITLE
+									, T.URL_LINK		= S.URL_LINK
+									, T.EDU_LINK		= S.EDU_LINK
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.FILE_SEQ
+							, T.EDU_M_BRANCH_CD
+							, T.S_YMD
+							, T.E_YMD
+							, T.SEARCH_SEQ
+							, T.NOTE
+							, T.TITLE
+							, T.URL_LINK
+							, T.EDU_LINK
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.FILE_SEQ
+							, S.EDU_M_BRANCH_CD
+							, S.S_YMD
+							, S.E_YMD
+							, S.SEARCH_SEQ
+							, S.NOTE
+							, S.TITLE
+							, S.URL_LINK
+							, S.EDU_LINK
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		<!-- 	교육 자료 삭제 -->
+		<delete parameterType="map" id="deleteEduContentsMgr">
+			
+				<![CDATA[
+				DELETE FROM TTRA541
+				 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+				   AND FILE_SEQ IN (  NULL ]]>
+<foreach item="rm" collection="deleteRows">
+				     , TRIM( #{rm.fileSeq} ) 
+</foreach>
+				       )
+		</delete>
+		
+		<select parameterType="map" resultType="cMap" id="getEduContentFileName">
+			
+				<![CDATA[
+					SELECT A.FILE_SEQ
+					     , SUBSTR(R_FILE_NM,INSTR(R_FILE_NM,'.',-1)+1) AS EXTENSION
+					     , A.SEQ_NO
+					     , A.R_FILE_NM
+					     , A.FILE_SIZE
+					     , TO_CHAR(A.CHKDATE,'YYYY-MM-DD HH24:MI:SS') AS CHKDATE
+					     , A.CHKID
+					     , '0' AS DOWNLOAD
+					  FROM TSYS201 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.FILE_SEQ = DECODE(#{fileSeq},'null',NULL,#{fileSeq})
+				]]>
+			
+			
+		</select>
+		
+		
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduContentsLst">
+			
+				<![CDATA[
+					SELECT	 A.ENTER_CD
+							,A.FILE_SEQ
+							,A.EDU_M_BRANCH_CD
+							,CASE WHEN B.FILE_SEQ IS NOT NULL THEN '<img src="/common/images/icon/icon_o.png"/>'
+								  ELSE '<img src="/common/images/icon/icon_x.png"/>'
+								  END AS FILE_YN
+							,'0' AS DETAIL
+							,A.FILE_TYPE
+							,A.S_YMD
+							,A.E_YMD
+							,A.SEARCH_SEQ
+							,(SELECT SEARCH_DESC FROM THRI201 WHERE ENTER_CD = A.ENTER_CD AND SEARCH_SEQ = A.SEARCH_SEQ) AS SEARCH_SEQ_NM
+							,A.NOTE
+							,'0' AS NOTE2
+							,B.R_FILE_NM	AS FILE_NM
+							,A.TITLE
+							,A.URL_LINK
+							,A.EDU_LINK
+					 FROM  TTRA541 A ,(SELECT ENTER_CD, FILE_SEQ,LISTAGG(S_FILE_NM,', ') WITHIN GROUP (ORDER BY SEQ_NO) AS S_FILE_NM, LISTAGG(R_FILE_NM,', ') WITHIN GROUP (ORDER BY SEQ_NO) AS R_FILE_NM FROM TSYS201 GROUP  BY ENTER_CD, FILE_SEQ) B
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.FILE_SEQ = B.FILE_SEQ(+)
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND F_COM_GET_SEARCH_YN(A.ENTER_CD, TRIM( #{searchSabun} ), A.SEARCH_SEQ, TO_CHAR(sysdate,'YYYYMMDD') ) = '1' 
+					   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.S_YMD AND NVL(A.E_YMD ,'99991231')
+					 ORDER BY S_YMD DESC
+				]]>
+			
+			
+		</select>
+	
+
+</mapper>

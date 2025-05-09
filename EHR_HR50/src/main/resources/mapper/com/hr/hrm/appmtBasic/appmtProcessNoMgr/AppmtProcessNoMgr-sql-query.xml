@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmtBasic.appmtProcessNoMgr">
+
+<!-- 발령품의번호관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtProcessNoMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					      ,A.PROCESS_NO
+					      ,A.PROCESS_TITLE
+					      ,A.ORG_CD
+					      ,F_COM_GET_ORG_NM( A.ENTER_CD, A.ORG_CD, A.INPUT_YMD ) AS ORG_NM
+					      ,A.PROCESS_SABUN
+					      ,(SELECT NAME FROM THRM100 WHERE ENTER_CD = A.ENTER_CD AND SABUN = A.PROCESS_SABUN) AS PROCESS_NAME
+					      ,A.INPUT_YMD
+					      ,A.ACTION_YN
+					      ,A.ACTION_YMD
+					      ,A.NOTICE_YN
+					      ,A.APPL_SEQ
+					      ,A.FILE_SEQ
+					      ,0 AS PROCESS_NO_SEQ		   
+					  FROM THRM220 A
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					           ]]>
+<if test=' (searchFromYmd != null and !searchFromYmd.equals("")) or (searchToYmd != null and !searchToYmd.equals("")) '>
+					   AND A.INPUT_YMD BETWEEN NVL(REPLACE( #{searchFromYmd} ,'-',''),'19000101') AND NVL(REPLACE( #{searchToYmd} ,'-',''),'99991231')
+</if>
+<if test=' searchProcessNo != null and !searchProcessNo.equals("") '>
+					   AND A.PROCESS_NO LIKE '%'||#{searchProcessNo} ||'%'
+</if>
+<if test=' searchProcessTitle != null and !searchProcessTitle.equals("")'>
+					   AND A.PROCESS_TITLE LIKE '%'||#{searchProcessTitle} ||'%'
+</if>
+					ORDER BY A.INPUT_YMD DESC, A.PROCESS_NO DESC 		
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAppmtProcessNoSeq">
+
+				<![CDATA[
+					SELECT NVL(MAX(TO_NUMBER(SUBSTR(A.PROCESS_NO
+					                               ,LENGTH(A.PROCESS_NO) - 2
+					                               ,LENGTH(A.PROCESS_NO))))
+					          ,0) AS PROCESS_NO_SEQ					
+					  FROM THRM220 A
+					 WHERE ENTER_CD = #{ssnEnterCd} AND PROCESS_NO LIKE #{processNo} || '%'
+				]]>
+
+		</select>
+		<update parameterType="map" id="saveAppmtProcessNoMgr">
+
+					MERGE INTO THRM220 T
+					USING (SELECT A.ENTER_CD
+					             ,A.PROCESS_NO
+					             ,A.PROCESS_TITLE
+					             ,A.ORG_CD
+					             ,A.PROCESS_SABUN
+					             ,A.INPUT_YMD
+					             ,A.ACTION_YN
+					             ,A.ACTION_YMD
+					             ,A.NOTICE_YN
+					             ,A.APPL_SEQ
+					             ,A.FILE_SEQ
+					         FROM (SELECT NULL AS ENTER_CD
+					                     ,NULL AS PROCESS_NO
+					                     ,NULL AS PROCESS_TITLE
+					                     ,NULL AS ORG_CD
+					                     ,NULL AS PROCESS_SABUN
+					                     ,NULL AS INPUT_YMD
+					                     ,NULL AS ACTION_YN
+					                     ,NULL AS ACTION_YMD
+					                     ,NULL AS NOTICE_YN
+					                     ,NULL AS APPL_SEQ
+					                     ,NULL AS FILE_SEQ					               
+					                 FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT #{ssnEnterCd} AS ENTER_CD
+											,TRIM(#{rm.processNo}) AS PROCESS_NO
+											,TRIM(#{rm.processTitle}) AS PROCESS_TITLE
+											,TRIM(#{rm.orgCd}) AS ORG_CD
+											,TRIM(#{rm.processSabun}) AS PROCESS_SABUN
+											,TRIM(#{rm.inputYmd}) AS INPUT_YMD
+											,TRIM(#{rm.actionYn}) AS ACTION_YN
+											,TRIM(#{rm.actionYmd}) AS ACTION_YMD
+											,TRIM(#{rm.noticeYn}) AS NOTICE_YN
+											,TRIM('') AS APPL_SEQ
+											,TRIM('') AS FILE_SEQ
+
+										FROM DUAL						
+</foreach>
+					                 
+					                 ) A
+					        WHERE A.ENTER_CD IS NOT NULL
+					          AND A.PROCESS_TITLE IS NOT NULL) S
+					ON (T.ENTER_CD = S.ENTER_CD AND T.PROCESS_NO = S.PROCESS_NO)
+					WHEN MATCHED THEN
+					  UPDATE
+					     SET T.PROCESS_TITLE = S.PROCESS_TITLE
+							,T.ORG_CD = S.ORG_CD
+							,T.PROCESS_SABUN = S.PROCESS_SABUN
+							,T.INPUT_YMD = S.INPUT_YMD
+							,T.ACTION_YN = S.ACTION_YN
+							,T.ACTION_YMD = S.ACTION_YMD
+							,T.NOTICE_YN = S.NOTICE_YN
+							,T.APPL_SEQ = S.APPL_SEQ
+							,T.FILE_SEQ = S.FILE_SEQ
+					        ,T.CHKDATE       = SYSDATE
+					        ,T.CHKID         = #{ssnSabun}
+					
+					WHEN NOT MATCHED THEN
+					  INSERT
+					    (T.ENTER_CD
+						,T.PROCESS_NO
+						,T.PROCESS_TITLE
+						,T.ORG_CD
+						,T.PROCESS_SABUN
+						,T.INPUT_YMD
+						,T.ACTION_YN
+						,T.ACTION_YMD
+						,T.NOTICE_YN
+						,T.APPL_SEQ
+						,T.FILE_SEQ
+						,T.CHKDATE
+						,T.CHKID
+						)
+					  VALUES
+					    (S.ENTER_CD
+						,S.PROCESS_NO
+						,S.PROCESS_TITLE
+						,S.ORG_CD
+						,S.PROCESS_SABUN
+						,S.INPUT_YMD
+						,S.ACTION_YN
+						,S.ACTION_YMD
+						,S.NOTICE_YN
+						,S.APPL_SEQ
+						,S.FILE_SEQ
+					    ,SYSDATE
+					    ,#{ssnSabun}
+					     )
+										
+		</update>
+		<delete parameterType="map" id="deleteAppmtProcessNoMgr">
+
+					DELETE FROM THRM220
+					 WHERE (ENTER_CD, PROCESS_NO) IN ( (NULL, NULL)
+					 <foreach item="rm" collection="deleteRows" >
+					 		,( TRIM( #{ssnEnterCd} ), TRIM( #{rm.processNo} ) )
+					 </foreach>
+					 )
+		</delete>
+
+</mapper>

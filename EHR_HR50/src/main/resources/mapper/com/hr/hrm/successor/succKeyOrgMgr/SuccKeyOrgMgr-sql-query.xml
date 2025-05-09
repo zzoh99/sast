@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+		
+	<mapper namespace="hrm.successor.succKeyOrgMgr">
+<!-- 		조직종합관리 조직도 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSuccKeyOrgMgrList">
+			<![CDATA[
+				    SELECT 	LEVEL AS "_level",
+				    		A.PRIOR_ORG_CD,
+				    		A.ORG_CD,
+				    		F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, #{searchSdate}, #{ssnLocaleCd}) AS ORG_NM,
+				    		B.ORG_TYPE,
+				    		B.INOUT_TYPE,
+				    		B.LOCATION_CD,
+				    		B.OBJECT_TYPE,
+				    		B.SDATE,
+				    		B.EDATE,
+				    		B.MEMO,
+				    		F_ORG_GET_CHIEF_SABUN(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(#{baseDate}),'-','')) AS CHIEF_SABUN,
+                            F_ORG_GET_CHIEF_NAME(A.ENTER_CD, A.ORG_CD, REPLACE(TRIM(#{baseDate}),'-',''), #{ssnLocaleCd} ) AS CHIEF_NAME,
+                            C.SUCC_YN,
+                            CASE WHEN C.SUCC_YN = 'Y' THEN 'O'
+                                 ELSE '' END AS SUCC_OX
+				      FROM TORG105 A, TORG101 B, THRM703 C
+				     WHERE A.ENTER_CD = B.ENTER_CD
+			           AND A.ORG_CD = B.ORG_CD
+			           AND A.ENTER_CD = C.ENTER_CD(+)
+			           AND A.ORG_CD = C.ORG_CD(+)
+			           AND C.YY(+) = SUBSTR(TRIM(#{searchSdate}), 1,4)
+			           AND A.SDATE BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+			           AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+				       AND A.SDATE = TRIM(#{searchSdate})
+				     START WITH A.PRIOR_ORG_CD = '0'
+				   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					   AND PRIOR A.SDATE = A.SDATE
+					   AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ, A.ORG_LEVEL
+			]]>
+		</select>
+
+<!-- 		조직종합관리 저장 -->
+		<update parameterType="map" id="saveSuccKeyOrgMgr">
+					MERGE INTO THRM703 T
+					USING	(
+							SELECT	  A.ENTER_CD
+							        , A.YY
+									, A.ORG_CD
+									, A.SUCC_YN
+									, A.NOTE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+									        , NULL      AS YY
+											, NULL		AS ORG_CD
+											, NULL      AS SUCC_YN
+											, NULL      AS NOTE
+									FROM	DUAL
+			<bind name="icnt" value="1" />
+			<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM(SUBSTR(#{searchSdate}, 1,4)) AS YY
+								            , TRIM(#{rm.orgCd}) AS ORG_CD
+								            , TRIM(#{rm.succYn}) AS SUCC_YN
+								            , TRIM('') AS NOTE
+											FROM   DUAL
+			</foreach>
+									) A WHERE A.ORG_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.YY = S.YY AND T.ORG_CD = S.ORG_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SUCC_YN	= S.SUCC_YN
+									, T.NOTE	= S.NOTE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+				            , T.YY
+				            , T.ORG_CD
+				            , T.SUCC_YN
+				            , T.NOTE
+				            , T.CHKDATE
+				            , T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+				            , S.YY
+				            , S.ORG_CD
+				            , S.SUCC_YN
+				            , S.NOTE
+				            , SYSDATE
+				            , #{ssnSabun}
+						)
+				
+		</update>
+<!-- 		조직종합관리 삭제 -->
+		<delete parameterType="map" id="deleteSuccKeyOrgMgr">
+					DELETE FROM THRM703
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||YY||'_'||ORG_CD IN 	(  NULL
+			<foreach item="rm" collection="deleteRows" >
+						,
+									<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+										and rm.orgCd != null and !rm.orgCd.equals("")
+										and rm.searchSdate != null and !rm.searchSdate.equals("")'>
+										TRIM(#{ssnEnterCd})||'_'||TRIM(#{searchSdate})||'_'||TRIM(#{rm.orgCd})
+									</if>
+			</foreach>
+										)
+		</delete>
+		
+		<!--      상세항목 조회-->
+        <select parameterType="map" resultType="cMap" id="getSuccKeyDetailMap">
+            <![CDATA[
+                SELECT A.ENTER_CD 
+                     , A.ORG_CD
+                     , A.TYPE_CD
+                     , A.TYPE_NM
+                     , A.ITEM_CD
+                     , A.ITEM_NM
+                     , A.CHKID
+                     , A.CHKDATE
+                  FROM THRM704 A
+                 WHERE A.ENTER_CD = #{ssnEnterCd}
+                   AND A.ORG_CD = #{searchOrgCd} 
+                   AND A.TYPE_CD = #{searchTypeCd}
+            ]]>
+        </select>
+		
+		<!--      상세항목 리스트 조회-->
+		<select parameterType="map" resultType="cMap" id="getSuccKeyDetailList">
+            <![CDATA[
+	            SELECT A.ENTER_CD 
+				     , A.ORG_CD
+				     , A.TYPE_CD
+				     , A.TYPE_NM
+				     , A.ITEM_CD
+				     , A.ITEM_NM
+				     , A.CHKID
+				     , A.CHKDATE
+				  FROM THRM704 A
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.ORG_CD = #{searchOrgCd} 
+				   AND A.TYPE_CD = #{searchTypeCd} 
+            ]]>
+        </select>
+        
+    <!--        상세항목 저장 -->
+    <update parameterType="map" id="saveSuccKeyDetail">
+         MERGE INTO THRM704 T
+          USING   (
+                  SELECT A.ENTER_CD
+                       , A.ORG_CD
+                       , A.TYPE_CD
+                       , A.TYPE_NM
+                       , A.ITEM_CD
+                       , A.ITEM_NM
+                  FROM  (
+                          SELECT    NULL      AS ENTER_CD
+                                  , NULL      AS ORG_CD
+                                  , NULL      AS TYPE_CD
+                                  , NULL      AS TYPE_NM
+                                  , NULL      AS ITEM_CD
+                                  , NULL      AS ITEM_NM
+                          FROM    DUAL
+            <foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                          SELECT
+                                    TRIM( #{ssnEnterCd} ) AS ENTER_CD
+                                  , TRIM(#{rm.orgCd})     AS ORG_CD
+                                  , TRIM(#{rm.typeCd})   AS TYPE_CD
+                                  , TRIM(#{rm.typeNm})    AS TYPE_NM
+                                  , TRIM(#{rm.itemCd})    AS ITEM_CD
+                                  , TRIM(#{rm.itemNm})    AS ITEM_NM
+                            FROM   DUAL
+            </foreach>
+                        ) A 
+                    WHERE A.ENTER_CD IS NOT NULL
+                      AND A.ORG_CD IS NOT NULL
+                      AND A.TYPE_CD IS NOT NULL
+                    ) S
+	               ON (      T.ENTER_CD = S.ENTER_CD
+	                     AND T.TYPE_CD = S.TYPE_CD 
+	                     AND T.ORG_CD = S.ORG_CD 
+	                     AND T.ITEM_CD = S.ITEM_CD 
+	               )
+                   WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.ORG_CD
+                            , T.TYPE_CD
+                            , T.TYPE_NM
+                            , T.ITEM_CD
+                            , T.ITEM_NM
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.ORG_CD
+                            , S.TYPE_CD
+                            , S.TYPE_NM
+                            , S.ITEM_CD
+                            , S.ITEM_NM
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+                
+    </update>
+        
+<!--    상세 항목 삭제 -->
+        <delete parameterType="map" id="deleteSuccKeyDetail">
+	         DELETE FROM THRM704
+	          WHERE ENTER_CD = #{ssnEnterCd}
+	           AND (ORG_CD, TYPE_CD,ITEM_CD) IN     (  (NULL, NULL, NULL)
+            <foreach item="rm" collection="deleteRows" >
+	                <if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+	                    and rm.orgCd != null and !rm.orgCd.equals("")
+	                    and rm.typeCD != null and !rm.typeCd.equals("")
+	                    and rm.itemCD != null and !rm.itemCd.equals("")'>
+	                   ,( TRIM(#{ssnEnterCd}), TRIM(#{rm.orgCd}) , TRIM(#{rm.typeCd} , TRIM(#{rm.itemCd})
+	                </if>
+            </foreach>
+                            )
+        </delete>
+        
+            <!--        상세항목 저장 -->
+    <update parameterType="map" id="saveSuccKeyJob">
+    MERGE INTO THRM704 T
+          USING   ( SELECT   TRIM( #{ssnEnterCd} ) AS ENTER_CD
+                           , TRIM(#{orgCd})     AS ORG_CD
+                           , TRIM(#{typeCd})   AS TYPE_CD
+                           , TRIM(#{typeNm})    AS TYPE_NM
+                           , TRIM(#{itemCd})    AS ITEM_CD
+                           , TRIM(#{itemNm})    AS ITEM_NM
+                     FROM   DUAL
+                    ) S
+                   ON (      T.ENTER_CD = S.ENTER_CD
+                         AND T.TYPE_CD = S.TYPE_CD 
+                         AND T.ORG_CD = S.ORG_CD 
+                   )
+                   WHEN MATCHED THEN
+                      UPDATE SET T.CHKDATE   = SYSDATE 
+                               , T.CHKID      = #{ssnSabun}
+                               , T.ITEM_CD       = S.ITEM_CD 
+                               , T.ITEM_NM      = S.ITEM_NM 
+                   WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.ORG_CD
+                            , T.TYPE_CD
+                            , T.TYPE_NM
+                            , T.ITEM_CD
+                            , T.ITEM_NM
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              S.ENTER_CD
+                            , S.ORG_CD
+                            , S.TYPE_CD
+                            , S.TYPE_NM
+                            , S.ITEM_CD
+                            , S.ITEM_NM
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+                
+    </update>
+        
+	</mapper>

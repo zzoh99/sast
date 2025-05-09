@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.hrmComPopup.hrmSchoolPopup">
+
+		<!-- 학교검색 조회 -->
+		<select parameterType="map" resultType="cMap" id="getHrmSchoolPopupList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.CODE
+					     , A.CODE_NM
+					     , A.SEQ
+					     , A.MEMO
+					  FROM TSYS005 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.GRCODE_CD = #{gubun} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.S_YMD AND A.E_YMD
+					           ]]>
+				<if test='codeNm != null and !codeNm.equals("")'>
+					   AND A.CODE_NM LIKE '%'||TRIM( #{codeNm} )||'%'
+				</if>
+				     ORDER BY A.CODE_NM
+
+
+		</select>
+
+		<!-- 학교코드 저장 -->
+		<update parameterType="map" id="saveHrmSchoolPopup">
+
+
+					MERGE INTO TSYS005 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.GRCODE_CD
+									, A.CODE
+									, A.CODE_NM
+									, A.MEMO
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL      AS GRCODE_CD
+											, NULL      AS CODE
+											, NULL      AS CODE_NM
+											, NULL		AS MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	TRIM( #{ssnEnterCd} )		AS ENTER_CD
+											, TRIM( #{gubun} )			AS GRCODE_CD
+											, TRIM( #{rm.code} )		AS CODE
+											, TRIM( #{rm.codeNm} )		AS CODE_NM
+											, TRIM( #{rm.memo} )		AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.CODE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.GRCODE_CD = S.GRCODE_CD AND T.CODE = S.CODE AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN T.S_YMD AND T.E_YMD)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.CODE_NM		  = S.CODE_NM
+									, T.MEMO		  = S.MEMO
+									, T.CHKDATE			  = SYSDATE
+									, T.CHKID			  = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.GRCODE_CD
+							, T.CODE
+							, T.CODE_NM
+						    , T.MEMO
+						    , T.CHKDATE
+						    , T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.GRCODE_CD
+							, S.CODE
+							, S.CODE_NM
+						    , S.MEMO
+						    , SYSDATE
+						    , #{ssnSabun}
+						)
+		</update>
+
+		<!-- 학교코드 삭제 -->
+		<delete parameterType="map" id="deleteHrmSchoolPopup">
+
+					DELETE FROM TSYS005
+					 WHERE ( ENTER_CD, GRCODE_CD, CODE ) IN ( ( NULL, NULL, NULL )
+<foreach item="rm" collection="deleteRows" >
+						, (
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.code != null and !rm.code.equals("")'>
+											TRIM( #{ssnEnterCd} ), TRIM( #{gubun} ), TRIM( #{rm.code} )
+										</if>
+</foreach>
+										)
+										) AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+		</delete>
+
+</mapper>

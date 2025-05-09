@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.status.timeCardMgrTeam">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getTimeCardMgrTeamList">
+
+				<![CDATA[
+				SELECT  X1.ENTER_CD,
+				        X1.YMD,
+				        X1.CLOSE_YN,
+				        X1.CHK_CLOSE_YN,
+				        X1.DAYNM,
+				        X1.ORG_CD,
+						X1.ORG_NM,
+						X1.SABUN, X1.NAME,
+						X1.WORK_SHM,
+						X1.WORK_EHM,
+						X1.IN_HM,
+						X1.OUT_HM,
+						X1.OVER_HH,     -- 연장
+						X1.NIGHT_HH,    -- 야간
+						X1.HOL_HH,      -- 휴일근무
+						X1.HOL_OVER_HH, -- 휴일연장
+						X1.TIME_CD,
+						X1.GNT_NM,
+						NVL( X1.MEMO, (SELECT MEMO FROM TTIM330T WHERE ENTER_CD = X1.ENTER_CD AND YMD = X1.YMD AND SABUN = X1.SABUN )) AS MEMO,
+						X1.WORK_MANAGE_CD,
+						X1.APPL_STATUS_NM,
+					    NVL( X1.CONFIRM_CD, (SELECT CONFIRM_CD FROM TTIM330T WHERE ENTER_CD = X1.ENTER_CD AND YMD = X1.YMD AND SABUN = X1.SABUN )) AS CONFIRM_CD,
+					    X1.STATUS_CD
+				FROM	(
+							SELECT	T1.ENTER_CD,
+							        T1.YMD,
+							        T1.CLOSE_YN,
+							        T1.CLOSE_YN AS CHK_CLOSE_YN,
+							        T1.DAYNM,
+							        T1.ORG_CD,
+									F_COM_GET_ORG_NM(T1.ENTER_CD,T1.ORG_CD, T1.YMD) AS ORG_NM,
+									T1.SABUN, T2.NAME,
+									-- F_COM_GET_WORK_TIME_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'S') AS WORK_SHM,
+									-- F_COM_GET_WORK_TIME_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'E') AS WORK_EHM,
+									T1.WORK_SHM,
+									T1.WORK_EHM,
+									T1.IN_HM,
+									T1.OUT_HM,
+									-- F_COM_GET_WORK_OVER_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'A') AS OVER_WORK,     -- 연장
+									-- F_COM_GET_WORK_OVER_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'B') AS NIGHT_WORK,    -- 야간
+									-- F_COM_GET_WORK_OVER_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'C') AS HOL_BAS_WORK,  -- 휴일근무
+									-- F_COM_GET_WORK_OVER_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'D') AS HOL_OVER_WORK, -- 휴일연장
+									NVL(T1.OVER_HH, 0) AS OVER_HH,     -- 연장
+									NVL(T1.NIGHT_HH, 0) AS NIGHT_HH,    -- 야간
+									NVL(T1.HOL_HH, 0) AS HOL_HH,      -- 휴일근무
+									NVL(T1.HOL_OVER_HH, 0) AS HOL_OVER_HH, -- 휴일연장
+									-- F_COM_GET_WORK_TIME_CD(T1.ENTER_CD, T1.WORK_MANAGE_CD, T1.YMD) AS TIME_CD,
+									T1.TIME_CD,
+									F_TIM_APPL_DTL_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'GNTNM')  AS GNT_NM, T1.MEMO, T1.WORK_MANAGE_CD,
+									F_TIM_APPL_DTL_INFO(T1.ENTER_CD, T1.SABUN, T1.YMD, 'STAT')  AS APPL_STATUS_NM
+								  , T1.CONFIRM_CD
+								  , T1.STATUS_CD
+							FROM	(
+										SELECT	A.ENTER_CD, A.YMD, A.CLOSE_YN, TO_CHAR(TO_DATE(A.YMD,'YYYYMMDD'),'DY') AS DAYNM,
+												F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, A.YMD) AS ORG_CD,
+												F_TIM_APPL_DTL_INFO(A.ENTER_CD, A.SABUN, A.YMD, 'GNTCD') AS GNT_CD,
+												A.SABUN,  A.IN_HM, A.OUT_HM, A.MEMO, A.WORK_MANAGE_CD,  B.TIME_GROUP_CD
+										      , A.CONFIRM_CD, A.TIME_CD, A.WORK_SHM, A.WORK_EHM, A.OVER_HH, A.NIGHT_HH, A.HOL_HH, A.HOL_OVER_HH
+										      , B.STATUS_CD
+										FROM	TTIM330 A
+										      , THRM151 B
+									    WHERE   A.ENTER_CD   = B.ENTER_CD
+									    AND     A.SABUN      = B.SABUN
+									    AND     A.YMD BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+									                ]]>
+									<if test='searchStatusCd != null and !searchStatusCd.equals("")'>
+			                            AND     B.STATUS_CD = TRIM(#{searchStatusCd})
+									</if>
+									<if test='schConfirmCd != null and !schConfirmCd.equals("")'>
+			                            AND     A.CONFIRM_CD = TRIM(#{schConfirmCd})
+									</if>
+			                        <if test='ssnSearchType.equals("O")'>
+									      <![CDATA[
+			                        	AND		B.ORG_CD IN (
+																SELECT	F_COM_GET_ORG_CD ( #{ssnEnterCd}, #{ssnSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+																FROM	DUAL
+																/*하위조직포함일때 Y , 아닐때 N */
+																UNION
+																SELECT ORG_CD
+																FROM TORG105
+																WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+																AND SDATE    = (SELECT MAX(SDATE) FROM TORG105 WHERE SDATE <= TO_CHAR(SYSDATE, 'YYYYMMDD') AND ENTER_CD = TRIM( #{ssnEnterCd} ) )
+																START WITH PRIOR_ORG_CD   =  F_COM_GET_ORG_CD ( #{ssnEnterCd}, #{ssnSabun}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+																CONNECT BY PRIOR ENTER_CD = ENTER_CD
+																	AND PRIOR SDATE    = SDATE
+																	AND PRIOR ORG_CD   = PRIOR_ORG_CD
+															)
+							    ]]>
+									</if>
+			                        <if test='schCloseYn != null and !schCloseYn.equals("")'>
+									<![CDATA[
+			                        AND     A.CLOSE_YN  <> 'Y'
+									]]>
+									</if>
+									)	T1,
+									THRM100	T2
+							WHERE	T1.ENTER_CD	=	T2.ENTER_CD
+							AND		T1.SABUN	=	T2.SABUN
+							AND		T1.ENTER_CD	=	#{ssnEnterCd}
+
+							<if test='searchGntCd != null and !searchGntCd.equals("")'>
+							AND		T1.GNT_CD	=	#{searchGntCd}
+							</if>
+							<if test='searchWorkManageCd != null and !searchWorkManageCd.equals("")'>
+							AND		T1.WORK_MANAGE_CD	=	#{searchWorkManageCd}
+							</if>
+							<if test='searchNm != null and !searchNm.equals("")'>
+							AND	(
+										T2.NAME	LIKE	'%'||TRIM(#{searchNm})||'%'
+									OR	T1.SABUN	=	TRIM(#{searchNm})
+								)
+							</if>
+							<if test='searchOrgType != null and !searchOrgType.equals("") and searchOrgType.equals("Y")'>
+								<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+							AND		T1.ORG_CD IN
+											(
+												SELECT #{searchOrgCd} /*소속*/
+												FROM DUAL
+												UNION
+												SELECT ORG_CD
+												FROM TORG105
+												WHERE ENTER_CD = #{ssnEnterCd}
+												AND SDATE IN
+															(
+																SELECT MAX(SDATE)
+																FROM TORG105
+																WHERE ENTER_CD = #{ssnEnterCd}
+															)
+												START WITH	PRIOR_ORG_CD	= #{searchOrgCd}
+												CONNECT BY	PRIOR ENTER_CD	= ENTER_CD
+												AND			PRIOR SDATE		= SDATE
+												AND			PRIOR ORG_CD	= PRIOR_ORG_CD
+											)
+								</if>
+							</if>
+							<if test='!searchOrgType or searchOrgType.equals("") '>
+								<if test='searchOrgCd != null and !searchOrgCd.equals("")'>
+							AND		T1.ORG_CD	=	#{searchOrgCd}
+								</if>
+							</if>
+							<if test='searchSymd != null and !searchSymd.equals("")'>
+							<![CDATA[ AND		T1.YMD		>=	REPLACE( #{searchSYmd},'-','') ]]>
+							</if>
+							<if test='searchEymd != null and !searchEymd.equals("")'>
+			<![CDATA[ AND		T1.YMD		<=	REPLACE( #{searchEYmd},'-','') ]]>
+							</if>
+							<if test='searchTypeIn and searchTypeIn.equals("Y")'>
+							AND		T1.IN_HM  IS NULL
+							</if>
+							<if test='searchTypeOut and searchTypeOut.equals("Y")'>
+							AND		T1.OUT_HM IS NULL
+							</if>
+						) X1
+				WHERE	1=1
+				<if test='searchTypeInOut and searchTypeInOut.equals("Y")'>
+				AND	(
+							X1.IN_HM IS NULL
+						AND	X1.OUT_HM IS NULL
+						AND X1.WORK_SHM IS NOT NULL
+                        AND X1.WORK_EHM IS NOT NULL
+                        AND (
+                        		X1.APPL_STATUS_NM NOT LIKE '%처리완료%'
+                        	OR X1.APPL_STATUS_NM IS NULL
+                        	)
+                        AND X1.STATUS_CD = 'AA'
+					)
+				</if>
+				ORDER BY
+					X1.NAME, X1.YMD DESC
+
+
+		</select>
+
+		<delete parameterType="map" id="deleteExcelUploadTTIM250">
+
+				<![CDATA[
+				DELETE
+				FROM	TTIM250
+				WHERE	ENTER_CD = #{ssnEnterCd}
+				AND		TDATE    = REPLACE(#{searchYmd}, '-','')
+				]]>
+
+		</delete>
+
+		<insert parameterType="map" id="excelUploadTTIM250">
+
+				<![CDATA[
+				INSERT INTO TTIM250
+				(ENTER_CD, SEC_CD, SEQ, TDATE, TTIME, CARDNO, INSANO, CHKDATE, CHKID)
+				SELECT #{ssnEnterCd} AS ENTER_CD
+				        ,   'W' AS SEC_CD
+				        ,   F_COM_GET_SPLIT ( CONTENTS, 1, '|')  AS SEQ
+				        ,   F_COM_GET_SPLIT ( CONTENTS, 2, '|')  AS TDATE
+				        ,   F_COM_GET_SPLIT ( CONTENTS, 3, '|')  AS TTIME
+				        ,   F_COM_GET_SPLIT ( CONTENTS, 4, '|')  AS CARDNO
+				        ,   F_COM_GET_SPLIT ( CONTENTS, 5, '|')  AS INSANO
+				        ,   SYSDATE AS CHKDATE
+				        ,   #{ssnSabun} AS CHKID
+				FROM (
+				            SELECT TO_CHAR(TRIM ( REGEXP_SUBSTR(CONTENTS, '[^,]+', 1, LEVEL))) AS CONTENTS
+				            FROM (
+				                        ${query}
+				                      )
+				            CONNECT BY INSTR(CONTENTS, ',' , 1, LEVEL -1 ) > 0
+				        )
+				]]>
+		</insert>
+
+		<delete parameterType="map" id="deleteTextUploadTTIM251">
+
+				<![CDATA[
+				DELETE
+				FROM	TTIM251
+				WHERE	ENTER_CD = #{ssnEnterCd}
+				AND		SEC_CD   = DECODE(#{searchGntCd} , '01', 'W', 'F')
+				AND		WORK_YMD = REPLACE(#{searchYmd}, '-','')
+				]]>
+
+		</delete>
+
+		<insert parameterType="map" id="textUploadTTIM251">
+
+				<![CDATA[
+				INSERT INTO TTIM251
+				SELECT #{ssnEnterCd} AS ENTER_CD
+				        ,   DECODE(GNT_CD , '01', 'W', 'F') AS SEC_CD
+				        ,   REPLACE(YMD, '-','') AS YMD
+				        ,   TO_CHAR(TRIM ( REGEXP_SUBSTR(CONTENTS, '[^|]+', 1, LEVEL))) AS FINGERPRINT
+				        ,   SYSDATE AS CHKDATE
+				        ,   #{ssnSabun} AS CHKID
+				FROM  (
+						    ${query}
+						)
+				CONNECT BY INSTR(CONTENTS, '|' , 1, LEVEL -1 ) > 0
+				]]>
+
+
+		</insert>
+
+		<update parameterType="map" id="procP_TIM_WORK_DAY_UPLOAD">
+
+			<![CDATA[
+
+					CALL P_TIM_WORK_DAY_UPLOAD(
+					    #{sqlCode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+					    #{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					    REPLACE( #{searchYmd,mode=IN,jdbcType=VARCHAR}, '-', ''),
+					    #{searchGntCdproc,mode=IN,jdbcType=VARCHAR},
+					    #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+		</update>
+
+		<select parameterType="map" resultType="cMap" id="getTimeCardMgrTeamCount">
+
+				<![CDATA[
+				SELECT NVL(MAX(A.SUM_YN),'N') AS SUM_YN
+				     , NVL(MAX(A.END_YN),'N') AS END_YN
+				  FROM (
+					    SELECT CASE WHEN B.WORK_DAY_TYPE = 1
+						            THEN TO_CHAR(ADD_MONTHS(TO_DATE(A.YM,'YYYYMM'), -1), 'YYYYMM')||STDW_S_DD
+						            ELSE A.YM||STDW_S_DD
+						            END SYMD
+						     , A.YM||STDW_E_DD EYMD
+		                     , A.YM
+		                     , A.SUM_YN
+		                     , A.END_YN
+						  FROM TTIM004 B
+				             , TTIM999 A
+						 WHERE A.ENTER_CD = #{ssnEnterCd}
+		                   AND A.ENTER_CD = B.ENTER_CD
+		                   AND A.BUSINESS_PLACE_CD = #{searchBizPlaceCd}
+					   ) A
+				     , (SELECT SUN_DATE FROM TSYS007 A WHERE SUN_DATE BETWEEN #{searchSYmd} AND #{searchEYmd}) C
+				 WHERE SUN_DATE BETWEEN A.SYMD AND A.EYMD
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveTimeCardMgrTeam">
+
+					MERGE INTO TTIM330 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.YMD
+									, A.SABUN
+									, A.WORK_MANAGE_CD
+									, A.IN_HM
+									, A.OUT_HM
+									, A.MEMO
+									, A.CONFIRM_CD
+									, A.CLOSE_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS YMD
+											, NULL		AS SABUN
+											, NULL      AS WORK_MANAGE_CD
+											, NULL      AS IN_HM
+											, NULL      AS OUT_HM
+											, NULL      AS MEMO
+											, NULL      AS CONFIRM_CD
+											, NULL      AS CLOSE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    #{ssnEnterCd}           		AS ENTER_CD
+											, TRIM( #{rm.ymd} )				AS YMD
+											, TRIM( #{rm.sabun} )			AS SABUN
+											, TRIM( #{rm.workManageCd} )	AS WORK_MANAGE_CD
+											, TRIM( #{rm.inHm} )			AS IN_HM
+											, TRIM( #{rm.outHm} )			AS OUT_HM
+											, TRIM( #{rm.memo} )			AS MEMO
+											, TRIM( #{rm.confirmCd})		AS CONFIRM_CD
+											, TRIM( #{rm.closeYn})			AS CLOSE_YN
+									FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.YMD	        = S.YMD
+					AND  T.SABUN        = S.SABUN
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.WORK_MANAGE_CD    =  S.WORK_MANAGE_CD
+									, T.IN_HM             =  S.IN_HM
+									, T.OUT_HM            =  S.OUT_HM
+									, T.MEMO              =  S.MEMO
+									, T.CONFIRM_CD        =  S.CONFIRM_CD
+									, T.CLOSE_YN          =  S.CLOSE_YN
+									, T.CHKDATE	          =  SYSDATE
+									, T.CHKID	          =  #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.YMD
+							, T.SABUN
+							, T.WORK_MANAGE_CD
+							, T.IN_HM
+							, T.OUT_HM
+							, T.MEMO
+							, T.CONFIRM_CD
+							, T.CLOSE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.YMD
+							, S.SABUN
+							, S.WORK_MANAGE_CD
+							, S.IN_HM
+							, S.OUT_HM
+							, S.MEMO
+							, S.CONFIRM_CD
+							, S.CLOSE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		temp 저장 -->
+		<update parameterType="map" id="saveTimeCardMgrTeamTemp">
+
+						MERGE INTO TTIM330T	T
+						USING
+						(
+									SELECT	ENTER_CD
+										,	YMD
+										,	SABUN
+										,	CLOSE_YN
+										,	CONFIRM_CD
+										,	MEMO
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	YMD
+										,	NULL		AS	SABUN
+										,	NULL		AS	CLOSE_YN
+										,	NULL		AS	CONFIRM_CD
+										,	NULL		AS	MEMO
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})			AS	ENTER_CD
+										,	TRIM(#{rm.ymd})				AS	YMD
+										,	TRIM(#{rm.sabun})			AS	SABUN
+										,	TRIM(#{rm.closeYn})			AS	CLOSE_YN
+										,	TRIM(#{rm.confirmCd})		AS	CONFIRM_CD
+										,	TRIM(#{rm.memo})			AS	MEMO
+										,	SYSDATE						AS	CHKDATE
+										,	#{ssnSabun}					AS	CHKID
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND		YMD IS NOT NULL
+										AND		SABUN IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD			=		S.ENTER_CD
+							AND	T.YMD				=		S.YMD
+							AND	T.SABUN				=		S.SABUN
+						)
+					WHEN MATCHED THEN
+					UPDATE SET
+							T.CLOSE_YN			=	S.CLOSE_YN
+						,	T.CONFIRM_CD		=	S.CONFIRM_CD
+						,	T.MEMO				=	S.MEMO
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID				=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					(
+							T.ENTER_CD
+						,	T.YMD
+						,	T.SABUN
+						,	T.CLOSE_YN
+						,	T.CONFIRM_CD
+						,	T.MEMO
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.YMD
+						,	S.SABUN
+						,	S.CLOSE_YN
+						,	S.CONFIRM_CD
+						,	S.MEMO
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteTimeCardMgrTeam">
+
+					DELETE FROM TTIM330
+					WHERE 	(ENTER_CD, YMD, SABUN) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+											#{ssnEnterCd}
+											, TRIM( #{rm.ymd} )
+											, TRIM( #{rm.sabun} )
+										)
+</foreach>
+										)
+		</delete>
+
+		<update parameterType="map" id="procP_TIM_DAILY_WORK_CRE">
+
+			<![CDATA[
+					CALL P_TIM_DAILY_WORK_CRE(
+					    #{sqlCode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					    REPLACE( #{searchSymd,mode=IN,jdbcType=VARCHAR}, '-', ''),
+					    REPLACE( #{searchEymd,mode=IN,jdbcType=VARCHAR}, '-', ''),
+					    #{timeGroupCd,mode=IN,jdbcType=VARCHAR},
+					    #{ssnSearchType,mode=IN,jdbcType=VARCHAR},
+					    #{ssnGrpCd,mode=IN,jdbcType=VARCHAR},
+					    #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+		</update>
+		<update parameterType="map" id="CallTimeCardMgrTeamP_TIM_WORK_HOUR_CHG_OSSTEM">
+
+			<![CDATA[
+					CALL P_TIM_WORK_HOUR_CHG_OSSTEM(
+					    #{sqlCode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					    REPLACE( #{searchSymd,mode=IN,jdbcType=VARCHAR}, '-', ''),
+					    REPLACE( #{searchEymd,mode=IN,jdbcType=VARCHAR}, '-', ''),
+					    #{sabun,mode=IN,jdbcType=VARCHAR},
+					    #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+		</update>
+
+		<update parameterType="map" id="CallP_TIM_SECOM_TIME_CRE">
+
+			<![CDATA[
+					CALL P_TIM_SECOM_TIME_CRE(
+					    #{sqlCode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					    REPLACE( #{searchSymd,mode=IN,jdbcType=VARCHAR}, '-', ''),
+					    REPLACE( #{searchEymd,mode=IN,jdbcType=VARCHAR}, '-', ''),
+					    #{searchSabun,mode=IN,jdbcType=VARCHAR},
+					    #{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+		</update>
+
+
+        <!--        저장 -->
+        <update parameterType="map" id="saveTimeCardMgrTeamAllColse">
+
+                <![CDATA[
+                    UPDATE TTIM330
+                    SET    CLOSE_YN = 'Y'
+                         , CHKDATE  = SYSDATE
+                         , CHKID    = TRIM(#{ssnSabun})
+                    WHERE  ENTER_CD = TRIM(#{ssnEnterCd})
+                    AND    YMD      BETWEEN REPLACE(TRIM(#{searchSYmd}),'-','') AND REPLACE(TRIM(#{searchEYmd}),'-','')
+                ]]>
+		</update>
+
+
+
+
+</mapper>

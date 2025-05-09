@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.allExepEmpLst">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAllExepEmpLstList">
+
+				<![CDATA[
+				
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , A.NAME
+					     , F_SYS_GET_ENDOW_AUTH_YN( A.ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  A.SABUN ) AS AUTH_YN
+					     , TO_CHAR(TO_DATE(A.BIR_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS BIR_YMD
+					     , A.OUT_REASON
+					     , DECODE( #{searchGubun} , 'B', A.BUSINESS_WORK_CNT, WORK_CNT) AS CNT   -- 변수  C:달력기준 , B:영업일수기준
+					     , A.EMP_YMD||A.HUJIK_YMD AS EMP_HU_YMD
+					     , A.RET_YMD||A.BOKJIK_YMD AS RET_BOK_YMD 
+					     , '' AS IMGUM
+					     , DECODE(A.EMP_YMD, NULL, '', '입사 ')
+					         || DECODE(A.HUJIK_YMD, NULL, '', '휴직 ')
+					         || DECODE(A.BOKJIK_YMD, NULL, '', '복직 ')
+					         || DECODE(A.RET_YMD, NULL, '', '퇴직') AS BIGO
+					     , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || A.ENTER_CD || chr(38) || 'searchKeyword=' || A.SABUN || chr(38) || 'type=1' AS PHOTO  
+							  FROM (
+							            SELECT ENTER_CD, SABUN, NAME, BIR_YMD, OUT_REASON, WORK_CNT, BUSINESS_WORK_CNT, EMP_YMD, RET_YMD
+							                                   ,(SELECT LISTAGG(ORD_YMD||'(휴직) ', ',') WITHIN GROUP (ORDER BY ORD_YMD ASC) AS ORD_YMD
+							                                      FROM THRM191 B
+							                                    WHERE ENTER_CD = AA.ENTER_CD
+							                                        AND SABUN = AA.SABUN
+							                                        AND ORD_YMD LIKE REPLACE(NVL(#{searchYm}, '190001'), '-', '') ||'%'
+							                                        AND ORD_TYPE_CD = 'C') AS HUJIK_YMD      
+							                                   ,(SELECT LISTAGG(ORD_YMD||'(복직) ', ',') WITHIN GROUP (ORDER BY ORD_YMD ASC) AS ORD_YMD
+							                                      FROM THRM191 B
+							                                    WHERE ENTER_CD = AA.ENTER_CD
+							                                        AND SABUN = AA.SABUN
+							                                        AND ORD_YMD LIKE REPLACE(NVL(#{searchYm}, '190001'), '-', '') ||'%'
+							                                        AND ORD_TYPE_CD = 'D') AS BOKJIK_YMD                                                         
+							              FROM (
+							                        SELECT A.ENTER_CD, A.SABUN, A.NAME, A.BIR_YMD, #{searchWorkCnt} ||'일 미만' AS OUT_REASON, --변수
+							                                    (
+							                                    SELECT COUNT(C.SUN_DATE) 
+							                                      FROM THRM151 B, TSYS007 C
+							                                    WHERE B.ENTER_CD   = #{ssnEnterCd}
+							                                        AND B.SABUN        = A.SABUN
+							                                        AND B.STATUS_CD = 'AA'
+							                                        AND C.SUN_DATE LIKE REPLACE(NVL(#{searchYm}, '190001'), '-', '') ||'%'
+							                                        AND C.SUN_DATE BETWEEN B.SDATE AND B.EDATE
+							                                     ) AS WORK_CNT
+							                                   ,
+							                                    (
+							                                    SELECT COUNT(C.SUN_DATE) 
+							                                      FROM THRM151 B, TSYS007 C
+							                                    WHERE B.ENTER_CD   = #{ssnEnterCd}
+							                                        AND B.SABUN        = A.SABUN
+							                                        AND B.STATUS_CD = 'AA'
+							                                        AND C.SUN_DATE LIKE REPLACE(NVL(#{searchYm}, '190001'), '-', '') ||'%'
+							                                        AND C.SUN_DATE BETWEEN B.SDATE AND B.EDATE
+							                                        AND C.DAY_NM NOT IN ('토', '일')
+							                                        AND C.SUN_DATE NOT IN (SELECT YY||MM||DD
+							                                                                              FROM TTIM001
+							                                                                            WHERE ENTER_CD = #{ssnEnterCd}
+							                                                                                AND YY||MM LIKE REPLACE(NVL(#{searchYm}, '190001'), '-', '')
+							                                                                           )      
+							                                     ) AS BUSINESS_WORK_CNT                                     
+							                                   ,DECODE(SUBSTR(EMP_YMD, 1, 6), REPLACE(NVL(#{searchYm}, '190001'), '-', '') , EMP_YMD||'(입사) ', '') AS EMP_YMD
+							                                   ,DECODE(SUBSTR(RET_YMD, 1, 6), REPLACE(NVL(#{searchYm}, '190001'), '-', '') , RET_YMD||'(퇴직) ', '') AS RET_YMD
+							                                  -- ,F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN,  TO_CHAR(LAST_DAY('201912'||'01'), 'YYYYMMDD')) AS ORG_NM --변수
+							                          FROM THRM100 A
+							                        WHERE A.ENTER_CD =  #{ssnEnterCd}
+							                            AND NVL(A.RET_YMD, '99991231') >= REPLACE(NVL(#{searchYm}, '190001'), '-', '') ||'01'
+							                            AND NVL(A.EMP_YMD, '99991231') <= REPLACE(NVL(#{searchYm}, '190001'), '-', '') ||'01'
+							                            AND A.SABUN <> 'ADMIN' ]]>
+													  <if test='searchSabunName !=null and !searchSabunName.equals("")'>
+													  	AND (A.SABUN LIKE  '%'|| #{searchSabunName} ||'%' OR A.NAME LIKE '%'|| #{searchSabunName} ||'%')
+													  </if> <![CDATA[
+							                     ) AA
+							                          WHERE 1=1 ]]>
+										  <if test='searchGubun != null and searchWorkCnt !=null and searchGubun.equals("B")'>
+										  <![CDATA[ AND BUSINESS_WORK_CNT < #{searchWorkCnt}  ]]> -- B:영업일수기준
+										  </if>
+										  <if test='searchGubun != null and searchWorkCnt !=null and searchGubun.equals("C")'>
+											  <![CDATA[ AND WORK_CNT < #{searchWorkCnt}    ]]>      -- C: 달력기준
+										  </if>
+							    ) A, THRM151 B
+					WHERE A.ENTER_CD = B.ENTER_CD
+					  AND A.SABUN = B.SABUN
+					  AND NVL(TO_CHAR(LAST_DAY(TO_DATE(REPLACE(NVL(#{searchYm}, '190001'), '-', '') ||'01', 'YYYYMMDD')), 'YYYYMMDD'), TO_CHAR(SYSDATE, 'YYYYMMDD')) BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')	-- 조회조건 기준일
+	    
+							ORDER BY A.NAME ASC
+
+
+		</select>
+		
+
+</mapper>

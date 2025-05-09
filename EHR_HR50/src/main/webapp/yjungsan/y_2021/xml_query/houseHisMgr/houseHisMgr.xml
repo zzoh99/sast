@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	주택자금
+ -->
+<root>
+	<!-- 주택자금 공제구분코드 조회 -->
+	<query id="selectHouseDecCdList">
+		<![CDATA[
+			 SELECT CODE, CODE_NM, MEMO, NOTE1, NOTE2, NOTE3
+			   FROM TSYS005
+			  WHERE ENTER_CD = #ssnEnterCd#	/** param[ ssnEnterCd ] **/
+				AND GRCODE_CD = trim( 'C00344'	/** param[ grpCd ] **/ )
+				-- dynamic query 보안 이슈 때문에 수정 /임차차입금(대출기관)10을 저당차입금 이자상환액과 분리
+
+			  ORDER BY USE_YN DESC, SEQ, CODE, CODE_NM 	/** param[ orderBy ] **/
+		]]>
+	</query>
+	
+	<!-- 주택자금 조회 -->
+	<query id="selectYeaDataHouList">
+		<![CDATA[
+			SELECT A.WORK_YY
+				 , A.ADJUST_TYPE
+				 , A.SABUN
+				 , A.CON_S_YMD
+				 , A.CON_E_YMD
+				 , A.RENT_MON
+				 , A.TAX_DAY
+				 , A.INPUT_MON
+				 , A.APPL_MON
+				 , A.ADJ_INPUT_TYPE
+				 , A.HOUSE_DEC_CD,SEQ
+				 , A.NAME_DAEJU
+				 , F_COM_DECRYPT(A.RES_NO_DAEJU, A.ENTER_CD) AS RES_NO_DAEJU
+				 , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+				 , A.ADDRESS
+				 , A.CHAIB_RATE
+				 , A.WONRI_MON
+				 , A.IJA_MON
+				 , A.KEOJUZA_GUBUN
+				 , A.FEEDBACK_TYPE
+	             , A.NAME_IMDAEIN
+	             , CASE WHEN LENGTH(F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD))=13 THEN SUBSTR(F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD),1,6)||'-'||SUBSTR(F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD),7)
+	             	 	WHEN LENGTH(F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD))=10 THEN SUBSTR(F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD),1,3)||'-'||SUBSTR(F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD),4,2)||'-'||SUBSTR(F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD),6,5)
+	             	 	ELSE F_COM_DECRYPT(A.RES_NO_IMDAEIN , A.ENTER_CD) END 
+	             	AS RES_NO_IMDAEIN
+	             , A.HOUSE_TYPE
+	             , A.HOUSE_SIZE
+	             , A.CON_S_YMD_IMDAE
+	             , A.CON_E_YMD_IMDAE
+	             , A.BOJEONG_MON
+	             , A.DOC_SEQ
+	             , A.DOC_SEQ_DETAIL
+	             , F_COM_DECRYPT(A.RES_NO_IMCHA, A.ENTER_CD) AS RES_NO_IMCHA /* 임차인 주민등록번호 */
+	             , B.NAME
+	             , A.ENTER_CD || '|' || 
+	               A.WORK_YY || '|' ||
+	               A.ADJUST_TYPE || '|' ||
+	               A.SABUN || '|' ||
+	               C.HOUSE_CNT || '|' ||
+	               C.HOUSE_GET_YMD || '|' ||
+	               C.HOUSE_AREA || '|' ||
+	               C.OFFICIAL_PRICE AS HOU_ADD_INFO
+			  FROM TCPN839 A, THRM100 B, TCPN811 C
+			 WHERE A.ENTER_CD       = #ssnEnterCd#
+			   AND A.WORK_YY  	  = #searchYear#
+			   AND A.ADJUST_TYPE    LIKE '%'||  #searchAdjustType# ||'%'
+			   AND A.ADJUST_TYPE    IN (SELECT CODE
+					                     FROM TSYS005
+					                    WHERE ENTER_CD = #ssnEnterCd#
+					                      AND GRCODE_CD = 'C00303'
+					                      AND USE_YN = 'Y')
+			   AND A.ENTER_CD = B.ENTER_CD
+			   AND A.SABUN = B.SABUN
+			   AND A.ENTER_CD = C.ENTER_CD(+)
+			   AND A.WORK_YY = C.WORK_YY(+)
+			   AND A.ADJUST_TYPE = C.ADJUST_TYPE(+)
+			   AND A.SABUN = C.SABUN(+)
+			   AND A.ADJ_INPUT_TYPE LIKE #searchInputType#||'%'
+			   AND (B.NAME LIKE '%' || TRIM(#searchSbNm#) || '%' OR A.SABUN LIKE '%' || TRIM(#searchSbNm#) || '%')	
+			   AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+               AND DECODE('',#searchFeedBackType#,'A',A.FEEDBACK_TYPE) = DECODE('',#searchFeedBackType#,'A',#searchFeedBackType#)			   			   		   
+			   -- dynamic query 보안 이슈 때문에 수정 /임차차입금(대출기관)10을 저당차입금 이자상환액과 분리
+			ORDER BY A.SABUN, A.SEQ DESC -- CON_S_YMD DESC   
+		]]>
+	</query>
+	<!-- pdf 파일 저장 (미반영 위한 용도) -->
+	<query id="updateYeaDataPdf">
+		<![CDATA[
+			UPDATE TCPN851
+			SET STATUS_CD = DECODE(#sDelete#,'1','D','')
+			  , EXCEPT_GUBUN = DECODE(#sDelete#,'1',#exceptCheck#,'')
+			WHERE ENTER_CD = #ssnEnterCd#
+			  AND SABUN = #sabun#
+			  AND ADJUST_TYPE = #adjust_type#
+			  AND WORK_YY = #work_yy#
+			  AND DOC_SEQ = #doc_seq#
+			  AND SEQ = #doc_seq_detail#
+		]]>
+	</query>
+</root>

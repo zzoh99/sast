@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.closeDayMgr">
+
+<!-- 근태마감기준일설정 조회 -->
+		<select parameterType="map" resultType="cMap" id="getCloseDayMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.PAY_TYPE
+					     , A.YM
+					     , A.GNT_DAY_TYPE
+					     , LTRIM(A.STD_S_DD,'0') AS STD_S_DD
+					     , LTRIM(A.STD_E_DD,'0') AS STD_E_DD
+					     , A.WORK_DAY_TYPE
+					     , LTRIM(A.STDW_S_DD,'0') AS STDW_S_DD
+					     , LTRIM(A.STDW_E_DD,'0') AS STDW_E_DD
+					     , A.ORD_DAY_TYPE
+					     , LTRIM(A.ORD_S_DD,'0') AS ORD_S_DD
+					     , LTRIM(A.ORD_E_DD,'0') AS ORD_E_DD
+					     , A.GNT_SUM_YN
+					     , A.WORK_SUM_YN     
+					  FROM TTIM004 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           ]]>
+					<if test='payType != null and !payType.equals("")'>
+					   AND A.PAY_TYPE = TRIM( #{payType} )
+					</if>
+					<if test='searchYm != null and !searchYm.equals("")'>
+					   AND YM = REPLACE(TRIM( #{searchYm} ),'-','')
+					</if>
+					 ORDER BY PAY_TYPE, YM DESC
+
+
+		</select>
+
+<!-- 근태마감기준일설정 저장 -->
+		<update parameterType="map" id="saveCloseDayMgr">
+
+					MERGE INTO TTIM004 T
+					USING	(
+							SELECT A.ENTER_CD     
+								 , A.PAY_TYPE    
+							     , A.GNT_DAY_TYPE 
+							     , A.STD_S_DD     
+							     , A.STD_E_DD     
+							     , A.WORK_DAY_TYPE
+							     , A.STDW_S_DD    
+							     , A.STDW_E_DD    
+							     , A.ORD_DAY_TYPE 
+							     , A.ORD_S_DD     
+							     , A.ORD_E_DD     
+							     , A.GNT_SUM_YN   
+							     , A.WORK_SUM_YN  
+							FROM	(
+									SELECT NULL AS ENTER_CD     
+										 , NULL AS PAY_TYPE      
+										 , NULL AS GNT_DAY_TYPE 
+										 , NULL AS STD_S_DD     
+										 , NULL AS STD_E_DD     
+									     , NULL AS WORK_DAY_TYPE
+									     , NULL AS STDW_S_DD    
+									     , NULL AS STDW_E_DD    
+									     , NULL AS ORD_DAY_TYPE 
+									     , NULL AS ORD_S_DD     
+									     , NULL AS ORD_E_DD     
+									     , NULL AS GNT_SUM_YN   
+									     , NULL AS WORK_SUM_YN  
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )		AS  ENTER_CD
+										 , TRIM( #{rm.payType})		AS  PAY_TYPE
+										 , TRIM( #{rm.gntDayType})		AS  GNT_DAY_TYPE
+										 , TRIM( #{rm.stdSDd})			AS  STD_S_DD
+										 , TRIM( #{rm.stdEDd})			AS  STD_E_DD
+										 , TRIM( #{rm.workDayType})	AS  WORK_DAY_TYPE
+										 , TRIM( #{rm.stdwSDd})		AS  STDW_S_DD
+										 , TRIM( #{rm.stdwEDd})		AS  STDW_E_DD
+										 , TRIM( #{rm.ordDayType})		AS  ORD_DAY_TYPE
+										 , TRIM( #{rm.ordSDd})			AS  ORD_S_DD
+										 , TRIM( #{rm.ordEDd})			AS  ORD_E_DD
+										 , TRIM( #{rm.gntSumYn})		AS  GNT_SUM_YN
+										 , TRIM( #{rm.workSumYn})		AS  WORK_SUM_YN
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.PAY_TYPE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.PAY_TYPE = S.PAY_TYPE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.GNT_DAY_TYPE 	= S.GNT_DAY_TYPE 
+									, T.STD_S_DD     	= LPAD(S.STD_S_DD,2,'0')     
+									, T.STD_E_DD     	= LPAD(S.STD_E_DD,2,'0')     
+									, T.WORK_DAY_TYPE	= S.WORK_DAY_TYPE
+									, T.STDW_S_DD       = LPAD(S.STDW_S_DD,2,'0')    
+									, T.STDW_E_DD       = LPAD(S.STDW_E_DD,2,'0')    
+									, T.ORD_DAY_TYPE    = S.ORD_DAY_TYPE 
+									, T.ORD_S_DD        = LPAD(S.ORD_S_DD,2,'0')     
+									, T.ORD_E_DD        = LPAD(S.ORD_E_DD,2,'0')     
+									, T.GNT_SUM_YN      = S.GNT_SUM_YN   
+									, T.WORK_SUM_YN     = S.WORK_SUM_YN  
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD     
+							, T.PAY_TYPE     
+							, T.GNT_DAY_TYPE 
+							, T.STD_S_DD     
+							, T.STD_E_DD     
+							, T.WORK_DAY_TYPE
+							, T.STDW_S_DD    
+							, T.STDW_E_DD    
+							, T.ORD_DAY_TYPE 
+							, T.ORD_S_DD     
+							, T.ORD_E_DD     
+							, T.GNT_SUM_YN   
+							, T.WORK_SUM_YN  
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD     
+							, S.PAY_TYPE     
+							, S.GNT_DAY_TYPE 
+							, LPAD(S.STD_S_DD,2,'0')     
+							, LPAD(S.STD_E_DD,2,'0')     
+							, S.WORK_DAY_TYPE
+							, LPAD(S.STDW_S_DD,2,'0')    
+							, LPAD(S.STDW_E_DD,2,'0')    
+							, S.ORD_DAY_TYPE 
+							, LPAD(S.ORD_S_DD,2,'0')     
+							, LPAD(S.ORD_E_DD,2,'0')     
+							, S.GNT_SUM_YN   
+							, S.WORK_SUM_YN  
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 근태마감기준일설정 삭제 -->
+		<delete parameterType="map" id="deleteCloseDayMgr">
+
+					DELETE FROM TTIM004
+					 WHERE ENTER_CD||'_'||PAY_TYPE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.payType != null and !rm.payType.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.payType})
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

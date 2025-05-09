@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	기타소득감면기간 쿼리
+ -->
+<root>
+	<!-- 기타소득감면기간 조회 -->
+	<query id="selectYearEtcReduceYmdMgr">
+		<![CDATA[
+		    SELECT S.ENTER_CD
+		          ,S.WORK_YY
+		          ,S.ADJUST_TYPE
+		          ,S.SABUN
+		          ,S.NAME
+		          ,S.BUSINESS_PLACE_CD
+		          ,S.PAY_ACTION_CD
+		          ,S.REDUCE_S_YMD
+		          ,S.REDUCE_E_YMD
+		          ,DECODE(NVL(S.ADJ_ELEMENT_YN,'0'),'0','N','Y') AS ADJ_ELEMENT_YN
+		    FROM(
+		         SELECT A.ENTER_CD
+		               ,A.WORK_YY
+		               ,A.ADJUST_TYPE
+		               ,A.SABUN
+		               ,NVL(F_COM_GET_NAMES(A.ENTER_CD,A.SABUN),(SELECT S.NAME
+		                                                         FROM THRM100 S
+		                                                         WHERE S.ENTER_CD = #ssnEnterCd#
+		                                                           AND S.SABUN = A.SABUN )) AS NAME
+		               ,A.BUSINESS_PLACE_CD
+		               ,A.PAY_ACTION_CD
+		               ,A.REDUCE_S_YMD
+		               ,A.REDUCE_E_YMD
+	                  ,(SELECT COUNT(ADJ_ELEMENT_CD) AS ADJ_ELEMENT_YN
+	                    FROM TCPN815
+	                    WHERE ENTER_CD    = A.ENTER_CD
+	                      AND WORK_YY     = A.WORK_YY
+	                      AND ADJUST_TYPE = A.ADJUST_TYPE
+	                      AND SABUN       = A.SABUN
+	                      AND ADJ_ELEMENT_CD IN (
+									'C010_112' --T12 중소기업취업청년 소득세 감면(70%)
+									, 'C010_113' --T13 중소기업취업청년 소득세 감면(90%)
+									, 'C010_120' --T20 교직자 조항의 감면세액
+									, 'C010_140' --T30 성과공유 중소기업의 경영성과급 소득세 감면
+									, 'C010_142' --T40 중소기업 핵심인력 성과보상기금 소득세 감면
+									, 'C010_143' --T41 중견기업 핵심인력 성과보상기금 소득세 감면
+									, 'C010_144' --T42 중소기업 핵심인력 성과보상기금 소득세 감면
+									, 'C010_145' --T43 중견기업 핵심인력 성과보상기금 소득세 감면
+									, 'C010_150' --T50 내국인 우수인력 국내복귀 소득세 감면
+									, 'C010_79' --T01 외국인기술자 소득세 감면(50%)
+									, 'C010_80' --T02 외국인기술자 소득세 감면(70%)
+						  )
+	                    ) AS ADJ_ELEMENT_YN
+		         FROM TCPN811 A
+	             WHERE A.ENTER_CD      = #ssnEnterCd#
+	               AND A.WORK_YY       = #srchYear#
+	               AND DECODE(#searchBizPlaceCd#,'','A',BUSINESS_PLACE_CD) = DECODE(#searchBizPlaceCd#,'','A',#searchBizPlaceCd#)
+	               AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+        	  	   AND ( #srchAdjustType# IS NULL OR A.ADJUST_TYPE = #srchAdjustType# ) -- 조회조건 : 작업구분
+		     ) S
+		     WHERE 1=1
+			   AND ( S.SABUN LIKE '%' || TRIM(#srchSbNm#) || '%' OR S.NAME LIKE '%' || TRIM(#srchSbNm#) || '%' )
+			  ORDER BY ADJUST_TYPE, SABUN
+		]]>
+	</query>
+    <!-- 기타소득감면기간 입력 -->
+    <query id="updateYearEtcReduceYmdMgr">
+	    <![CDATA[
+           UPDATE TCPN811
+           SET REDUCE_S_YMD  = #reduce_s_ymd#
+              ,REDUCE_E_YMD  = #reduce_e_ymd#
+           WHERE ENTER_CD    = #ssnEnterCd#
+             AND WORK_YY     = #work_yy#
+             AND SABUN       = #sabun#
+             AND ADJUST_TYPE = #adjust_type#
+	    ]]>
+    </query>
+</root>

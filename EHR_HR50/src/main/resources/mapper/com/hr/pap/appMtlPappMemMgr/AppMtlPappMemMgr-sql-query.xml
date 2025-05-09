@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.appMtlPappMemMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppMtlPappMemMgrList1">
+
+				<![CDATA[
+					SELECT ENTER_CD
+				       	 , #{searchAppSeqCd} AS APP_SEQ_CD  -- 평가차수 => 3:상향평가, 4:동료평가
+				      	 , F_COM_GET_GRCODE_NAME(ENTER_CD, 'P00003', #{searchAppSeqCd}) AS APP_SEQ_NM  -- 평가차수=>3:상향평가, 4:동료평가
+				      	 , SABUN
+				      	 , F_COM_GET_NAMES(ENTER_CD, SABUN) AS NAME
+				      	 , F_COM_GET_ORG_NM21(ENTER_CD, SABUN, NVL(F_PAP_GET_BASE_YMD(ENTER_CD, APPRAISAL_CD, '5'), '99991231')) AS ORG_NM
+				      	 , F_COM_GET_JIKWEE_NM(ENTER_CD, SABUN, NVL(F_PAP_GET_BASE_YMD(ENTER_CD, APPRAISAL_CD, '5'), '99991231')) AS JIKWEE_NM
+				      	 , F_COM_GET_JIKCHAK_NM(ENTER_CD, SABUN, NVL(F_PAP_GET_BASE_YMD(ENTER_CD, APPRAISAL_CD, '5'), '99991231')) AS JIKCHAK_NM
+				      	 , APP_ORG_CD
+				      	 , (SELECT COUNT(SABUN) 
+					           FROM TPAP202 
+					          WHERE ENTER_CD = A.ENTER_CD
+					            AND APPRAISAL_CD = A.APPRAISAL_CD
+					            AND APP_STEP_CD  = '5'  
+					            AND APP_SEQ_CD   = #{searchAppSeqCd} --평가차수=>3:상향평가, 4:동료평가
+					            AND SABUN        = A.SABUN
+					            AND APP_ORG_CD   = A.APP_ORG_CD) AS INWON_CNT
+				  FROM TPAP201 A
+				 WHERE A.ENTER_CD     = #{ssnEnterCd}
+				   AND A.APPRAISAL_CD = #{searchAppraisalCd}
+				   AND A.APP_STEP_CD  = '5' -- 최종평가
+				   AND A.APP_YN       = 'Y'
+				]]>
+
+
+		</select>
+		
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppMtlPappMemMgrList2">
+
+				<![CDATA[
+				     SELECT B.APP_ORG_NM
+				     	  , B.APP_ORG_CD
+						  , B.SABUN
+						  , C.APP_SABUN
+						  , F_COM_GET_NAMES(C.ENTER_CD, C.APP_SABUN) AS NAME
+						  , F_COM_GET_ORG_NM21(C.ENTER_CD, C.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231')) AS ORG_NM
+						  , F_COM_GET_JIKWEE_NM(C.ENTER_CD, C.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231')) AS JIKWEE_NM
+						  , F_COM_GET_JIKCHAK_NM(C.ENTER_CD, C.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231')) AS JIKCHAK_NM       
+				      FROM TPAP201 B, TPAP202 C 
+				     WHERE B.ENTER_CD = #{ssnEnterCd}
+				       AND B.APPRAISAL_CD = #{searchAppraisalCd}
+				       AND B.APP_STEP_CD  = '5' --최종평가일 경우에만 
+				       AND B.SABUN        = #{searchSabun}
+				       AND B.APP_ORG_CD   = #{searchAppOrgCd}
+				       AND B.APP_YN       = 'Y'
+				       AND C.ENTER_CD     = B.ENTER_CD
+				       AND C.APPRAISAL_CD = B.APPRAISAL_CD
+				       AND C.APP_STEP_CD  = B.APP_STEP_CD
+				       AND C.SABUN        = B.SABUN
+				       AND C.APP_ORG_CD   = B.APP_ORG_CD
+				       AND C.APP_SEQ_CD   = #{searchAppSeqCd} -- 평가차수=>3:상향평가, 4:동료평가
+				    ORDER BY F_COM_JIKJE_SORT(C.ENTER_CD, C.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(B.ENTER_CD, B.APPRAISAL_CD, '5'), '99991231'))
+				]]>
+
+
+		</select>
+		
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppMtlPappMemMgrList3">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					     , ENTER_CD AS W_ENTER_CD
+					     , ENTER_CD AS APP_ENTER_CD
+					     , NAME
+					     , SABUN			AS APP_SABUN
+					     , ORG_CD			AS APP_ORG_CD
+					     , ORG_NM			AS APP_ORG_NM
+					     , JIKWEE_NM
+					     , JIKCHAK_NM
+					     , #{searchAppOrgCd}	AS APP_ORG_CD
+					     , ''				AS SABUN
+					  FROM
+					       (
+					          SELECT A.ENTER_CD
+					               , A.NAME
+					               , A.SABUN 
+					               , F_COM_GET_ORG_CD(A.ENTER_CD, A.SABUN, NVL(F_PAP_GET_BASE_YMD(A.ENTER_CD, #{searchAppraisalCd}, '5'), '99991231')) AS ORG_CD
+					               , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, NVL(F_PAP_GET_BASE_YMD(A.ENTER_CD, #{searchAppraisalCd}, '5'), '99991231')) AS ORG_NM
+					               , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, NVL(F_PAP_GET_BASE_YMD(A.ENTER_CD, #{searchAppraisalCd}, '5'), '99991231')) AS JIKWEE_NM
+					               , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, NVL(F_PAP_GET_BASE_YMD(A.ENTER_CD, #{searchAppraisalCd}, '5'), '99991231')) AS JIKCHAK_NM
+					            FROM THRM100 A, THRM151 B
+					           WHERE A.ENTER_CD = #{ssnEnterCd}
+					             AND A.SABUN NOT IN (
+					                                 SELECT SABUN 
+					                                   FROM TPAP201 
+					                                  WHERE ENTER_CD     = #{ssnEnterCd}
+					                                    AND APPRAISAL_CD = #{searchAppraisalCd}
+					                                    AND APP_STEP_CD  = '5' -- 최종평가
+					                                    AND SABUN        = #{searchSabun} -- 선택한 평가자
+					                                 UNION
+					                                 SELECT APP_SABUN
+					                                   FROM TPAP202
+					                                  WHERE ENTER_CD = #{ssnEnterCd}
+					                                    AND APPRAISAL_CD = #{searchAppraisalCd}
+					                                    AND APP_STEP_CD  = '5' -- 최종평가   
+					                                    AND SABUN    = #{searchSabun} -- 선택한 평가자
+					                                    AND APP_ORG_CD   = #{searchAppOrgCd} -- 선택한 평가자
+					                                    AND APP_SEQ_CD   = #{searchAppSeqCd} -- 평가차수=>3:상향평가, 4:동료평가
+					                                )    
+					             AND B.ENTER_CD = A.ENTER_CD
+					             AND B.SABUN    = A.SABUN
+					             AND B.SDATE    = (SELECT MAX(SDATE)
+					                                 FROM THRM151
+					                                WHERE ENTER_CD = B.ENTER_CD
+					                                  AND SABUN    = B.SABUN
+					                                  AND NVL(F_PAP_GET_BASE_YMD(ENTER_CD, #{searchAppraisalCd}, '5'), '99991231') BETWEEN SDATE AND NVL(EDATE, '99991231'))
+								]]>
+								 <choose><when test='searchStatusYn != null and searchStatusYn.equals("Y")'>
+								 	AND B.STATUS_CD = 'AA' -- 재직자일 경우
+								</when><otherwise>
+					             <![CDATA[
+								 	AND B.STATUS_CD <> 'AA'  -- 재직자외 일 경우
+								 	]]>
+								 </otherwise>
+								 </choose>
+					      )
+					      WHERE ENTER_CD = #{ssnEnterCd}
+					      <if test='searchSheet3Word != null and !searchSheet3Word.equals("")'>
+						  AND (
+							      NAME LIKE '%' || #{searchSheet3Word} || '%' OR
+							      SABUN LIKE '%' || #{searchSheet3Word} || '%' OR
+							      ORG_NM LIKE '%' || #{searchSheet3Word} || '%' OR
+							      JIKWEE_NM LIKE '%' || #{searchSheet3Word} || '%' OR
+							      JIKCHAK_NM LIKE  '%' || #{searchSheet3Word} || '%'
+						      )
+						  </if>
+					      ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, NVL(F_PAP_GET_BASE_YMD(ENTER_CD, #{searchAppraisalCd}, '5'), '99991231'))
+
+
+
+		</select>
+	
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppMtlPappMemMgr">
+
+				MERGE INTO TPAP202 T
+					USING	(
+							SELECT #{ssnEnterCd} 			AS ENTER_CD
+								 , #{searchAppraisalCd}	AS APPRAISAL_CD
+								 , '5'		AS APP_STEP_CD
+								 , A.SABUN
+								 , A.APP_ORG_CD
+								 , #{searchAppSeqCd}		AS APP_SEQ_CD
+								 , A.APP_SABUN
+								 , F_COM_GET_ORG_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS ORG_CD
+								 , F_COM_GET_ORG_NM21(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS ORG_NM
+								 , F_COM_GET_JIKWEE_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKWEE_CD
+								 , F_COM_GET_JIKWEE_NM(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKWEE_NM
+								 , F_COM_GET_JIKCHAK_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKCHAK_CD
+								 , F_COM_GET_JIKCHAK_NM(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKCHAK_NM
+								 , F_COM_GET_JIKGUB_CD(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKGUB_CD
+								 , F_COM_GET_JIKGUB_NM(#{ssnEnterCd}, A.APP_SABUN, NVL(F_PAP_GET_BASE_YMD(#{ssnEnterCd}, #{searchAppraisalCd}, '5'), '99991231')) AS JIKGUB_NM
+							   FROM (
+									SELECT NULL			AS SABUN
+										 , NULL			AS APP_SABUN
+										 , NULL			AS APP_ORG_CD
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+							SELECT TRIM(#{rm.sabun})	AS SABUN
+								 , TRIM(#{rm.appSabun})	AS APP_SABUN
+								 , TRIM(#{rm.appOrgCd})	AS APP_ORG_CD
+							  FROM DUAL
+</foreach>
+									) A 
+							WHERE A.APP_SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= S.ENTER_CD 
+						AND	T.APPRAISAL_CD	= S.APPRAISAL_CD
+						AND	T.APP_STEP_CD	= S.APP_STEP_CD
+						AND	T.SABUN			= S.SABUN
+						AND	T.APP_ORG_CD	= S.APP_ORG_CD
+						AND	T.APP_SEQ_CD	= S.APP_SEQ_CD
+						AND T.APP_SABUN		= S.APP_SABUN
+						)
+					WHEN MATCHED THEN 
+					UPDATE SET T.CHKDATE = SYSDATE
+					DELETE WHERE(T.SABUN IS NOT NULL)
+					WHEN NOT MATCHED THEN
+					INSERT (
+						T.ENTER_CD, 
+						T.APPRAISAL_CD, 
+						T.APP_STEP_CD, 
+						T.SABUN,
+						T.APP_ORG_CD, 
+						T.APP_SEQ_CD, 
+						T.APP_SABUN,
+						T.ORG_CD, 
+						T.ORG_NM, 
+						T.JIKWEE_CD, 
+						T.JIKWEE_NM,
+						T.JIKCHAK_CD, 
+						T.JIKCHAK_NM, 
+						T.JIKGUB_CD, 
+						T.JIKGUB_NM,
+						T.CHKDATE, 
+						T.CHKID
+					)
+					VALUES (
+						S.ENTER_CD, 
+						S.APPRAISAL_CD, 
+						S.APP_STEP_CD, 
+						#{searchSabun},
+						S.APP_ORG_CD, 
+						S.APP_SEQ_CD, 
+						S.APP_SABUN,
+						S.ORG_CD, 
+						S.ORG_NM, 
+						S.JIKWEE_CD, 
+						S.JIKWEE_NM,
+						S.JIKCHAK_CD, 
+						S.JIKCHAK_NM, 
+						S.JIKGUB_CD, 
+						S.JIKGUB_NM,
+						SYSDATE, 
+						#{ssnSabun}
+					)
+		</update>
+		
+<!-- 		평가그룹 초기화 -->
+		<delete parameterType="map" id="initializeAppMtlPappMem">
+
+				<![CDATA[
+					 DELETE TPAP202 
+					  WHERE ENTER_CD		= #{ssnEnterCd}
+					    AND APPRAISAL_CD	= #{searchAppraisalCd}
+					    AND APP_STEP_CD		= '5'
+					    AND APP_SEQ_CD		= #{searchAppSeqCd}
+				]]>
+
+		</delete>
+
+</mapper>

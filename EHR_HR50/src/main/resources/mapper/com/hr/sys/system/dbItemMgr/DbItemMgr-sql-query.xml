@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.system.dbItemMgr">
+<!-- 		DB Item관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getDbItemMgrList">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL,
+					       A.DB_ITEM_CD,
+					       A.DB_ITEM_NM,
+					       A.DESCRIPTION,
+					       A.DATA_TYPE,
+					       A.SQL_SYNTAX,
+					       A.BIZ_CD,
+					       A.SYS_YN,
+					       A.CHKDATE,
+					       A.CHKID
+					  FROM TSYS807 A
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND UPPER(NVL(A.DB_ITEM_NM, '%')) LIKE '%'||UPPER(TRIM(#{searchDbItemNm}))||'%'
+					   AND UPPER(A.BIZ_CD) LIKE '%'||UPPER(TRIM(#{searchBizCd}))||'%'
+					 ORDER BY A.BIZ_CD, A.DB_ITEM_CD
+				]]>
+
+
+		</select>
+		
+<!-- 		DB Item관리 저장 -->	
+		<update parameterType="map" id="saveDbItemMgr">
+
+
+					MERGE INTO TSYS807 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.DB_ITEM_CD
+									, A.DB_ITEM_NM
+									, A.DESCRIPTION
+									, A.DATA_TYPE
+									, A.SQL_SYNTAX
+									, A.BIZ_CD
+									, A.SYS_YN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS DB_ITEM_CD
+											, NULL		AS DB_ITEM_NM
+											, NULL		AS DESCRIPTION
+											, NULL		AS DATA_TYPE
+											, NULL		AS SQL_SYNTAX
+											, NULL		AS BIZ_CD
+											, NULL		AS SYS_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.dbItemCd} )	AS DB_ITEM_CD
+											, TRIM( #{rm.dbItemNm} )	AS DB_ITEM_NM
+											, TRIM( #{rm.description} )	AS DESCRIPTION
+											, TRIM( #{rm.dataType} )	AS DATA_TYPE
+											, TRIM( #{rm.sqlSyntax} )	AS SQL_SYNTAX
+											, TRIM( #{rm.bizCd} )	AS BIZ_CD
+											, TRIM( #{rm.sysYn} )	AS SYS_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.DB_ITEM_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.DB_ITEM_CD = S.DB_ITEM_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.DB_ITEM_NM	= S.DB_ITEM_NM
+									, T.DESCRIPTION	= S.DESCRIPTION
+									, T.DATA_TYPE	= S.DATA_TYPE
+									, T.SQL_SYNTAX	= S.SQL_SYNTAX
+									, T.BIZ_CD	= S.BIZ_CD
+									, T.SYS_YN = S.SYS_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD
+							, T.DB_ITEM_CD
+							, T.DB_ITEM_NM
+							, T.DESCRIPTION
+							, T.DATA_TYPE
+							, T.SQL_SYNTAX
+							, T.BIZ_CD
+							, T.SYS_YN
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  S.ENTER_CD
+							, S.DB_ITEM_CD
+							, S.DB_ITEM_NM
+							, S.DESCRIPTION
+							, S.DATA_TYPE
+							, S.SQL_SYNTAX
+							, S.BIZ_CD
+							, S.SYS_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		DB Item관리 삭제 -->
+		<delete parameterType="map" id="deleteDbItemMgr">
+
+
+					DELETE FROM TSYS807 
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||DB_ITEM_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.dbItemCd != null and !rm.dbItemCd.equals("")'>
+											TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.dbItemCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+
+
+</mapper>

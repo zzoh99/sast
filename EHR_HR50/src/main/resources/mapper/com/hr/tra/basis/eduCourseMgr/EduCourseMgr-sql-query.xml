@@ -1,0 +1,596 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.basis.eduCourseMgr">
+
+<!-- 신청자정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduCourseMgrUserInfo">
+			
+				<![CDATA[
+					SELECT F_COM_GET_CONT_ADDRESS(TRIM(#{ssnEnterCd}), TRIM(#{ssnSabun}),'HP') AS PHONE_NO
+					     , F_COM_GET_CONT_ADDRESS(TRIM(#{ssnEnterCd}), TRIM(#{ssnSabun}),'OT') AS TEL_NO
+                      FROM DUAL
+				]]>
+			
+			
+		</select>
+		
+<!-- 		교육과정관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduCourseMgrList">
+			
+				<![CDATA[
+				SELECT
+					T.*
+				FROM (
+					SELECT A.ENTER_CD
+					     , A.EDU_SEQ
+					     , A.EDU_COURSE_NM
+					     , A.IN_OUT_TYPE
+					     , A.EDU_BRANCH_CD
+						 , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'L10010', A.EDU_BRANCH_CD) AS EDU_BRANCH_NM
+					     , A.EDU_M_BRANCH_CD
+					     , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'L10015', A.EDU_M_BRANCH_CD) AS EDU_M_BRANCH_NM
+					     , A.EDU_METHOD_CD
+					     , A.EDU_STATUS_CD
+					     , A.EDU_ORG_CD
+						 , A.EDU_LEVEL 
+					     , A.FOREIGN_CD
+					     , A.MANDATORY_YN
+					     , A.JOB_CD
+					     , (SELECT X.JOB_NM
+					          FROM TORG201 X
+					         WHERE X.ENTER_CD = A.ENTER_CD
+					           AND X.JOB_CD   = A.JOB_CD
+					           AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN X.SDATE AND NVL( X.EDATE, '99991231' ) ) AS JOB_NM 
+					     , A.NOTE
+					     , A.EDU_MEMO
+					     , (SELECT X.EDU_ORG_NM
+					          FROM TTRA001 X
+					         WHERE X.ENTER_CD   = A.ENTER_CD
+					           AND X.EDU_ORG_CD = A.EDU_ORG_CD ) AS EDU_ORG_NM
+					     , A.FILE_SEQ      
+					     , A.MNG_SABUN 
+					     , A.MNG_TEL_NO 
+						 , F_COM_GET_NAMES(A.ENTER_CD, A.MNG_SABUN ) AS MNG_NAME -- 성명       
+						 , F_COM_GET_ORG_NM2(A.ENTER_CD, A.MNG_SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS MNG_ORG_NM
+						 
+					     , 1 AS FILE_IMG
+					     , 0 AS SELECT_IMG
+					  FROM TTRA101 A
+					 WHERE A.ENTER_CD   = TRIM(#{ssnEnterCd}) ]]>
+<!-- 				 
+	<if test="ssnGrpCd and ssnGrpCd neq '10' and ssnGrpCd neq '15'">
+					   AND A.MNG_SABUN = TRIM(#{ssnSabun})			   
+	</if>
+ -->		
+	<if test='searchDtl != null and searchDtl eq "Y"'>			     
+					   AND A.EDU_SEQ 	  = TRIM(#{searchEduSeq})
+	</if>
+	<if test="searchEduCourseNm != null and searchEduCourseNm neq ''">
+					   AND NVL(A.EDU_COURSE_NM,'^') LIKE '%' || #{searchEduCourseNm} || '%'
+	</if>
+	<if test="searchMandatoryYn != null and searchMandatoryYn neq ''">
+	 				   AND A.MANDATORY_YN = #{searchMandatoryYn}
+	</if>
+	<if test="searchEduMBranchCd != null and searchEduMBranchCd neq ''">
+	 				   AND A.EDU_M_BRANCH_CD = #{searchEduMBranchCd}
+	</if>
+	<if test="searchInOutType != null and searchInOutType neq ''">
+	 				   AND A.IN_OUT_TYPE = #{searchInOutType}
+	</if>
+	<if test="searchEduStatusCd != null and searchEduStatusCd neq ''">
+	 				   AND A.EDU_STATUS_CD = #{searchEduStatusCd}
+	</if>
+	<if test="searchEduBranchCd != null and searchEduBranchCd neq ''">
+	 				   AND A.EDU_BRANCH_CD = #{searchEduBranchCd}
+	</if>
+	<if test="searchEduMethodCd != null and searchEduMethodCd neq ''">
+	 				   AND A.EDU_METHOD_CD = #{searchEduMethodCd}
+	</if>
+	<if test="searchEduLevel != null and searchEduLevel neq ''">
+	 				   AND A.EDU_LEVEL = #{searchEduLevel}
+	</if>
+	<if test="searchSabunName != null and searchSabunName neq ''">
+					   AND (A.MNG_SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.MNG_SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+	</if>
+	 				 				
+				) T
+				WHERE 1=1
+	<if test="searchEduOrgNm != null and searchEduOrgNm neq ''">
+	 			  AND NVL(T.EDU_ORG_NM,'^') LIKE '%' || #{searchEduOrgNm} || '%'
+	</if>		
+				ORDER BY T.EDU_COURSE_NM
+	</select>
+
+<!-- 		교육과정관리-교육분류 리스트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduMBranchMgrList">
+			
+				<![CDATA[
+					SELECT CODE 	AS EDU_M_BRANCH_CD
+						 , CODE_NM  AS EDU_M_BRANCH_NM
+						 , NOTE1
+						 , NOTE2
+						 , NOTE3
+					  FROM TSYS005
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND GRCODE_CD  = 'L10015'
+			 		   AND CODE LIKE '%' || TRIM(#{searchEduMBranchCd}) || '%'
+				 	   AND CODE_NM LIKE '%' || TRIM(#{searchEduMBranchNm}) || '%'
+			 		 ORDER BY SEQ ASC
+				]]>
+		</select>
+
+<!-- 		교육과정관리-교육구분에 해당하는 교육분류 코드 리스트  -->
+		<select parameterType="map" resultType="cMap" id="getEduMBranchCdList">
+			
+				<![CDATA[
+					SELECT CODE 	
+						 , CODE_NM  
+						 , NOTE1
+						 , NOTE2
+						 , NOTE3
+					  FROM TSYS005
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND GRCODE_CD  = 'L10015' ]]>
+<if test="searchEduBranchCd != null and searchEduBranchCd neq ''">
+			 		   AND DECODE( NOTE1, NULL, TRIM(#{searchEduBranchCd}), TRIM(NOTE1)) = TRIM(#{searchEduBranchCd})
+</if>
+			 		 ORDER BY SEQ ASC
+			
+		</select>
+
+<!-- 		교육관련역량 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduMgrComptyList">
+			
+				<![CDATA[
+				SELECT A.ENTER_CD
+				     , A.EDU_SEQ
+				     , A.COMPETENCY_CD
+				     , A.NOTE
+                     , F_COM_GET_COMPETENCY_NM( B.ENTER_CD, B.COMPETENCY_CD, 		TO_CHAR(SYSDATE, 'YYYYMMDD')) AS COMPETENCY_NM
+                     , F_COM_GET_COMPETENCY_NM( B.ENTER_CD, B.PRIOR_COMPETENCY_CD,  TO_CHAR(SYSDATE, 'YYYYMMDD')) AS PRIOR_COMPETENCY_NM
+				  FROM TTRA103 A, TORG055 B 
+				 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				   AND A.EDU_SEQ  = TRIM(#{searchEduSeq})
+				   AND A.ENTER_CD = B.ENTER_CD
+				   AND A.COMPETENCY_CD = B.COMPETENCY_CD
+				
+				]]>
+			
+			
+		</select>
+		
+
+<!-- 		교육관련역량-역량분류표 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduMgrComptyStdList">
+			
+				<![CDATA[
+					SELECT A.PRIOR_COMPETENCY_NM, A.COMPETENCY_NM, A.COMPETENCY_CD
+					     , DECODE( B.COMPETENCY_CD, NULL, 1, 0 ) AS ROW_EDIT 
+					     , DECODE( B.COMPETENCY_CD, NULL, '#ffffff', '#f1f1f1' ) AS SEL_BACK_COLOR 
+					  FROM (
+								 SELECT A.ENTER_CD
+								      , F_COM_GET_COMPETENCY_NM( A.ENTER_CD, A.PRIOR_COMPETENCY_CD, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS PRIOR_COMPETENCY_NM
+								      , A.COMPETENCY_CD
+								      , B.COMPETENCY_NM
+								      , ROWNUM AS SEQ
+								   FROM TORG055 A, TORG051 B
+								  WHERE A.ENTER_CD = B.ENTER_CD
+								    AND A.COMPETENCY_CD = B.COMPETENCY_CD
+								    AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+								    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+								  START WITH A.PRIOR_COMPETENCY_CD = '0'
+								CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+								    AND PRIOR A.COMPETENCY_CD = A.PRIOR_COMPETENCY_CD
+								ORDER SIBLINGS BY A.PRIOR_COMPETENCY_CD, A.SEQ
+							) A, TTRA103 B
+					   WHERE A.PRIOR_COMPETENCY_NM IS NOT NULL
+					     AND A.ENTER_CD          = B.ENTER_CD(+)
+				         AND TRIM(#{searchEduSeq}) = EDU_SEQ(+)
+					     AND A.COMPETENCY_CD     = B.COMPETENCY_CD(+)
+					   ORDER BY A.SEQ 
+				
+				]]>
+			
+			
+		</select>
+
+	<!-- 		교육과정관리 저장 -->
+	<update parameterType="map" id="saveEduCourseMgr">
+
+				<![CDATA[
+		MERGE INTO TTRA101 T
+			USING
+				(
+					SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD
+						 , TRIM(#{eduSeq})  		AS  EDU_SEQ
+						 , TRIM(#{eduCourseNm}) 	AS  EDU_COURSE_NM
+						 , TRIM(#{inOutType})  	AS  IN_OUT_TYPE
+						 , TRIM(#{eduBranchCd})  	AS  EDU_BRANCH_CD
+						 , TRIM(#{eduMBranchCd})  	AS  EDU_M_BRANCH_CD
+						 , TRIM(#{eduMethodCd})  	AS  EDU_METHOD_CD
+						 , TRIM(#{eduStatusCd})  	AS  EDU_STATUS_CD
+						 , TRIM(#{eduOrgCd})  		AS  EDU_ORG_CD
+						 , TRIM(#{foreignCd})  	AS  FOREIGN_CD
+						 , TRIM(#{mandatoryYn}) 	AS  MANDATORY_YN
+						 , TRIM(#{jobCd})  		AS  JOB_CD
+						 , TRIM(#{eduLevel})  		AS  EDU_LEVEL
+						 , TRIM(#{eduMemo})  		AS  EDU_MEMO
+						 , TRIM(#{fileSeq})  		AS  FILE_SEQ
+						 , TRIM(#{mngSabun})  		AS  MNG_SABUN
+						 , TRIM(#{mngTelNo})  		AS  MNG_TEL_NO
+						 , TRIM(#{note})  			AS  NOTE
+					FROM DUAL
+				) S
+			ON (
+				T.ENTER_CD 	= S.ENTER_CD
+					AND  T.EDU_SEQ 	= S.EDU_SEQ
+				)
+			WHEN MATCHED THEN
+				UPDATE SET T.CHKDATE			= sysdate
+					, T.CHKID			= #{ssnSabun}
+					, T.EDU_COURSE_NM 	= S.EDU_COURSE_NM
+					, T.IN_OUT_TYPE 	= S.IN_OUT_TYPE
+					, T.EDU_BRANCH_CD 	= S.EDU_BRANCH_CD
+					, T.EDU_M_BRANCH_CD = S.EDU_M_BRANCH_CD
+					, T.EDU_METHOD_CD 	= S.EDU_METHOD_CD
+					, T.EDU_STATUS_CD 	= S.EDU_STATUS_CD
+					, T.EDU_ORG_CD 		= S.EDU_ORG_CD
+					, T.FOREIGN_CD 		= S.FOREIGN_CD
+					, T.MANDATORY_YN 	= S.MANDATORY_YN
+					, T.JOB_CD 			= S.JOB_CD
+					, T.EDU_LEVEL 		= S.EDU_LEVEL
+					, T.EDU_MEMO 		= S.EDU_MEMO
+					, T.FILE_SEQ 		= S.FILE_SEQ
+					, T.MNG_SABUN 		= S.MNG_SABUN
+					, T.MNG_TEL_NO 		= S.MNG_TEL_NO
+					, T.NOTE 			= S.NOTE
+			WHEN NOT MATCHED THEN
+				INSERT
+					(
+					 T.ENTER_CD
+						, T.EDU_SEQ
+						, T.EDU_COURSE_NM
+						, T.IN_OUT_TYPE
+						, T.EDU_BRANCH_CD
+						, T.EDU_M_BRANCH_CD
+						, T.EDU_METHOD_CD
+						, T.EDU_STATUS_CD
+						, T.EDU_ORG_CD
+						, T.FOREIGN_CD
+						, T.MANDATORY_YN
+						, T.JOB_CD
+						, T.EDU_LEVEL
+						, T.EDU_MEMO
+						, T.FILE_SEQ
+						, T.MNG_SABUN
+						, T.MNG_TEL_NO
+						, T.NOTE
+						, T.CHKDATE
+						, T.CHKID
+						)
+					VALUES
+						(
+						  S.ENTER_CD
+						, NVL(S.EDU_SEQ, F_COM_GET_SEQ('EDU'))
+						, S.EDU_COURSE_NM
+						, S.IN_OUT_TYPE
+						, S.EDU_BRANCH_CD
+						, S.EDU_M_BRANCH_CD
+						, S.EDU_METHOD_CD
+						, S.EDU_STATUS_CD
+						, S.EDU_ORG_CD
+						, S.FOREIGN_CD
+						, S.MANDATORY_YN
+						, S.JOB_CD
+						, S.EDU_LEVEL
+						, S.EDU_MEMO
+						, S.FILE_SEQ
+						, S.MNG_SABUN
+						, S.MNG_TEL_NO
+						, S.NOTE
+						, sysdate
+						, #{ssnSabun}
+						)
+
+		]]>
+		</update>
+
+	<!-- 		교육과정관리 삭제 -->
+	<delete parameterType="map" id="deleteEduCourseMgr">
+
+				<![CDATA[
+		DELETE FROM TTRA101
+		WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+		  AND EDU_SEQ  = TRIM(#{eduSeq})
+		]]>
+
+
+		</delete>
+
+<!-- 		교육과정관리 저장 (다건) -->
+		<update parameterType="map" id="saveEduCourseMgrSheet">
+			
+				<![CDATA[
+					 MERGE INTO TTRA101 T 
+					 USING ]]>
+						(
+								SELECT      ENTER_CD
+										,   EDU_SEQ
+										,   EDU_COURSE_NM
+										,   IN_OUT_TYPE
+										,   EDU_BRANCH_CD
+										,   EDU_M_BRANCH_CD
+										,   EDU_METHOD_CD
+										,   EDU_STATUS_CD
+										,   EDU_ORG_CD
+										,   FOREIGN_CD
+										,   MANDATORY_YN
+										,   JOB_CD
+										,   EDU_LEVEL
+										,   EDU_MEMO
+										,   FILE_SEQ
+										,   MNG_SABUN
+										,   MNG_TEL_NO
+										,   NOTE
+							FROM	(
+									SELECT 	NULL		AS ENTER_CD
+										,	NULL		AS EDU_SEQ
+										,	NULL		AS EDU_COURSE_NM
+										,	NULL		AS IN_OUT_TYPE
+										,	NULL		AS EDU_BRANCH_CD
+										,	NULL		AS EDU_M_BRANCH_CD
+										,	NULL		AS EDU_METHOD_CD
+										,	NULL		AS EDU_STATUS_CD
+										,	NULL		AS EDU_ORG_CD
+										,	NULL		AS FOREIGN_CD
+										,	NULL		AS MANDATORY_YN
+										,	NULL		AS JOB_CD
+										,	NULL		AS EDU_LEVEL
+										,	NULL		AS EDU_MEMO
+										,	NULL		AS FILE_SEQ
+										,	NULL		AS MNG_SABUN
+										,	NULL		AS MNG_TEL_NO
+										,	NULL		AS NOTE
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+						   UNION ALL
+					       SELECT TRIM(#{ssnEnterCd})  	AS  ENTER_CD
+					            , TRIM(#{rm.eduSeq})  		AS  EDU_SEQ
+					            , TRIM(#{rm.eduCourseNm}) 	AS  EDU_COURSE_NM
+					            , TRIM(#{rm.inOutType})  	AS  IN_OUT_TYPE
+					            , TRIM(#{rm.eduBranchCd})  	AS  EDU_BRANCH_CD
+					            , TRIM(#{rm.eduMBranchCd})  	AS  EDU_M_BRANCH_CD
+					            , TRIM(#{rm.eduMethodCd})  	AS  EDU_METHOD_CD
+					            , TRIM(#{rm.eduStatusCd})  	AS  EDU_STATUS_CD
+					            , TRIM(#{rm.eduOrgCd})  		AS  EDU_ORG_CD
+					            , TRIM(#{rm.foreignCd})  	AS  FOREIGN_CD
+					            , TRIM(#{rm.mandatoryYn}) 	AS  MANDATORY_YN
+					            , TRIM(#{rm.jobCd})  		AS  JOB_CD
+					            , TRIM(#{rm.eduLevel})  		AS  EDU_LEVEL
+					            , TRIM(#{rm.eduMemo})  		AS  EDU_MEMO
+					            , TRIM(#{rm.fileSeq})  		AS  FILE_SEQ
+					            , TRIM(#{rm.mngSabun})  		AS  MNG_SABUN
+					            , TRIM(#{rm.mngTelNo})  		AS  MNG_TEL_NO
+					            , TRIM(#{rm.note})  			AS  NOTE
+						   FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+					) S 
+					ON ( 
+					          T.ENTER_CD 	= S.ENTER_CD 
+					     AND  T.EDU_SEQ 	= S.EDU_SEQ 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun} 
+					            , T.EDU_COURSE_NM 	= S.EDU_COURSE_NM 
+					            , T.IN_OUT_TYPE 	= S.IN_OUT_TYPE 
+					            , T.EDU_BRANCH_CD 	= S.EDU_BRANCH_CD 
+					            , T.EDU_M_BRANCH_CD = S.EDU_M_BRANCH_CD 
+					            , T.EDU_METHOD_CD 	= S.EDU_METHOD_CD 
+					            , T.EDU_STATUS_CD 	= S.EDU_STATUS_CD 
+					            , T.EDU_ORG_CD 		= S.EDU_ORG_CD 
+					            , T.FOREIGN_CD 		= S.FOREIGN_CD 
+					            , T.MANDATORY_YN 	= S.MANDATORY_YN 
+					            , T.JOB_CD 			= S.JOB_CD 
+					            , T.EDU_LEVEL 		= S.EDU_LEVEL 
+					            , T.EDU_MEMO 		= S.EDU_MEMO 
+					            , T.FILE_SEQ 		= S.FILE_SEQ 
+					            , T.MNG_SABUN 		= S.MNG_SABUN 
+					            , T.MNG_TEL_NO 		= S.MNG_TEL_NO
+					            , T.NOTE 			= S.NOTE 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.EDU_SEQ
+					            , T.EDU_COURSE_NM
+					            , T.IN_OUT_TYPE
+					            , T.EDU_BRANCH_CD
+					            , T.EDU_M_BRANCH_CD
+					            , T.EDU_METHOD_CD
+					            , T.EDU_STATUS_CD
+					            , T.EDU_ORG_CD
+					            , T.FOREIGN_CD
+					            , T.MANDATORY_YN
+					            , T.JOB_CD
+					            , T.EDU_LEVEL
+					            , T.EDU_MEMO
+					            , T.FILE_SEQ
+					            , T.MNG_SABUN
+					            , T.MNG_TEL_NO
+					            , T.NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , NVL(S.EDU_SEQ, F_COM_GET_SEQ('EDU'))
+					            , S.EDU_COURSE_NM
+					            , S.IN_OUT_TYPE
+					            , S.EDU_BRANCH_CD
+					            , S.EDU_M_BRANCH_CD
+					            , S.EDU_METHOD_CD
+					            , S.EDU_STATUS_CD
+					            , S.EDU_ORG_CD
+					            , S.FOREIGN_CD
+					            , S.MANDATORY_YN
+					            , S.JOB_CD
+					            , S.EDU_LEVEL
+					            , S.EDU_MEMO
+					            , S.FILE_SEQ
+					            , S.MNG_SABUN
+					            , S.MNG_TEL_NO
+					            , S.NOTE
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+		</update>
+		
+<!-- 		교육과정관리 삭제(다건) -->
+		<delete parameterType="map" id="deleteEduCourseMgrSheet">
+
+			DELETE FROM TTRA101
+			WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			AND ( EDU_SEQ ) IN ( ( NULL)
+			<foreach item="rm" collection="deleteRows" >
+				<if test='rm.eduSeq != null and !rm.eduSeq.equals("") '>
+					, ( TRIM( #{rm.eduSeq} ) )
+				</if>
+			</foreach>
+			)
+
+		</delete>
+
+
+
+<!-- 		강사내역 삭제 -->
+		<delete parameterType="map" id="deleteEduCourseTeacher">
+			
+				<![CDATA[
+					DELETE FROM TTRA122
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+					   AND EDU_SEQ  = TRIM(#{eduSeq})
+					   AND EDU_EVENT_SEQ  = TRIM(#{eduEventSeq})  
+				]]>
+			
+			
+		</delete>
+		
+
+<!-- 		강사내역 저장 -->
+		<insert parameterType="map" id="insertEduCourseTeacher">
+			
+				<![CDATA[
+					 INSERT INTO TTRA122 ( ENTER_CD, EDU_SEQ, EDU_EVENT_SEQ, SEQ, TEACHER_SEQ, TEL_NO, SUBJECT_LECTURE, LECTURE_FEE, NOTE, CHKDATE, CHKID)
+					 SELECT ENTER_CD, EDU_SEQ, EDU_EVENT_SEQ, SEQ, TEACHER_SEQ, TEL_NO, SUBJECT_LECTURE, LECTURE_FEE, NOTE, sysdate, #{ssnSabun}  
+					   FROM ( ]]>
+<foreach item="rm" collection="mergeRows" index="idx" separator=" UNION ALL ">
+					       SELECT TRIM(#{ssnEnterCd})  			AS  ENTER_CD 
+					            , TRIM(#{eduSeq})  				AS  EDU_SEQ
+					            , TRIM(#{eduEventSeq})  			AS  EDU_EVENT_SEQ
+			               		, (#{idx} + 1)     					AS  SEQ
+					            , TRIM(#{rm.teacherSeq})  		AS  TEACHER_SEQ
+					            , TRIM(#{rm.telNo})  			AS  TEL_NO
+					            , TRIM(#{rm.subjectLecture})  	AS  SUBJECT_LECTURE
+					            , TRIM(#{rm.lectureFee})  		AS  LECTURE_FEE
+					            , TRIM(#{rm.note})  			AS  NOTE
+					        FROM DUAL   
+</foreach>
+							)
+			
+		</insert>
+		
+<!-- 		교육관련역량 저장 -->
+		<update parameterType="map" id="saveEduMgrCompty">
+			
+				<![CDATA[
+					 MERGE INTO TTRA103 T 
+					 USING 
+					( ]]>
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+					       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+					            , TRIM(#{searchEduSeq})		AS  EDU_SEQ
+					            , TRIM(#{rm.competencyCd})  AS  COMPETENCY_CD
+					            , TRIM(#{rm.note})  		AS  NOTE
+					        FROM DUAL
+</foreach>
+					) S 
+					ON ( 
+					          T.ENTER_CD 		= S.ENTER_CD 
+					     AND  T.EDU_SEQ 		= S.EDU_SEQ 
+					     AND  T.COMPETENCY_CD 	= S.COMPETENCY_CD 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE	= sysdate 
+					            , T.CHKID	= #{ssnSabun} 
+					            , T.NOTE 	= S.NOTE 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.EDU_SEQ
+					            , T.COMPETENCY_CD
+					            , T.NOTE
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.EDU_SEQ
+					            , S.COMPETENCY_CD
+					            , S.NOTE
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+				
+		</update>
+		
+<!-- 		교육관련역량 저장 -->
+		<insert parameterType="map" id="insertEduMgrCompty">
+			
+				<![CDATA[
+					 INSERT INTO TTRA103 (  ENTER_CD , EDU_SEQ , COMPETENCY_CD , CHKDATE, CHKID ) 
+					 SELECT ENTER_CD , EDU_SEQ , COMPETENCY_CD , sysdate, #{ssnSabun}
+					   FROM ( ]]>
+				<foreach item="rm" collection="cmtyRows" separator=" UNION ALL ">
+						       SELECT TRIM(#{ssnEnterCd})  		AS  ENTER_CD 
+						            , TRIM(#{eduSeq})				AS  EDU_SEQ
+						            , TRIM(#{rm.competencyCd})  AS  COMPETENCY_CD
+						        FROM DUAL
+				</foreach>
+							)
+		</insert>
+		
+<!-- 		교육관련역량 삭제 -->
+		<delete parameterType="map" id="deleteEduMgrCompty">
+			
+				<![CDATA[
+					DELETE FROM TTRA103
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+					   AND EDU_SEQ  = TRIM(#{searchEduSeq})
+					   AND COMPETENCY_CD IN ( NULL ]]>
+<foreach item="rm" collection="deleteRows"> 
+    <if test="rm.competencyCd != null and rm.competencyCd neq ''">
+					     , TRIM( #{rm.competencyCd} ) 
+    </if>
+</foreach>
+					       )
+			
+		</delete>
+		
+<!-- 		교육관련역량 삭제 -->
+		<delete parameterType="map" id="deleteEduMgrComptyAll">
+			
+				<![CDATA[
+					DELETE FROM TTRA103
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+					   AND EDU_SEQ  = TRIM(#{eduSeq})
+				]]>
+			
+		</delete>
+</mapper>

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.exWorkDriverNApp">
+
+<!-- 야근수당종합신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverNAppList">
+
+				<![CDATA[
+		          SELECT A.ENTER_CD
+		                      ,A.APPL_SEQ
+		                      ,A.WORK_GUBUN
+		                      ,B.APPL_STATUS_CD
+		                      ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+		                      ,DECODE(WORK_GUBUN, 'N', '야근수당', 'S', '특근수당', '') AS WORK_GUBUN
+		                      ,B.APPL_YMD          
+		                      ,A.WORK_YM
+		                      ,A.TOT_MON
+		                      ,A.BIGO
+		                      , '0' AS DETAIL
+		                      ,B.APPL_IN_SABUN                      
+		              FROM TTIM715 A, THRI103 B
+		            WHERE A.ENTER_CD = #{ssnEnterCd}
+		                AND B.ENTER_CD = A.ENTER_CD    
+		                AND B.APPL_SEQ = A.APPL_SEQ ]]>
+						  <if test='sabun != null and !sabun.equals("")'>
+						  	AND B.APPL_SABUN = #{sabun}
+						  </if>
+		                AND A.WORK_GUBUN = 'N' -- 야근수당(고정값)
+		                AND A.WORK_YM BETWEEN REPLACE(NVL(TRIM( #{searchFromYm} ),'190001'), '-', '') AND REPLACE(NVL(TRIM( #{searchToYm} ),'999912'), '-', '')
+				           <if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+				                AND B.APPL_STATUS_CD = #{searchApplStatusCd}
+						   </if>
+		 ORDER BY B.APPL_YMD DESC, APPL_SEQ DESC
+		</select>
+
+<!-- 야근수당종합신청 상세내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverNAppDetailList">
+				<![CDATA[
+					SELECT A.ENTER_CD
+					          ,A.APPL_SEQ
+					          ,C.SABUN          
+					          ,D.NAME
+					          ,F_COM_GET_JIKWEE_NM(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS JIKWEE_NM
+					          ,F_COM_GET_ORG_NM2(C.ENTER_CD, C.SABUN, B.APPL_YMD) AS ORG_NM
+					          ,DECODE(A.WORK_GUBUN, 'N', '야근수당', 'S', '특근수당', '') AS WORK_GUBUN
+					          ,B.APPL_STATUS_CD
+					          ,F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'R10010', B.APPL_STATUS_CD) AS APPL_STATUS_NM
+					          ,B.APPL_YMD          
+					          ,A.WORK_YM
+					          ,C.PAY_MON
+					          ,C.DETAIL_BIGO
+					  FROM TTIM715 A, THRI103 B, TTIM717 C, THRM100 D
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					    AND B.ENTER_CD = A.ENTER_CD    
+					    AND B.APPL_SEQ = A.APPL_SEQ
+					    AND C.ENTER_CD = A.ENTER_CD
+					    AND C.APPL_SEQ = A.APPL_SEQ    
+					    AND A.APPL_SEQ = #{applSeq}
+					    AND D.ENTER_CD = C.ENTER_CD
+					    AND D.SABUN      = C.SABUN  
+					ORDER BY D.NAME ASC
+				]]>
+		</select>
+
+<!-- 야근수당종합신청 Detail 삭제 -->
+		<delete parameterType="map" id="deleteExWorkDriverNAppDetail">
+					DELETE FROM TTIM717
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 야근수당종합신청 Master 삭제 -->
+		<delete parameterType="map" id="deleteExWorkDriverNApp">
+					DELETE FROM TTIM715
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+	</mapper>

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.retire.retireMgr">
+
+<!-- 퇴직설문항목관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetireMgrList">
+
+				<![CDATA[
+					SELECT
+					    A.ENTER_CD
+					  , A.SEQ
+					  , A.SORT_NO
+					  , A.GUBUN
+					  , A.QUESTION
+					  , A.BIGO
+					FROM THRM553 A
+					WHERE 1=1
+					  AND A.ENTER_CD = #{ssnEnterCd}
+					ORDER BY A.SORT_NO, A.GUBUN, A.QUESTION
+				]]>
+
+
+		</select>
+
+<!-- 퇴직설문항목관리 저장 -->
+		<update parameterType="map" id="saveRetireMgr">
+
+		          MERGE INTO THRM553 T
+		          USING (
+		              SELECT    A.ENTER_CD
+		                  	  , A.SEQ
+		                  	  , A.SORT_NO
+		                  	  , A.GUBUN
+		                  	  , A.QUESTION
+		                  	  , A.BIGO
+		              FROM  (
+		                  SELECT    NULL    AS ENTER_CD
+		                      	  , NULL    AS SEQ
+			                      , NULL    AS SORT_NO
+			                      , NULL    AS GUBUN
+			                      , NULL    AS QUESTION
+			                      , NULL    AS BIGO
+		                  FROM  DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+		              UNION ALL
+		                  SELECT  TRIM(#{ssnEnterCd})   AS ENTER_CD
+		                  		<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+								, TRIM(#{rm.seq})				AS	SEQ
+								</when><otherwise>
+								, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt}) FROM THRM553 WHERE ENTER_CD = #{ssnEnterCd}) )	AS SEQ
+									<bind name="icnt" value="icnt + 1" />
+								</otherwise>
+								</choose>
+		                      	, TRIM(#{rm.sortNo})   	AS SORT_NO
+		                      	, TRIM(#{rm.gubun})   	AS GUBUN
+		                      	, TRIM(#{rm.question})  AS QUESTION
+		                      	, TRIM(#{rm.bigo})    	AS BIGO
+		                      FROM   DUAL
+</foreach>
+		                  ) A WHERE A.ENTER_CD IS NOT NULL
+		                      AND A.SEQ IS NOT NULL
+		                      AND A.SORT_NO IS NOT NULL
+		              ) S
+		          ON ( T.ENTER_CD = S.ENTER_CD AND T.SEQ = S.SEQ )
+		          WHEN MATCHED THEN
+		            UPDATE SET    T.SORT_NO 	= S.SORT_NO
+		                  		, T.GUBUN 		= S.GUBUN
+		                  		, T.QUESTION 	= S.QUESTION
+		                  		, T.BIGO 		= S.BIGO
+		                  		, T.CHKDATE 	= SYSDATE
+		                  		, T.CHKID   	= #{ssnSabun}
+		          WHEN NOT MATCHED THEN
+		            INSERT
+		            (
+		                T.ENTER_CD
+		              , T.SEQ
+		              , T.SORT_NO
+		              , T.GUBUN
+		              , T.QUESTION
+		              , T.BIGO
+		              , T.CHKDATE
+		              , T.CHKID
+		            )
+		            VALUES
+		            (
+		                S.ENTER_CD
+		              , S.SEQ
+		              , S.SORT_NO
+		              , S.GUBUN
+		              , S.QUESTION
+		              , S.BIGO
+		              , SYSDATE
+		              , #{ssnSabun}
+		            )
+		</update>
+
+<!--  퇴직설문항목관리 삭제 -->
+		<delete parameterType="map" id="deleteRetireMgr">
+
+					DELETE FROM THRM553
+					WHERE  ENTER_CD||'_'||SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.seq != null and !rm.seq.equals("")'>
+
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.seq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+</mapper>

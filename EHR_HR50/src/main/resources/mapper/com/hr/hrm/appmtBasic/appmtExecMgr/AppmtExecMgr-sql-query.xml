@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.appmtBasic.appmtExecMgr">
+
+<!-- 발령처리담당자관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppmtExecMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.SABUN
+					     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) AS NAME
+					     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN,'ALIAS') AS ALIAS
+					     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+					     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+					     , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+					     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+					     , A.SDATE
+					     , A.EDATE
+					  FROM THRM207 A
+ 					 WHERE A.ENTER_CD = #{ssnEnterCd}
+ 					           ]]>
+ 					 <if test='name != null and !name.equals("")'>
+					   AND (A.SABUN LIKE '%'||TRIM( #{name} )||'%' OR LOWER(F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})) LIKE '%'||LOWER(TRIM( #{name} ))||'%')
+					 </if>
+					 ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+		</select>
+
+<!-- 발령처리담당자관리 저장 -->
+		<update parameterType="map" id="saveAppmtExecMgr">
+
+					MERGE INTO THRM207 T
+					USING	(
+							SELECT A.ENTER_CD
+								 , A.SABUN
+								 , A.SDATE
+								 , A.EDATE
+							FROM	(
+									SELECT NULL AS ENTER_CD
+										 , NULL AS SABUN
+										 , NULL AS SDATE
+										 , NULL AS EDATE
+									FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT TRIM( #{ssnEnterCd} )	AS  ENTER_CD
+										 , TRIM( #{rm.sabun} )		AS  SABUN
+										 , TRIM( #{rm.sdate} )		AS  SDATE
+										 , TRIM( #{rm.edate} )		AS  EDATE
+									  FROM DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+										  AND A.SABUN IS NOT NULL
+										  AND A.SDATE IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.SABUN = S.SABUN AND T.SDATE = S.SDATE )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE    	= S.EDATE
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.SDATE
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.SABUN
+							, S.SDATE
+							, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 발령처리담당자관리 삭제 -->
+		<delete parameterType="map" id="deleteAppmtExecMgr">
+
+					DELETE FROM THRM207
+					 WHERE ENTER_CD||'_'||SABUN||'_'||SDATE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.sdate != null and !rm.sdate.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.sdate} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

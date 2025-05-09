@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.month.timeWorkCount">
+
+
+<!-- 월근태/근무집계(기준년월일) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getTimWorkCount">
+				<![CDATA[
+					SELECT NVL(MAX(A.SUM_YN),'N') AS SUM_YN
+					     , NVL(MAX(A.END_YN),'N') AS END_YN
+					  FROM TTIM999 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.YM = TRIM( #{schYm} ) ]]>
+				<if test=' searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("") '>
+				   AND A.BUSINESS_PLACE_CD = #{searchBusinessPlaceCd}
+				</if>
+		</select>
+
+<!-- 월근태/근무집계 마감 수정  -->
+		<update parameterType="map" id="updateTimWorkCountEndYn">
+
+				<![CDATA[
+					UPDATE TTIM999
+					SET	END_YN	= TRIM( #{endYn} )
+						, CHKDATE	= SYSDATE
+						, CHKID		= #{ssnSabun}
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND YM = TRIM( #{schYm} )   ]]>
+				<if test=' searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("") '>
+				   AND BUSINESS_PLACE_CD = #{searchBusinessPlaceCd}
+				</if>
+		</update>
+
+<!-- 월근태/근무집계(작업) 프로시저 -->
+		<update parameterType="map" id="prcTimWorkCount1" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_TIM_MONTH_C_TOTAL(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{sqlCnt,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{placeCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{schYm,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+<!-- 월근태/근무집계(작업취소) 프로시저 -->
+		<update parameterType="map" id="prcTimWorkCount2" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_TIM_MONTH_C_TOTAL_CANCEL(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{sqlCnt,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{placeCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{schYm,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+		
+		<!-- 월근태/근무집계 진행여부 SELECT  -->
+		<select parameterType="map" resultType="cMap" id="getTimWorkEndYn">
+		<![CDATA[
+			SELECT
+                	WORK_CLOSE_YN AS CODE
+               FROM
+               	TSYS906
+               WHERE ENTER_CD = #{ssnEnterCd}
+               AND WORK_GUBUN = 'B'
+               AND BUSINESS_PLACE_CD = NVL( #{searchBusinessPlaceCd} , 'ALL')
+               
+		]]>
+		</select>
+
+		<!-- 진행중인 건 삭제 -->
+		<delete parameterType="map" id="deleteTSYS906ForTimWorkCount">
+
+				<![CDATA[
+					DELETE FROM TSYS906
+					WHERE 	ENTER_CD = #{ssnEnterCd}
+					AND WORK_GUBUN = 'B'
+					AND BUSINESS_PLACE_CD = NVL( #{searchBusinessPlaceCd} , 'ALL')
+				]]>
+
+		</delete>
+
+
+</mapper>

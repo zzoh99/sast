@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.jikgubHisSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getJikgubHisStaList1">
+			
+				<![CDATA[
+
+				]]>
+			
+			
+		</select>
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getJikgubHisStaList2">
+			
+				<![CDATA[
+				SELECT F_SEQ, CODE_NM_PT AS CODE_NM, SUM(CNT) AS CNT, SUM(PER_CNT) AS PER_CNT
+                FROM (
+                    SELECT F_SEQ, CODE_NM_PT, SUM(CNT) AS CNT,  ROUND((CNT/ SUM( DECODE(CNT, 0, 1, CNT ) ) OVER())*100,1) AS PER_CNT
+                    FROM (
+                      SELECT A.NOTE2 AS CODE_NM_PT,
+                              A.NOTE3 AS F_SEQ,
+                              A.SYEAR, A.CNT, A.CODE, A.CODE_NM, (A.CODE_NM||' ('||A.CNT||')') AS CODE_CNT
+                        FROM (
+                            SELECT X.NOTE2, X.NOTE3, TITLE AS SYEAR, SUM(CNT) AS CNT,
+                                   DECODE(Y.CODE, NULL, '',   Y.CODE) AS CODE,
+                                   DECODE(Y.CODE, NULL, '', Y.CODE_NM) AS CODE_NM,
+                                   DECODE(Y.SEQ, NULL, 0,   Y.SEQ) AS SEQ
+                              FROM (
+                                    SELECT NOTE2, NOTE3, REPLACE( #{searchYmd} , '-', '') TITLE, B.CODE AS JIKGUB_CD, COUNT(A.SABUN) AS CNT
+                                     FROM (
+                                      SELECT A.JIKGUB_CD
+                                            ,A.SABUN 
+                                            ,A.ENTER_CD
+                                      FROM THRM151 A
+                                          ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, SABUN, F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, #{searchYmd}) AS ORG_NM
+                                              FROM THRM151
+                                             WHERE ENTER_CD =  #{ssnEnterCd}
+                                               AND REPLACE( #{searchYmd} , '-', '') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				 			                   AND (ENTER_CD, STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+							                                                       FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900) A
+							                                                    CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+				                           <if test="workType != null and workType neq ''">
+				                                 AND WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				                           </if>
+				                           <if test="manageCd != null and manageCd neq ''">
+				                                 AND MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+				                           </if> 
+                                            GROUP BY ENTER_CD, SABUN, ORG_CD ) B
+                                          ,THRM100 C
+                                     WHERE A.ENTER_CD = B.ENTER_CD
+                                       AND A.SABUN    = B.SABUN
+                                       AND A.SDATE    = B.SDATE
+                                       AND A.ENTER_CD = C.ENTER_CD
+                                       AND A.SABUN    = C.SABUN
+                                   <if test="searchOrgNm != null and searchOrgNm neq ''">
+						           	   AND B.ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+						           </if>
+                                       AND (C.RET_YMD IS NULL OR C.RET_YMD > REPLACE( #{searchYmd} , '-', ''))
+                                       AND A.JIKGUB_CD IS NOT NULL
+                                    ) A, TSYS005 B
+                                     WHERE A.ENTER_CD(+) = B.ENTER_CD
+                                       AND A.JIKGUB_CD(+) = B.CODE
+                                       AND B.GRCODE_CD='H20010'
+                                       AND B.USE_YN = 'Y'
+                                       AND NOTE2 IS NOT NULL
+                                    GROUP BY NOTE2, B.CODE , NOTE3      
+                                   ) X
+                                  ,(SELECT *
+                                      FROM TSYS005
+                                     WHERE ENTER_CD =  #{ssnEnterCd}
+                                       AND GRCODE_CD = 'H20010'
+                                       AND USE_YN = 'Y'
+                                       AND NOTE2 IS NOT NULL
+                                    ) Y
+                             WHERE X.JIKGUB_CD = Y.CODE
+                             GROUP BY X.NOTE2, X.NOTE3, CUBE( X.TITLE, Y.CODE, Y.CODE_NM, Y.SEQ)
+                             HAVING (X.TITLE IS NOT NULL)
+                                AND ((Y.CODE IS NOT NULL AND Y.CODE_NM IS NOT NULL AND Y.SEQ IS NOT NULL)
+                                  OR (Y.CODE IS NULL AND Y.CODE_NM IS NULL AND Y.SEQ IS NULL))
+                          )A, TSYS005 B
+                         WHERE B.ENTER_CD= #{ssnEnterCd}
+                          AND A.CODE = B.CODE
+                          AND B.GRCODE_CD='H20010'
+                    )
+                    GROUP BY F_SEQ, CODE_NM_PT, CNT
+                )
+                GROUP BY F_SEQ, CODE_NM_PT
+                ORDER BY TO_NUMBER(NVL(F_SEQ,0))
+			
+			
+		</select>
+</mapper>

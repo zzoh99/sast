@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.request.vacationUpdApr">
+
+<!-- 근태취소승인관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getVacationUpdAprList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						 ,'0' AS IBS_IMAGE
+						 , A.APPL_YMD           --신청일자
+					     , A.APPL_STATUS_CD     --신청상태
+					     , A.APPL_SEQ           --신청서순번
+					     , A.APPL_SABUN
+					     , A.APPL_IN_SABUN
+					     , B.B_APPL_SEQ			--원신청순번
+					     , B.GNT_CD             --근태종류
+					     , (SELECT NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'ttim014', LANGUAGE_CD, #{ssnLocaleCd}), GNT_NM)
+					         FROM TTIM014 WHERE ENTER_CD = A.ENTER_CD AND GNT_CD = B.GNT_CD) AS GNT_NM
+					     , CASE WHEN C.GNT_CD = '70' THEN  
+					                 F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'B60020', C.OCC_CD) || '-' || F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'B60030', C.FAM_CD)
+					            ELSE '' END AS OCC_NM
+					     , D.SABUN				--사번 
+					     , C.S_YMD              --신청시작일
+					     , C.E_YMD              --신청종료일
+					     , C.HOL_DAY            --적용일수
+					     , C.CLOSE_DAY           --적용일수
+					     , B.GNT_REQ_REASON      --근태취소사유
+					     , (SELECT F_COM_GET_ORG_NM(D.ENTER_CD, D.ORG_CD, A.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) AS ORG_NM
+					     , D.MANAGE_NM --고용형태명
+					     , F_COM_GET_GRCODE_NAME(D.ENTER_CD, 'H20030', D.JIKWEE_CD, #{ssnLocaleCd}) AS JIKWEE_NM --직위명
+					     , F_COM_GET_GRCODE_NAME(D.ENTER_CD, 'H20010', D.JIKGUB_CD, #{ssnLocaleCd}) AS JIKGUB_NM
+					     , F_COM_GET_GRCODE_NAME(D.ENTER_CD, 'H10030', D.MANAGE_CD, #{ssnLocaleCd}) AS MANAGE_NM --사원구분명
+					     , F_COM_GET_JIKCHAK_NM (A.ENTER_CD, A.APPL_SABUN, A.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM --직책명
+					     , (SELECT F_COM_GET_NAMES(D.ENTER_CD, D.SABUN, #{ssnLocaleCd}) FROM DUAL) AS NAME --성명
+					     , D.WORK_TYPE_NM
+					     , D.PAY_TYPE_NM
+					     , A.MEMO
+					     , A.APPL_CD
+					  FROM THRI103 A
+						, ( SELECT * FROM TTIM383 
+							-- 변경 신청 테이블 
+					  		UNION ALL 
+				  		 	SELECT ENTER_CD, GNT_CD, SABUN, S_YMD, APPL_SEQ, B_APPL_SEQ, GNT_REQ_REASON, CHKDATE, CHKID, UPDATE_YN 
+				  		 		FROM TTIM385) B 
+				  		, TTIM301 C, THRM151 D
+					 WHERE A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND B.ENTER_CD = C.ENTER_CD
+					   AND B.B_APPL_SEQ = C.APPL_SEQ
+					   AND B.ENTER_CD = D.ENTER_CD
+					   AND B.SABUN = D.SABUN
+					   AND A.APPL_YMD BETWEEN D.SDATE AND NVL(D.EDATE, '99991231')
+					   AND A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPL_STATUS_CD != '11'
+					   ]]>
+<if test='searchFrom != null and !searchFrom.equals("") and searchTo != null and !searchTo.equals("")'>
+					   AND A.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+</if>
+<if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+					   AND A.APPL_STATUS_CD = #{searchApplStatusCd}
+</if>
+<if test='searchSabunName != null and !searchSabunName.equals("")'>
+					   AND (B.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR (SELECT F_COM_GET_NAMES(D.ENTER_CD, D.SABUN, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+</if>
+<if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+					   AND (SELECT F_COM_GET_ORG_NM(D.ENTER_CD, D.ORG_CD, A.APPL_YMD, #{ssnLocaleCd}) FROM DUAL) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+</if>
+<if test='searchGntCd != null and !searchGntCd.equals("")'>
+					   AND B.GNT_CD IN ( #{searchGntCd} )
+</if>
+<if test='searchGntGubunCd != null and !searchGntGubunCd.equals("")'>
+					   AND C.GNT_GUBUN_CD IN ( #{searchGntGubunCd} )
+</if>
+					 ORDER BY A.APPL_YMD DESC, B.S_YMD DESC, A.APPL_CD, A.APPL_STATUS_CD
+
+
+		</select>
+
+<!-- 근태취소승인관리 삭제 -->
+		<delete parameterType="map" id="deleteVacationUpdApr">
+
+					DELETE FROM TTIM383
+					 WHERE ENTER_CD||'_'||GNT_CD||'_'||SABUN||'_'||S_YMD||'_'||APPL_SEQ||'_'||UPDATE_GB IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.gntCd != null and !rm.gntCd.equals("")
+												and rm.sabun != null and !rm.sabun.equals("")
+												and rm.sYmd != null and !rm.sYmd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")
+												and rm.updateGb != null and !rm.updateGb.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.gntCd} )||'_'||TRIM( #{rm.sabun} )||'_'||TRIM( #{rm.sYmd} )||'_'||TRIM( #{rm.applSeq} )||'_'||TRIM( #{rm.updateGb} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+<!-- 근태취소승인관리 삭제 -->
+		<delete parameterType="map" id="deleteVacationUpdApr103">
+
+					DELETE FROM THRI103
+					 WHERE ENTER_CD||'_'||APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")
+												and rm.applSeq != null and !rm.applSeq.equals("")'>
+											TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.applSeq} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

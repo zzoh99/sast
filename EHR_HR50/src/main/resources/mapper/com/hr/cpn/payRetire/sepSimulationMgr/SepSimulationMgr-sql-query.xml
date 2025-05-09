@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 예상퇴직금
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepSimulationMgr">
+		<select parameterType="map" resultType="cMap" id="getSepSimulationMgr">
+
+				<![CDATA[
+					SELECT  A.SABUN
+					       ,A.EMP_YMD
+					       ,A.RMID_YMD
+					       ,TO_CHAR(TO_DATE(A.SEP_SYMD,'YYYYMMDD'),'YYYY.MM.DD') AS SEP_SYMD
+					       ,TO_CHAR(TO_DATE(A.SEP_EYMD,'YYYYMMDD'),'YYYY.MM.DD') AS SEP_EYMD
+					       ,(A.WKP_YEAR||'년 '||A.WKP_MONTH||'월 '||A.WKP_DAY||'일') AS WKP_D_CNT
+					       ,A.WKP_D_CNT AS WKP_ALL_D_CNT
+					       ,(CASE WHEN NVL(F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD,'SEP_AVG_TYPE',A.SEP_EYMD),'A') = 'C' THEN '(월)평균임금' ELSE '(일)평균임금' END) AS AVG_MON_TITLE
+					       ,(CASE WHEN NVL(F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD,'SEP_AVG_TYPE',A.SEP_EYMD),'A') = 'C' THEN A.AVG_MON ELSE A.D_AVG_MON END) AS AVG_MON
+					       ,(CASE WHEN NVL(F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD,'SEP_AVG_TYPE',A.SEP_EYMD),'A') = 'C' THEN
+					                   '3개월임금총액['|| TRIM(TO_CHAR(A.TOT_AVG_MON,'9,999,999,999')) || '] / 90 * 30'
+					              ELSE '3개월임금총액['|| TRIM(TO_CHAR(A.TOT_AVG_MON,'9,999,999,999')) || ']/3개월총일수[' ||
+					                   (SELECT SUM(NVL(X.WORK_DAY,0))
+					                      FROM TCPN757 X
+					                     WHERE X.ENTER_CD = A.ENTER_CD
+					                       AND X.PAY_ACTION_CD = A.PAY_ACTION_CD
+					                       AND X.SABUN = A.SABUN) || '] * 30'
+					              END) AS SEP_RULE
+					       ,A.EARNING_MON AS EARNING_MON -- 퇴직소득 : 퇴직금
+					       ,(CASE WHEN NVL(F_CPN_GET_GLOVAL_VALUE(A.ENTER_CD,'SEP_AVG_TYPE',A.SEP_EYMD),'A') = 'C' THEN
+					                  '월평균임금[' || TRIM(TO_CHAR(A.AVG_MON,'9,999,999,999')) || '] * (근속년[' || TRIM(TO_CHAR(A.WKP_YEAR,'999')) || ']+(근속월[' || TRIM(TO_CHAR(A.WKP_MONTH,'999')) || '] / 12) * (근속일[' || TRIM(TO_CHAR(A.WKP_DAY,'999')) || '] / 365))'
+					              ELSE
+					                  '일평균임금[' || TRIM(TO_CHAR(A.D_AVG_MON,'9,999,999,999')) || '] * 30 * 근속일수[' || TRIM(TO_CHAR(A.WKP_D_CNT,'9,999')) || '] / 365'
+					              END) AS E_SEP_RULE
+					  FROM TCPN771 A
+					      ,TCPN203 B
+					      ,TCPN755 C
+					 WHERE A.ENTER_CD         = #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD    = 'R' || SUBSTR(TRIM(#{searchSabun}), 2,9)
+					   AND A.SABUN            = TRIM(#{searchSabun})
+					   AND B.ENTER_CD(+)      = A.ENTER_CD
+					   AND B.PAY_ACTION_CD(+) = A.PAY_ACTION_CD
+					   AND B.SABUN(+)         = A.SABUN
+					   AND B.ENTER_CD         = C.ENTER_CD
+					   AND B.PAY_ACTION_CD    = C.PAY_ACTION_CD
+					   AND B.SABUN            = C.SABUN
+				]]>
+
+
+		</select>
+
+		<!-- 예상퇴직금 계산 프로시저 -->
+		<update parameterType="map" statementType="CALLABLE" id="prcPCpnSepSimulation">
+
+			<![CDATA[
+				CALL P_CPN_SEP_SIMULATION(
+					#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+					#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+					#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+					#{searchSabun,mode=IN,jdbcType=VARCHAR},
+					#{searchYmd,mode=IN,jdbcType=VARCHAR},
+					#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+
+
+		</update>
+	</mapper>

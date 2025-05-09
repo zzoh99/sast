@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobDivReportApr">
+	
+		<!-- 직무분장보고승인 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobDivReportAprList">
+
+				<![CDATA[
+						 SELECT A.APPL_SEQ
+                              , A.ENTER_CD
+                              , A.ORG_CD
+                              , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+                              , A.SABUN
+                              , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+							  , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, C.APPL_YMD, #{ssnLocaleCd}) AS ORG_NM
+							  , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD, #{ssnLocaleCd}) AS JIKCHAK_NM
+							  , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD, #{ssnLocaleCd}) AS JIKWEE_NM
+							  , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD, #{ssnLocaleCd}) AS JIKGUB_NM
+							  , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, C.APPL_YMD, #{ssnLocaleCd}) AS WORKTYPE_NM
+							  , A.APPLY_YMD
+                              , C.APPL_YMD
+						      , C.APPL_STATUS_CD
+						      , C.AGREE_YMD
+						      , C.APPL_SABUN
+						      , C.APPL_IN_SABUN
+						      , 0 AS DETAIL
+                           FROM THRM175 A
+                          INNER JOIN THRI103 C
+                            ON A.ENTER_CD = C.ENTER_CD
+                           AND A.APPL_SEQ = C.APPL_SEQ
+                         WHERE 1=1
+                         AND C.APPL_STATUS_CD NOT IN ('11')
+                         AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+                                 ]]>
+                    <if test='searchFrom != null and !searchFrom.equals("")  != null and searchTo != null and !searchTo.equals("")'>
+					     AND C.APPL_YMD BETWEEN REPLACE(#{searchFrom}, '-','') AND REPLACE(#{searchTo}, '-','')
+					</if>
+                    <if test='searchApplStatusCd != null and !searchApplStatusCd.equals("")'>
+                         AND C.APPL_STATUS_CD = #{searchApplStatusCd}
+					</if>
+                    <if test='searchSabunName != null and !searchSabunName.equals("")'>
+                         AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+                    </if>
+                    <if test='searchOrgNm != null and !searchOrgNm.equals("")'>
+                         AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, C.APPL_YMD, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+					</if>
+                        ORDER BY C.APPL_YMD DESC,  A.APPL_SEQ DESC                        
+
+
+		</select>
+		
+		<!-- 직무분장보고승인 저장 -->
+		<update parameterType="map" id="saveJobDivReportApr">
+
+					MERGE INTO THRM175 T 						
+					 USING 						
+					( 						
+		            <bind name="icnt" value="1" />
+		            <foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+					   SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+				            , TRIM(#{rm.applSeq}) AS APPL_SEQ
+				            , TRIM(#{rm.applInSabun}) AS SABUN
+				            , TRIM(#{rm.applYmd}) AS APPL_YMD
+		                    , TRIM(#{rm.applyYmd}) AS APPLY_YMD
+		                FROM DUAL				
+					</foreach>
+					) S 						
+					ON ( 						
+					          T.ENTER_CD = S.ENTER_CD 						
+					     AND  T.APPL_SEQ = S.APPL_SEQ 						
+					) 						
+					WHEN MATCHED THEN 						
+					   UPDATE SET T.CHKDATE	= sysdate
+					            , T.CHKID = #{ssnSabun}
+					            , T.APPLY_YMD = S.APPLY_YMD        
+		</update>
+
+
+</mapper>

@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천징수영수증/징수부신청 쿼리
+ -->
+<root>
+
+	<!-- 원천징수영수증/징수부신청 조회 -->
+	<query id="selectWithHoldRcptAppList">
+		<![CDATA[
+			SELECT A.ENTER_CD,
+			       A.SABUN,
+			       A.SEQ,
+			       A.ADJUST_TYPE,
+			       A.APPL_YMD,
+			       A.APPL_STATUS,
+			       A.WORK_YY,
+			       A.APPR_YMD,
+			       A.STAMP_YN,
+			       A.PRINT_YN,
+			       A.PRINT_TYPE,
+			       A.MEMO,
+			       A.CHKDATE,
+			       A.CHKID,
+			       (SELECT DISTINCT SABUN 
+			          FROM TCPN811 B 
+			         WHERE A.ENTER_CD = B.ENTER_CD 
+			           AND A.WORK_YY = B.WORK_YY 
+			           AND A.SABUN = B.SABUN
+			           AND A.ADJUST_TYPE = B.ADJUST_TYPE ) AS ADJ_SABUN
+			  FROM TYEA101 A
+			 WHERE A.ENTER_CD	= #ssnEnterCd#
+			   AND A.SABUN   	= #srchSabun#
+			   AND A.WORK_YY	= #srchWorkYy#
+			 ORDER BY A.SEQ DESC
+		]]>
+	</query>
+	
+	<!-- 원천징수영수증/징수부신청 입력 -->
+	<query id="insertWithHoldRcptApp">
+		<![CDATA[
+			INSERT INTO TYEA101
+			(
+				  ENTER_CD
+				, SABUN
+				, SEQ
+				, ADJUST_TYPE
+				, APPL_YMD
+				, APPL_STATUS
+				, WORK_YY
+			    , PRINT_TYPE
+				, CHKDATE
+				, CHKID
+			)
+			VALUES
+			(
+				  #ssnEnterCd#
+				, #sabun#
+				, TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + 1)
+					          FROM TYEA101
+					         WHERE ENTER_CD = #ssnEnterCd#
+					           AND SABUN = TRIM(#sabun#)
+					      ) )
+				, #adjust_type#
+				, TO_CHAR(SYSDATE,'YYYYMMDD')
+				, '21'
+				, #work_yy#
+				, #print_type#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+
+	<!-- 원천징수영수증/징수부신청 수정 (수정저장없음) -->
+	<!-- <query id="updateWithHoldRcptApp">
+		<![CDATA[
+			UPDATE TYEA101
+			   SET CHKDATE		 	= SYSDATE
+				 , CHKID			= #ssnSabun#
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND SABUN   			= #sabun#
+			   AND SEQ   			= #seq#
+		]]>
+	</query> -->
+	
+	<!-- 원천징수영수증/징수부신청 출력여부 변경 -->
+	<query id="updateWithHoldRcptPrintYn">
+		<![CDATA[
+			UPDATE TYEA101
+			   SET PRINT_YN       	= 'Y'
+				 , CHKDATE		 	= SYSDATE
+				 , CHKID			= #ssnSabun#
+			 WHERE ENTER_CD			= #ssnEnterCd#
+			   AND SABUN   			= #sabun#
+			   AND SEQ   			= #seq#
+		]]>
+	</query>
+
+	<!-- 원천징수영수증/징수부신청 삭제 -->
+	<query id="deleteWithHoldRcptApp">
+		<![CDATA[
+			DELETE FROM TYEA101
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND SABUN   				= #sabun#
+			   AND SEQ   				= #seq#
+		]]>
+	</query>
+	
+	<!-- 기 등록 대상자 확인 -->
+	<query id="selectYearCalcCrePeopleCnt">
+		<![CDATA[
+			SELECT COUNT(1) AS CNT
+			  FROM TCPN811 A
+			 WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.SABUN        = #sabun#
+			   AND A.WORK_YY      = #work_yy#
+			   AND A.ADJUST_TYPE  = #adjust_type#
+		  ]]>
+	</query>
+
+
+	<!-- 급여계산코드확인 -->
+	<query id="selectPayActionCd">
+		<![CDATA[
+				SELECT PAY_ACTION_CD
+				     , PAY_ACTION_NM
+				  FROM TCPN201
+				 WHERE ENTER_CD = #ssnEnterCd#
+				   AND PAY_YM  LIKE #work_yy# || '%'
+				   AND PAY_CD = #searchPayCd#
+		  ]]>
+	</query>
+	
+	<!-- 급여계산코드 입력 -->
+	<query id="insertPayActionCd">
+		<![CDATA[
+			INSERT INTO TCPN201 
+		       ( 
+		           ENTER_CD
+		         , PAY_ACTION_CD
+		         , PAY_ACTION_NM
+		         , PAY_YM
+		         , PAY_CD
+		         , PAYMENT_YMD
+		         , ORD_SYMD
+		         , ORD_EYMD
+		         , CHKDATE
+		         , CHKID 
+		       ) 
+		       VALUES 
+		       ( 
+		           #ssnEnterCd#
+		         , (
+						COALESCE ( 
+					    	(
+						    	SELECT PAY_YM || TO_CHAR(TO_NUMBER(NVL(MAX(SUBSTR(PAY_ACTION_CD, 7, 3)),0)) + 1, 'FM000') AS SEQ
+							      FROM TCPN201
+							     WHERE ENTER_CD = #ssnEnterCd#
+							       AND PAY_YM = #work_yy# || '12'
+							     GROUP BY PAY_YM
+						    ), #work_yy# || '12' || '001')
+				   )
+		         , #pay_action_nm#
+		         , #work_yy# || '12'
+		         , #searchPayCd#
+		         , #work_yy# || '1231'
+		         , #work_yy# || '0101'
+		         , #work_yy# || '1231'
+		         , SYSDATE
+		         , #ssnSabun#
+		       )
+		]]>
+	</query>
+	
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="deleteWithHoldRcptAppTCPN981">
+		<![CDATA[
+			DELETE FROM TCPN981
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND PAY_ACTION_CD = #pay_action_cd#
+		]]>
+	</query>
+
+	<!-- 연말정산 마감 , 취소 처리 -->
+	<query id="insertWithHoldRcptAppTCPN981">
+		<![CDATA[
+			INSERT INTO TCPN981 A
+			(
+				ENTER_CD
+				, PAY_ACTION_CD
+				, CLOSE_YN
+				, CHKDATE
+				, CHKID
+			) VALUES (
+				  #ssnEnterCd#
+				, #pay_action_cd#
+				, ( SELECT DECODE(SUM(DECODE(FINAL_CLOSE_YN, 'Y', 0, 1)), 0, 'Y', 'N') AS FINAL_CLOSE_YN
+					  FROM TCPN811
+					 WHERE ENTER_CD = #ssnEnterCd#
+					   AND WORK_YY = #work_yy#
+					   AND ADJUST_TYPE = #adjust_type#
+					   AND PAY_ACTION_CD = #pay_action_cd#
+				  )
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]>
+	</query>
+	
+	
+	<query id="selectAdjustTypeCnt">
+		<![CDATA[
+			SELECT COUNT(1) CNT
+		   	  FROM TCPN813 A
+		     WHERE A.ENTER_CD     = #ssnEnterCd#
+			   AND A.SABUN        = #sabun#
+			   AND A.WORK_YY      = #work_yy#
+			   AND A.ADJUST_TYPE  = #adjust_type#
+		  ]]>
+	</query>
+	
+	<query id="insertWithHoldRcptApp">
+		<![CDATA[
+			INSERT INTO TCPN813
+			(
+				 ENTER_CD
+				,WORK_YY
+				,ADJUST_TYPE
+				,SABUN
+				,YM
+				,PAY_MON
+				,BONUS_MON
+				,ETC_BONUS_MON
+				,FRGN_TAX_PLUS_MON
+				,INCOME_TAX_MON
+				,INHBT_TAX_MON
+				,RURAL_TAX_MON
+				,FRGN_PAY_YMD
+				,EXMPT_TAX_MON
+				,FRGN_MON
+				,FRGN_NTAX_MON
+				,PEN_MON
+				,HEL_MON
+				,EMP_MON
+				,LABOR_MON
+				,NOTAX_ABROAD_MON
+				,NOTAX_WORK_MON
+				,NOTAX_FOOD_MON
+				,NOTAX_CAR_MON
+				,NOTAX_ETC_MON
+				,NOTAX_FORN_MON
+				,ETC_MON1
+				,ETC_MON2
+				,ETC_MON3
+				,CHKDATE
+				,CHKID
+				,NOTAX_BABY_MON
+				,STOCK_BUY_MON
+				,STOCK_UNION_MON
+				,NOTAX_RESEARCH_MON
+				,NOTAX_NIGHTDUTY_MON
+				,IMWON_RET_OVER_MON
+				,ETC_MON4
+				,NOTAX_REPORTER_MON
+				,MEMO
+			)
+		 SELECT ENTER_CD
+				,WORK_YY
+				,'9'
+				,SABUN
+				,YM
+				,PAY_MON
+				,BONUS_MON
+				,ETC_BONUS_MON
+				,FRGN_TAX_PLUS_MON
+				,INCOME_TAX_MON
+				,INHBT_TAX_MON
+				,RURAL_TAX_MON
+				,FRGN_PAY_YMD
+				,EXMPT_TAX_MON
+				,FRGN_MON
+				,FRGN_NTAX_MON
+				,PEN_MON
+				,HEL_MON
+				,EMP_MON
+				,LABOR_MON
+				,NOTAX_ABROAD_MON
+				,NOTAX_WORK_MON
+				,NOTAX_FOOD_MON
+				,NOTAX_CAR_MON
+				,NOTAX_ETC_MON
+				,NOTAX_FORN_MON
+				,ETC_MON1
+				,ETC_MON2
+				,ETC_MON3
+				,CHKDATE
+				,CHKID
+				,NOTAX_BABY_MON
+				,STOCK_BUY_MON
+				,STOCK_UNION_MON
+				,NOTAX_RESEARCH_MON
+				,NOTAX_NIGHTDUTY_MON
+				,IMWON_RET_OVER_MON
+				,ETC_MON4
+				,NOTAX_REPORTER_MON
+				,MEMO
+			 FROM TCPN813
+			WHERE 1=1
+			  AND A.ENTER_CD     = #ssnEnterCd#
+			  AND A.SABUN        = #sabun#
+			  AND A.WORK_YY      = #work_yy#
+			  AND A.ADJUST_TYPE  = #adjust_type#
+		]]>
+	</query>
+	  
+</root>

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.eLearning.eduElAppDet">
+
+<!-- 신청내역 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduElAppDetMap">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_SEQ
+					     , A.SABUN
+					     , A.YM
+					     , TO_CHAR(TO_DATE(A.YM, 'YYYYMM'), 'YYYY-MM') AS YM_VIEW
+					     , A.EDU_CD
+					     , A.EDU_DTL_CD
+					     , A.EDU_NM
+					     , A.S_YM
+					     , A.E_YM
+					     , A.PHONE_NO
+					     , A.MAIL_ID
+					     , A.NOTE
+					  FROM TTRA253 A 
+					 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+		</select>
+
+
+<!-- 신청정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduElAppDetInfo">
+				<![CDATA[
+					SELECT F_COM_GET_CONT_ADDRESS(TRIM(#{ssnEnterCd}), TRIM(#{ssnSabun}),'HP') AS PHONE_NO
+					     , F_COM_GET_CONT_ADDRESS(TRIM(#{ssnEnterCd}), TRIM(#{ssnSabun}),'OT') AS TEL_NO
+					     , F_COM_GET_CONT_ADDRESS(TRIM(#{ssnEnterCd}), TRIM(#{ssnSabun}),'IM') AS MAIL_ID
+					     , YM
+					     , TO_CHAR(TO_DATE(YM, 'YYYYMM'), 'YYYY-MM') AS YM_VIEW
+                      FROM TTRA250
+                     WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND EDATE
+				]]>
+		</select>
+		
+<!-- 중복신청 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEduElAppDetDupChk">
+				<![CDATA[
+				SELECT (
+						   SELECT COUNT(1)
+						     FROM TTRA253 A
+						    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+						      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+						      AND A.SABUN   	= TRIM( #{searchApplSabun} )           
+	                          AND A.EDU_CD      = TRIM( #{eduCd} )         
+	                          AND TRIM( #{ym} ) BETWEEN S_YM AND E_YM                                 
+	                          AND EXISTS ( SELECT 1
+	                                         FROM THRI103 X
+	                                        WHERE X.ENTER_CD = A.ENTER_Cd
+	                                          AND X.APPL_SEQ = A.APPL_SEQ
+	                                          AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+	                                      )
+                        ) AS DUP_CNT   -- 남은 강좌 개월수 체크 
+                     , (
+						   SELECT COUNT(1)
+						     FROM TTRA253 A
+						    WHERE A.ENTER_CD    = #{ssnEnterCd}    
+						      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   		
+						      AND A.SABUN   	= TRIM( #{searchApplSabun} )           
+	                          AND A.YM          = TRIM( #{ym} )                                      
+	                          AND EXISTS ( SELECT 1
+	                                         FROM THRI103 X
+	                                        WHERE X.ENTER_CD = A.ENTER_Cd
+	                                          AND X.APPL_SEQ = A.APPL_SEQ
+	                                          AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+	                                      )
+                        ) +1 AS CNT    -- 대상년월 신청건수
+                     , (
+						   SELECT NVL(B.APP_CNT, A.APP_CNT)
+						     FROM TTRA250 A, TTRA251 B
+						    WHERE A.ENTER_CD   = #{ssnEnterCd}          
+	                          AND A.YM         = TRIM( #{ym} )
+	                          AND A.ENTER_CD   = B.ENTER_CD(+)
+	                          AND TRIM( #{searchApplSabun} ) = B.SABUN(+)
+	                          AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE(+) AND B.EDATE(+) 
+                        ) AS APP_CNT    -- 대상년월 신청가능건수
+                  FROM DUAL                                                                 
+				]]>
+		</select>
+	
+<!--  세부내역 저장 -->
+		<update parameterType="map" id="saveEduElAppDet">
+			
+				<![CDATA[
+				 MERGE INTO TTRA253 T 
+				 USING 
+				( ]]>
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				       SELECT TRIM(#{ssnEnterCd}) 			AS ENTER_CD 
+				            , TRIM(#{rm.searchApplSeq}) 	AS APPL_SEQ
+				            , TRIM(#{rm.searchApplSabun}) 	AS SABUN
+				            , TRIM(#{rm.ym}) 				AS YM
+				            , TRIM(#{rm.eduCd}) 			AS EDU_CD
+				            , TRIM(#{rm.eduDtlCd}) 			AS EDU_DTL_CD
+				            , TRIM(#{rm.eduNm}) 			AS EDU_NM
+				            , TRIM(#{rm.ym}) 				AS S_YM
+				            , TO_CHAR(ADD_MONTHS(TO_DATE(TRIM(#{rm.ym}),'YYYYMM'), TO_NUMBER(NVL(NOTE2,'1')))-1, 'YYYYMM' ) AS E_YM
+				            , TRIM(#{rm.phoneNo}) 			AS PHONE_NO
+				            , TRIM(#{rm.mailId}) 			AS MAIL_ID
+				        FROM TSYS005
+				       WHERE ENTER_CD  = TRIM(#{ssnEnterCd})
+				         AND GRCODE_CD = 'L50120'
+				         AND CODE      =  TRIM(#{rm.eduDtlCd})
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+				     AND  T.SABUN 		= S.SABUN 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE		= sysdate 
+				            , T.CHKID	    = #{ssnSabun} 
+				            , T.YM 			= S.YM 
+				            , T.EDU_CD 		= S.EDU_CD 
+				            , T.EDU_DTL_CD 	= S.EDU_DTL_CD 
+				            , T.EDU_NM 		= S.EDU_NM 
+				            , T.S_YM 		= S.S_YM 
+				            , T.E_YM 		= S.E_YM 
+				            , T.PHONE_NO 	= S.PHONE_NO 
+				            , T.MAIL_ID 	= S.MAIL_ID 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.APPL_SEQ
+				            , T.SABUN
+				            , T.YM
+				            , T.EDU_CD
+				            , T.EDU_DTL_CD
+				            , T.EDU_NM
+				            , T.S_YM
+				            , T.E_YM
+				            , T.PHONE_NO
+				            , T.MAIL_ID
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.APPL_SEQ
+				            , S.SABUN
+				            , S.YM
+				            , S.EDU_CD
+				            , S.EDU_DTL_CD
+				            , S.EDU_NM
+				            , S.S_YM
+				            , S.E_YM
+				            , S.PHONE_NO
+				            , S.MAIL_ID
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+	
+</mapper>

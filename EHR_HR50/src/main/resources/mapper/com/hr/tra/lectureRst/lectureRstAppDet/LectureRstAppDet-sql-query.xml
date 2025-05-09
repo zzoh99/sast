@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.lectureRst.lectureRstAppDet">
+	
+	<!-- 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLectureRstAppDetMap">
+			
+				<![CDATA[
+				   SELECT B.EDU_SEQ
+				        , C.EDU_EVENT_SEQ
+				        , B.EDU_COURSE_NM
+						, C.EDU_EVENT_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10010', B.EDU_BRANCH_CD) AS EDU_BRANCH_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L10015', B.EDU_M_BRANCH_CD) AS EDU_M_BRANCH_NM
+						, (SELECT X.EDU_ORG_NM FROM TTRA001 X WHERE X.ENTER_CD = C.ENTER_CD AND X.EDU_ORG_CD = C.EDU_ORG_CD) AS EDU_ORG_NM
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'L20020', B.IN_OUT_TYPE) AS IN_OUT_TYPE_NM
+						, B.EDU_MEMO
+						, TO_CHAR(TO_DATE(C.EDU_S_YMD,'YYYYMMDD'),'YYYY-MM-DD') || ' ~ ' ||TO_CHAR(TO_DATE(C.EDU_E_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS EDU_YMD
+						, C.REAL_EXPENSE_MON
+						, C.EDU_PLACE
+					    , E.EMP_CNT
+					    , E.NOTE
+					    , E.APPL_SEQ AS APPED_APPL_SEQ
+					FROM TTRA101 B
+					   , TTRA121 C
+					   , ( 
+					       SELECT *
+					         FROM TTRA531
+					        WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					          AND APPL_SEQ = TRIM(#{searchApplSeq})  
+					     ) E
+			       WHERE B.ENTER_CD      = TRIM(#{ssnEnterCd}) ]]>
+<choose><when test="eduSeq != null and eduSeq neq ''">
+			       	 AND B.EDU_SEQ	     = TRIM(#{eduSeq})
+</when><otherwise>
+					 AND B.EDU_SEQ	     = (SELECT EDU_SEQ
+									         FROM TTRA531
+									        WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+									          AND APPL_SEQ = TRIM(#{searchApplSeq}))
+</otherwise></choose>
+<choose><when test="eduEventSeq != null and eduEventSeq neq ''">
+					 AND C.EDU_EVENT_SEQ = TRIM(#{eduEventSeq})
+</when><otherwise>
+					 AND C.EDU_EVENT_SEQ = (SELECT EDU_EVENT_SEQ
+									         FROM TTRA531
+									        WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+									          AND APPL_SEQ = TRIM(#{searchApplSeq}))
+</otherwise></choose>
+			         AND B.ENTER_CD      = C.ENTER_CD
+					 AND B.EDU_SEQ	     = C.EDU_SEQ
+					 /*신청서*/
+					 AND C.ENTER_CD      = E.ENTER_CD(+)
+                     AND C.EDU_SEQ       = E.EDU_SEQ(+)
+                     AND C.EDU_EVENT_SEQ = E.EDU_EVENT_SEQ(+)
+		</select>
+		
+		<!-- 사내교육결과보고신청 중복 체크  -->
+		<select parameterType="map" resultType="cMap" id="getLectureRstAppDetDupChk">
+			
+				<![CDATA[
+
+				   SELECT COUNT(1) AS CNT
+				     FROM TTRA531 A
+				    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+				      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+				   	  AND EDU_SEQ    	= TRIM(#{eduSeq})             
+				   	  AND EDU_EVENT_SEQ = TRIM(#{eduEventSeq})                
+                      AND EXISTS ( SELECT 1
+                                     FROM THRI103 X
+                                    WHERE X.ENTER_CD = A.ENTER_Cd
+                                       AND X.APPL_SEQ = A.APPL_SEQ
+                                       AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+                                  )            
+				]]>
+			
+		</select>
+		
+		<!-- 사내교육결과보고신청 저장 -->
+		<update parameterType="map" id="saveLectureRstAppDet">
+			
+				 MERGE INTO TTRA531 T 
+				 USING (
+						SELECT	  TRIM( #{ssnEnterCd} ) 						AS ENTER_CD
+								, TRIM( #{searchApplSeq} ) 				AS APPL_SEQ
+								, TRIM( #{searchApplSabun} )				AS SABUN
+								, TRIM( #{eduSeq} )  					AS EDU_SEQ
+	            				, TRIM( #{eduEventSeq} )  				AS EDU_EVENT_SEQ
+	            				, REPLACE(TRIM(#{empCnt}),',','')		AS EMP_CNT
+					            , TRIM( #{note} )  						AS NOTE
+						 FROM   DUAL
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.APPL_SEQ 	= S.APPL_SEQ 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE			= sysdate 
+				            , T.CHKID			= #{ssnSabun} 
+				            , T.EDU_SEQ 		= S.EDU_SEQ 
+				            , T.EDU_EVENT_SEQ 	= S.EDU_EVENT_SEQ 
+				            , T.EMP_CNT 		= S.EMP_CNT 
+				            , T.NOTE 			= S.NOTE 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.APPL_SEQ
+				            , T.SABUN
+				            , T.EDU_SEQ
+				            , T.EDU_EVENT_SEQ
+				            , T.EMP_CNT
+				            , T.NOTE
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.APPL_SEQ
+				            , S.SABUN
+				            , S.EDU_SEQ
+				            , S.EDU_EVENT_SEQ
+				            , S.EMP_CNT
+				            , S.NOTE
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+		</update>
+</mapper>

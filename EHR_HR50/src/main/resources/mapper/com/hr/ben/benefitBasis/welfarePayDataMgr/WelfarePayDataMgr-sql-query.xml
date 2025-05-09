@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.benefitBasis.welfarePayDataMgr">
+		
+	<select id="getWelfarePayDataMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.BENEFIT_BIZ_CD
+			 , A.CLOSE_ST
+			 , A.BUSINESS_PLACE_CD
+			 , A.BIGO
+			 , TO_CHAR(A.CHKDATE,'YYYY-MM-DD  HH24:MI:SS') AS CHKDATE
+			 , A.CHKID
+		  FROM TBEN991 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+			 AND A.PAY_ACTION_CD = #{payActionCd} ]]>
+		<if test="schBusinessPlaceCd != null and schBusinessPlaceCd neq ''">
+			 AND A.BUSINESS_PLACE_CD = #{schBusinessPlaceCd}
+		</if>
+		<if test="schBenefitBizCd != null and schBenefitBizCd neq ''">
+			 AND A.BENEFIT_BIZ_CD = #{schBenefitBizCd}
+		</if>
+	<![CDATA[
+		  AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD
+		                            FROM TCPN980
+		                           WHERE ENTER_CD = A.ENTER_CD
+		                             AND NVL(FLEX_YN, 'N') = 'N'
+		                             AND PAY_CD  = (SELECT PAY_CD 
+		                                              FROM TCPN201 
+		                                             WHERE ENTER_CD = #{ssnEnterCd} 
+		                                               AND PAY_ACTION_CD = #{payActionCd})
+		                          )    
+		ORDER BY A.PAY_ACTION_CD DESC, A.BENEFIT_BIZ_CD, A.CLOSE_ST DESC
+	]]>
+	</select>
+		
+		
+	<select id="getWelfarePayDataMgr2List" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.BENEFIT_BIZ_CD
+			 , A.CLOSE_ST
+			 , A.BUSINESS_PLACE_CD
+			 , A.BIGO
+			 , TO_CHAR(A.CHKDATE,'YYYY-MM-DD  HH24:MI:SS') AS CHKDATE
+			 , A.CHKID
+		  FROM TBEN991 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+			 AND A.PAY_ACTION_CD = #{payActionCd}
+			 AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD FROM TBEN993 WHERE SABUN = #{ssnSabun}) ]]>
+		<if test="schBusinessPlaceCd != null and schBusinessPlaceCd neq ''">
+			 AND A.BUSINESS_PLACE_CD = #{schBusinessPlaceCd}
+		</if>
+		<if test="schBenefitBizCd != null and schBenefitBizCd neq ''">
+			 AND A.BENEFIT_BIZ_CD = #{schBenefitBizCd}
+		</if>
+	<![CDATA[
+			  AND A.BENEFIT_BIZ_CD IN (SELECT BENEFIT_BIZ_CD
+			                            FROM TCPN980
+			                           WHERE ENTER_CD = A.ENTER_CD
+			                             AND NVL(FLEX_YN, 'N') = 'N'
+			                             AND PAY_CD  = (SELECT PAY_CD 
+			                                              FROM TCPN201 
+			                                             WHERE ENTER_CD = #{ssnEnterCd} 
+			                                               AND PAY_ACTION_CD = #{payActionCd})
+			                          ) 					
+		ORDER BY A.PAY_ACTION_CD DESC, A.BENEFIT_BIZ_CD, A.CLOSE_ST DESC
+	]]>
+	</select>
+		
+		
+	<update id="saveWelfarePayDataMgr" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN991 T
+		USING	(
+				SELECT A.YM
+					 , A.CLOSE_CD
+					 , A.CLOSE_ST
+					 , A.BIGO
+				  FROM (
+						SELECT NULL		AS YM
+							 , NULL		AS CLOSE_CD
+							 , NULL		AS CLOSE_ST
+							 , NULL		AS BIGO
+						  FROM DUAL ]]>
+			<foreach item="rm" collection="mergeRows">
+						UNION ALL
+						SELECT TRIM(#{rm.ym})		AS YM
+							 , TRIM(#{rm.closeCd})	AS CLOSE_CD
+							 , TRIM(#{rm.closeSt})	AS CLOSE_ST
+							 , TRIM(#{rm.bigo})		AS BIGO
+						  FROM DUAL
+			</foreach>
+		<![CDATA[
+						) A
+				 WHERE A.YM IS NOT NULL
+				   AND A.CLOSE_CD IS NOT NULL
+				) S
+		ON (	T.ENTER_CD	= #{ssnEnterCd}
+			AND	T.YM		= S.YM
+			AND	T.CLOSE_CD	= S.CLOSE_CD
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.CLOSE_ST	= S.CLOSE_ST
+					 , T.BIGO		= S.BIGO
+					 , T.CHKDATE	= SYSDATE
+					 , T.CHKID		= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  T.ENTER_CD
+				, T.YM
+				, T.CLOSE_CD
+				, T.CLOSE_ST
+				, T.BIGO
+				, T.CHKDATE
+				, T.CHKID
+			)
+			VALUES
+			(
+				  #{ssnEnterCd}
+				, S.YM
+				, S.CLOSE_CD
+				, S.CLOSE_ST
+				, S.BIGO
+				, SYSDATE
+				, #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<insert id="insertWelfarePayDataMgrMonthData" parameterType="map">
+	<![CDATA[
+			INSERT INTO TBEN991
+			SELECT ENTER_CD
+				 , REPLACE(#{ym},'-','')
+				 , CLOSE_CD
+				 , CLOSE_ST
+				 , BUSINESS_PLACE_CD
+				 , BIGO
+				 , SYSDATE
+				 , #{ssnSabun}
+			  FROM TBEN991
+			 WHERE ENTER_CD	= #{ssnEnterCd}
+			   AND YM		= TO_CHAR(ADD_MONTHS(TO_DATE(REPLACE(#{ym},'-',''),'YYYYMM'),-1),'YYYYMM')
+	]]>
+	</insert>
+		
+	<delete id="deleteWelfarePayDataMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN991
+		 WHERE ENTER_CD||'_'||YM||'_'||CLOSE_CD IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.ym != null and rm.ym neq '' and rm.closeCd != null and rm.closeCd neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.ym})||'_'||TRIM(#{rm.closeCd})
+			</if>
+		</foreach>
+		)
+	</delete>
+		
+	<update id="callP_BEN_PAY_DATA_CLOSE" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_PAY_DATA_CLOSE(
+			#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBusinessPlaceCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBenefitBizCd,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+		
+	<update id="callP_BEN_PAY_DATA_CLOSE_CANCEL" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_PAY_DATA_CLOSE_CANCEL(
+			#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBusinessPlaceCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBenefitBizCd,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+		
+	<update id="callP_BEN_PAY_DATA_CREATE" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_PAY_DATA_CREATE(
+			#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+			#{cnt,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBenefitBizCd,mode=IN,jdbcType=VARCHAR},
+			#{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBusinessPlaceCd,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+		
+	<update id="callP_BEN_PAY_DATA_CREATE_DEL" parameterType="map" statementType="CALLABLE">
+	<![CDATA[
+		{CALL P_BEN_PAY_DATA_CREATE_DEL(
+			#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+			#{cnt,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBenefitBizCd,mode=IN,jdbcType=VARCHAR},
+			#{searchPayActionCd,mode=IN,jdbcType=VARCHAR},
+			#{searchBusinessPlaceCd,mode=IN,jdbcType=VARCHAR},
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+	]]>
+	</update>
+</mapper>

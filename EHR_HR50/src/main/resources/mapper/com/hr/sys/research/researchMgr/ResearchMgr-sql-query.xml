@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.research.researchMgr">
+		<select parameterType="map" resultType="cMap" id="getResearchMgrList">
+
+				<![CDATA[
+					SELECT '1' AS DETAIL
+					     , '1' AS "DESC"
+					     , RESEARCH_SEQ
+					     , RESEARCH_NM
+					     , MEMO
+					     , SIGN_YN
+					     , OPEN_YN
+					     , TO_CHAR(TO_DATE(RESEARCH_SYMD,'YYYYMMDD'),'YYYY-MM-DD') AS RESEARCH_SYMD
+					     , TO_CHAR(TO_DATE(RESEARCH_EYMD,'YYYYMMDD'),'YYYY-MM-DD') AS RESEARCH_EYMD
+					     , STATE_CD
+					     , NOTICE_LVL
+					     , FILE_SEQ
+					  FROM TSYS601
+					 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+			<if test='researchNm != null and !researchNm.equals("")'>
+					   AND RESEARCH_NM LIKE '%' || TRIM( #{researchNm} ) || '%'
+			</if>
+					 ORDER BY RESEARCH_SEQ DESC
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getResearchMgrDetailList">
+
+				<![CDATA[
+					SELECT RESEARCH_SEQ
+					     , QUESTION_SEQ
+					     , QUESTION_NM
+					     , QUESTION_NO
+					     , QUESTION_ITEM_CD
+					     , RIGHT
+					     , DECODE(QUESTION_ITEM_CD,'30','2','1') AS DETAIL
+					  FROM TSYS603
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND RESEARCH_SEQ = TRIM( #{rsSeq} )
+					 ORDER BY TO_NUMBER(QUESTION_NO)
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getResearchMgrDetailTypeList">
+
+				<![CDATA[
+					SELECT RESEARCH_SEQ
+					     , QUESTION_SEQ
+					     , ITEM_SEQ
+					     , DISPLAY_SEQ
+					     , ITEM_NM
+					     , RIGHT_POINT
+					  FROM TSYS605
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND RESEARCH_SEQ = TO_NUMBER( TRIM( #{rSeq} ))
+					   AND QUESTION_SEQ = TO_NUMBER( TRIM( #{qSeq} ) )
+					 ORDER BY DISPLAY_SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getResearchMgrNoticeLvl">
+
+				<![CDATA[
+ 					SELECT A.CODE
+ 					     , A.CODE_NM
+					     , DECODE( (SELECT COUNT(*)
+					                  FROM TSYS609 C
+					                 WHERE C.ENTER_CD = A.ENTER_CD
+					                   AND C.RESEARCH_SEQ = TRIM( #{researchSeq} )
+					                   AND C.NOTICE_LVL = TRIM( #{noticeLvl} )
+					                   AND C.NOTICE_ITEM = A.CODE), 0, 0, 1
+					       ) AS CHK_BX
+ 					  FROM TSYS005 A
+ 					 WHERE A.GRCODE_CD = TRIM( #{noticeLvl} )
+ 					   AND A.ENTER_CD  = #{ssnEnterCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getResearchMgrNoticeLvlList">
+
+				<![CDATA[
+				SELECT NOTICE_ITEM
+				  FROM TSYS609
+				 WHERE ENTER_CD     = #{ssnEnterCd}
+				   AND RESEARCH_SEQ	= TO_NUMBER( TRIM( #{researchSeq} ) )
+ 				   AND NOTICE_LVL   = TRIM( #{noticeLvl} )
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getResearchMgrOrgList">
+
+				<![CDATA[
+						SELECT LEVEL AS "_level"
+						     , A.SDATE
+						     , A.PRIOR_ORG_CD
+						     , A.ORG_CD
+						     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, TRIM(#{searchSdate}), #{ssnLocaleCd}) AS ORG_NM
+						     , A.DIRECT_YN
+						     , A.SEQ
+						     , A.ORDER_SEQ
+						     , NVL(A.ORG_LEVEL, LEVEL) AS ORG_LEVEL
+						     , A.LOC_TYPE
+						     , A.X_POS
+						     , A.Y_POS
+						     , DECODE( (SELECT COUNT(*)
+						                  FROM TSYS609 C
+						                 WHERE C.ENTER_CD = A.ENTER_CD
+						                   AND C.RESEARCH_SEQ = TRIM( #{researchSeq} )
+						                   AND C.NOTICE_LVL = TRIM( #{noticeLvl} )
+						                   AND C.NOTICE_ITEM = A.ORG_CD), 0, 0, 1
+						       ) AS CHK_BX
+						  FROM TORG105 A, TORG101 B
+						 WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.ORG_CD   = B.ORG_CD
+				           AND A.SDATE    BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+				           AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND A.SDATE = (SELECT MAX(AA.SDATE)
+                     					    FROM TORG103 AA
+                                     	   WHERE AA.ENTER_CD = A.ENTER_CD
+                                       		 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN AA.SDATE AND NVL(AA.EDATE,'99991231')
+                     					  )
+						 START WITH A.PRIOR_ORG_CD = '0'
+					   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+						   AND PRIOR A.SDATE  = A.SDATE
+						   AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+						 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+				]]>
+
+
+		</select>
+
+		<update parameterType="map" id="saveResearchMgr">
+
+
+   					MERGE INTO TSYS601 T
+                  	USING (
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                           	SELECT
+                          		<choose><when test='rm.researchSeq != null and !rm.researchSeq.equals("")'>
+										TO_NUMBER( TRIM(#{rm.researchSeq}) ) 	AS RESEARCH_SEQ
+								</when><otherwise>
+										(SELECT (NVL(MAX(TO_NUMBER(RESEARCH_SEQ)),0) + ${icnt}) FROM TSYS601 WHERE ENTER_CD = #{ssnEnterCd})  	AS RESEARCH_SEQ
+										<bind name="icnt" value="icnt + 1" />
+								</otherwise>
+								</choose>
+                           			, TRIM(#{rm.researchNm})	AS  RESEARCH_NM
+                           			, TRIM(#{rm.memo})			AS  MEMO
+                           			, TRIM(#{rm.signYn})		AS  SIGN_YN
+                           			, TRIM(#{rm.openYn})		AS  OPEN_YN
+                           			, REPLACE(TRIM(#{rm.researchSymd}),'-','')	AS  RESEARCH_SYMD
+                           			, REPLACE(TRIM(#{rm.researchEymd}),'-','')	AS  RESEARCH_EYMD
+                           			, TRIM(#{rm.stateCd})		AS  STATE_CD
+                           			, TRIM(#{rm.noticeLvl})	    AS  NOTICE_LVL
+                     			<choose><when test='rm.fileSeq != null and !rm.fileSeq.equals("")'>
+									, TRIM(#{rm.fileSeq})		AS  FILE_SEQ
+								</when><otherwise>
+									, F_COM_GET_SEQ('FILE')		AS  FILE_SEQ
+								</otherwise>
+								</choose>
+                           	FROM   DUAL
+</foreach>
+                           ) S
+                        ON (
+                               	   T.ENTER_CD 		= #{ssnEnterCd}
+                               AND T.RESEARCH_SEQ 	= S.RESEARCH_SEQ
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.RESEARCH_NM		= S.RESEARCH_NM
+         							, T.MEMO         	= S.MEMO
+									, T.SIGN_YN      	= S.SIGN_YN
+									, T.OPEN_YN      	= S.OPEN_YN
+									, T.RESEARCH_SYMD	= S.RESEARCH_SYMD
+									, T.RESEARCH_EYMD	= S.RESEARCH_EYMD
+									, T.STATE_CD     	= S.STATE_CD
+									, T.NOTICE_LVL   	= S.NOTICE_LVL
+									, T.FILE_SEQ     	= S.FILE_SEQ
+									, T.CHKDATE       	= SYSDATE
+									, T.CHKID         	= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  T.ENTER_CD
+               				, T.RESEARCH_SEQ
+							, T.RESEARCH_NM
+							, T.MEMO
+							, T.SIGN_YN
+							, T.OPEN_YN
+							, T.RESEARCH_SYMD
+							, T.RESEARCH_EYMD
+							, T.STATE_CD
+							, T.NOTICE_LVL
+							, T.FILE_SEQ
+							, T.CHKDATE
+							, T.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+							, S.RESEARCH_SEQ
+							, S.RESEARCH_NM
+							, S.MEMO
+							, S.SIGN_YN
+							, S.OPEN_YN
+							, S.RESEARCH_SYMD
+							, S.RESEARCH_EYMD
+							, S.STATE_CD
+							, S.NOTICE_LVL
+							, S.FILE_SEQ
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+
+
+
+		</update>
+		<update parameterType="map" id="saveResearchMgrDetail">
+
+
+   					MERGE INTO TSYS603 T
+                  	USING (
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                           	SELECT
+                           		<choose><when test='rm.questionSeq != null and !rm.questionSeq.equals("")'>
+									#{rm.questionSeq}							AS  QUESTION_SEQ
+								</when><otherwise>
+										(	SELECT (NVL(MAX(TO_NUMBER(QUESTION_SEQ )),0) + ${icnt})
+											FROM TSYS603
+											WHERE ENTER_CD 		= #{ssnEnterCd}
+											AND RESEARCH_SEQ 	= #{rsSeq}
+										)  										AS QUESTION_SEQ
+										<bind name="icnt" value="icnt + 1" />
+								</otherwise>
+								</choose>
+                           			, TRIM(#{rm.questionNm})					AS QUESTION_NM
+                           			, TRIM(#{rm.questionNo})					AS QUESTION_NO
+                           			, TRIM(#{rm.questionItemCd})				AS QUESTION_ITEM_CD
+                           			, #{rsSeq}									AS RESEARCH_SEQ
+                           	FROM   DUAL
+</foreach>
+                           ) S
+                        ON (
+                               	   T.ENTER_CD 		= #{ssnEnterCd}
+                               AND T.RESEARCH_SEQ 	= S.RESEARCH_SEQ
+                               AND T.QUESTION_SEQ	= S.QUESTION_SEQ
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.QUESTION_NM     	= S.QUESTION_NM
+									, T.QUESTION_NO     	= S.QUESTION_NO
+									, T.QUESTION_ITEM_CD	= S.QUESTION_ITEM_CD
+									, T.CHKDATE       		= SYSDATE
+									, T.CHKID         		= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  T.ENTER_CD
+               				, T.RESEARCH_SEQ
+							, T.QUESTION_SEQ
+							, T.QUESTION_NM
+							, T.QUESTION_NO
+							, T.QUESTION_ITEM_CD
+							, T.CHKDATE
+							, T.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+							, S.RESEARCH_SEQ
+							, S.QUESTION_SEQ
+							, S.QUESTION_NM
+							, S.QUESTION_NO
+							, S.QUESTION_ITEM_CD
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<update parameterType="map" id="saveResearchMgrDetailType">
+
+
+   					MERGE INTO TSYS605 T
+                  	USING (
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+                           	SELECT
+                           		<choose><when test='rm.itemSeq != null and !rm.itemSeq.equals("")'>
+										TO_NUMBER(TRIM(#{rm.itemSeq}))		AS  ITEM_SEQ
+</when><otherwise>
+										(	SELECT (NVL(MAX(TO_NUMBER(ITEM_SEQ )),0) + ${icnt})
+											FROM TSYS605
+											WHERE ENTER_CD = #{ssnEnterCd}
+											AND RESEARCH_SEQ = #{rm.researchSeq}
+											AND QUESTION_SEQ = #{rm.questionSeq}
+										)  									AS ITEM_SEQ
+										<bind name="icnt" value="icnt + 1" />
+								</otherwise>
+								</choose>
+                           			, TO_NUMBER( TRIM(#{rm.displaySeq})	)	AS  DISPLAY_SEQ
+                           			, TRIM(#{rm.itemNm})					AS  ITEM_NM
+                           			, TO_NUMBER( TRIM(#{rm.rightPoint}) )	AS  RIGHT_POINT
+                           			, #{rm.researchSeq}						AS  RESEARCH_SEQ
+                           			, #{rm.questionSeq}						AS  QUESTION_SEQ
+                           	FROM   DUAL
+</foreach>
+                           ) S
+                        ON (
+                               	   T.ENTER_CD 		= #{ssnEnterCd}
+                               AND T.RESEARCH_SEQ 	= S.RESEARCH_SEQ
+                               AND T.QUESTION_SEQ	= S.QUESTION_SEQ
+                               AND T.ITEM_SEQ 		= S.ITEM_SEQ
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.DISPLAY_SEQ     	= S.DISPLAY_SEQ
+									, T.ITEM_NM     		= S.ITEM_NM
+									, T.RIGHT_POINT			= S.RIGHT_POINT
+									, T.CHKDATE       		= SYSDATE
+									, T.CHKID         		= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  T.ENTER_CD
+               				, T.RESEARCH_SEQ
+							, T.QUESTION_SEQ
+							, T.ITEM_SEQ
+							, T.DISPLAY_SEQ
+							, T.ITEM_NM
+							, T.RIGHT_POINT
+							, T.CHKDATE
+							, T.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+							, S.RESEARCH_SEQ
+							, S.QUESTION_SEQ
+							, S.ITEM_SEQ
+							, S.DISPLAY_SEQ
+							, S.ITEM_NM
+							, S.RIGHT_POINT
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<insert parameterType="map" id="insertResearchMgrNotice">
+
+
+           			INSERT INTO TSYS609
+           			(
+           				  ENTER_CD
+						, RESEARCH_SEQ
+						, NOTICE_LVL
+						, NOTICE_ITEM
+						, CHKDATE
+						, CHKID
+           			)
+<foreach item="rm" collection="updateRows" separator=" UNION ALL ">
+					SELECT
+							  #{ssnEnterCd}
+							, TO_NUMBER( TRIM( #{researchSeq} ) )
+							, TRIM( #{noticeLvl} )
+					<choose><when test='noticeLvl != null and noticeLvl.equals("ORG")'>
+							, TRIM( #{rm.orgCd} )
+					</when><otherwise>
+							, TRIM( #{rm.code} )
+					</otherwise>
+					</choose>
+							, SYSDATE
+							, #{ssnSabun}
+					FROM   DUAL
+</foreach>
+
+
+
+		</insert>
+		<delete parameterType="map" id="deleteResearchMasterMgr601">
+
+
+   					DELETE FROM TSYS601
+					WHERE ( ENTER_CD,RESEARCH_SEQ  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), #{rm.researchSeq}  )
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteResearchMasterMgr603">
+
+
+   					DELETE FROM TSYS603
+					WHERE ( ENTER_CD,RESEARCH_SEQ  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  #{ssnEnterCd} , #{rm.researchSeq}  )
+</foreach>
+							)
+		</delete>
+		<delete parameterType="map" id="deleteResearchMasterMgrSeq603">
+
+
+   					DELETE FROM TSYS603
+					WHERE ( ENTER_CD,RESEARCH_SEQ,QUESTION_SEQ  ) IN  (  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+,                         (  #{ssnEnterCd}, #{rm.researchSeq} , #{rm.questionSeq} )
+</foreach>
+							)
+
+
+
+		</delete>
+		<delete parameterType="map" id="deleteResearchMasterMgr605">
+
+
+   					DELETE FROM TSYS605
+					WHERE ( ENTER_CD,RESEARCH_SEQ  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  #{ssnEnterCd} , #{rm.researchSeq}  )
+</foreach>
+							)
+		</delete>
+		<delete parameterType="map" id="deleteResearchMasterMgrSeq605">
+
+
+			DELETE FROM TSYS605
+			WHERE ( ENTER_CD,RESEARCH_SEQ,QUESTION_SEQ,ITEM_SEQ ) IN  (  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+,                         (  #{ssnEnterCd}, #{rm.researchSeq} , #{rm.questionSeq}, #{rm.itemSeq} )
+</foreach>
+					)
+		</delete>
+		<delete parameterType="map" id="deleteResearchMasterMgr609">
+
+
+   					DELETE FROM TSYS609
+					WHERE ( ENTER_CD,RESEARCH_SEQ  ) IN  (  (NULL,NULL )
+<foreach item="rm" collection="deleteRows" >
+,                         (  #{ssnEnterCd} , #{rm.researchSeq}  )
+</foreach>
+							)
+		</delete>
+		<delete parameterType="map" id="deleteItemResearchMasterMgr609">
+
+
+					DELETE FROM TSYS609
+					WHERE ENTER_CD = #{ssnEnterCd}
+					  AND ENTER_CD||'_'||RESEARCH_SEQ||'_'||NOTICE_LVL||'_'||NOTICE_ITEM IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+					    ,
+  <if test='researchSeq != null and !researchSeq.equals("") and noticeLvl != null and !noticeLvl.equals("")
+       and rm.orgCd != null and !rm.orgCd.equals("")'>
+					        TRIM(#{ssnEnterCd})||'_'||TRIM(#{researchSeq})||'_'||TRIM(#{noticeLvl})||'_'||TRIM(#{rm.orgCd})
+  </if>
+  <if test='researchSeq != null and !researchSeq.equals("") and noticeLvl != null and !noticeLvl.equals("")
+           and rm.code != null and !rm.code.equals("")'>
+					        TRIM(#{ssnEnterCd})||'_'||TRIM(#{researchSeq})||'_'||TRIM(#{noticeLvl})||'_'||TRIM(#{rm.code})
+  </if>
+</foreach>
+					  )
+
+
+
+		</delete>
+
+
+	<delete parameterType="map" id="deleteResearchMasterMgrSeq609">
+		DELETE
+		  FROM TSYS609
+		 WHERE ( ENTER_CD,RESEARCH_SEQ  ) IN  (  (NULL,NULL )
+		<foreach item="rm" collection="deleteRows" >
+			,                         (  #{ssnEnterCd} , #{rm.researchSeq}  )
+		</foreach>
+		)
+	</delete>
+
+
+</mapper>

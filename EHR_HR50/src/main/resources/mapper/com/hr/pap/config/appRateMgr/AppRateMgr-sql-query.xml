@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appRateMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppRateMgrList">
+
+				<![CDATA[
+				 SELECT B.ENTER_CD
+				      ,B.APPRAISAL_CD
+				      ,B.MBO_RATE1
+				      ,B.COMPETENCY_RATE1
+				      ,B.MBO_RATE2
+				      ,B.COMPETENCY_RATE2
+				      ,B.MBO_RATE
+				      ,B.COMPETENCY_RATE
+				      ,B.JIKCHAK_CD
+				  FROM TPAP101 A
+				      ,TPAP124 B
+				 WHERE A.ENTER_CD     = B.ENTER_CD
+				   AND A.APPRAISAL_CD = B.APPRAISAL_CD
+				   AND B.ENTER_CD     = TRIM(#{ssnEnterCd})
+				           ]]>
+				<if test='searchAppraisalCd != null and !searchAppraisalCd.equals("")'>
+				   AND B.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+				</if>
+				<if test='searchjikchakCd != null and !searchjikchakCd.equals("")'>
+				   AND B.JIKCHAK_CD LIKE TRIM(#{searchJikchakCd}) || '%'
+				</if>
+			  ORDER BY B.JIKCHAK_CD
+
+
+		</select>
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveAppRateMgr">
+
+					MERGE INTO TPAP124 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.JIKCHAK_CD
+									, A.MBO_RATE1
+									, A.MBO_RATE2
+									, A.COMPETENCY_RATE1
+									, A.COMPETENCY_RATE2
+									, A.MBO_RATE
+									, A.COMPETENCY_RATE
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD        
+											, NULL	AS APPRAISAL_CD    
+											, NULL	AS JIKCHAK_CD        
+											, NULL	AS MBO_RATE1       
+											, NULL	AS MBO_RATE2       
+											, NULL	AS COMPETENCY_RATE1
+											, NULL	AS COMPETENCY_RATE2
+											, NULL	AS MBO_RATE        
+											, NULL	AS COMPETENCY_RATE 
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	                AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	    AS APPRAISAL_CD
+											, TRIM( #{rm.jikchakCd})	    AS JIKCHAK_CD
+											, TRIM( #{rm.mboRate1})	    AS MBO_RATE1
+											, TRIM( #{rm.mboRate2})		AS MBO_RATE2
+											, TRIM( #{rm.competencyRate1})	AS COMPETENCY_RATE1
+											, TRIM( #{rm.competencyRate2})	AS COMPETENCY_RATE2
+											, TRIM( #{rm.mboRate})	        AS MBO_RATE
+											, TRIM( #{rm.competencyRate})	AS COMPETENCY_RATE
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		    = S.ENTER_CD
+					AND  T.APPRAISAL_CD		= S.APPRAISAL_CD
+					AND  T.JIKCHAK_CD		= S.JIKCHAK_CD
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	     
+									  T.MBO_RATE1           = S.MBO_RATE1          
+									, T.MBO_RATE2           = S.MBO_RATE2          
+			                      	, T.COMPETENCY_RATE1    = S.COMPETENCY_RATE1   
+			                   		, T.COMPETENCY_RATE2    = S.COMPETENCY_RATE2   
+			                    	, T.MBO_RATE            = S.MBO_RATE           
+			                      	, T.COMPETENCY_RATE     = S.COMPETENCY_RATE    
+									, T.CHKDATE			    = SYSDATE
+									, T.CHKID			    = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD        
+   							, T.APPRAISAL_CD    
+   							, T.JIKCHAK_CD       
+   							, T.MBO_RATE1       
+   							, T.MBO_RATE2       
+   							, T.COMPETENCY_RATE1
+   							, T.COMPETENCY_RATE2
+   							, T.MBO_RATE        
+   							, T.COMPETENCY_RATE   
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+ 							  S.ENTER_CD        
+ 							, S.APPRAISAL_CD    
+ 							, S.JIKCHAK_CD       
+ 							, S.MBO_RATE1       
+ 							, S.MBO_RATE2       
+ 							, S.COMPETENCY_RATE1
+ 							, S.COMPETENCY_RATE2
+ 							, S.MBO_RATE        
+ 							, S.COMPETENCY_RATE 
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppRateMgr">
+
+					DELETE FROM TPAP124 
+					WHERE 	(ENTER_CD,APPRAISAL_CD,JIKCHAK_CD) IN 	(  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+										,	TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.jikchakCd != null and !rm.jikchakCd.equals("")'>
+										,	TRIM( #{rm.jikchakCd})
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+		
+		<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppRateMgrCopyPop">
+
+				<![CDATA[
+					DELETE FROM TPAP124 
+					WHERE  ENTER_CD      = #{ssnEnterCd}
+					AND    APPRAISAL_CD  = #{tgtAppraisalCd}
+
+				]]>
+
+		</delete>
+		
+		
+		
+<!-- 		생성 -->	
+		<insert parameterType="map" id="insertAppRateMgrCopyPop">
+
+				<![CDATA[
+						INSERT INTO TPAP124
+						(
+							  ENTER_CD
+							, APPRAISAL_CD
+							, JIKCHAK_CD
+							, MBO_RATE1
+							, COMPETENCY_RATE1
+							, MBO_RATE2
+							, COMPETENCY_RATE2
+							, MBO_RATE
+							, COMPETENCY_RATE
+							, WORK_TYPE
+							, Q_ORG_CD
+							, JOB_CD
+							, KPI_RATE
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.ENTER_CD
+								, #{tgtAppraisalCd}
+								, S.JIKCHAK_CD
+								, S.MBO_RATE1
+								, S.COMPETENCY_RATE1
+								, S.MBO_RATE2
+								, S.COMPETENCY_RATE2
+								, S.MBO_RATE
+								, S.COMPETENCY_RATE
+								, S.WORK_TYPE
+								, S.Q_ORG_CD
+								, S.JOB_CD
+								, S.KPI_RATE
+								, SYSDATE
+								, #{ssnSabun}
+						FROM    TPAP124 S
+						WHERE   S.ENTER_CD = #{ssnEnterCd}
+						AND     S.APPRAISAL_CD = #{orgnAppraisalCd}
+				]]>
+
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppRateMgr">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET 
+					( COL1, COL2, COL3, COL4, CHKDATE, CHKID ) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT   
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+
+</mapper>

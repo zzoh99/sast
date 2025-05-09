@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 퇴직연금유형관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetire.sepPenTypeMgr">
+		<select parameterType="map" resultType="cMap" id="getSepPenTypeMgrList">
+
+
+					SELECT A.SABUN
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') ALIAS
+						 , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, A.SDATE) AS JIKGUB_NM
+						 , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.SDATE) AS JIKWEE_NM
+						 , F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD,A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+						 , A.SDATE
+						 , A.EDATE
+						 , A.RET_PENTION_TYPE
+					  FROM TCPN710 A
+<if test='ssnSearchType != null and ssnSearchType.equals("O")'>
+INNER JOIN ${query} AUTH
+   ON AUTH.ENTER_CD = A.ENTER_CD
+  AND AUTH.SABUN = A.SABUN
+</if>
+						 , THRM100 B
+						 , THRM151 C
+					 WHERE A.ENTER_CD	= B.ENTER_CD
+					   AND A.SABUN		= B.SABUN
+					   AND A.ENTER_CD	= C.ENTER_CD
+					   AND A.SABUN		= C.SABUN
+					   AND A.ENTER_CD	= #{ssnEnterCd}
+					   AND DECODE(REPLACE(#{sdate},'-',''),NULL,A.SDATE,REPLACE(#{sdate},'-','')) BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+					<if test='retPentionType != null and !retPentionType.equals("")'>
+					   AND A.RET_PENTION_TYPE = #{retPentionType}
+					</if>
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND A.SABUN||F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) LIKE '%'||trim(#{sabunName})||'%'
+					</if>
+					   AND C.SDATE = (SELECT MAX(SDATE) FROM THRM151 WHERE ENTER_CD = C.ENTER_CD AND SABUN = C.SABUN AND A.SDATE BETWEEN SDATE AND NVL(EDATE,'99991231'))
+					 ORDER BY SABUN, SDATE DESC
+
+
+
+		</select>
+		<update parameterType="map" id="saveSepPenTypeMgr">
+
+
+					MERGE INTO TCPN710 T
+					USING	(
+							SELECT A.SABUN
+								 , A.SDATE
+								 , A.EDATE
+								 , A.RET_PENTION_TYPE
+							  FROM (
+									SELECT NULL	AS SABUN
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+										 , NULL AS RET_PENTION_TYPE
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})			AS SABUN
+										 , TRIM(#{rm.sdate})			AS SDATE
+										 , TRIM(#{rm.edate})			AS EDATE
+										 , TRIM(#{rm.retPentionType})	AS RET_PENTION_TYPE
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.SABUN	IS NOT NULL
+							  AND A.SDATE	IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD	= #{ssnEnterCd}
+						AND	T.SABUN		= S.SABUN
+						AND	T.SDATE		= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE				= S.EDATE
+								 , T.RET_PENTION_TYPE	= S.RET_PENTION_TYPE
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+						  , T.SABUN
+						  , T.SDATE
+						  , T.EDATE
+						  , T.RET_PENTION_TYPE
+						  , T.CHKDATE
+						  , T.CHKID
+						)
+						VALUES
+						(
+							#{ssnEnterCd}
+						  , S.SABUN
+						  , S.SDATE
+						  , S.EDATE
+						  , S.RET_PENTION_TYPE
+						  , SYSDATE
+						  , #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" id="updateSepPenTypeMgrEdate">
+
+
+					MERGE INTO TCPN710 T
+					USING	(
+							SELECT A.SABUN
+								 , A.SDATE
+								 , A.EDATE
+							  FROM (
+									SELECT NULL	AS SABUN
+										 , NULL	AS SDATE
+										 , NULL	AS EDATE
+									  FROM DUAL
+<foreach item="rm" collection="insertRows" >
+	<![CDATA[
+									UNION ALL
+									SELECT A.SABUN
+										 , A.SDATE
+										 , TO_CHAR(TO_DATE(TRIM(#{rm.sdate}),'YYYYMMDD')-1,'YYYYMMDD')	AS EDATE
+									  FROM TCPN710 A
+									 WHERE A.ENTER_CD = #{ssnEnterCd}
+									   AND A.SABUN = TRIM(#{rm.sabun})
+									   AND A.EDATE IS NULL
+									   AND A.SDATE = (SELECT MAX(SDATE)
+													  FROM TCPN710
+													 WHERE ENTER_CD = A.ENTER_CD
+													   AND SABUN = A.SABUN
+													   AND SDATE < TRIM(#{rm.sdate})
+									   				)
+									   				]]>
+</foreach>
+									) A
+							WHERE A.SABUN	IS NOT NULL
+							  AND A.SDATE	IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD	= #{ssnEnterCd}
+						AND	T.SABUN		= S.SABUN
+						AND	T.SDATE		= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.EDATE		= S.EDATE
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteSepPenTypeMgr">
+
+
+					DELETE FROM TCPN710
+					 WHERE ENTER_CD||'_'||SABUN||'_'||SDATE IN ( NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.sabun != null and !rm.sabun.equals("") and #{rm.sdate} != null and !rm.sdate.equals("")'>
+								TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.sdate})
+							</if>
+</foreach>
+							)
+
+
+
+		</delete>
+	</mapper>

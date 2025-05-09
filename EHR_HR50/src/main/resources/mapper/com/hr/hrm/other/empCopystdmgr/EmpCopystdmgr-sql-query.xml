@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.empCopystdmgr">
+
+		<select parameterType="map" resultType="cMap" id="getEmpCopystdmgrLeftList">
+
+					SELECT	0	AS	DETAIL
+						,	A.ENTER_CD			/*	회사구분(TORG900)	*/
+						,	A.TABLE_NAME		/*	테이블명			*/	
+						,	A.TABLE_COMMENT		/*	테이블코멘트		*/	
+						,	A.USE_YN			/*	사용여부(Y/N)		*/	
+						,	A.ORDER_SEQ			/*	작업순서			*/	
+						,	A.CHKDATE			/*	최종수정시간		*/	
+						,	A.CHKID				/*	최종수정자			*/	
+					FROM	THRM098	A
+					WHERE	A.ENTER_CD	=	#{ssnEnterCd}
+					<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+					AND		A.TABLE_NAME	LIKE	'%' || UPPER( #{searchTableName} ) || '%'
+					</if>
+					ORDER	BY
+							A.ORDER_SEQ
+
+
+
+		</select>
+
+		<update parameterType="map" id="saveEmpCopystdmgrLeft">
+
+						MERGE INTO THRM098	T
+						USING	
+						(
+									SELECT	ENTER_CD
+										,	TABLE_NAME
+										,	TABLE_COMMENT
+										,	USE_YN
+										,	ORDER_SEQ
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	TABLE_NAME
+										,	NULL		AS	TABLE_COMMENT
+										,	NULL		AS	USE_YN
+										,	NULL		AS	ORDER_SEQ
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+										,	TRIM(#{rm.tableName})				AS	TABLE_NAME
+										,	TRIM(#{rm.tableComment})				AS	TABLE_COMMENT
+										,	TRIM(#{rm.useYn})				AS	USE_YN
+										,	TRIM(#{rm.orderSeq})				AS	ORDER_SEQ
+										,	SYSDATE						AS	CHKDATE
+										,	#{ssnSabun}						AS	CHKID
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND	TABLE_NAME IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.TABLE_NAME				=		S.TABLE_NAME
+						)
+					WHEN MATCHED THEN 
+					UPDATE SET	
+							T.TABLE_COMMENT			=	S.TABLE_COMMENT
+						,	T.USE_YN			=	S.USE_YN
+						,	T.ORDER_SEQ			=	S.ORDER_SEQ
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID			=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					( 
+							T.ENTER_CD
+						,	T.TABLE_NAME
+						,	T.TABLE_COMMENT
+						,	T.USE_YN
+						,	T.ORDER_SEQ
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.TABLE_NAME
+						,	S.TABLE_COMMENT
+						,	S.USE_YN
+						,	S.ORDER_SEQ
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+
+		</update>
+
+		<delete parameterType="map" id="deleteEmpCopystdmgrLeft">
+
+					DELETE	FROM THRM098
+					WHERE	(ENTER_CD, TABLE_NAME) IN ((NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.tableName != null and !rm.tableName.equals("")'>
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.tableName} ) )
+										</if>
+										</if>
+</foreach>
+										)
+
+
+		</delete>
+		
+		<select parameterType="map" resultType="cMap" id="getEmpCopystdmgrRightList">
+
+				<![CDATA[
+					SELECT	A.ENTER_CD			/*	회사구분(TORG900)	*/
+						,	B.TABLE_NAME		/*	테이블명			*/	
+						,	B.COLUMN_NAME		/*	컬럼명			*/	
+						,	B.COMMENTS AS COLUMN_COMMENT	/*	컬럼코멘트			*/	
+						,	A.USE_YN			/*	사용여부(Y/N)		*/	
+						,	A.PK_YN				/*	PK여부			*/	
+						,	A.CHKDATE			/*	최종수정시간		*/	
+						,	A.CHKID				/*	최종수정자			*/	
+					FROM	THRM099	A
+					   ,   (SELECT X.*, Y.COMMENTS
+					          FROM ALL_TAB_COLUMNS X, ALL_COL_COMMENTS Y
+					         WHERE X.OWNER = Y.OWNER 
+					           AND X.TABLE_NAME = Y.TABLE_NAME 
+					           AND X.COLUMN_NAME = Y.COLUMN_NAME 
+					           AND X.OWNER = F_COM_GET_STD_CD_VALUE(#{ssnEnterCd}, 'SYS_DB_OWNER')
+					           AND X.TABLE_NAME	=	#{searchTableNameHidden}) B
+					WHERE	A.TABLE_NAME(+) = B.TABLE_NAME
+					AND     A.COLUMN_NAME(+) = B.COLUMN_NAME
+					AND     A.ENTER_CD(+)		=	#{ssnEnterCd}
+					AND		A.TABLE_NAME(+)	=	#{searchTableNameHidden}
+					ORDER	BY
+							B.COLUMN_ID
+				]]>
+
+
+		</select>
+
+		<update parameterType="map" id="saveEmpCopystdmgrRight">
+
+						MERGE INTO THRM099	T
+						USING	
+						(
+									SELECT	ENTER_CD
+										,	TABLE_NAME
+										,	COLUMN_NAME
+										,	COLUMN_COMMENT
+										,	USE_YN
+										,	PK_YN
+										,	CHKDATE
+										,	CHKID
+							FROM	(
+									SELECT	NULL		AS	ENTER_CD
+										,	NULL		AS	TABLE_NAME
+										,	NULL		AS	COLUMN_NAME
+										,	NULL		AS	COLUMN_COMMENT
+										,	NULL		AS	USE_YN
+										,	NULL		AS	PK_YN
+										,	NULL		AS	CHKDATE
+										,	NULL		AS	CHKID
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+								UNION ALL
+									SELECT	TRIM(#{ssnEnterCd})				AS	ENTER_CD
+										,	TRIM(#{rm.tableName})				AS	TABLE_NAME
+										,	TRIM(#{rm.columnName})				AS	COLUMN_NAME
+										,	TRIM(#{rm.columnComment})				AS	COLUMN_COMMENT
+										,	TRIM(#{rm.useYn})				AS	USE_YN
+										,	TRIM(#{rm.pkYn})				AS	PK_YN
+										,	SYSDATE						AS	CHKDATE
+										,	#{ssnSabun}						AS	CHKID
+									FROM	DUAL
+</foreach>
+									)	WHERE	ENTER_CD IS NOT NULL
+										AND	TABLE_NAME IS NOT NULL
+										AND	COLUMN_NAME IS NOT NULL
+						) S
+					ON	(
+								T.ENTER_CD				=		S.ENTER_CD
+							AND	T.TABLE_NAME				=		S.TABLE_NAME
+							AND	T.COLUMN_NAME				=		S.COLUMN_NAME
+						)
+					WHEN MATCHED THEN 
+					UPDATE SET	
+							T.COLUMN_COMMENT			=	S.COLUMN_COMMENT
+						,	T.USE_YN			=	S.USE_YN
+						,	T.PK_YN			=	S.PK_YN
+						,	T.CHKDATE			=	S.CHKDATE
+						,	T.CHKID			=	S.CHKID
+					WHEN NOT MATCHED THEN
+					INSERT
+					( 
+							T.ENTER_CD
+						,	T.TABLE_NAME
+						,	T.COLUMN_NAME
+						,	T.COLUMN_COMMENT
+						,	T.USE_YN
+						,	T.PK_YN
+						,	T.CHKDATE
+						,	T.CHKID
+					)
+					VALUES
+					(
+							S.ENTER_CD
+						,	S.TABLE_NAME
+						,	S.COLUMN_NAME
+						,	S.COLUMN_COMMENT
+						,	S.USE_YN
+						,	S.PK_YN
+						,	S.CHKDATE
+						,	S.CHKID
+					)
+
+		</update>
+
+
+		<delete parameterType="map" id="deleteEmpCopystdmgrRight">
+
+					DELETE	FROM THRM099
+					WHERE	(ENTER_CD, TABLE_NAME, COLUMN_NAME) IN ((NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.tableName != null and !rm.tableName.equals("")'>
+										<if test='rm.columnName != null and !rm.columnName.equals("")'>
+												( TRIM( #{ssnEnterCd} ) , TRIM( #{rm.tableName} ) , TRIM( #{rm.columnName} ) )
+										</if>
+										</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+		
+		<select parameterType="map" resultType="cMap" id="getSearchTableCdList">
+
+				<![CDATA[
+				SELECT	TABLE_NAME AS CODE
+					,   TABLE_COMMENT AS CODE_NM
+				FROM	THRM099
+				WHERE	ENTER_CD	=	#{ssnEnterCd}
+				GROUP BY TABLE_NAME, TABLE_COMMENT
+				ORDER BY TABLE_NAME
+				]]>
+
+
+		</select>
+
+</mapper>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  * 성과그룹관리 
+ -->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.payBonus.bonusGrpMgr">
+
+    <!-- 성과그룹관리 조회 -->
+    <select parameterType="map" resultType="cMap" id="getBonusGrpMgrList">
+        <![CDATA[
+            SELECT A.ENTER_CD
+                 , A.YYYY
+                 , A.BONUS_GRP
+                 , A.BONUS_TYPE
+                 , A.BONUS_RESOURCE_MON
+                 , A.CLOSE_YN
+              FROM TCPN610 A 
+             WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+               AND A.YYYY = TRIM(#{searchYear})
+        ]]>
+    </select>
+
+    <!-- 성과그룹관리 저장 -->
+     <update parameterType="map" id="saveBonusGrpMgr">
+      MERGE INTO TCPN610 T 
+           USING 
+               (  SELECT TRIM(#{ssnEnterCd})   AS ENTER_CD
+                       , A.YYYY                AS YYYY
+                       , A.BONUS_GRP           AS BONUS_GRP
+                       , A.BONUS_TYPE          AS BONUS_TYPE
+                       , A.BONUS_RESOURCE_MON  AS BONUS_RESOURCE_MON
+                       , A.CLOSE_YN            AS CLOSE_YN
+                    FROM (
+                           SELECT NULL  AS YYYY
+                                , NULL  AS BONUS_GRP
+                                , NULL  AS BONUS_TYPE
+                                , NULL  AS BONUS_RESOURCE_MON
+                                , NULL  AS CLOSE_YN
+                             FROM DUAL
+                  <foreach item="rm" collection="mergeRows" >
+                         UNION ALL 
+                        SELECT TRIM(#{rm.yyyy})             AS YYYY
+                             , TRIM(#{rm.bonusGrp})         AS BONUS_GRP
+                             , TRIM(#{rm.bonusType})        AS BONUS_TYPE
+                             , TRIM(#{rm.bonusResourceMon}) AS BONUS_RESOURCE_MON
+                             , TRIM(#{rm.closeYn})          AS CLOSE_YN
+                          FROM DUAL
+                  </foreach>
+                         ) A 
+                     WHERE A.YYYY       IS NOT NULL
+                       AND A.BONUS_GRP  IS NOT NULL
+                ) S 
+           ON ( 
+                     T.ENTER_CD  = S.ENTER_CD 
+                AND  T.YYYY      = S.YYYY 
+                AND  T.BONUS_GRP = S.BONUS_GRP 
+              ) 
+              WHEN MATCHED THEN 
+                 UPDATE SET T.CHKDATE            = SYSDATE 
+                          , T.CHKID              =  #{ssnSabun}
+                          , T.BONUS_TYPE         = S.BONUS_TYPE 
+                          , T.BONUS_RESOURCE_MON = S.BONUS_RESOURCE_MON 
+                          , T.CLOSE_YN           = S.CLOSE_YN 
+              WHEN NOT MATCHED THEN 
+                 INSERT 
+                 ( 
+                            T.ENTER_CD
+                          , T.YYYY
+                          , T.BONUS_GRP
+                          , T.BONUS_TYPE
+                          , T.BONUS_RESOURCE_MON
+                          , T.CLOSE_YN
+                          , T.CHKDATE
+                          , T.CHKID
+                 ) 
+                 VALUES 
+                 ( 
+                            S.ENTER_CD
+                          , S.YYYY
+                          , S.BONUS_GRP
+                          , S.BONUS_TYPE
+                          , S.BONUS_RESOURCE_MON
+                          , S.CLOSE_YN
+                          , SYSDATE
+                          , #{ssnSabun}
+                 ) 
+
+    </update>
+        
+    <!-- 성과그룹관리 삭제 -->
+    <delete parameterType="map" id="deleteBonusGrpMgr">
+        DELETE FROM TCPN610
+              WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+                AND ( YYYY,BONUS_GRP ) IN ( ( NULL,NULL) 
+        <foreach item="rm" collection="deleteRows" >
+            <if test='rm.yyyy and !rm.yyyy.equals("") and rm.bonusGrp and !rm.bonusGrp.equals("")'>
+                        , ( TRIM( #{rm.yyyy} ),TRIM( #{rm.bonusGrp}) ) 
+            </if>
+        </foreach>
+               )
+    </delete>
+    
+    
+</mapper>

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.psnalPension.psnalPenSta">
+
+	<!-- 개인연금 현황 조회 -->
+	<select id="getPsnalPenStaList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.*    
+		     , DECODE(NVL(TO_NUMBER(COMP_MON1),0) + NVL(TO_NUMBER(PSNL_MON1),0),0,null, NVL(TO_NUMBER(COMP_MON1),0) + NVL(TO_NUMBER(PSNL_MON1),0)) AS TOT_MON1
+		     , DECODE(NVL(TO_NUMBER(COMP_MON2),0) + NVL(TO_NUMBER(PSNL_MON2),0),0,null, NVL(TO_NUMBER(COMP_MON2),0) + NVL(TO_NUMBER(PSNL_MON2),0)) AS TOT_MON2
+		     , DECODE(NVL(TO_NUMBER(COMP_MON3),0) + NVL(TO_NUMBER(PSNL_MON3),0),0,null, NVL(TO_NUMBER(COMP_MON3),0) + NVL(TO_NUMBER(PSNL_MON3),0)) AS TOT_MON3
+		  FROM (
+			 SELECT B.ENTER_CD
+			      , B.SABUN
+			      , B.NAME
+			      , B.EMP_YMD
+			      , B.RET_YMD
+				  , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS ORG_NM
+			      , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20020' , A.JIKCHAK_CD) AS JIKCHAK_NM
+			      , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20030' , A.JIKWEE_CD) AS JIKWEE_NM
+			      , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H20010' , A.JIKGUB_CD) AS JIKGUB_NM
+			      , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10050' , A.WORK_TYPE) AS WORKTYPE_NM
+			      , F_COM_GET_GRCODE_NAME(A.ENTER_CD, 'H10010' , A.STATUS_CD) AS STATUS_NM
+                  , P1.PSNL_MON AS PSNL_MON1
+                  , P1.PENS_CD AS PENS_CD1
+                  , P1.COMP_MON AS COMP_MON1
+                  , P2.PSNL_MON AS PSNL_MON2
+                  , P2.PENS_CD AS PENS_CD2
+                  , P2.COMP_MON AS COMP_MON2
+                  , P3.PSNL_MON AS PSNL_MON3
+                  , P3.PENS_CD AS PENS_CD3
+                  , P3.COMP_MON AS COMP_MON3
+			   FROM THRM151 A, THRM100 B
+                        , (   SELECT X.ENTER_CD, X.SABUN
+                                   , MAX(X.PSNL_MON) KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS PSNL_MON
+                                   , MAX(X.PENS_CD) KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS PENS_CD
+                                   , ( SELECT COMP_MON
+                                         FROM TBEN650 Z
+                                        WHERE Z.ENTER_CD = X.ENTER_CD
+                                          AND Z.JIKGUB_CD = F_COM_GET_JIKGUB_CD(X.ENTER_CD, X.SABUN, TRIM(#{ym1}) || '01')
+                                          AND TRIM(#{ym1}) || '01' BETWEEN Z.SDATE AND NVL(Z.EDATE, '99991231') 
+                                     ) AS COMP_MON
+                                FROM TBEN651 X, THRI103 Y
+                               WHERE X.ENTER_CD = #{ssnEnterCd}
+                                 AND X.ENTER_CD = Y.ENTER_CD
+                                 AND X.APPL_SEQ = Y.APPL_SEQ
+                                 AND Y.APPL_STATUS_CD = '99'
+                                 AND X.PAY_YM <= TRIM(#{ym1})
+                               GROUP BY X.ENTER_CD, X.SABUN  
+                          ) P1
+                        , (   SELECT X.ENTER_CD, X.SABUN
+                                   , MAX(X.PSNL_MON) KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS PSNL_MON
+                                   , MAX(X.PENS_CD) KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS PENS_CD
+                                   , ( SELECT COMP_MON
+                                         FROM TBEN650 Z
+                                        WHERE Z.ENTER_CD = X.ENTER_CD
+                                          AND Z.JIKGUB_CD = F_COM_GET_JIKGUB_CD(X.ENTER_CD, X.SABUN, TRIM(#{ym2}) || '01')
+                                          AND TRIM(#{ym2}) || '01' BETWEEN Z.SDATE AND NVL(Z.EDATE, '99991231') 
+                                     ) AS COMP_MON
+                                FROM TBEN651 X, THRI103 Y
+                               WHERE X.ENTER_CD = #{ssnEnterCd}
+                                 AND X.ENTER_CD = Y.ENTER_CD
+                                 AND X.APPL_SEQ = Y.APPL_SEQ
+                                 AND Y.APPL_STATUS_CD = '99'
+                                 AND X.PAY_YM <= TRIM(#{ym2})
+                               GROUP BY X.ENTER_CD, X.SABUN  
+                          ) P2
+                        , (   SELECT X.ENTER_CD, X.SABUN
+                                   , MAX(X.PSNL_MON) KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS PSNL_MON
+                                   , MAX(X.PENS_CD) KEEP(DENSE_RANK FIRST ORDER BY X.APPL_SEQ DESC) AS PENS_CD
+                                   , ( SELECT COMP_MON
+                                         FROM TBEN650 Z
+                                        WHERE Z.ENTER_CD = X.ENTER_CD
+                                          AND Z.JIKGUB_CD = F_COM_GET_JIKGUB_CD(X.ENTER_CD, X.SABUN, TRIM(#{ym3}) || '01')
+                                          AND TRIM(#{ym3}) || '01' BETWEEN Z.SDATE AND NVL(Z.EDATE, '99991231') 
+                                     ) AS COMP_MON
+                                FROM TBEN651 X, THRI103 Y
+                               WHERE X.ENTER_CD = #{ssnEnterCd}
+                                 AND X.ENTER_CD = Y.ENTER_CD
+                                 AND X.APPL_SEQ = Y.APPL_SEQ
+                                 AND Y.APPL_STATUS_CD = '99'
+                                 AND X.PAY_YM <= TRIM(#{ym3})
+                               GROUP BY X.ENTER_CD, X.SABUN  
+                          ) P3
+			  WHERE A.ENTER_CD = B.ENTER_CD
+			    AND A.SABUN    = B.SABUN
+			    AND A.ENTER_CD = #{ssnEnterCd}
+			    AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')  -- 대상자 정보는 현재시점으로 가져옴.
+			    AND NVL(B.RET_YMD, '29991231') >= TRIM(#{ym1}) || '01'
+                      AND EXISTS ( SELECT 1 
+                                     FROM TBEN651 X, THRI103 Y
+                                    WHERE X.ENTER_CD = A.ENTER_CD
+                                      AND X.SABUN    = A.SABUN
+                                      AND X.ENTER_CD = Y.ENTER_CD
+                                      AND X.APPL_SEQ = Y.APPL_SEQ
+                                      AND Y.APPL_STATUS_CD = '99' )
+			    AND A.ENTER_CD = P1.ENTER_CD(+)
+			    AND A.SABUN    = P1.SABUN(+)
+			    AND A.ENTER_CD = P2.ENTER_CD(+)
+			    AND A.SABUN    = P2.SABUN(+)
+			    AND A.ENTER_CD = P3.ENTER_CD(+)
+			    AND A.SABUN    = P3.SABUN(+)
+			 ) A
+		WHERE ( PENS_CD1 IS NOT NULL OR PENS_CD2 IS NOT NULL OR PENS_CD3 IS NOT NULL ) 	]]>	
+		<if test="searchDiffYn != null and searchDiffYn eq '1'">
+		<![CDATA[
+		  AND ( NVL(COMP_MON1,-1) <> NVL(COMP_MON2,-1) OR NVL(PSNL_MON1,-1) <> NVL(PSNL_MON2,-1) )
+		]]>
+		</if>
+		<if test="searchDiffYn != null and searchDiffYn eq '2'">
+		<![CDATA[
+		  AND ( NVL(COMP_MON3,-1) <> NVL(COMP_MON2,-1) OR NVL(PSNL_MON3,-1) <> NVL(PSNL_MON2,-1) )
+		]]>
+		</if>
+		<if test="searchSabunName != null and searchSabunName neq ''">
+		  AND (A.SABUN LIKE '%'||TRIM( #{searchSabunName} )||'%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd}) LIKE '%'||TRIM( #{searchSabunName} )||'%')
+		</if>
+		<if test="searchOrgNm != null and searchOrgNm neq ''">
+		  AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%'||TRIM( #{searchOrgNm} )||'%'
+		</if>
+		ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+	</select>
+	
+</mapper>

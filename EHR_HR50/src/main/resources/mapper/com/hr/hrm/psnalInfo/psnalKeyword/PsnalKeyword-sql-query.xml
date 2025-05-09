@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="hrm.psnalInfo.psnalKeyword">
+<!-- 인사기본(KEYWORD) 조회 -->
+    <select id="getPsnalKeywordList"  parameterType="map" resultType="cMap">
+        <![CDATA[
+            SELECT
+                X.ENTER_CD -- 회사코드
+              , X.SABUN -- 사번
+              , X.KEYWORD_TYPE
+              , X.KEYWORD
+              , X.KEYWORD_SEQ
+              , X.NOTE
+             FROM THRM139 X
+             WHERE X.ENTER_CD = #{ssnEnterCd}
+               AND X.SABUN = TRIM( #{sabun} )
+             UNION ALL
+             SELECT A.ENTER_CD
+                 , B.SABUN
+                 , 'C' AS KEYWORD_TYPE
+                 , A.SEARCH_DESC AS KEYWORD
+                 , ROW_NUMBER() OVER (ORDER BY A.ENTER_CD, B.SABUN, A.SEARCH_SEQ) AS KEYWORD_SEQ
+                 , A.CONDITION_DESC AS NOTE
+             FROM THRI201 A, THRM100 B
+             WHERE A.ENTER_CD = B.ENTER_CD
+               AND A.INDIVIDUAL_YN = 'K'
+               AND F_COM_GET_SEARCH_YN(A.ENTER_CD, B.SABUN, A.SEARCH_SEQ, TO_CHAR(SYSDATE, 'YYYYMMDD')) = 1
+               AND A.ENTER_CD = #{ssnEnterCd}
+               AND B.SABUN = TRIM( #{sabun}  )
+        ]]>
+    </select>
+
+    <!-- 인사기본(KEYWORD) 변경 저장 -->
+    <update  parameterType="map" id="savePsnalKeyword">
+        MERGE INTO THRM139 T
+        USING (
+            SELECT A.ENTER_CD
+                 , A.SABUN
+                 , A.KEYWORD_TYPE
+                 , A.KEYWORD_SEQ
+                 , A.KEYWORD
+                 , A.NOTE
+              FROM (
+                    SELECT NULL AS ENTER_CD
+                         , NULL AS SABUN
+                         , NULL AS KEYWORD_TYPE
+                         , NULL AS KEYWORD_SEQ
+                         , NULL AS KEYWORD
+                         , NULL AS NOTE
+                   FROM DUAL
+        <bind name="icnt" value="1" />
+        <foreach item="rm" collection="mergeRows" >
+                     UNION ALL
+                    SELECT TRIM( #{ssnEnterCd} ) AS ENTER_CD
+                         , TRIM( #{rm.sabun} ) AS SABUN
+                         , TRIM( #{rm.keywordType} ) AS KEYWORD_TYPE
+                      <choose>
+                      <when test='rm.keywordSeq != null and !rm.keywordSeq.equals("")' >
+                            , TRIM(#{rm.keywordSeq})             AS KEYWORD_SEQ
+                       </when>
+                       <otherwise>
+                        --증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+                            , TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(KEYWORD_SEQ)),0) + ${icnt}) FROM THRM139 WHERE ENTER_CD = TRIM( #{ssnEnterCd} ) AND SABUN = TRIM( #{rm.sabun} ) AND KEYWORD_TYPE =  TRIM( #{rm.keywordType}) ) )    AS KEYWORD_SEQ
+                            --icnt 증가
+                            <bind name="icnt" value="icnt+1"/>
+                        </otherwise>
+                       </choose>
+                         , TRIM(  #{rm.keyword} ) AS KEYWORD
+                         , TRIM(  #{rm.note} ) AS NOTE
+                      FROM DUAL
+        </foreach> 
+                   ) A
+             WHERE 1=1
+               AND A.ENTER_CD IS NOT NULL
+               AND A.SABUN IS NOT NULL
+               AND A.KEYWORD_TYPE IS NOT NULL
+        ) S
+        ON (
+                T.ENTER_CD = S.ENTER_CD
+            AND T.SABUN = S.SABUN
+            AND T.KEYWORD_TYPE = S.KEYWORD_TYPE
+            AND T.KEYWORD_SEQ = S.KEYWORD_SEQ
+        )
+        WHEN MATCHED THEN
+            UPDATE SET
+                  T.KEYWORD = S.KEYWORD
+                , T.NOTE = S.NOTE
+                , T.CHKDATE = SYSDATE
+                , T.CHKID = #{sabun} 
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                  T.ENTER_CD
+                , T.SABUN
+                , T.KEYWORD_TYPE
+                , T.KEYWORD_SEQ
+                , T.KEYWORD
+                , T.NOTE
+                , CHKDATE
+                , CHKID
+            )
+            VALUES
+            (
+                  S.ENTER_CD
+                , S.SABUN
+                , S.KEYWORD_TYPE
+                , S.KEYWORD_SEQ
+                , S.KEYWORD
+                , S.NOTE
+                , SYSDATE
+                ,#{ssnSabun} 
+            )
+    </update>
+
+    <!-- 인사기본(KEYWORD) 삭제 -->
+     <delete parameterType="map" id="deletePsnalKeyword">
+        DELETE FROM THRM139
+              WHERE ENTER_CD = #{ssnEnterCd}
+                AND ENTER_CD||'_'||SABUN||'_'||KEYWORD_TYPE||'_'||KEYWORD_SEQ IN ( NULL
+          <foreach item="rm" collection="deleteRows" >
+               ,
+               <if test='rm.sabun and !rm.sabun.equals("")'>
+                  <if test='rm.keywordType and !rm.keywordType.equals("")'>
+                     <if test='rm.keywordSeq and !rm.keywordSeq.equals("")'>
+                            ( TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.keywordType})||'_'||TRIM(#{rm.keywordSeq}))
+                        </if>
+                    </if>
+                 </if>
+            </foreach> 
+
+            )
+    </delete>
+    
+</mapper>

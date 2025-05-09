@@ -1,0 +1,299 @@
+<?xml	version="1.0"	encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.evaluation.appCoachingApr">
+<!--			조회	-->
+		<select parameterType="map" resultType="cMap" id="getAppCoachingAprList1">
+
+				<![CDATA[
+					SELECT	DISTINCT	A.ENTER_CD,	A.APPRAISAL_CD,	A.SABUN,	A.NAME,	A.APP_ORG_CD,A.APP_ORG_NM,
+						A.JIKWEE_NM,	A.JIKCHAK_NM,	A.JIKGUB_NM,	D.EMP_YMD,	B.APP_SEQ_CD
+						, F_COM_GET_GRCODE_SEQ(A.ENTER_CD,	'H20020', A.JIKCHAK_CD)
+						, F_COM_GET_GRCODE_SEQ(A.ENTER_CD,	'H20010', A.JIKGUB_CD)
+						, F_COM_GET_GRCODE_SEQ(A.ENTER_CD,	'H20030', A.JIKWEE_CD)
+						, F_COM_GET_GRCODE_NAME(B.ENTER_CD,	'P00003', B.APP_SEQ_CD)	AS	APP_SEQ_CD_NM
+						, F_COM_GET_JIKGUB_YEUNCHA(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) AS JIKGUB_YEUNCHA
+					FROM	TPAP201	A,
+						TPAP202	B,
+						THRM100	D
+					WHERE	A.ENTER_CD	=	B.ENTER_CD
+						AND	A.APPRAISAL_CD	=	B.APPRAISAL_CD
+						AND	A.APP_ORG_CD	=	B.APP_ORG_CD
+						AND	A.SABUN	=	B.SABUN
+						AND	A.APP_STEP_CD	=	B.APP_STEP_CD
+						AND	A.ENTER_CD	=	D.ENTER_CD
+						AND	A.SABUN	=	D.SABUN
+						AND	A.APP_YN	=	'Y'
+						AND	A.ENTER_CD	=	TRIM(#{ssnEnterCd})
+						AND	A.APPRAISAL_CD	=	TRIM(#{searchAppraisalCd})
+						]]>
+						AND	A.APP_STEP_CD IN ('1','3')
+						
+						AND	B.APP_SABUN	=	TRIM(#{searchAppSabun})
+						AND	B.APP_SEQ_CD	=	TRIM(#{searchAppSeqCd})
+						
+						<if test='searchEvaSabun != null and !searchEvaSabun.equals("")'>
+							AND	A.SABUN	=	TRIM(#{searchEvaSabun})
+						</if>
+					ORDER BY A.APP_ORG_CD
+						, F_COM_GET_GRCODE_SEQ(A.ENTER_CD,	'H20020',A.JIKCHAK_CD)
+						, F_COM_GET_GRCODE_SEQ(A.ENTER_CD,	'H20010',A.JIKGUB_CD)
+						, F_COM_GET_GRCODE_SEQ(A.ENTER_CD,	'H20030',A.JIKWEE_CD)
+						,	D.EMP_YMD
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getAppCoachingAprList2">
+
+				<![CDATA[
+					SELECT	A.APPRAISAL_CD,	A.SABUN,	A.APP_SEQ_CD,	A.APP_ORG_CD,	A.COA_YMD,	A.COA_PLACE,	A.MEMO,	B.NAME	AS	APP_NAME,	DECODE(A.APP_SABUN,	TRIM(#{searchAppSabun}),	'Y',	'N')	as	EDITABLE
+					,	F_COM_GET_GRCODE_NAME(A.ENTER_CD,	'P00003',	A.APP_SEQ_CD)	AS	APP_SEQ_CD_NM
+					, A.APP_SABUN
+					, '0' AS IBS_IMAGE
+					FROM	TPAP369	A,	THRM100	B
+					WHERE	A.ENTER_CD	=	B.ENTER_CD
+						AND	A.APP_SABUN	=	B.SABUN
+						AND	A.ENTER_CD	=	TRIM(#{ssnEnterCd})
+						AND	A.APPRAISAL_CD	=	TRIM(#{searchAppraisalCd})
+						AND	A.SABUN	=	TRIM(#{searchEvaSabun})
+						AND	A.APP_ORG_CD	=	TRIM(#{searchAppOrgCd})
+						AND	A.APP_SABUN	=	TRIM(#{searchAppSabun})
+						]]>
+						<if test='searchAppSeqCd != null and !searchAppSeqCd.equals("")'>
+							AND	A.APP_SEQ_CD	=	TRIM(#{searchAppSeqCd})
+						</if>
+					ORDER	BY	A.COA_YMD
+
+
+		</select>
+
+<!--			저장	-->	
+		<update parameterType="map" id="saveAppCoachingApr">
+
+				<![CDATA[	
+					MERGE	INTO	TPAP369	T
+					USING	(
+							SELECT			A.ENTER_CD
+									,	A.APPRAISAL_CD
+									,	A.SABUN
+									,	A.APP_ORG_CD
+									,	A.APP_SEQ_CD
+									,	A.APP_SABUN
+									,	A.COA_YMD
+									,	A.COA_PLACE
+									,	A.MEMO
+							FROM	(
+									SELECT			NULL	AS	ENTER_CD		
+											,	NULL	AS	APPRAISAL_CD	
+											,	NULL	AS	SABUN	
+											,	NULL	AS	APP_ORG_CD	
+											,	NULL	AS	APP_SEQ_CD	
+											,	NULL	AS	APP_SABUN
+											,	NULL	AS	COA_YMD
+											,	NULL	AS	COA_PLACE
+											,	NULL	AS	MEMO
+									FROM	DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION	ALL
+									SELECT
+											#{ssnEnterCd}					AS	ENTER_CD
+											,	TRIM(	#{rm.appraisalCd}	)	AS	APPRAISAL_CD
+											,	TRIM(	#{rm.sabun}		)	AS	SABUN
+											,	TRIM(	#{rm.appOrgCd}	)	AS	APP_ORG_CD
+											,	TRIM(	#{rm.appSeqCd}	)	AS	APP_SEQ_CD
+											,	TRIM(	#{rm.appSabun}	)	AS	APP_SABUN
+											,	TRIM(	#{rm.coaYmd})	AS	COA_YMD
+											,	TRIM(	#{rm.coaPlace})	AS	COA_PLACE
+											,	TRIM(	#{rm.memo}		)	AS	MEMO
+											FROM	DUAL
+</foreach>
+									)	A	WHERE	ENTER_CD	IS	NOT	NULL
+							)	S
+					ON	(	T.ENTER_CD		=	S.ENTER_CD
+					AND		T.APPRAISAL_CD	=	S.APPRAISAL_CD
+					AND		T.SABUN			=	S.SABUN
+					AND		T.APP_ORG_CD	=	S.APP_ORG_CD
+					AND		T.APP_SEQ_CD	=	S.APP_SEQ_CD
+					AND		T.APP_SABUN		=	S.APP_SABUN
+					AND		T.COA_YMD		=	S.COA_YMD
+						)
+					WHEN	MATCHED	THEN
+						UPDATE	SET			
+									T.COA_PLACE		=	S.COA_PLACE
+									,	T.MEMO	=	S.MEMO	
+									,	T.CHKDATE		=	SYSDATE
+									,	T.CHKID			=	#{ssnSabun}
+					WHEN	NOT	MATCHED	THEN
+						INSERT	
+						(
+									T.ENTER_CD		
+								,	T.APPRAISAL_CD	
+								,	T.SABUN
+								,	T.APP_ORG_CD	
+								,	T.APP_SEQ_CD	
+								,	T.APP_SABUN	
+								,	T.COA_YMD
+								,	T.COA_PLACE
+								,	T.MEMO
+								,	T.CHKDATE
+							,	T.CHKID
+						)	
+						VALUES	
+						(
+									S.ENTER_CD		
+								,	S.APPRAISAL_CD	
+								,	S.SABUN
+								,	S.APP_ORG_CD	
+								,	S.APP_SEQ_CD	
+								,	S.APP_SABUN	
+								,	S.COA_YMD
+								,	S.COA_PLACE
+								,	S.MEMO
+								,	SYSDATE
+								,	#{ssnSabun}
+						)
+		</update>
+		
+<!--			삭제	-->
+		<delete parameterType="map" id="deleteAppCoachingApr">
+
+					DELETE	FROM	TPAP369
+					WHERE		(ENTER_CD,APPRAISAL_CD,SABUN,APP_ORG_CD,APP_SEQ_CD,APP_SABUN,COA_YMD)	IN		(		(NULL,NULL,NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											,TRIM(	#{rm.appraisalCd}	)
+										</if>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											,TRIM(	#{rm.sabun}	)
+										</if>
+										<if test='rm.appOrgCd != null and !rm.appOrgCd.equals("")'>
+											,TRIM(	#{rm.appOrgCd}	)
+										</if>
+										<if test='rm.appSeqCd != null and !rm.appSeqCd.equals("")'>
+											,TRIM(	#{rm.appSeqCd}	)
+										</if>
+										<if test='rm.appSabun != null and !rm.appSabun.equals("")'>
+											,TRIM(	#{rm.appSabun}	)
+										</if>
+										<if test='rm.coaYmd != null and !rm.coaYmd.equals("")'>
+											,TRIM(	#{rm.coaYmd})
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+		<!-- 세부내역 단건 팝업조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppCoachingAprMap">
+
+				<![CDATA[
+					SELECT    COA_YMD AS TD_YMD
+							, COA_PLACE
+							, MEMO
+					FROM      TPAP369
+					WHERE     ENTER_CD = #{ssnEnterCd}
+					AND       APPRAISAL_CD = #{appraisalCd}
+					AND 	  SABUN = #{sabun}
+					AND 	  APP_ORG_CD = #{appOrgCd}
+					AND       APP_SEQ_CD = #{appSeqCd}
+					AND       APP_SABUN = #{appSabun}
+					AND       COA_YMD = #{coaYmd}
+				]]>
+
+
+		</select>
+		<!-- 중복체크 -->
+		<select parameterType="map" resultType="cMap" id="getCoachingAprDupChk">
+
+				<![CDATA[
+					SELECT COUNT(*) AS CNT
+					  FROM TPAP369 A
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.APPRAISAL_CD = #{appraisalCd}
+					   AND A.SABUN = #{sabun}
+					   AND A.APP_ORG_CD = #{appOrgCd}
+					   AND A.APP_SEQ_CD = #{appSeqCd}
+					   AND A.APP_SABUN = #{appSabun}
+					   AND A.COA_YMD = REPLACE( #{tdYmd} ,'-','')
+				]]>
+
+
+		</select>
+		
+		<update parameterType="map" id="saveCoachingAprPop">
+
+					MERGE	INTO	TPAP369	T
+					USING	(
+							SELECT		A.ENTER_CD
+									,	A.APPRAISAL_CD
+									,	A.SABUN
+									,	A.APP_ORG_CD
+									,	A.APP_SEQ_CD
+									,	A.APP_SABUN
+									,	A.COA_YMD
+									,	A.COA_PLACE
+									,	A.MEMO
+							FROM	(
+									SELECT
+											#{ssnEnterCd}						AS	ENTER_CD
+											,	TRIM(	#{appraisalCd}	)	AS	APPRAISAL_CD
+											,	TRIM(	#{sabun}		)		AS	SABUN
+											,	TRIM(	#{appOrgCd}	)		AS	APP_ORG_CD
+											,	TRIM(	#{appSeqCd}	)		AS	APP_SEQ_CD
+											,	TRIM(	#{appSabun}	)		AS	APP_SABUN
+											,	REPLACE( #{tdYmd} ,'-','')	AS	COA_YMD
+											,	TRIM(	#{coaPlace}	)		AS	COA_PLACE
+											,	TRIM(	#{memo}		)		AS	MEMO
+											FROM	DUAL
+									)	A	WHERE	ENTER_CD	IS	NOT	NULL
+							)	S
+					ON	(	T.ENTER_CD		=	S.ENTER_CD
+					AND		T.APPRAISAL_CD	=	S.APPRAISAL_CD
+					AND		T.SABUN			=	S.SABUN
+					AND		T.APP_ORG_CD	=	S.APP_ORG_CD
+					AND		T.APP_SEQ_CD	=	S.APP_SEQ_CD
+					AND		T.APP_SABUN		=	S.APP_SABUN
+					AND		T.COA_YMD		=	S.COA_YMD
+						)
+					WHEN	MATCHED	THEN
+						UPDATE	SET			
+										T.COA_PLACE		=	S.COA_PLACE
+									,	T.MEMO			=	S.MEMO	
+									,	T.CHKDATE		=	SYSDATE
+									,	T.CHKID			=	#{ssnSabun}
+					WHEN	NOT	MATCHED	THEN
+						INSERT	
+						(
+									T.ENTER_CD		
+								,	T.APPRAISAL_CD	
+								,	T.SABUN
+								,	T.APP_ORG_CD	
+								,	T.APP_SEQ_CD	
+								,	T.APP_SABUN	
+								,	T.COA_YMD
+								,	T.COA_PLACE
+								,	T.MEMO
+								,	T.CHKDATE
+							,	T.CHKID
+						)	
+						VALUES	
+						(
+									S.ENTER_CD		
+								,	S.APPRAISAL_CD	
+								,	S.SABUN
+								,	S.APP_ORG_CD	
+								,	S.APP_SEQ_CD	
+								,	S.APP_SABUN	
+								,	S.COA_YMD
+								,	S.COA_PLACE
+								,	S.MEMO
+								,	SYSDATE
+								,	#{ssnSabun}
+						)
+		</update>
+
+</mapper>

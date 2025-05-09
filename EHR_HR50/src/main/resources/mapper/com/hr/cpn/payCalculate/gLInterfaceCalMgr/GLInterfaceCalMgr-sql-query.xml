@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급상여전표처리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.gLInterfaceCalMgr">
+		<select parameterType="map" resultType="cMap" id="getGLInterfaceCalMgrList">
+
+				<![CDATA[
+				SELECT A.PAY_ACTION_CD
+					, (SELECT AA.PAY_ACTION_NM FROM TCPN201 AA WHERE AA.ENTER_CD = A.ENTER_CD AND AA.PAY_ACTION_CD = A.PAY_ACTION_CD) AS PAY_ACTION_NM
+				    , A.SEQ
+				    , A.BUSINESS_PLACE_CD
+				    , A.LOCATION_CD
+				    , A.CC_CD
+				    , A.CD_KEY
+				    , A.ACCT_CD
+				    , A.RESULT_MON
+				    , A.HEAD_TEXT
+				    , A.REFER_TEXT
+				 FROM TCPN977 A
+				WHERE A.ENTER_CD = #{ssnEnterCd}
+				  AND A.PAY_ACTION_CD	= #{payActionCd}
+				          		]]>
+
+				<choose>
+					<when test='searchMapCd != null and !searchMapCd.equals("")'>
+						AND A.BUSINESS_PLACE_CD = #{searchMapCd}
+					</when>
+					<when test='searchMapCd != null and searchMapCd.equals("")'>
+					AND A.BUSINESS_PLACE_CD = 'ALL'
+					</when>
+				</choose>
+
+				<choose>
+					<when test='searchLocationCd != null and !searchLocationCd.equals("")'>
+					AND A.LOCATION_CD = #{searchLocationCd}
+					</when>
+					<when test='searchLocationCd != null and searchLocationCd.equals("")'>
+						AND A.LOCATION_CD = 'ALL'
+					</when>
+				</choose>
+				<choose>
+					<when test='searchKostl != null and !searchKostl.equals("")'>
+						AND A.CC_CD = #{searchKostl}
+					</when>
+					<when test='searchKostl != null and searchKostl.equals("")'>
+						AND A.CC_CD = 'ALL'
+					</when>
+				</choose>
+
+				ORDER BY SEQ
+
+
+
+		</select>
+		<update parameterType="map" id="saveGLInterfaceCalMgr">
+
+
+					MERGE INTO TCPN977 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SEQ          
+								 , A.BUSINESS_PLACE_CD      
+								 , A.LOCATION_CD  
+								 , A.CC_CD        
+								 , A.CD_KEY  
+								 , A.ACCT_CD        
+								 , A.RESULT_MON       
+								 , A.HEAD_TEXT
+								 , A.REFER_TEXT        
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS SEQ          
+										 , NULL		AS BUSINESS_PLACE_CD
+										 , NULL		AS LOCATION_CD        
+										 , NULL		AS CC_CD        
+										 , NULL		AS CD_KEY  
+										 , NULL		AS ACCT_CD        
+										 , NULL		AS RESULT_MON       
+										 , NULL		AS HEAD_TEXT
+										 , NULL		AS REFER_TEXT         
+									  FROM DUAL
+<bind name="cnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})			AS PAY_ACTION_CD     
+										 , TRIM(#{rm.seq})					AS SEQ
+									     <choose>
+											 <when test='rm.businessPlaceCd != null and !rm.businessPlaceCd.equals("")'>
+												 , TRIM(#{rm.businessPlaceCd})		AS BUSINESS_PLACE_CD
+											 </when>
+											 <otherwise>
+												 , 'ALL'							AS BUSINESS_PLACE_CD
+											 </otherwise>
+										 </choose>
+
+										<choose>
+											<when test='rm.locationCd != null and !rm.locationCd.equals("")'>
+												, TRIM(#{rm.locationCd})			AS LOCATION_CD
+											</when>
+											<otherwise>
+												, 'ALL'							AS LOCATION_CD
+											</otherwise>
+										</choose>
+
+										<choose>
+											<when test='rm.ccCd != null and !rm.ccCd.equals("")'>
+												, TRIM(#{rm.ccCd})				AS CC_CD
+											</when>
+											<otherwise>
+												, 'ALL'							AS CC_CD
+											</otherwise>
+										</choose>
+
+
+
+										 , TRIM(#{rm.cdKey})				AS CD_KEY       
+										 , TRIM(#{rm.acctCd})				AS ACCT_CD             
+										 , TRIM(#{rm.resultMon})			AS RESULT_MON            
+										 , TRIM(#{rm.headText})				AS HEAD_TEXT
+										 , TRIM(#{rm.referText})			AS REFER_TEXT                       
+									  FROM DUAL
+<bind name="cnt" value="cnt + 1" />
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD	IS NOT NULL
+							   AND A.SEQ			IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SEQ			= S.SEQ
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.CD_KEY     		= S.CD_KEY     
+								 , T.ACCT_CD      		= S.ACCT_CD      
+								 , T.RESULT_MON      	= S.RESULT_MON
+								 , T.HEAD_TEXT      	= S.HEAD_TEXT
+								 , T.REFER_TEXT      	= S.REFER_TEXT        
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.SEQ          
+							, T.BUSINESS_PLACE_CD  
+						    , T.LOCATION_CD
+							, T.CC_CD        
+							, T.CD_KEY  
+							, T.ACCT_CD        
+							, T.RESULT_MON       
+							, T.HEAD_TEXT   
+							, T.REFER_TEXT     
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.SEQ          
+							, S.BUSINESS_PLACE_CD        
+							, S.LOCATION_CD
+							, S.CC_CD        
+							, S.CD_KEY  
+							, S.ACCT_CD        
+							, S.RESULT_MON       
+							, S.HEAD_TEXT   
+							, S.REFER_TEXT     
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+		<delete parameterType="map" id="deleteGLInterfaceCalMgr">
+
+
+							
+					DELETE FROM TCPN977
+					WHERE 	(ENTER_CD, PAY_ACTION_CD, SEQ) IN 	(  (NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+											<if test='rm.payActionCd != null and !rm.payActionCd.equals("")'>
+												<if test='rm.seq != null and !rm.seq.equals("")'>
+													(#{ssnEnterCd}, TRIM( #{rm.payActionCd} ) ,TRIM( #{rm.seq} ))
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+		<update  statementType="CALLABLE" parameterType="map" id="callP_CPN_GL_INS">
+
+			<![CDATA[
+					CALL P_CPN_GL_INS(
+
+						#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						#{searchMapCd,mode=IN,jdbcType=VARCHAR},
+						#{searchLocationCd,mode=IN,jdbcType=VARCHAR},
+						#{searchKostl,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+			]]>
+
+
+		</update>
+	</mapper>

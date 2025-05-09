@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.ourBenefits.ourBenefitsMgr">
+		
+	<select id="getOurBenefitsMgr" parameterType="map" resultType="cMap">
+        SELECT ENTER_CD, BNFT_CD, BNFT_NM, CATEGORY_NM, SEQ, USE_YN, ICON, REDIRECT_URL, NOTE
+          FROM TBEN901
+         WHERE ENTER_CD = #{ssnEnterCd}
+         <if test='searchBnftNm != null and !"".equals(searchBnftNm)'>
+             AND BNFT_NM LIKE '%' || #{searchBnftNm} || '%'
+         </if>
+         ORDER BY SEQ
+	</select>
+
+    <update id="saveOurBenefitsMgr" parameterType="map">
+        MERGE INTO TBEN901 T
+        USING (
+            SELECT ENTER_CD, BNFT_CD, BNFT_NM, CATEGORY_NM, SEQ, USE_YN, ICON, REDIRECT_URL, NOTE, INSDATE, INSID, CHKDATE, CHKID
+              FROM (
+                  SELECT NULL AS ENTER_CD, NULL AS BNFT_CD, NULL AS BNFT_NM, NULL AS CATEGORY_NM, NULL AS SEQ
+                       , NULL AS USE_YN, NULL AS ICON, NULL AS REDIRECT_URL, NULL AS NOTE
+                       , NULL AS INSDATE, NULL AS INSID, NULL AS CHKDATE, NULL AS CHKID
+                    FROM DUAL
+                  <foreach collection="mergeRows" item="rm" index="idx">
+                      UNION ALL
+                      SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+                           <choose>
+                               <when test='rm.bnftCd == null or "".equals(rm.bnftCd)'>
+                                    , NVL(( SELECT MAX(TO_NUMBER(BNFT_CD))
+                                          FROM TBEN901
+                                         WHERE ENTER_CD = TRIM(#{rm.enterCd}) ), 0) + #{idx} AS BNFT_CD
+                               </when>
+                               <otherwise>
+                                   , TRIM(#{rm.bnftCd}) AS BNFT_CD
+                               </otherwise>
+                           </choose>
+                           , TRIM(#{rm.bnftNm}) AS BNFT_NM, TRIM(#{rm.categoryNm}) AS CATEGORY_NM, #{rm.seq} AS SEQ
+                           , #{rm.useYn} AS USE_YN, #{rm.icon} AS ICON, TRIM(#{rm.redirectUrl}) AS REDIRECT_URL, TRIM(#{rm.note}) AS NOTE
+                           , SYSDATE AS INSDATE, #{ssnSabun} AS INSID, SYSDATE AS CHKDATE, #{ssnSabun} AS CHKID
+                        FROM DUAL
+                  </foreach>
+              )
+          WHERE ENTER_CD IS NOT NULL
+            AND BNFT_CD IS NOT NULL
+            AND BNFT_NM IS NOT NULL
+        ) S
+        ON (
+            T.ENTER_CD = S.ENTER_CD
+            AND T.BNFT_CD = S.BNFT_CD
+        )
+        WHEN MATCHED THEN
+            UPDATE SET T.BNFT_NM = S.BNFT_NM
+                     , T.CATEGORY_NM = S.CATEGORY_NM
+                     , T.SEQ = S.SEQ
+                     , T.USE_YN = S.USE_YN
+                     , T.ICON = S.ICON
+                     , T.REDIRECT_URL = S.REDIRECT_URL
+                     , T.NOTE = S.NOTE
+                     , T.CHKDATE = S.CHKDATE
+                     , T.CHKID = S.CHKID
+        WHEN NOT MATCHED THEN
+            INSERT
+            (
+                  T.ENTER_CD, T.BNFT_CD, T.BNFT_NM, T.CATEGORY_NM, T.SEQ
+                , T.USE_YN, T.ICON, T.REDIRECT_URL, T.NOTE, T.INSDATE
+                , T.INSID, T.CHKDATE, T.CHKID
+            )
+            VALUES
+            (
+                  S.ENTER_CD, S.BNFT_CD, S.BNFT_NM, S.CATEGORY_NM, S.SEQ
+                , S.USE_YN, S.ICON, S.REDIRECT_URL, S.NOTE, S.INSDATE
+                , S.INSID, S.CHKDATE, S.CHKID
+            )
+    </update>
+
+    <delete id="deleteOurBenefitsMgr" parameterType="map">
+        DELETE FROM TBEN901
+         WHERE (ENTER_CD, BNFT_CD) IN
+               <foreach collection="deleteRows" item="rm" open="(" close=")" separator=" UNION ALL ">
+                   SELECT #{rm.enterCd}, #{rm.bnftCd} FROM DUAL
+               </foreach>
+    </delete>
+</mapper>

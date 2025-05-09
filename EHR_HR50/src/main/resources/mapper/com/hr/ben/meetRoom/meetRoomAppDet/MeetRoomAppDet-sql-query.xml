@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.meetRoom.meetRoomAppDet">
+	
+	<!-- 회의실 신청 단건 조회 -->
+	<select id="getMeetRoomAppDetMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.SABUN
+		     , A.APPL_SEQ
+		     , A.MEET_ROOM_NO
+		     , C.MEET_ROOM_NM
+		     , TO_CHAR(TO_DATE(A.FROM_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS FROM_YMD
+		     , TO_CHAR(TO_DATE(A.FROM_TIME, 'HH24MI'), 'HH24:MI') AS FROM_TIME
+		     , TO_CHAR(TO_DATE(A.TO_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS TO_YMD
+		     , TO_CHAR(TO_DATE(A.TO_TIME, 'HH24MI'), 'HH24:MI') AS TO_TIME
+		     , A.USE_PURPOSE
+		     , A.NOTE
+		     , B.APPL_YMD
+		     , B.APPL_IN_SABUN
+		     , B.APPL_STATUS_CD
+		     , B.AGREE_SABUN
+		     , B.AGREE_YMD
+		     , TO_CHAR(TO_DATE(B.APPL_YMD, 'YYYYMMDD'), 'YYYY-MM-DD') AS APPL_YMD
+		  FROM TBEN895 A
+	       LEFT OUTER JOIN THRI103 B
+	            ON A.ENTER_CD = B.ENTER_CD
+	            AND A.APPL_SEQ = B.APPL_SEQ
+	     , TBEN894 C
+		 WHERE A.ENTER_CD = C.ENTER_CD
+		   AND A.ENTER_CD = #{ssnEnterCd} ]]>
+		<if test="searchApplSeq != null and searchApplSeq neq ''">
+		   AND A.APPL_SEQ = #{searchApplSeq}
+		</if>
+		   AND A.MEET_ROOM_NO = C.MEET_ROOM_NO
+	</select>
+
+	<!-- 회의실 상세정보 조회 -->
+	<select id="getMeetRoomInfo" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ENTER_CD
+		     , MEET_ROOM_NO
+		     , MEET_ROOM_NM
+		     , MEET_USE
+		     , USE_YN
+		     , BUSINESS_PLACE_CD
+		     , CHARGE_ORG_CD
+		     , CHARGE_ORG_NM
+		     , CHARGE_SABUN
+		     , CHARGE_NAME
+		     , NOTE
+		     , ORDER_SEQ
+		  FROM TBEN894
+		 WHERE ENTER_CD = #{ssnEnterCd} ]]>
+		<if test="searchMeetRoomNo != null and searchMeetRoomNo neq ''">
+		   AND MEET_ROOM_NO = #{searchMeetRoomNo}
+		</if>
+	</select>
+
+	<!-- 회의실 예약 정보 확인 -->
+	<select id="getEnableMeetRoomApp" parameterType="map" resultType="cMap">
+	<![CDATA[
+		/* getEnableMeetRoomApp */ 
+		SELECT * FROM 	(
+			SELECT A.ENTER_CD
+			     , A.SABUN
+			     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+			     , A.APPL_SEQ
+			     , A.MEET_ROOM_NO
+			     , TO_CHAR(TO_DATE(A.FROM_YMD, 'YYYYMMDD'), 'YYYY.MM.DD') AS FROM_YMD
+			     , TO_CHAR(TO_DATE(A.FROM_TIME, 'HH24MI'), 'HH24:MI') AS FROM_TIME
+			     , TO_CHAR(TO_DATE(A.TO_YMD, 'YYYYMMDD'), 'YYYY.MM.DD') AS TO_YMD
+			     , TO_CHAR(TO_DATE(A.TO_TIME, 'HH24MI'), 'HH24:MI') AS TO_TIME
+			     , A.USE_PURPOSE
+			     , A.NOTE
+			     , CASE WHEN B.APPL_STATUS_CD IN ('21', '98') AND B.APPL_SABUN = #{searchApplSabun} THEN 0 ELSE 1 END CH
+			  FROM TBEN895 A
+			       LEFT OUTER JOIN THRI103 B
+			            ON A.ENTER_CD = B.ENTER_CD
+			            AND A.APPL_SEQ = B.APPL_SEQ
+			 WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+			<if test="searchMeetRoomNo != null and searchMeetRoomNo neq ''">
+			   AND A.MEET_ROOM_NO = #{searchMeetRoomNo}
+			</if>
+			   AND B.APPL_STATUS_CD IN ( '21', '98', '99' )
+			   AND (   TO_DATE(#{searchFromYmd} || #{searchFromTime}, 'YYYYMMDDHH24MI') + 0.00001 BETWEEN TO_DATE(A.FROM_YMD||A.FROM_TIME, 'YYYYMMDDHH24MI') AND TO_DATE(A.TO_YMD||A.TO_TIME, 'YYYYMMDDHH24MI')
+					   OR TO_DATE(#{searchToYmd} || #{searchToTime}, 'YYYYMMDDHH24MI') - 0.00001 BETWEEN TO_DATE(A.FROM_YMD||A.FROM_TIME, 'YYYYMMDDHH24MI') AND TO_DATE(A.TO_YMD||A.TO_TIME, 'YYYYMMDDHH24MI'))
+			) TBL WHERE CH = 1
+	</select>
+
+	<!-- 회의실신청 세부내역 저장 -->
+	<update id="saveMeetRoomAppDet" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN895 T
+		USING (]]>
+            <foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				SELECT #{ssnEnterCd}							AS ENTER_CD
+					 , TRIM(#{rm.searchApplSabun})				AS SABUN
+				     , TO_NUMBER(TRIM(#{rm.searchApplSeq}))		AS APPL_SEQ
+					 , TRIM(#{rm.meetRoom})						AS MEET_ROOM_NO
+					 , TRIM(REPLACE(#{rm.fromYmd}, '-', ''))	AS FROM_YMD
+					 , TRIM(REPLACE(#{rm.fromTime}, ':', ''))	AS FROM_TIME
+					 , TRIM(REPLACE(#{rm.toYmd}, '-', ''))		AS TO_YMD
+					 , TRIM(REPLACE(#{rm.toTime}, ':', ''))		AS TO_TIME
+				     , #{rm.usePurpose}							AS USE_PURPOSE
+				     , #{rm.note}								AS NOTE
+				     , #{ssnSabun}							    AS CHKID
+					 , SYSDATE								    AS CHKDATE
+				  FROM DUAL
+		    </foreach>
+        <![CDATA[
+				) S
+		ON (	T.ENTER_CD	= S.ENTER_CD
+		    AND T.SABUN 	= S.SABUN
+			AND	T.APPL_SEQ	= S.APPL_SEQ
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.MEET_ROOM_NO	= S.MEET_ROOM_NO
+					 , T.FROM_YMD		= S.FROM_YMD
+					 , T.FROM_TIME		= S.FROM_TIME
+					 , T.TO_YMD			= S.TO_YMD
+					 , T.TO_TIME		= S.TO_TIME
+					 , T.USE_PURPOSE	= S.USE_PURPOSE
+					 , T.NOTE			= S.NOTE
+					 , T.CHKID			= S.CHKID
+					 , T.CHKDATE		= S.CHKDATE
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  T.ENTER_CD
+				, T.SABUN
+				, T.APPL_SEQ
+				, T.MEET_ROOM_NO
+				, T.FROM_YMD
+				, T.FROM_TIME
+				, T.TO_YMD
+				, T.TO_TIME
+				, T.USE_PURPOSE
+				, T.NOTE
+				, T.CHKID
+				, T.CHKDATE
+			)
+			VALUES
+			(
+				  S.ENTER_CD
+				, S.SABUN
+				, S.APPL_SEQ
+				, S.MEET_ROOM_NO
+				, S.FROM_YMD
+				, S.FROM_TIME
+				, S.TO_YMD
+				, S.TO_TIME
+				, S.USE_PURPOSE
+				, S.NOTE
+				, S.CHKID
+				, S.CHKDATE
+			)
+	]]>
+	</update>
+
+	<!-- 회의실 신청 내역 삭제 -->
+	<delete id="deleteMeetRoomAppDet" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN895
+		WHERE 	(ENTER_CD, MEET_ROOM_NO) IN 	(  (NULL,NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.meetRoomNo != null and rm.meetRoomNo neq ''">
+				(#{ssnEnterCd}, TRIM( #{rm.meetRoomNo} ))
+			</if>
+		</foreach>
+			)
+	</delete>
+</mapper>

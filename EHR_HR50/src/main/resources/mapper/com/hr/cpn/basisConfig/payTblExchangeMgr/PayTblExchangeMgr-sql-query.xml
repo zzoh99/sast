@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.payTblExchangeMgr">
+
+<!-- 일근무일수 조회  -->
+		<select parameterType="map" resultType="cMap" id="getSearchMDays">
+	       <![CDATA[
+				SELECT GLOBAL_VALUE, SDATE
+				  FROM TCPN081
+				 WHERE ENTER_CD  = #{ssnEnterCd}
+				   AND GLOBAL_VALUE_CD = #{searchGlobalValueCd}
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				 ORDER BY SDATE DESC
+	       ]]>
+	    </select>
+
+<!-- 변경내역 Master 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayTblExchangeMasterList">
+
+				<![CDATA[
+				SELECT A.JIKGUB_CD, A.ELEMENT_CD, B.ELEMENT_NM, A.SDATE, A.EDATE, A.INCREASE_TYPE, A.INCREASE_MON_RATE, A.APPLY_TYPE, A.UPDOWN_TYPE, A.UPDOWN_UNIT, A.ONE_HOBONG_MON, A.CHANGE_STATUS
+				  FROM TCPN003 A,
+				       ( SELECT SUB1.*
+				           FROM TCPN011 SUB1,
+				                (SELECT MAX(SDATE) AS SDATE, ENTER_CD, ELEMENT_TYPE, ELEMENT_CD
+				                   FROM TCPN011
+				                  WHERE ENTER_CD = #{ssnEnterCd}
+				                    AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+				                  GROUP BY ENTER_CD, ELEMENT_TYPE, ELEMENT_CD
+				                ) SUB2
+				          WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+				            AND SUB1.ENTER_CD = SUB2.ENTER_CD
+				            AND SUB1.ELEMENT_TYPE  = SUB2.ELEMENT_TYPE
+				            AND SUB1.ELEMENT_CD = SUB2.ELEMENT_CD
+				            AND SUB1.SDATE = SUB2.SDATE
+				      ) B
+				 WHERE A.ENTER_CD  = #{ssnEnterCd} ]]>
+<if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+				   AND A.JIKGUB_CD = #{searchJikgubCd}
+</if>
+<if test='searchElementCd != null and !searchElementCd.equals("")'>
+				   AND B.ELEMENT_CD = #{searchElementCd}
+</if>
+<if test='searchSdate != null and !searchSdate.equals("")'>
+				   AND A.SDATE = #{searchSdate}
+</if>
+				   -- 항목테이블 조인
+				   AND A.ENTER_CD  = B.ENTER_CD
+				   AND A.ELEMENT_CD = B.ELEMENT_CD
+				 ORDER BY A.SDATE DESC
+		</select>
+		
+<!-- 변경내역 Detail 조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayTblExchangeDetailList">
+				<![CDATA[
+					SELECT A.JIKGUB_CD, A.SAL_CLASS, A.ELEMENT_CD, B.ELEMENT_NM, A.SDATE, A.EDATE, A.SAL_MON, A.TIME_UNIT, A.CURRENCY_CD, A.MONTH_MON
+					  FROM TCPN005 A, TCPN011 B
+					 WHERE A.ENTER_CD = #{ssnEnterCd} ]]>
+<if test='searchJikgubCdDetail != null and !searchJikgubCdDetail.equals("")'>
+					   AND A.JIKGUB_CD = #{searchJikgubCdDetail}
+</if>
+<if test='searchElementCdDetail != null and !searchElementCdDetail.equals("")'>
+					   AND B.ELEMENT_CD = #{searchElementCdDetail}
+</if>
+<if test='searchSdateDetail != null and !searchSdateDetail.equals("")'>
+					   AND A.SDATE = #{searchSdateDetail}
+</if>
+					   -- 항목테이블 조인
+					   AND A.ENTER_CD  = B.ENTER_CD
+					   AND A.ELEMENT_CD = B.ELEMENT_CD
+					   AND B.SDATE = (SELECT MAX(SDATE) FROM TCPN011 WHERE ENTER_CD = #{ssnEnterCd} AND ELEMENT_CD = B.ELEMENT_CD AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231'))
+					 ORDER BY TO_NUMBER(A.SAL_CLASS) ASC ,A.SDATE DESC
+		</select>
+		
+<!-- 변경내역 Master 저장 -->
+		<update parameterType="map" id="savePayTblExchangeMaster">
+
+					MERGE INTO TCPN003 T
+					USING (
+					    SELECT A.ENTER_CD
+					         , A.JIKGUB_CD
+					         , A.ELEMENT_CD
+					         , A.SDATE
+					         , A.EDATE
+					         , A.INCREASE_TYPE
+					         , A.INCREASE_MON_RATE
+					         , A.APPLY_TYPE
+					         , A.UPDOWN_TYPE
+					         , A.UPDOWN_UNIT
+					         , A.ONE_HOBONG_MON
+					         , A.CHANGE_STATUS
+					      FROM (
+					            SELECT NULL AS ENTER_CD
+					                 , NULL AS JIKGUB_CD
+					                 , NULL AS ELEMENT_CD
+					                 , NULL AS SDATE
+					                 , NULL AS EDATE
+					                 , NULL AS INCREASE_TYPE
+					                 , NULL AS INCREASE_MON_RATE
+					                 , NULL AS APPLY_TYPE
+					                 , NULL AS UPDOWN_TYPE
+					                 , NULL AS UPDOWN_UNIT
+					                 , NULL AS ONE_HOBONG_MON
+					                 , NULL AS CHANGE_STATUS
+					              FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					            UNION ALL
+					            SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					                 , TRIM(#{rm.jikgubCd}) AS JIKGUB_CD
+					                 , TRIM(#{rm.elementCd}) AS ELEMENT_CD
+					                 , TRIM(#{rm.sdate}) AS SDATE
+					                 , TRIM(#{rm.edate}) AS EDATE
+					                 , TRIM(#{rm.increaseType}) AS INCREASE_TYPE
+					                 , TRIM(#{rm.increaseMonRate}) AS INCREASE_MON_RATE
+					                 , TRIM(#{rm.applyType}) AS APPLY_TYPE
+					                 , TRIM(#{rm.updownType}) AS UPDOWN_TYPE
+					                 , TRIM(#{rm.updownUnit}) AS UPDOWN_UNIT
+					                 , TRIM(#{rm.oneHobongMon}) AS ONE_HOBONG_MON
+					                 , TRIM(#{rm.changeStatus}) AS CHANGE_STATUS
+					              FROM DUAL
+</foreach>
+					      ) A WHERE 1 = 1
+					            AND A.ENTER_CD IS NOT NULL
+					            AND A.JIKGUB_CD IS NOT NULL
+					            AND A.ELEMENT_CD IS NOT NULL
+					            AND A.SDATE IS NOT NULL
+					    ) S     ON (
+					          T.ENTER_CD = S.ENTER_CD
+					      AND T.JIKGUB_CD = S.JIKGUB_CD
+					      AND T.ELEMENT_CD = S.ELEMENT_CD
+					      AND T.SDATE = S.SDATE
+					)
+					WHEN MATCHED THEN
+					UPDATE SET
+					        T.EDATE = S.EDATE
+					      , T.INCREASE_TYPE = S.INCREASE_TYPE
+					      , T.INCREASE_MON_RATE = S.INCREASE_MON_RATE
+					      , T.APPLY_TYPE = S.APPLY_TYPE
+					      , T.UPDOWN_TYPE = S.UPDOWN_TYPE
+					      , T.UPDOWN_UNIT = S.UPDOWN_UNIT
+					      , T.ONE_HOBONG_MON = S.ONE_HOBONG_MON
+					      , T.CHANGE_STATUS = S.CHANGE_STATUS
+					      , T.CHKDATE = SYSDATE
+					      , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					INSERT ( T.ENTER_CD
+					       , T.JIKGUB_CD
+					       , T.ELEMENT_CD
+					       , T.SDATE
+					       , T.EDATE
+					       , T.INCREASE_TYPE
+					       , T.INCREASE_MON_RATE
+					       , T.APPLY_TYPE
+					       , T.UPDOWN_TYPE
+					       , T.UPDOWN_UNIT
+					       , T.ONE_HOBONG_MON
+					       , T.CHANGE_STATUS
+					       , T.CHKDATE
+					       , T.CHKID
+					) VALUES (
+					         S.ENTER_CD
+					       , S.JIKGUB_CD
+					       , S.ELEMENT_CD
+					       , S.SDATE
+					       , S.EDATE
+					       , S.INCREASE_TYPE
+					       , S.INCREASE_MON_RATE
+					       , S.APPLY_TYPE
+					       , S.UPDOWN_TYPE
+					       , S.UPDOWN_UNIT
+					       , S.ONE_HOBONG_MON
+					       , S.CHANGE_STATUS
+					       , SYSDATE
+					       , #{ssnSabun}
+					)
+		</update>
+		
+<!-- 변경내역 Detail 저장 -->
+		<update parameterType="map" id="savePayTblExchangeDetail">
+
+					MERGE INTO TCPN005 T
+					USING (
+					    SELECT A.ENTER_CD
+					         , A.JIKGUB_CD
+					         , A.SAL_CLASS
+					         , A.ELEMENT_CD
+					         , A.SDATE
+					         , A.EDATE
+					         , A.SAL_MON
+					         , A.TIME_UNIT
+					         , A.CURRENCY_CD
+					         , A.MONTH_MON
+					      FROM (
+					            SELECT NULL AS ENTER_CD
+					                 , NULL AS JIKGUB_CD
+					                 , NULL AS SAL_CLASS
+					                 , NULL AS ELEMENT_CD
+					                 , NULL AS SDATE
+					                 , NULL AS EDATE
+					                 , NULL AS SAL_MON
+					                 , NULL AS TIME_UNIT
+					                 , NULL AS CURRENCY_CD
+					                 , NULL AS MONTH_MON
+					              FROM DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+					            UNION ALL
+					            SELECT TRIM(#{ssnEnterCd}) AS ENTER_CD
+					                 , TRIM(#{rm.jikgubCd}) AS JIKGUB_CD
+					                 , TRIM(#{rm.salClass}) AS SAL_CLASS
+					                 , TRIM(#{rm.elementCd}) AS ELEMENT_CD
+					                 , TRIM(#{rm.sdate}) AS SDATE
+					                 , TRIM(#{rm.edate}) AS EDATE
+					                 , TRIM(#{rm.salMon}) AS SAL_MON
+					                 , TRIM(#{rm.timeUnit}) AS TIME_UNIT
+					                 , TRIM(#{rm.currencyCd}) AS CURRENCY_CD
+					                 , TRIM(#{rm.monthMon}) AS MONTH_MON
+					              FROM DUAL
+</foreach>
+					      ) A WHERE 1 = 1
+					            AND A.ENTER_CD IS NOT NULL
+					            AND A.JIKGUB_CD IS NOT NULL
+					            AND A.SAL_CLASS IS NOT NULL
+					            AND A.ELEMENT_CD IS NOT NULL
+					            AND A.SDATE IS NOT NULL
+					    ) S     ON (
+					          T.ENTER_CD = S.ENTER_CD
+					      AND T.JIKGUB_CD = S.JIKGUB_CD
+					      AND T.SAL_CLASS = S.SAL_CLASS
+					      AND T.ELEMENT_CD = S.ELEMENT_CD
+					      AND T.SDATE = S.SDATE
+					)
+					WHEN MATCHED THEN
+					UPDATE SET
+					        T.EDATE = S.EDATE
+					      , T.SAL_MON = S.SAL_MON
+					      , T.TIME_UNIT = S.TIME_UNIT
+					      , T.CURRENCY_CD = S.CURRENCY_CD
+					      , T.MONTH_MON = S.MONTH_MON
+					      , T.CHKDATE = SYSDATE
+					      , T.CHKID = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+					INSERT ( T.ENTER_CD
+					       , T.JIKGUB_CD
+					       , T.SAL_CLASS
+					       , T.ELEMENT_CD
+					       , T.SDATE
+					       , T.EDATE
+					       , T.SAL_MON
+					       , T.TIME_UNIT
+					       , T.CURRENCY_CD
+					       , T.MONTH_MON
+					       , T.CHKDATE
+					       , T.CHKID
+					) VALUES (
+					         S.ENTER_CD
+					       , S.JIKGUB_CD
+					       , S.SAL_CLASS
+					       , S.ELEMENT_CD
+					       , S.SDATE
+					       , S.EDATE
+					       , S.SAL_MON
+					       , S.TIME_UNIT
+					       , S.CURRENCY_CD
+					       , S.MONTH_MON
+					       , SYSDATE
+					       , #{ssnSabun}
+					)
+		</update>
+		
+<!-- 변경내역 Master 삭제 -->
+		<delete parameterType="map" id="deletePayTblExchangeMaster">
+
+
+					DELETE FROM TCPN003
+					WHERE 	(ENTER_CD,JIKGUB_CD,ELEMENT_CD,SDATE) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+								<if test='rm.jikgubCd != null and !rm.jikgubCd.equals("")'>
+									<if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+										<if test='rm.sdate != null and !rm.sdate.equals("")'>
+											(#{ssnEnterCd}, TRIM( #{rm.jikgubCd} ),TRIM( #{rm.elementCd} ),TRIM( #{rm.sdate} ))
+										</if>
+									</if>
+								</if>
+							</if>
+</foreach>
+										)
+		</delete>
+		
+<!-- 변경내역 Detail 삭제 -->
+		<delete parameterType="map" id="deletePayTblExchangeDetail">
+					DELETE FROM TCPN005
+					WHERE 	(ENTER_CD,JIKGUB_CD,ELEMENT_CD,SAL_CLASS,SDATE) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+								<if test='rm.jikgubCd != null and !rm.jikgubCd.equals("")'>
+									<if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+										<if test='rm.salClass != null and !rm.salClass.equals("")'>
+											<if test='rm.sdate != null and !rm.sdate.equals("")'>
+												(#{ssnEnterCd}, TRIM( #{rm.jikgubCd} ),TRIM( #{rm.elementCd} ),TRIM( #{rm.salClass} ),TRIM( #{rm.sdate} ))
+											</if>
+										</if>
+									</if>
+								</if>
+							</if>
+</foreach>
+										)
+
+		</delete>
+
+
+
+<!-- 변경내역 Master - 작업할 목록 조회 -->
+		<select parameterType="map" resultType="cMap" id="payTblExchangeMasterOperation">
+				<![CDATA[
+					SELECT B.JIKGUB_CD, B.SAL_CLASS, A.TIME_UNIT, B.SAL_MON, A.CURRENCY_CD, B.MONTH_MON, B.ELEMENT_CD, C.ELEMENT_NM, D.SDATE, D.EDATE
+					  FROM ( SELECT SUB1.*
+					           FROM TCPN001 SUB1,( SELECT MAX(SDATE) AS SDATE, ENTER_CD, JIKGUB_CD, ELEMENT_CD
+					                                 FROM TCPN001 WHERE ENTER_CD = #{ssnEnterCd}
+					                                  AND #{sdate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                                GROUP BY ENTER_CD, JIKGUB_CD, ELEMENT_CD) SUB2
+					          WHERE SUB1.ENTER_CD   = #{ssnEnterCd}
+					            AND SUB1.ENTER_CD   = SUB2.ENTER_CD
+					            AND SUB1.JIKGUB_CD  = SUB2.JIKGUB_CD
+					            AND SUB1.ELEMENT_CD = SUB2.ELEMENT_CD
+					            AND SUB1.SDATE      = SUB2.SDATE)  A,
+					       ( SELECT SUB1.*
+					           FROM TCPN002 SUB1, ( SELECT MAX(SDATE) AS SDATE, ENTER_CD, JIKGUB_CD, ELEMENT_CD, SAL_CLASS
+					                                  FROM TCPN002 WHERE ENTER_CD = #{ssnEnterCd}
+					                                   AND #{sdate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                                 GROUP BY ENTER_CD, JIKGUB_CD, SAL_CLASS, ELEMENT_CD) SUB2
+					          WHERE SUB1.ENTER_CD   = #{ssnEnterCd}
+					            AND SUB1.ENTER_CD   = SUB2.ENTER_CD
+					            AND SUB1.JIKGUB_CD  = SUB2.JIKGUB_CD
+					            AND SUB1.ELEMENT_CD = SUB2.ELEMENT_CD
+					            AND SUB1.SAL_CLASS  = SUB2.SAL_CLASS
+					            AND SUB1.SDATE      = SUB2.SDATE ) B,
+					       ( SELECT SUB1.*
+					           FROM TCPN011 SUB1, ( SELECT MAX(SDATE) AS SDATE, ENTER_CD, ELEMENT_TYPE, ELEMENT_CD
+					                                  FROM TCPN011
+					                                 WHERE ENTER_CD = #{ssnEnterCd}
+					                                   AND #{sdate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                                 GROUP BY ENTER_CD, ELEMENT_TYPE, ELEMENT_CD) SUB2
+					          WHERE SUB1.ENTER_CD     = #{ssnEnterCd}
+					            AND SUB1.ENTER_CD     = SUB2.ENTER_CD
+					            AND SUB1.ELEMENT_TYPE = SUB2.ELEMENT_TYPE
+					            AND SUB1.ELEMENT_CD   = SUB2.ELEMENT_CD
+					            AND SUB1.SDATE        = SUB2.SDATE )  C,
+					       ( SELECT SUB1.*
+					          FROM TCPN003 SUB1, ( SELECT MAX(SDATE) AS SDATE, ENTER_CD, JIKGUB_CD, ELEMENT_CD
+					                                 FROM TCPN003
+					                                WHERE ENTER_CD = #{ssnEnterCd}
+					                                  AND #{sdate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                                GROUP BY ENTER_CD, JIKGUB_CD, ELEMENT_CD) SUB2
+					          WHERE SUB1.ENTER_CD   = #{ssnEnterCd}
+					            AND SUB1.ENTER_CD   = SUB2.ENTER_CD
+					            AND SUB1.JIKGUB_CD  = SUB2.JIKGUB_CD
+					            AND SUB1.ELEMENT_CD = SUB2.ELEMENT_CD
+					            AND SUB1.SDATE      = SUB2.SDATE ) D
+					 WHERE D.ENTER_CD   = #{ssnEnterCd}
+					   AND D.JIKGUB_CD  = #{jikgubCd}
+					   AND D.ELEMENT_CD = #{elementCd}
+					   AND A.ENTER_CD   = D.ENTER_CD
+					   AND A.JIKGUB_CD  = D.JIKGUB_CD
+					   AND A.ELEMENT_CD = D.ELEMENT_CD
+					   AND B.ENTER_CD   = D.ENTER_CD
+					   AND B.JIKGUB_CD  = D.JIKGUB_CD
+					   AND B.ELEMENT_CD = D.ELEMENT_CD
+					   AND C.ENTER_CD   = D.ENTER_CD
+					   AND C.ELEMENT_CD = D.ELEMENT_CD
+					 ORDER BY TO_NUMBER(B.SAL_CLASS)
+				]]>
+		</select>
+
+<!-- 급여테이블 반영 -->
+
+		<update id="prcCpnBaseSalchange" parameterType="map" statementType="CALLABLE">
+				<![CDATA[
+					CALL P_CPN_BASE_SALCHANGE(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{cnt,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{jikgubCd,mode=IN,jdbcType=VARCHAR},
+						#{sdate,mode=IN,jdbcType=VARCHAR},
+						#{elementCd,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+		</update>
+
+<!-- 개인반영 -->
+		<update id="prcCpnBaseEmpsalUpd" parameterType="map" statementType="CALLABLE">
+				<![CDATA[
+					CALL P_CPN_BASE_EMPSAL_UPD(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{cnt,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{jikgubCd,mode=IN,jdbcType=VARCHAR},
+						#{sdate,mode=IN,jdbcType=VARCHAR},
+						#{elementCd,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR}
+					    )
+				]]>
+		</update>
+
+
+	</mapper>

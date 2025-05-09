@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.psnlWork.psnlTimeWorkSta">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPsnlTimeStaPopList">
+
+				<![CDATA[
+					SELECT  (SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = A.ENTER_CD AND GRCODE_CD = 'R10010' AND CODE = B.APPL_STATUS_CD) AS APPL_STATUS_NM--신청상태
+                    		, A.GNT_CD AS GNT_CD --근태종류
+                            , (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD = A.ENTER_CD AND GNT_CD = A.GNT_CD) AS GNT_NM
+                            , A.YMD
+							, A.APP_DAY AS HOL_DAY --일수
+					FROM     TTIM405 A
+							,THRI103 B
+					WHERE    A.ENTER_CD = #{ssnEnterCd}
+					AND      A.SABUN = TRIM( #{searchSabun} )
+					AND 	 A.YMD BETWEEN TRIM( REPLACE(#{searchSYm}, '-', '') || '01' ) AND TO_CHAR(LAST_DAY( TO_DATE(TRIM( REPLACE(#{searchEYm}, '-', '')) ,'YYYYMM' ) ), 'YYYYMMDD')
+					AND		 A.ENTER_CD = B.ENTER_CD
+					AND		 A.APPL_SEQ = B.APPL_SEQ
+					AND		 B.APPL_STATUS_CD = '99'
+					ORDER BY YMD
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getPsnlAnnualStaPopList">
+
+				<![CDATA[
+					SELECT
+							(SELECT CODE_NM FROM TSYS005 WHERE ENTER_CD = A.ENTER_CD AND GRCODE_CD = 'R10010' AND CODE = A.APPL_STATUS_CD) AS APPL_STATUS_NM--신청상태
+							, A.APPL_YMD
+							, B.GNT_CD         --근태종류
+							, (SELECT GNT_NM FROM TTIM014 WHERE ENTER_CD = A.ENTER_CD AND GNT_CD = B.GNT_CD) AS GNT_NM
+							, B.S_YMD             --신청시작일
+							, B.E_YMD             --신청종료일
+							, B.HOL_DAY         --적용일수
+					FROM     THRI103 A, TTIM301 B
+					WHERE    A.ENTER_CD = B.ENTER_CD
+					AND      A.APPL_SEQ = B.APPL_SEQ
+					AND		 A.APPL_STATUS_CD = '99'
+					AND 	 B.GNT_CD IN (SELECT X.GNT_CD FROM TTIM005 X WHERE X.ENTER_CD = A.ENTER_CD AND YY_DED_YN = 'Y')
+					AND      A.ENTER_CD = #{ssnEnterCd}
+					AND      B.SABUN = TRIM( #{searchSabun} )
+					AND		 B.S_YMD BETWEEN TRIM( #{sdate} ) AND TRIM( #{edate} )
+					ORDER BY A.APPL_YMD DESC, B.S_YMD DESC, A.APPL_STATUS_CD
+				]]>
+
+
+		</select>
+
+				<select parameterType="map" resultType="cMap" id="getPsnlTimeStaPopMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="savePsnlTimeStaPop">
+
+					MERGE INTO ZTST002 T
+					USING	(
+							SELECT	  A.COL1
+									, A.COL2
+									, A.COL3
+									, A.COL4
+									, A.COL5
+									, A.COL6
+							FROM	(
+									SELECT	  NULL		AS COL1
+											, NULL		AS COL2
+											, NULL		AS COL3
+											, NULL		AS COL4
+											, NULL		AS COL5
+											, NULL		AS COL6
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											--증가가 되는 키인경우 키가 공백이면 들어온 값을 삽입
+											<choose><when test=' rm.col1 != null and !rm.col1.equals("")'>
+												TRIM(#{rm.col1}) 			AS COL1
+											--증가가 되는 키인경우 키가 공백이 아니면 증가된 값을 삽입
+											</when><otherwise>
+												TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(COL1)),0) + ${icnt}) FROM ZTST002) )	AS COL1
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+
+											, TRIM( #{rm.col2} )	AS COL2
+											, TRIM( #{rm.col3} )	AS COL3
+											, TRIM( #{rm.col4} )	AS COL4
+											, TRIM( #{rm.col5} )	AS COL5
+											, TRIM( #{rm.col6} )	AS COL6
+											FROM   DUAL
+</foreach>
+									) A WHERE A.COL1 IS NOT NULL
+							) S
+					ON ( T.COL1		= S.COL1 )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.COL2	= S.COL2
+									, T.COL3	= S.COL3
+									, T.COL4	= S.COL4
+									, T.COL5	= S.COL5
+									, T.COL6	= S.COL6
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.COL1
+							, T.COL2
+							, T.COL3
+							, T.COL4
+							, T.COL5
+							, T.COL6
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.COL1
+							, S.COL2
+							, S.COL3
+							, S.COL4
+							, S.COL5
+							, S.COL6
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePsnlTimeStaPop">
+
+					DELETE FROM ZTST002
+					WHERE 	COL1 IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' rm.col1 != null and !rm.col1.equals("")'>
+											TRIM( #{rm.col1} )
+										</if>
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertPsnlTimeStaPop">
+
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePsnlTimeStaPop">
+
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+</mapper>

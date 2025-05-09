@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="common.popup.pwrSrchBizPopup">
+		
+	<select id="getPwrSrchBizPopupViewElemList" parameterType="map" resultType="cMap">
+			<![CDATA[
+				SELECT 	  A.COLUMN_NAME AS COLUMN_NM
+						, B.SEARCH_ITEM_CD
+						, B.SEARCH_ITEM_NM
+						, B.ITEM_MAP_TYPE
+						, B.PRG_URL
+						, B.SQL_SYNTAX
+ 					FROM COLS A, THRI203 B
+					WHERE A.TABLE_NAME	= TRIM( #{viewNm} )
+  					AND A.COLUMN_NAME	= B.SEARCH_ITEM_NM(+)
+  					AND B.ENTER_CD(+)	= #{ssnEnterCd}
+  					AND COLUMN_NAME NOT IN ('ENTER_CD', 'SABUN')
+				ORDER BY A.COLUMN_ID
+			]]>
+	</select>
+		
+	<select id="getPwrSrchBizPopupElemList" parameterType="map" resultType="cMap">
+			<![CDATA[
+				SELECT 	  SEARCH_SEQ
+						, COLUMN_NM
+						, SEQ
+						, ORDER_BY_SEQ
+						, ASC_DESC
+						, INQ_TYPE
+						, MERGE_YN  
+ 					FROM THRI213 
+					WHERE 	ENTER_CD   = #{ssnEnterCd}
+  					AND 	SEARCH_SEQ =  TO_NUMBER( TRIM( #{srchSeq} ) )
+				ORDER BY SEQ
+			]]>
+	</select>
+		
+	<select id="getPwrSrchBizPopupConditionList" parameterType="map" resultType="cMap">
+			<![CDATA[
+				SELECT 	  A.SEARCH_SEQ
+						, A.COLUMN_NM	
+						, A.OPERATOR
+						, A.INPUT_VALUE
+						, A.INPUT_VALUE_DESC
+						, A.AND_OR
+						, A.VALUE_TYPE
+						, A.SEQ
+						, A.COND_TYPE
+      						, B.SEARCH_ITEM_NM
+      						, A.SEARCH_ITEM_CD
+      						, B.ITEM_MAP_TYPE
+      						, B.PRG_URL
+      						, B.SQL_SYNTAX
+ 					FROM THRI215 A, THRI203 B
+					WHERE A.ENTER_CD     = #{ssnEnterCd}
+  					AND A.SEARCH_SEQ     = TO_NUMBER( TRIM( #{srchSeq} ) )
+  					AND A.COND_TYPE      = TRIM( #{condType} )
+  					AND A.ENTER_CD       = B.ENTER_CD(+)
+  					AND A.SEARCH_ITEM_CD = B.SEARCH_ITEM_CD(+)
+				ORDER BY SEQ
+			]]>
+	</select>
+
+	<update id="updatePwrSrchBizPopupSql" parameterType="map">
+    <![CDATA[/* thri211 */
+         UPDATE THRI201 SET
+				  SQL_SYNTAX= #{sqlSyntax}
+				, CHKDATE 	= SYSDATE
+				, CHKID		= #{ssnSabun}
+		  WHERE 	ENTER_CD 	= #{ssnEnterCd}
+			AND		SEARCH_SEQ 	= #{searchSeq}
+    ]]>
+    </update>
+
+	<update id="updatePwrSrchBizPopupSqlDesc" parameterType="map">
+	<![CDATA[/* thri211 */
+		UPDATE THRI201 SET
+				CONDITION_DESC  = TRIM(#{sqlDescConv})
+		WHERE 	ENTER_CD 	= #{ssnEnterCd}
+		AND		SEARCH_SEQ 	= #{srchSeq} 	
+	]]>
+	</update>
+		
+		
+	<update id="savePwrSrchBizPopupElem" parameterType="map">
+	<![CDATA[
+		MERGE INTO THRI213 T
+		USING	(
+				SELECT	  A.SEARCH_SEQ  
+						, A.COLUMN_NM   
+						, A.SEQ         
+						, A.INQ_TYPE    
+						, A.ORDER_BY_SEQ
+						, A.ASC_DESC    
+						, A.MERGE_YN
+				FROM	(
+						SELECT	  NULL		AS SEARCH_SEQ  
+								, NULL		AS COLUMN_NM   
+								, NULL		AS SEQ         
+								, NULL		AS INQ_TYPE    
+								, NULL		AS ORDER_BY_SEQ
+								, NULL		AS ASC_DESC
+								, NULL		AS MERGE_YN    
+						FROM	DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+						UNION ALL
+							SELECT
+								  TO_NUMBER( TRIM(#{rm.searchSeq}) )		AS SEARCH_SEQ  
+								, TRIM(#{rm.columnNm})		AS COLUMN_NM   
+								, TRIM(#{rm.seq})			AS SEQ         
+								, TRIM(#{rm.inqType})		AS INQ_TYPE    
+								, TRIM(#{rm.orderBySeq})	AS ORDER_BY_SEQ
+								, TRIM(#{rm.ascDesc})		AS ASC_DESC  
+								, TRIM(#{rm.mergeYn})		AS MERGE_YN
+							 FROM DUAL
+		</foreach>
+		<![CDATA[
+						) A WHERE A.SEARCH_SEQ IS NOT NULL
+				) S
+		ON ( 		T.ENTER_CD		= #{ssnEnterCd}
+				AND T.SEARCH_SEQ	= S.SEARCH_SEQ 
+				AND T.COLUMN_NM		= S.COLUMN_NM
+			)
+		WHEN MATCHED THEN
+			UPDATE SET	  T.SEQ    			= S.SEQ         
+						, T.INQ_TYPE		= S.INQ_TYPE    
+						, T.ORDER_BY_SEQ	= S.ORDER_BY_SEQ
+						, T.ASC_DESC		= S.ASC_DESC    
+						, T.MERGE_YN		= S.MERGE_YN
+						, T.CHKDATE			= SYSDATE
+						, T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT 
+			(	
+				  T.ENTER_CD
+				, T.SEARCH_SEQ  
+				, T.COLUMN_NM   
+				, T.SEQ         
+				, T.INQ_TYPE    
+				, T.ORDER_BY_SEQ
+				, T.ASC_DESC 
+				, T.MERGE_YN   
+				, T.CHKDATE
+				, T.CHKID
+			) 
+			VALUES 
+			(
+				  #{ssnEnterCd}
+				, S.SEARCH_SEQ  
+				, S.COLUMN_NM   
+				, S.SEQ         
+				, S.INQ_TYPE    
+				, S.ORDER_BY_SEQ
+				, S.ASC_DESC    
+				, S.MERGE_YN
+				, SYSDATE
+				, #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<delete id="deletePwrSrchBizPopupElem" parameterType="map">
+	<![CDATA[
+		DELETE FROM THRI213
+		WHERE ( ENTER_CD,SEARCH_SEQ,COLUMN_NM )
+				IN (  (NULL,NULL,NULL) ]]>
+	<foreach item="rm" collection="deleteRows">
+			,							(
+        				TRIM(#{ssnEnterCd}), TO_NUMBER( TRIM(#{rm.searchSeq}) ),TRIM(#{rm.columnNm})
+        			)
+	</foreach>
+		)
+	</delete>
+		
+	<update id="savePwrSrchBizPopupCondition" parameterType="map">
+	<![CDATA[
+		MERGE INTO THRI215 T
+		USING	(
+				SELECT	  A.SEARCH_SEQ      
+						, A.COLUMN_NM       
+						, A.SEQ             
+						, A.COND_TYPE       
+						, A.OPERATOR        
+						, A.INPUT_VALUE     
+						, A.INPUT_VALUE_DESC
+						, A.AND_OR          
+						, A.VALUE_TYPE      
+						, A.SEARCH_ITEM_CD  
+				FROM	(
+						SELECT	  NULL		AS SEARCH_SEQ      
+								, NULL		AS COLUMN_NM       
+								, NULL		AS SEQ             
+								, NULL		AS COND_TYPE       
+								, NULL		AS OPERATOR        
+								, NULL		AS INPUT_VALUE     
+								, NULL		AS INPUT_VALUE_DESC
+								, NULL		AS AND_OR          
+								, NULL		AS VALUE_TYPE      
+								, NULL		AS SEARCH_ITEM_CD  
+						FROM	DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+			UNION ALL
+				SELECT
+						  TO_NUMBER( TRIM(#{rm.searchSeq}) )		AS SEARCH_SEQ  
+						, TRIM(#{rm.columnNm})			AS COLUMN_NM       
+						, TRIM(#{rm.seq})				AS SEQ             
+						, TRIM(#{rm.condType})			AS COND_TYPE       
+						, TRIM(#{rm.operator})			AS OPERATOR
+						, TRIM(#{rm.inputValue})		AS INPUT_VALUE
+						, TRIM(#{rm.inputValueDesc})	AS INPUT_VALUE_DESC
+						, TRIM(#{rm.andOr})				AS AND_OR          
+						, TRIM(#{rm.valueType})			AS VALUE_TYPE      
+						, TRIM(#{rm.searchItemCd})		AS SEARCH_ITEM_CD  
+						FROM DUAL
+		</foreach>
+		<![CDATA[
+						) A WHERE A.SEARCH_SEQ IS NOT NULL
+				) S
+		ON ( 		T.ENTER_CD		= #{ssnEnterCd}
+				AND T.SEARCH_SEQ	= S.SEARCH_SEQ 
+				AND T.COLUMN_NM		= S.COLUMN_NM
+			)
+		WHEN MATCHED THEN
+			UPDATE SET	  T.SEQ             	= S.SEQ             
+						, T.COND_TYPE       	= S.COND_TYPE       
+						, T.OPERATOR        	= S.OPERATOR        
+						, T.INPUT_VALUE     	= S.INPUT_VALUE     
+						, T.INPUT_VALUE_DESC	= S.INPUT_VALUE_DESC
+						, T.AND_OR          	= S.AND_OR          
+						, T.VALUE_TYPE      	= S.VALUE_TYPE      
+						, T.SEARCH_ITEM_CD  	= S.SEARCH_ITEM_CD  
+						, T.CHKDATE				= SYSDATE
+						, T.CHKID				= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT 
+			(	
+				  T.ENTER_CD
+				, T.SEARCH_SEQ      
+				, T.COLUMN_NM       
+				, T.SEQ             
+				, T.COND_TYPE       
+				, T.OPERATOR        
+				, T.INPUT_VALUE     
+				, T.INPUT_VALUE_DESC
+				, T.AND_OR          
+				, T.VALUE_TYPE      
+				, T.SEARCH_ITEM_CD  
+				, T.CHKDATE
+				, T.CHKID
+			) 
+			VALUES 
+			(
+				  #{ssnEnterCd}
+				, S.SEARCH_SEQ      
+				, S.COLUMN_NM       
+				, S.SEQ             
+				, S.COND_TYPE       
+				, S.OPERATOR        
+				, S.INPUT_VALUE     
+				, S.INPUT_VALUE_DESC
+				, S.AND_OR          
+				, S.VALUE_TYPE      
+				, S.SEARCH_ITEM_CD  
+				, SYSDATE
+				, #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<delete id="deletePwrSrchBizPopupCondition" parameterType="map">
+	<![CDATA[
+		DELETE FROM THRI215
+		WHERE ( ENTER_CD,SEARCH_SEQ,COLUMN_NM )
+				IN (  (NULL,NULL,NULL) ]]>
+	<foreach item="rm" collection="deleteRows">
+		,							(
+	           				TRIM(#{ssnEnterCd}), TO_NUMBER( TRIM(#{rm.searchSeq}) ),TRIM(#{rm.columnNm})
+	           			)
+	</foreach>
+		)
+	</delete>
+		
+	<select id="getPwrSrchBizPopupAuthStmtList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		(	SELECT * 
+			FROM (	SELECT SUB1.* 
+					FROM THRM151 SUB1 
+					WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+					AND #{ssnBaseDate} BETWEEN SDATE AND NVL(EDATE, '99991231') 
+				)
+			WHERE ENTER_CD = #{ssnEnterCd}
+			AND ( 
+					ORG_CD IN (	SELECT SCOPE_VALUE 
+								FROM TSYS319 
+								WHERE ENTER_CD = #{ssnEnterCd}
+								AND SABUN = #{ssnSabun}
+								AND GRP_CD = #{ssnGrpCd}
+								AND AUTH_SCOPE_CD = 'W10' 
+          						   )
+          				OR 
+          				SABUN IN (
+          							SELECT F_ORG_GET_CHIEF_SABUN( ENTER_CD, SCOPE_VALUE , TO_CHAR( SYSDATE,'YYYYMMDD' ) ) 
+                          			FROM TSYS319 
+                          			WHERE ENTER_CD = #{ssnEnterCd} 
+                          			AND SABUN = #{ssnSabun}
+                          			AND GRP_CD = #{ssnGrpCd}
+                          			AND AUTH_SCOPE_CD = 'W10' 
+          						  )
+				)
+  				AND SABUN = #{ssnSabun}
+  			)
+	]]>
+	</select>
+		
+	<select id="getPwrSrchBizPopupTrackStmtList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	SUB1.*                                                                                     
+      			FROM	THRM151 SUB1                                                                                
+        			WHERE	SUB1.ENTER_CD    = #{ssnEnterCd}                     
+		AND		#{ssnBaseDate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+	]]>
+	</select>
+		
+	<select id="getPwrSrchBizPopupQueryResultList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		${resultQuery}
+	]]>
+	</select>
+		
+	<select id="getPwrSrchBizPopupQueryMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_SQL_TMP(#{ssnEnterCd},TRIM(#{srchSeq}),#{ssnSearchType},#{ssnSabun},#{ssnGrpCd},'') AS query FROM dual
+	]]>
+	</select>
+		
+	<select id="getPwrSrchBizPopupResultList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		${query}
+	]]>
+	</select>
+</mapper>

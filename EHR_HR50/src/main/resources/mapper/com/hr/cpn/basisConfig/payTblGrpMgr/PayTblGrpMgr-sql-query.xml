@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.payTblGrpMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayTblGrpMgrList">
+
+				<![CDATA[
+				SELECT SEX_TYPE,
+				       JIKGUB_CD,
+				       ELEMENT_CD,
+				       ELEMENT_NM,
+				       TIME_UNIT,
+				       CURRENCY_CD,
+				       SDATE,
+				       EDATE
+				  FROM (SELECT ROWNUM AS RNUM,
+				               SEX_TYPE,
+				               JIKGUB_CD,
+				               ELEMENT_CD,
+				               ELEMENT_NM,
+				               TIME_UNIT,
+				               CURRENCY_CD,
+				               SDATE,
+				               EDATE
+				          FROM (SELECT A.SEX_TYPE,
+				                       A.JIKGUB_CD,
+				                       A.ELEMENT_CD,
+				                       B.ELEMENT_NM,
+				                       A.TIME_UNIT,
+				                       A.CURRENCY_CD,
+				                       A.SDATE,
+				                       A.EDATE
+				                  FROM TCPN001 A,
+				                       (SELECT SUB1.*
+				                          FROM TCPN011 SUB1,
+				                               (  SELECT MAX (SDATE) AS SDATE, ELEMENT_CD
+				                                  FROM TCPN011
+				                                  WHERE ENTER_CD = #{ssnEnterCd}
+				                                    AND TO_CHAR (SYSDATE, 'YYYYMMDD') 
+													BETWEEN SDATE AND NVL (EDATE, '99991231')
+				                                GROUP BY ELEMENT_CD) SUB2
+				                         WHERE     SUB1.ENTER_CD = #{ssnEnterCd}
+				                               AND SUB1.ELEMENT_CD = SUB2.ELEMENT_CD
+				                               AND SUB1.SDATE = SUB2.SDATE) B
+				                 WHERE A.ENTER_CD = #{ssnEnterCd}
+				                           ]]>
+				                 <if test='searchJikgubCd != null and !searchJikgubCd.equals("")'>
+				                       AND A.JIKGUB_CD LIKE #{searchJikgubCd} || '%'
+								 </if>
+				                 <if test='searchYear != null and !searchYear.equals("")'>
+				                       AND SUBSTR(A.SDATE,0,4) LIKE '%' || #{searchYear} || '%'
+								 </if>
+				                 <if test='searchBaseDate != null and !searchBaseDate.equals("")'>
+				                       AND REPLACE(#{searchBaseDate}, '-', '') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+								 </if>
+				               -- 항목테이블 조인
+				               AND A.ENTER_CD  = B.ENTER_CD
+				               AND A.ELEMENT_CD = B.ELEMENT_CD
+				            )
+				       )
+				 ORDER BY JIKGUB_CD, ELEMENT_CD 
+		</select>
+		
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayTblGrpMgrList2">
+				<![CDATA[
+				SELECT SEX_TYPE,
+				       JIKGUB_CD,
+				       ELEMENT_CD,
+				       SAL_CLASS,
+				       JIKWEE_CD,
+				       SAL_MON,
+				       MONTH_MON, 
+				       MAX_MON,
+				       SDATE,
+				       EDATE
+				  FROM (SELECT ROWNUM AS RNUM,
+				               A.SEX_TYPE,
+				               A.JIKGUB_CD,
+				               A.ELEMENT_CD,
+				               A.SAL_CLASS,
+				               A.JIKWEE_CD,
+				               A.SAL_MON,
+				               A.MONTH_MON,
+				               A.MAX_MON,
+				               A.SDATE,
+				               A.EDATE
+				          FROM (SELECT SEX_TYPE,
+				                       JIKGUB_CD,
+				                       ELEMENT_CD,
+				                       SAL_CLASS,
+				                       JIKWEE_CD,
+				                       SAL_MON,
+				                       MONTH_MON,
+				                       MAX_MON,
+				                       SDATE,
+				                       EDATE
+				                  FROM TCPN002
+				                 WHERE     ENTER_CD = #{ssnEnterCd}
+				                       AND JIKGUB_CD = #{sheet1JikgubCd}
+				                       AND ELEMENT_CD = #{sheet1ElementCd}
+				                       AND #{searchSdate} BETWEEN SDATE AND NVL(EDATE, '99991231')
+				                       AND SEX_TYPE = #{sheet1SexType}) A )
+					ORDER BY TO_NUMBER(SAL_CLASS) DESC				                       
+				]]>
+		</select>
+		
+<!-- 		저장 -->
+		<update parameterType="map" id="savePayTblGrpMgr">
+
+					MERGE INTO TCPN001 T
+					USING	(
+							SELECT	  ENTER_CD
+									, JIKGUB_CD
+									, ELEMENT_CD
+									, SEX_TYPE
+									, SDATE
+									, EDATE
+									, CURRENCY_CD
+									, TIME_UNIT
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD     
+											, NULL		AS JIKGUB_CD    
+											, NULL		AS ELEMENT_CD   
+											, NULL		AS SEX_TYPE     
+											, NULL		AS SDATE        
+											, NULL		AS EDATE        
+											, NULL		AS CURRENCY_CD  
+											, NULL		AS TIME_UNIT    
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd} AS ENTER_CD
+											, TRIM( #{rm.jikgubCd}) 	AS JIKGUB_CD
+											, TRIM( #{rm.elementCd}) 	AS ELEMENT_CD
+											, TRIM( #{rm.sexType}) 		AS SEX_TYPE
+											, TRIM( REPLACE(#{rm.sdate}, '-', '') ) 	AS SDATE
+											, TRIM( REPLACE(#{rm.edate}, '-', '') )	 	AS EDATE
+											, TRIM( #{rm.currencyCd}) 	AS CURRENCY_CD
+											, TRIM( #{rm.timeUnit}) 	AS TIME_UNIT
+											FROM   DUAL
+</foreach>
+									) WHERE JIKGUB_CD IS NOT NULL
+							) S
+					ON ( 
+						T.ENTER_CD      = #{ssnEnterCd}
+					AND	T.JIKGUB_CD     = S.JIKGUB_CD 
+					AND	T.ELEMENT_CD    = S.ELEMENT_CD
+					AND	T.SEX_TYPE      = S.SEX_TYPE  
+					AND	T.SDATE         = S.SDATE     
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE			= S.EDATE
+									, T.CURRENCY_CD		= S.CURRENCY_CD
+									, T.TIME_UNIT		= S.TIME_UNIT
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD    
+							, T.JIKGUB_CD   
+							, T.ELEMENT_CD  
+							, T.SEX_TYPE    
+							, T.SDATE       
+							, T.EDATE       
+							, T.CURRENCY_CD 
+							, T.TIME_UNIT   
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.JIKGUB_CD   
+							, S.ELEMENT_CD  
+							, S.SEX_TYPE    
+							, S.SDATE       
+							, S.EDATE       
+							, S.CURRENCY_CD 
+							, S.TIME_UNIT   
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+		<!-- 		저장2 -->
+		<update parameterType="map" id="savePayTblGrpMgr2">
+					MERGE INTO TCPN002 T
+					USING	(
+							SELECT	  ENTER_CD
+									, JIKGUB_CD
+									, ELEMENT_CD
+									, SEX_TYPE
+									, SAL_CLASS
+									, SDATE
+									, EDATE
+									, JIKWEE_CD
+									, SAL_MON
+									, MAX_MON
+									, MONTH_MON
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD      
+											, NULL		AS JIKGUB_CD     
+											, NULL		AS ELEMENT_CD    
+											, NULL		AS SEX_TYPE      
+											, NULL		AS SAL_CLASS     
+											, NULL		AS SDATE         
+											, NULL		AS EDATE         
+											, NULL		AS JIKWEE_CD     
+											, NULL		AS SAL_MON       
+											, NULL		AS MAX_MON       
+											, NULL		AS MONTH_MON     
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd} AS ENTER_CD
+											, TRIM( #{rm.jikgubCd}) 	AS JIKGUB_CD
+											, TRIM( #{rm.elementCd}) 	AS ELEMENT_CD
+											, TRIM( #{rm.sexType}) 		AS SEX_TYPE
+											, TRIM( #{rm.salClass}) 	AS SAL_CLASS
+											, TRIM( REPLACE(#{rm.sdate}, '-', '') )	 	AS SDATE
+											, TRIM( REPLACE(#{rm.edate}, '-', '') ) 	AS EDATE
+											, TRIM( #{rm.jikweeCd}) 	AS JIKWEE_CD
+											, TRIM( #{rm.salMon}) 		AS SAL_MON
+											, TRIM( #{rm.maxMon}) 		AS MAX_MON
+											, TRIM( #{rm.monthMon}) 	AS MONTH_MON
+											FROM   DUAL
+</foreach>
+									) WHERE JIKGUB_CD IS NOT NULL
+							) S
+					ON ( 
+						T.ENTER_CD      = #{ssnEnterCd}
+					AND	T.JIKGUB_CD   	= S.JIKGUB_CD
+					AND	T.ELEMENT_CD   	= S.ELEMENT_CD
+					AND	T.SEX_TYPE   	= S.SEX_TYPE
+					AND	T.SAL_CLASS  	= S.SAL_CLASS
+					AND	T.SDATE   		= S.SDATE
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.EDATE		= S.EDATE
+									, T.JIKWEE_CD	= S.JIKWEE_CD
+									, T.SAL_MON		= S.SAL_MON
+									, T.MAX_MON		= S.MAX_MON
+									, T.MONTH_MON	= S.MONTH_MON
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.JIKGUB_CD
+							, T.ELEMENT_CD
+							, T.SEX_TYPE
+							, T.SAL_CLASS
+							, T.SDATE
+							, T.EDATE
+							, T.JIKWEE_CD
+							, T.SAL_MON
+							, T.MAX_MON
+							, T.MONTH_MON
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.JIKGUB_CD  
+							, S.ELEMENT_CD  
+							, S.SEX_TYPE  
+							, S.SAL_CLASS  
+							, S.SDATE 
+							, S.EDATE  
+							, S.JIKWEE_CD  
+							, S.SAL_MON  
+							, S.MAX_MON  
+							, S.MONTH_MON  
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayTblGrpMgr">
+					DELETE FROM TCPN001
+					WHERE 	(ENTER_CD,JIKGUB_CD,ELEMENT_CD,SEX_TYPE,SDATE) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+								<if test='rm.jikgubCd != null and !rm.jikgubCd.equals("")'>
+									<if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+										<if test='rm.sexType != null and !rm.sexType.equals("")'>
+											(#{ssnEnterCd}, TRIM( #{rm.jikgubCd} ),TRIM( #{rm.elementCd} ),TRIM( #{rm.sexType} ),TRIM( #{rm.sdate} ))
+										</if>
+									</if>
+								</if>
+							</if>
+</foreach>
+										)
+
+		</delete>
+		
+		<!-- 		삭제2 -->
+		<delete parameterType="map" id="deletePayTblGrpMgr2">
+
+
+					DELETE FROM TCPN002
+					WHERE 	(ENTER_CD,JIKGUB_CD,ELEMENT_CD,SEX_TYPE,SAL_CLASS,SDATE) IN 	(  (NULL,NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+							<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+								<if test='rm.jikgubCd != null and !rm.jikgubCd.equals("")'>
+									<if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+										<if test='rm.sexType != null and !rm.sexType.equals("")'>
+											<if test='rm.salClass != null and !rm.salClass.equals("")'>
+												(#{ssnEnterCd}, TRIM( #{rm.jikgubCd} ),TRIM( #{rm.elementCd} ),TRIM( #{rm.sexType} ),TRIM( #{rm.salClass} ),TRIM( #{rm.sdate} ))
+											</if>
+										</if>
+									</if>
+								</if>
+							</if>
+</foreach>
+										)
+		</delete>
+		
+</mapper>

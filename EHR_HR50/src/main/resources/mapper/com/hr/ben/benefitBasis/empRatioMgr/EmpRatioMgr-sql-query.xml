@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.benefitBasis.empRatioMgr">
+		
+	<select id="getEmpRatioMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT SDATE
+			 , EDATE
+			 , UMEMP_SELF_RATE
+			 , UNEMP_COMP_RATE
+			 , EMP_SELF_RATE
+			 , EMP_COMP_RATE
+			 , ABILITY_SELF_RATE
+			 , ABILITY_COMP_RATE
+			 , ACCIDENT_RATE
+			 , BOND_MON
+		FROM TBEN003
+		WHERE ENTER_CD = #{ssnEnterCd}
+		ORDER BY SDATE DESC
+	]]>
+	</select>
+		
+	<update id="saveEmpRatioMgr" parameterType="map">
+	<![CDATA[
+			MERGE INTO TBEN003 T
+			USING	(
+					SELECT A.SDATE
+						 , A.EDATE
+						 , A.UMEMP_SELF_RATE
+						 , A.UNEMP_COMP_RATE
+						 , A.EMP_SELF_RATE
+						 , A.EMP_COMP_RATE
+						 , A.ABILITY_SELF_RATE
+						 , A.ABILITY_COMP_RATE
+						 , A.ACCIDENT_RATE
+						 , A.BOND_MON
+					  FROM (
+							SELECT NULL		AS SDATE
+								 , NULL		AS EDATE
+								 , NULL		AS UMEMP_SELF_RATE
+								 , NULL		AS UNEMP_COMP_RATE
+								 , NULL		AS EMP_SELF_RATE
+								 , NULL		AS EMP_COMP_RATE
+								 , NULL		AS ABILITY_SELF_RATE
+								 , NULL		AS ABILITY_COMP_RATE
+								 , NULL		AS ACCIDENT_RATE
+								 , NULL		AS BOND_MON
+							  FROM DUAL ]]>
+					<foreach item="rm" collection="mergeRows">
+							  UNION ALL
+								SELECT TRIM(#{rm.sdate})			AS SDATE
+									 , TRIM(#{rm.edate})			AS EDATE
+									 , TRIM(#{rm.umempSelfRate})	AS UMEMP_SELF_RATE
+									 , TRIM(#{rm.unempCompRate})	AS UNEMP_COMP_RATE
+									 , TRIM(#{rm.empSelfRate})		AS EMP_SELF_RATE
+									 , TRIM(#{rm.empCompRate})		AS EMP_COMP_RATE
+									 , TRIM(#{rm.abilitySelfRate})	AS ABILITY_SELF_RATE
+									 , TRIM(#{rm.abilityCompRate})	AS ABILITY_COMP_RATE
+									 , TRIM(#{rm.accidentRate})		AS ACCIDENT_RATE
+									 , TRIM(#{rm.bondMon})			AS BOND_MON
+								  FROM DUAL
+					</foreach>
+		<![CDATA[
+							) A
+					WHERE A.SDATE IS NOT NULL
+					) S
+			ON (	T.ENTER_CD	= #{ssnEnterCd}
+				AND	T.SDATE		= S.SDATE
+				)
+			WHEN MATCHED THEN
+				UPDATE SET T.EDATE				= S.EDATE
+						 , T.UMEMP_SELF_RATE	= S.UMEMP_SELF_RATE
+						 , T.UNEMP_COMP_RATE	= S.UNEMP_COMP_RATE
+						 , T.EMP_SELF_RATE		= S.EMP_SELF_RATE
+						 , T.EMP_COMP_RATE		= S.EMP_COMP_RATE
+						 , T.ABILITY_SELF_RATE	= S.ABILITY_SELF_RATE
+						 , T.ABILITY_COMP_RATE	= S.ABILITY_COMP_RATE
+						 , T.ACCIDENT_RATE		= S.ACCIDENT_RATE
+						 , T.BOND_MON			= S.BOND_MON
+						 , T.CHKDATE			= SYSDATE
+						 , T.CHKID				= #{ssnSabun}
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					T.ENTER_CD
+				  , T.SDATE
+				  , T.EDATE
+				  , T.UMEMP_SELF_RATE
+				  , T.UNEMP_COMP_RATE
+				  , T.EMP_SELF_RATE
+				  , T.EMP_COMP_RATE
+				  , T.ABILITY_SELF_RATE
+				  , T.ABILITY_COMP_RATE
+				  , T.ACCIDENT_RATE
+				  , T.BOND_MON
+				  , T.CHKDATE
+				  , T.CHKID
+				)
+				VALUES
+				(
+					#{ssnEnterCd}
+				  , S.SDATE
+				  , S.EDATE
+				  , S.UMEMP_SELF_RATE
+				  , S.UNEMP_COMP_RATE
+				  , S.EMP_SELF_RATE
+				  , S.EMP_COMP_RATE
+				  , S.ABILITY_SELF_RATE
+				  , S.ABILITY_COMP_RATE
+				  , S.ACCIDENT_RATE
+				  , S.BOND_MON
+				  , SYSDATE
+				  , #{ssnSabun}
+				)
+	]]>
+	</update>
+		
+	<delete id="deleteEmpRatioMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN003
+		 WHERE ENTER_CD||'_'||SDATE IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sdate != null and rm.sdate neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sdate})
+			</if>
+		</foreach>
+		)
+	</delete>
+		
+</mapper>

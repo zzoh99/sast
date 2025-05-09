@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.otWorkOrgApp">
+		<select parameterType="map" resultType="cMap" id="getOtWorkOrgAppList">
+
+				<![CDATA[
+					   SELECT A.APPL_SEQ
+					   		, F_COM_GET_ORG_NM( A.ENTER_CD, A.APPL_ORG_CD, A.YMD) AS ORG_NM
+							, TO_CHAR(TO_DATE(A.YMD, 'YYYYMMDD'),'YYYY-MM-DD') ||' ('||C.DAY_NM||')' AS YMD
+							, A.EMP_CNT
+							, A.EMP_LIST
+							, A.REQUEST_HOUR
+							
+							, B.APPL_YMD
+							, B.APPL_STATUS_CD
+							, B.AGREE_YMD
+							, B.APPL_SABUN
+							, B.APPL_IN_SABUN
+							
+							, DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">' || NVL(F_COM_GET_LANGUAGE_MAPPING(A.ENTER_CD, 'tit', '113460', #{ssnLocaleCd}), '삭제') || '</a>', '') AS BTN_DEL
+							, 0 AS DETAIL
+						 FROM (SELECT ENTER_CD, APPL_SEQ, APPL_ORG_CD, YMD
+						  	        , COUNT(SABUN) AS EMP_CNT
+									, LISTAGG(F_COM_GET_NAMES(ENTER_CD, SABUN)||'('||REQUEST_HOUR||')', ', ') WITHIN GROUP (ORDER BY SABUN) AS EMP_LIST
+						  	        , SUM(REQUEST_HOUR) AS REQUEST_HOUR
+						         FROM TTIM601
+						        WHERE ENTER_CD      = TRIM( #{ssnEnterCd} )
+						          AND APPL_SABUN    = TRIM( #{searchSabun} )
+						          AND YMD BETWEEN REPLACE( #{searchAppSYmd} ,'-','') AND REPLACE( #{searchAppEYmd} ,'-','')
+						          AND APPL_GUBUN = 'B'  -- 사전신청
+						        GROUP BY ENTER_CD, APPL_SEQ, APPL_ORG_CD, YMD  
+						      ) A, THRI103 B
+						     , TSYS007 C 
+						WHERE A.ENTER_CD = B.ENTER_CD
+						  AND A.APPL_SEQ = B.APPL_SEQ
+						  AND A.YMD      = C.SUN_DATE
+						  AND B.APPL_CD  = '110'
+				]]>
+<if test='searchAppSYmd != null and searchAppSYmd neq ""'>
+	<![CDATA[
+						   AND A.YMD >= REPLACE(#{searchAppSYmd}, '-', '')
+	]]>
+</if>
+<if test='searchAppEYmd != null and searchAppEYmd neq ""'>
+	<![CDATA[
+						   AND A.YMD <= REPLACE(#{searchAppEYmd}, '-', '')
+	]]>
+</if>
+				<![CDATA[
+						ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+				]]>
+
+
+		</select>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteOtWorkOrgApp">
+
+					DELETE FROM TTIM601
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					   AND APPL_SEQ IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						<if test=' rm.applSeq != null and !rm.applSeq.equals("")'>
+						,TRIM(#{rm.applSeq})
+						</if>
+</foreach>
+						)
+		</delete>
+
+
+</mapper>

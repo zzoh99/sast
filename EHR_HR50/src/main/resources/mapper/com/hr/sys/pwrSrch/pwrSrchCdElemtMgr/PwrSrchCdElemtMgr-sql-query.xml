@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.pwrSrch.pwrSrchCdElemtMgr">
+		<select parameterType="map" resultType="cMap" id="getPwrSrchCdElemtMgrList">
+
+
+					SELECT    '0' AS DB_ITEM_DESC
+							, SEARCH_ITEM_CD
+							, SEARCH_ITEM_NM
+							, SEARCH_ITEM_DESC
+							, ITEM_MAP_TYPE
+							, PRG_URL
+							, SQL_SYNTAX
+		         	FROM THRI203
+                	WHERE 1=1
+                	AND ENTER_CD          = #{enterCd}
+                	<if test='contentNm != null and !contentNm.equals("")'>
+                  		AND SEARCH_ITEM_NM	LIKE '%'||TRIM(#{contentNm})||'%'
+                  	</if>
+                  	ORDER BY SEARCH_ITEM_CD
+
+
+
+		</select>
+
+		<update parameterType="map" id="savePwrSrchCdElemtMgr">
+
+   					MERGE INTO THRI203 TARGETTABLE
+                  	USING (
+               				SELECT    A.ENTER_CD 			AS ENTER_CD
+               						, A.SEARCH_ITEM_CD		AS SEARCH_ITEM_CD
+                                	, A.SEARCH_ITEM_NM		AS SEARCH_ITEM_NM
+                                	, A.SEARCH_ITEM_DESC	AS SEARCH_ITEM_DESC
+                                	, A.ITEM_MAP_TYPE		AS ITEM_MAP_TYPE
+                                	, A.PRG_URL				AS PRG_URL
+                                	, A.SQL_SYNTAX			AS SQL_SYNTAX
+                     		FROM   (
+                               		SELECT    NULL			AS ENTER_CD
+                               				, NULL			AS SEARCH_ITEM_CD
+                                			, NULL			AS SEARCH_ITEM_NM
+                                			, NULL			AS SEARCH_ITEM_DESC
+                                			, NULL			AS ITEM_MAP_TYPE
+                                			, NULL			AS PRG_URL
+                                			, NULL			AS SQL_SYNTAX
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT
+                                			TRIM(#{ssnEnterCd}) AS ENTER_CD,
+		                                	<if test='rm.searchItemCd != null and !rm.searchItemCd.equals("")'>
+		                    	 				TRIM(#{rm.searchItemCd}) 	AS SEARCH_ITEM_CD
+											</if>
+											<if test='rm.searchItemCd != null and  rm.searchItemCd.equals("")'>
+		                    	 				TO_CHAR( ( SELECT ( NVL( MAX( TO_NUMBER( SEARCH_ITEM_CD ) ),1000) + ${icnt} ) FROM THRI203 ) )  	AS SEARCH_ITEM_CD
+												<bind name="icnt" value="icnt + 1" />
+											</if>
+                                      		, TRIM(#{rm.searchItemNm})  	AS SEARCH_ITEM_NM
+                                       		, TRIM(#{rm.searchItemDesc})	AS SEARCH_ITEM_DESC
+                                       		, TRIM(#{rm.itemMapType})		AS ITEM_MAP_TYPE
+                                       		, TRIM(#{rm.prgUrl})			AS PRG_URL
+                                       		, TRIM(#{rm.sqlSyntax})			AS SQL_SYNTAX
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.SEARCH_ITEM_CD IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               TARGETTABLE.ENTER_CD = SOURCETABLE.ENTER_CD
+                           AND TARGETTABLE.SEARCH_ITEM_CD = SOURCETABLE.SEARCH_ITEM_CD
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.SEARCH_ITEM_NM	= SOURCETABLE.SEARCH_ITEM_NM
+                        			, TARGETTABLE.SEARCH_ITEM_DESC  = SOURCETABLE.SEARCH_ITEM_DESC
+                                  	, TARGETTABLE.ITEM_MAP_TYPE		= SOURCETABLE.ITEM_MAP_TYPE
+                                  	, TARGETTABLE.PRG_URL			= SOURCETABLE.PRG_URL
+                                  	, TARGETTABLE.SQL_SYNTAX		= SOURCETABLE.SQL_SYNTAX
+                                  	, TARGETTABLE.CHKDATE			= SYSDATE
+                                  	, TARGETTABLE.CHKID				= #{sabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SEARCH_ITEM_CD
+               				, TARGETTABLE.SEARCH_ITEM_NM
+                			, TARGETTABLE.SEARCH_ITEM_DESC
+                          	, TARGETTABLE.ITEM_MAP_TYPE
+                          	, TARGETTABLE.PRG_URL
+                          	, TARGETTABLE.SQL_SYNTAX
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, SOURCETABLE.SEARCH_ITEM_CD
+               				, SOURCETABLE.SEARCH_ITEM_NM
+               				, SOURCETABLE.SEARCH_ITEM_DESC
+               				, SOURCETABLE.ITEM_MAP_TYPE
+               				, SOURCETABLE.PRG_URL
+               				, SOURCETABLE.SQL_SYNTAX
+               				, SYSDATE
+               				, #{sabun}
+               			)
+
+
+
+
+		</update>
+
+		<delete parameterType="map" id="deletePwrSrchCdElemtMgr">
+
+   					DELETE	FROM THRI203
+					WHERE 	(ENTER_CD, SEARCH_ITEM_CD) IN ( (NULL,NULL)
+					<foreach item="rm" collection="deleteRows" >
+						,
+						<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+						and 	rm.searchItemCd != null and !rm.searchItemCd.equals("")'>
+							( TRIM(REPLACE(#{ssnEnterCd},CHR(13),'')), TRIM(REPLACE(#{rm.searchItemCd},CHR(13),'')) )
+						</if>
+					</foreach>
+														  )
+
+
+		</delete>
+
+		<select parameterType="map" resultType="cMap" id="getPwrSrchCdElemtMgrDetail">
+
+				<![CDATA[
+   					SELECT 	  SEARCH_ITEM_CD
+		   					, SEARCH_ITEM_NM
+		   					, SEARCH_ITEM_DESC
+		   					, ITEM_MAP_TYPE
+		   					, PRG_URL
+		   					, SQL_SYNTAX
+				  	FROM THRI203
+					WHERE 	ENTER_CD 		= #{ssnEnterCd}
+				   	AND 	SEARCH_ITEM_CD	= #{searchItemCd}
+				]]>
+
+
+		</select>
+
+</mapper>
+

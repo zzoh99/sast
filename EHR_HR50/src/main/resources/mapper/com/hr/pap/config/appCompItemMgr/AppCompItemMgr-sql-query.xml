@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appCompltemMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppCompItemMgrList">
+
+				<![CDATA[
+					SELECT '0' AS BTN_SET
+					     , '0' AS SCOPE
+					     , APPRAISAL_CD, COM_GUBUN_CD, COMPETENCY_CD, COMPETENCY_NM, SCOPE_GUBUN, APP_RATE, MEMO, SEQ, DETAIL_YN
+					FROM (
+					    SELECT RANK() OVER(ORDER BY ENTER_CD, APPRAISAL_CD, COM_GUBUN_CD, COMPETENCY_CD) AS RNUM
+					        , APPRAISAL_CD, COM_GUBUN_CD, COMPETENCY_CD, COMPETENCY_NM, SCOPE_GUBUN, APP_RATE, MEMO, SEQ, DETAIL_YN
+					    FROM (
+					        SELECT T.ENTER_CD, T.APPRAISAL_CD, T.COM_GUBUN_CD, T.COMPETENCY_CD, B.COMPETENCY_NM, T.SCOPE_GUBUN, T.APP_RATE, T.MEMO, T.SEQ
+					            , (SELECT DECODE(COUNT(*),0,'N','Y')
+					                 FROM TSYS991
+					                WHERE ENTER_CD = T.ENTER_CD
+					                AND USE_GUBUN = 'C'
+					                AND ITEM_VALUE1 = T.APPRAISAL_CD
+					                AND ITEM_VALUE2 = T.COMPETENCY_CD
+					                AND ITEM_VALUE3 = T.SEQ) AS DETAIL_YN
+					        FROM TPAP109 T
+					            , TPAP101 D
+					            , TORG051 B
+					        WHERE T.ENTER_CD = TRIM(#{ssnEnterCd})
+					            AND T.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+					                    ]]>
+					    		<if test='searchComGubunCd != null and !searchComGubunCd.equals("")'>
+									AND T.COM_GUBUN_CD LIKE '%'||TRIM(#{searchComGubunCd})||'%'
+								</if>
+					            AND T.ENTER_CD = D.ENTER_CD
+					            AND T.APPRAISAL_CD = D.APPRAISAL_CD
+					            AND T.ENTER_CD = B.ENTER_CD
+					            AND T.COMPETENCY_CD = B.COMPETENCY_CD
+					            AND B.SDATE = (SELECT MAX(C.SDATE) FROM TORG051 C
+					                            WHERE C.ENTER_CD = B.ENTER_CD
+					                                AND C.COMPETENCY_CD = B.COMPETENCY_CD
+					                                AND D.APP_E_YMD BETWEEN C.SDATE AND NVL(C.EDATE,'99991231'))
+					        ORDER BY T.COM_GUBUN_CD, T.COMPETENCY_CD, T.SEQ
+					    )
+					)
+
+
+		</select>
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppCompItemMgr">
+
+					MERGE INTO TPAP109 T
+					USING	(
+							SELECT	  A.ENTER_CD
+								, A.APPRAISAL_CD
+								, A.COM_GUBUN_CD
+								, A.COMPETENCY_CD
+								, A.SEQ
+								, A.APP_RATE
+								, A.SCOPE_GUBUN
+								, A.MEMO
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD
+											, NULL	AS APPRAISAL_CD
+											, NULL	AS COM_GUBUN_CD
+											, NULL	AS COMPETENCY_CD
+											, NULL	AS SEQ
+											, NULL	AS APP_RATE
+											, NULL	AS SCOPE_GUBUN
+											, NULL	AS MEMO
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	                AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	    AS APPRAISAL_CD
+											, TRIM( #{rm.comGubunCd} )	    AS COM_GUBUN_CD
+											, TRIM( #{rm.competencyCd} )	AS COMPETENCY_CD
+
+											<choose><when test='rm.seq != null and !rm.seq.equals("")'>
+												--증가가 되는 키인경우 키가 공백이 아니면 들어온 값을 삽입
+												, TRIM(#{rm.seq}) 			AS SEQ
+											</when><otherwise>
+												--증가가 되는 키인경우 키가 공백이면 증가된 값을 삽입
+												, TO_CHAR( NVL((SELECT MAX(SEQ)
+													FROM TPAP109
+													WHERE ENTER_CD = #{ssnEnterCd} AND APPRAISAL_CD = #{rm.appraisalCd} AND COMPETENCY_CD = #{rm.competencyCd}
+												), 0) + ${icnt} )	AS SEQ
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+
+											, TRIM( #{rm.appRate} )         AS APP_RATE
+											, TRIM( #{rm.scopeGubun} )	    AS SCOPE_GUBUN
+											, TRIM( #{rm.memo} )	        AS MEMO
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD     		= S.ENTER_CD
+					AND  T.APPRAISAL_CD         = S.APPRAISAL_CD
+					AND  T.COM_GUBUN_CD         = S.COM_GUBUN_CD
+					AND  T.COMPETENCY_CD        = S.COMPETENCY_CD
+					AND  T.SEQ                  = S.SEQ
+					)
+					WHEN MATCHED THEN
+						UPDATE SET
+									  T.APP_RATE            = S.APP_RATE
+									, T.SCOPE_GUBUN        	= S.SCOPE_GUBUN
+			                      	, T.MEMO             	= S.MEMO
+									, T.CHKDATE			    = SYSDATE
+									, T.CHKID			    = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+   							, T.APPRAISAL_CD
+   							, T.COM_GUBUN_CD
+   							, T.COMPETENCY_CD
+   							, T.SEQ
+   							, T.APP_RATE
+   							, T.SCOPE_GUBUN
+   							, T.MEMO
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+ 							  S.ENTER_CD
+ 							, S.APPRAISAL_CD
+ 							, S.COM_GUBUN_CD
+ 							, S.COMPETENCY_CD
+ 							, S.SEQ
+ 							, S.APP_RATE
+ 							, S.SCOPE_GUBUN
+ 							, S.MEMO
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppCompItemMgr">
+
+					DELETE FROM TPAP109
+					WHERE 	(ENTER_CD,APPRAISAL_CD,COM_GUBUN_CD,COMPETENCY_CD, SEQ) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+										,	TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.comGubunCd != null and !rm.comGubunCd.equals("")'>
+										,	TRIM( #{rm.comGubunCd})
+										</if>
+										<if test='rm.competencyCd != null and !rm.competencyCd.equals("")'>
+										,	TRIM( #{rm.competencyCd} )
+										</if>
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+										,	TRIM( #{rm.seq} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+
+		<delete parameterType="map" id="deleteAppCompItemMgr2">
+
+					DELETE FROM TSYS991
+					WHERE 	(ENTER_CD, USE_GUBUN, ITEM_VALUE1, ITEM_VALUE2, ITEM_VALUE3) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										,	TRIM( 'C' )
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+										,	TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.competencyCd != null and !rm.competencyCd.equals("")'>
+										,	TRIM( #{rm.competencyCd} )
+										</if>
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+										,	TRIM( #{rm.seq} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+
+		<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppCompItemMgrCopyPop1">
+
+				<![CDATA[
+					DELETE FROM TPAP109
+					WHERE 	ENTER_CD       =  #{ssnEnterCd}
+					AND     APPRAISAL_CD   =  #{tgtAppraisalCd}
+				]]>
+
+
+		</delete>
+
+
+		<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppCompItemMgrCopyPop2">
+
+				<![CDATA[
+					DELETE FROM TSYS991
+					WHERE 	ENTER_CD       =  #{ssnEnterCd}
+					AND     USE_GUBUN      =  'B'
+					AND     ITEM_VALUE1    =  #{tgtAppraisalCd}
+				]]>
+
+
+		</delete>
+
+		<select parameterType="map" resultType="cMap" id="getAppCompItemMgrTblNm">
+
+				<![CDATA[
+				SELECT A.SCOPE_CD, B. AUTH_SCOPE_NM, B.TABLE_NM
+				  FROM (
+						SELECT ENTER_CD, SCOPE_CD
+						FROM  TSYS991
+						WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						AND USE_GUBUN = 'C'
+						AND ITEM_VALUE1 =  TRIM(#{searchAppraisalCd})
+						AND ITEM_VALUE2 =  TRIM(#{competencyCd})
+						AND ITEM_VALUE3 =  TRIM(#{seq})
+						GROUP BY ENTER_CD,SCOPE_CD
+						) A, TSYS315 B
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.SCOPE_CD = B. AUTH_SCOPE_CD
+				]]>
+
+
+		</select>
+
+
+		<select parameterType="map" resultType="cMap" id="getAppCompItemMgrScopeCd">
+
+				<![CDATA[
+
+				SELECT A.SCOPE_CD, A.SCOPE_VALUE, A.SCOPE_VALUE_NM
+				  FROM TSYS991 A
+				 WHERE ENTER_CD =TRIM(#{ssnEnterCd})
+				   AND USE_GUBUN = 'C'
+				   AND ITEM_VALUE1 = TRIM(#{searchAppraisalCd})
+				   AND ITEM_VALUE2 = TRIM(#{competencyCd})
+				   AND ITEM_VALUE3 = TRIM(#{seq})
+				   AND SCOPE_CD = TRIM(#{scopeCd})
+				ORDER BY 1,2,3
+				]]>
+
+
+		</select>
+
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppCompItemMgrCopyPop1">
+
+				<![CDATA[
+						INSERT INTO TPAP109
+						(
+							  ENTER_CD
+							, APPRAISAL_CD
+							, COM_GUBUN_CD
+							, COMPETENCY_CD
+							, APP_BASIS_POINT
+							, SCOPE_GUBUN
+							, SUNBUN
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.ENTER_CD
+								, #{tgtAppraisalCd}
+								, S.COM_GUBUN_CD
+								, S.COMPETENCY_CD
+								, S.APP_BASIS_POINT
+								, S.SCOPE_GUBUN
+								, S.SUNBUN
+								, SYSDATE
+								, #{ssnSabun}
+						FROM    TPAP109 S
+						WHERE S.ENTER_CD = #{ssnEnterCd}
+						AND   S.APPRAISAL_CD = #{orgnAppraisalCd}
+				]]>
+
+		</insert>
+
+
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppCompItemMgrCopyPop2">
+
+				<![CDATA[
+						INSERT INTO TSYS991
+						(
+							  ENTER_CD
+							, USE_GUBUN
+							, ITEM_VALUE1
+							, ITEM_VALUE2
+							, ITEM_VALUE3
+							, SCOPE_CD
+							, SCOPE_VALUE
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.ENTER_CD
+								, 'B'
+								, #{tgtAppraisalCd}
+								, S.ITEM_VALUE2
+								, S.ITEM_VALUE3
+								, S.SCOPE_CD
+								, S.SCOPE_VALUE
+								, SYSDATE
+								, #{ssnSabun}
+						FROM    TSYS991 S
+						WHERE S.ENTER_CD    = #{ssnEnterCd}
+						AND   S.USE_GUBUN   = 'B'
+						AND   S.ITEM_VALUE1 = #{orgnAppraisalCd}
+				]]>
+		</insert>
+
+</mapper>

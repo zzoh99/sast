@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.code.holidayOccurStd.occurExcStd">
+
+<!-- 하계휴가차감기준 조회 -->
+		<select parameterType="map" resultType="cMap" id="getOccurExcStdList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.GNT_CD
+					     , A.WORK_TYPE
+					     , A.JIKGUB_CD
+					     , A.DAY
+					     , A.ORDER_SEQ
+					     , A.NOTE
+					  FROM TTIM030 A
+  					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					 ORDER BY A.GNT_CD, A.ORDER_SEQ
+				
+				]]>
+
+
+		</select>
+				
+
+<!-- 하계휴가차감기준 저장 -->
+		<update parameterType="map" id="saveOccurExcStd">
+
+				 MERGE INTO TTIM030 T 
+				 USING 
+				( 
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL " >
+				       SELECT TRIM(#{ssnEnterCd}) 	AS ENTER_CD
+				            , TRIM(#{rm.gntCd}) 	AS GNT_CD
+				            , TRIM(#{rm.workType}) 	AS WORK_TYPE
+				            , TRIM(#{rm.jikgubCd}) 	AS JIKGUB_CD
+				            , TRIM(#{rm.day}) 		AS DAY
+				            , TRIM(#{rm.orderSeq}) 	AS ORDER_SEQ
+				            , TRIM(#{rm.note}) 		AS NOTE
+				        FROM DUAL
+</foreach>
+				) S 
+				ON ( 
+				          T.ENTER_CD 	= S.ENTER_CD 
+				     AND  T.GNT_CD 		= S.GNT_CD 
+				     AND  T.WORK_TYPE 	= S.WORK_TYPE 
+				     AND  T.JIKGUB_CD 	= S.JIKGUB_CD 
+				) 
+				WHEN MATCHED THEN 
+				   UPDATE SET T.CHKDATE		= sysdate 
+				            , T.CHKID	    = #{ssnSabun}
+				            , T.DAY 		= S.DAY 
+				            , T.ORDER_SEQ 	= S.ORDER_SEQ 
+				            , T.NOTE 		= S.NOTE 
+				WHEN NOT MATCHED THEN 
+				   INSERT 
+				   ( 
+				              T.ENTER_CD
+				            , T.GNT_CD
+				            , T.WORK_TYPE
+				            , T.JIKGUB_CD
+				            , T.DAY
+				            , T.ORDER_SEQ
+				            , T.NOTE
+				            , T.CHKDATE
+				            , T.CHKID
+				   ) 
+				   VALUES 
+				   ( 
+				              S.ENTER_CD
+				            , S.GNT_CD
+				            , S.WORK_TYPE
+				            , S.JIKGUB_CD
+				            , S.DAY
+				            , S.ORDER_SEQ
+				            , S.NOTE
+				            , sysdate
+				            , #{ssnSabun}
+				   ) 
+				
+		</update>
+				
+<!-- 하계휴가차감기준 삭제 -->
+		<delete parameterType="map" id="deleteOccurExcStd">
+
+				DELETE FROM TTIM030
+				 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+				   AND ( GNT_CD,WORK_TYPE,JIKGUB_CD ) IN ( ( NULL,NULL,NULL) 
+<foreach item="rm" collection="deleteRows" >
+    <if test='rm.gntCd != null and !rm.gntCd.equals("") and rm.workType != null and !rm.workType.equals("") and rm.jikgubCd != null and !rm.jikgubCd.equals("") '>
+				     , ( TRIM( #{rm.gntCd} ),TRIM( #{rm.workType} ),TRIM( #{rm.jikgubCd} ) )
+	</if>
+</foreach>
+				       )
+				
+		</delete>
+
+</mapper>

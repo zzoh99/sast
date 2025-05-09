@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 월급여재계산
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payCalcReCre">
+		<select parameterType="map" resultType="cMap" id="getPayCalcReCreBasicMap">
+
+				<![CDATA[
+					SELECT DISTINCT A.PAY_ACTION_CD
+						 , TRIM(A.PAY_ACTION_NM) AS PAY_ACTION_NM
+						 , SUBSTR(A.PAY_YM,1,4)||'-'||SUBSTR(A.PAY_YM,5,2) AS PAY_YM
+						 , A.PAY_CD
+						 , TRIM(B.PAY_NM) AS PAY_NM
+						 , DECODE(TRIM(NVL(A.ORD_SYMD,'')),'','',
+										SUBSTR(A.ORD_SYMD,1,4)||'-'||SUBSTR(A.ORD_SYMD,5,2)||'-'||SUBSTR(A.ORD_SYMD,7,2))
+						   ||'~'||
+						   DECODE(TRIM(NVL(A.ORD_EYMD,'')),'','',
+							SUBSTR(A.ORD_EYMD,1,4)||'-'||SUBSTR(A.ORD_EYMD,5,2)||'-'||SUBSTR(A.ORD_EYMD,7,2)) AS ORD_YMD
+						 , SUBSTR(A.PAYMENT_YMD,1,4)||'-'||SUBSTR(A.PAYMENT_YMD,5,2)||'-'||SUBSTR(A.PAYMENT_YMD,7,2) AS PAYMENT_YMD
+						 , SUBSTR(A.TIME_YM,1,4)||'-'||SUBSTR(A.TIME_YM,5,2) AS TIME_YM
+						 , NVL(A.ADD_TAX_RATE,0)||' %' AS ADD_TAX_RATE
+						 , TRIM(F_COM_GET_GRCODE_NAME(A.ENTER_CD,'C00110',A.CAL_TAX_METHOD)) AS CAL_TAX_METHOD
+						 , NVL(D.CLOSE_YN,'N') AS CLOSE_YN
+						 , F_CPN_GET_EMP_STATUS(A.ENTER_CD,A.PAY_ACTION_CD,'ALL') EMP_STATUS
+					  FROM TCPN201 A
+						 , TCPN051 B
+						 , TCPN981 D
+					 WHERE A.ENTER_CD		= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD	= #{payActionCd}
+					   AND A.ENTER_CD		= B.ENTER_CD
+					   AND A.PAY_CD			= B.PAY_CD
+					   AND A.ENTER_CD		= D.ENTER_CD(+)
+					   AND A.PAY_ACTION_CD	= D.PAY_ACTION_CD(+)
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayCalcReCreTitleList">
+
+				<![CDATA[
+					SELECT 'ELEMENT_'||ELEMENT_CD AS ELEMENT_CD
+						 , ELEMENT_NM
+					  FROM (
+							SELECT 11 AS NUM
+								 , SEQ
+								 , ELEMENT_CD
+								 , ELEMENT_NM
+							FROM (
+								SELECT Y.ELEMENT_CD
+									 , Z.ELEMENT_NM
+									 , MAX(Z.GRP_SORT) AS SEQ
+								  FROM TCPN201 X
+									 , TCPN205 Y
+									 , (
+										SELECT SUB1.*
+										  FROM TCPN011 SUB1
+											 , (SELECT MAX(SDATE) AS SDATE
+												 , ELEMENT_CD
+												  FROM TCPN011
+												 WHERE ENTER_CD	= #{ssnEnterCd}
+												   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+												GROUP BY ELEMENT_CD
+												) SUB2
+										 WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+										   AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+										   AND SUB1.SDATE		= SUB2.SDATE
+									) Z
+								  WHERE X.ENTER_CD		= Y.ENTER_CD
+									AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+									AND Y.ENTER_CD		= Z.ENTER_CD
+									AND Y.ELEMENT_CD	= Z.ELEMENT_CD
+									AND X.ENTER_CD		= #{ssnEnterCd}
+									AND X.PAY_ACTION_CD	= #{payActionCd}
+									AND Z.ELEMENT_TYPE	= 'A'
+								GROUP BY Y.ENTER_CD, Y.ELEMENT_CD, Z.ELEMENT_NM
+								)
+							UNION
+							SELECT 12 AS NUM
+								 , 0 AS SEQ
+								 , '12' AS ELEMENT_CD
+								 , '과세총액' AS ELEMENT_NM
+							  FROM DUAL
+							UNION
+							SELECT 13 AS NUM
+								 , 0 AS SEQ
+								 , '13' AS ELEMENT_CD
+								 , '지급총액' AS ELEMENT_NM
+							  FROM DUAL
+							UNION
+							SELECT 14 AS NUM
+								 , SEQ
+								 , ELEMENT_CD
+								 , ELEMENT_NM
+							FROM (
+								SELECT Y.ELEMENT_CD
+									 , Z.ELEMENT_NM
+									 , MAX(Z.GRP_SORT) AS SEQ
+								  FROM TCPN201 X
+									 , TCPN205 Y
+									 , (
+										SELECT SUB1.*
+										  FROM TCPN011 SUB1
+											 , (SELECT MAX(SDATE) AS SDATE
+												 , ELEMENT_CD
+												  FROM TCPN011
+												 WHERE ENTER_CD	= #{ssnEnterCd}
+												   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+												GROUP BY ELEMENT_CD
+												) SUB2
+										 WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+										   AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+										   AND SUB1.SDATE		= SUB2.SDATE
+									) Z
+								 WHERE X.ENTER_CD		= Y.ENTER_CD
+								   AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+								   AND Y.ENTER_CD		= Z.ENTER_CD
+								   AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+								   AND X.ENTER_CD		= #{ssnEnterCd}
+								   AND X.PAY_ACTION_CD	= #{payActionCd}
+								   AND Z.ELEMENT_TYPE	= 'D'
+								GROUP BY Y.ENTER_CD, Y.ELEMENT_CD, Z.ELEMENT_NM
+								)
+							UNION
+							SELECT 15 AS NUM
+								 , 0 AS SEQ
+								 , '15' AS ELEMENT_CD
+								 , '공제총액' AS ELEMENT_NM
+							  FROM DUAL
+							UNION
+							SELECT 16 AS NUM
+								 , 0 AS SEQ
+								 , '16' AS ELEMENT_CD
+								 , '실지급액' AS ELEMENT_NM
+							 FROM DUAL
+						)
+					ORDER BY NUM, SEQ
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getPayCalcReCreList">
+
+
+					SELECT '0' AS DETAIL
+						 , B.ORG_CD
+						 , B.ORG_NM
+						 , B.JIKGUB_CD
+						 , B.SAL_CLASS
+						 , B.WORK_TYPE
+						 , B.MANAGE_CD
+						 , A.PAY_TYPE
+						 , B.STATUS_CD
+						 , B.SABUN
+						 , B.NAME
+						 , B.EMP_YMD
+						 , B.GEMP_YMD
+						 , B.RET_YMD
+						 , A.PAY_ACTION_CD
+						 , A.PAY_PEOPLE_STATUS
+						 , DECODE(A.PAY_PEOPLE_STATUS,'M','재계산','PM','재계산','P','작업대상','J','작업완료','') AS PAY_PEOPLE_STATUS_NM
+					<foreach item="tCnt" collection="titles" >
+						 , MAX(DECODE(C.ELEMENT_CD, TRIM(#{tCnt.elementCd}), C.MON, NULL)) AS "${tCnt.elementCd}"
+					</foreach>
+					  FROM TCPN203 A
+						 , (
+							SELECT X.ENTER_CD
+								 , Y.ORG_CD
+								 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+								 , Y.WORK_TYPE
+								 , Y.JIKGUB_CD
+								 , Y.JIKCHAK_CD
+								 , Y.JIKWEE_CD
+								 , Y.MANAGE_CD
+								 , Y.STATUS_CD
+								 , X.SABUN
+								 , TRIM(X.NAME) AS NAME
+								 , X.EMP_YMD
+								 , X.GEMP_YMD
+								 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+								 , X.RET_YMD
+								 , Y.SAL_CLASS
+							  FROM THRM100 X
+								 , THRM151 Y
+							 WHERE X.ENTER_CD	= Y.ENTER_CD
+							   AND X.SABUN		= Y.SABUN
+							   AND X.ENTER_CD	= #{ssnEnterCd}
+							<if test='multiManageCd != null and !multiManageCd.equals("")'>
+							   AND Y.MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+							</if>
+							<if test='multiStatusCd != null and !multiStatusCd.equals("")'>
+							   AND Y.STATUS_CD	IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+							</if>
+							<if test='sabunName != null and !sabunName.equals("")'>
+							   AND X.SABUN||X.NAME LIKE '%'||trim(#{sabunName})||'%'
+							</if>
+							   AND Y.SDATE		= (	SELECT MAX(SDATE)
+													  FROM THRM151
+													 WHERE ENTER_CD	= Y.ENTER_CD
+													   AND SABUN	= Y.SABUN
+													   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231'))
+							) B
+						 , (
+							SELECT ENTER_CD
+								 , PAY_ACTION_CD
+								 , SABUN
+								 , 'ELEMENT_'||ELEMENT_CD AS ELEMENT_CD
+								 , ELEMENT_NM
+								 , MON
+							  FROM (
+									SELECT 11 AS NUM
+										 , ENTER_CD
+										 , PAY_ACTION_CD
+										 , SABUN
+										 , ELEMENT_CD
+										 , ELEMENT_NM
+										 , MON
+									FROM (
+										SELECT Y.ENTER_CD
+											 , Y.PAY_ACTION_CD
+											 , Y.SABUN
+											 , Y.ELEMENT_CD
+											 , Z.ELEMENT_NM
+											 , SUM(NVL(Y.RESULT_MON,0)) AS MON
+										  FROM TCPN201 X
+											 , TCPN205 Y
+											 , (
+												SELECT SUB1.*
+												  FROM TCPN011 SUB1
+													 , (SELECT MAX(SDATE) AS SDATE
+														 , ELEMENT_CD
+														  FROM TCPN011
+														 WHERE ENTER_CD	= #{ssnEnterCd}
+														   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+														GROUP BY ELEMENT_CD
+														) SUB2
+												 WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+												   AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+												   AND SUB1.SDATE		= SUB2.SDATE
+											) Z
+										 WHERE X.ENTER_CD		= Y.ENTER_CD
+										   AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+										   AND Y.ENTER_CD		= Z.ENTER_CD
+										   AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+										   AND X.ENTER_CD		= #{ssnEnterCd}
+										   AND X.PAY_ACTION_CD	= #{payActionCd}
+										   AND Z.ELEMENT_TYPE	= 'A'
+										GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD, Z.ELEMENT_NM
+										)
+									UNION
+									SELECT 12 AS NUM
+										 , A.ENTER_CD
+										 , A.PAY_ACTION_CD
+										 , A.SABUN
+										 , '12' AS ELEMENT_CD
+										 , '과세총액' AS ELEMENT_NM
+										 , NVL(B.TAXIBLE_EARN_MON,0) AS MON
+									  FROM TCPN203 A
+										 , TCPN303 B
+									 WHERE A.ENTER_CD			= #{ssnEnterCd}
+									   AND A.PAY_ACTION_CD		= #{payActionCd}
+									   AND A.PAY_PEOPLE_STATUS	= 'J'
+									   AND A.ENTER_CD			= B.ENTER_CD(+)
+									   AND A.PAY_ACTION_CD		= B.PAY_ACTION_CD(+)
+									   AND A.SABUN				= B.SABUN(+)
+									UNION
+									SELECT 13 AS NUM
+										 , A.ENTER_CD
+										 , A.PAY_ACTION_CD
+										 , A.SABUN
+										 , '13' AS ELEMENT_CD
+										 , '지급총액' AS ELEMENT_NM
+										 , NVL(B.TOT_EARNING_MON,0) AS MON
+									  FROM TCPN203 A
+										 , TCPN303 B
+									 WHERE A.ENTER_CD			= #{ssnEnterCd}
+									   AND A.PAY_ACTION_CD		= #{payActionCd}
+									   AND A.PAY_PEOPLE_STATUS	= 'J'
+									   AND A.ENTER_CD			= B.ENTER_CD(+)
+									   AND A.PAY_ACTION_CD		= B.PAY_ACTION_CD(+)
+									   AND A.SABUN				= B.SABUN(+)
+									UNION
+									SELECT 14 AS NUM
+										 , ENTER_CD
+										 , PAY_ACTION_CD
+										 , SABUN
+										 , ELEMENT_CD
+										 , ELEMENT_NM
+										 , MON
+									FROM (
+										SELECT Y.ENTER_CD
+											 , Y.PAY_ACTION_CD
+											 , Y.SABUN
+											 , Y.ELEMENT_CD
+											 , Z.ELEMENT_NM
+											 , SUM(NVL(Y.RESULT_MON,0)) AS MON
+										  FROM TCPN201 X
+											 , TCPN205 Y
+											 , (
+												SELECT SUB1.*
+												  FROM TCPN011 SUB1
+													 , (SELECT MAX(SDATE) AS SDATE
+														 , ELEMENT_CD
+														  FROM TCPN011
+														 WHERE ENTER_CD	= #{ssnEnterCd}
+														   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+														GROUP BY ELEMENT_CD
+														) SUB2
+												 WHERE SUB1.ENTER_CD	= SUB1.ENTER_CD
+												   AND SUB1.ELEMENT_CD	= SUB2.ELEMENT_CD
+												   AND SUB1.SDATE		= SUB2.SDATE
+											) Z
+										 WHERE X.ENTER_CD		= Y.ENTER_CD
+										   AND X.PAY_ACTION_CD	= Y.PAY_ACTION_CD
+										   AND Y.ENTER_CD		= Z.ENTER_CD
+										   AND Y.ELEMENT_CD		= Z.ELEMENT_CD
+										   AND X.ENTER_CD		= #{ssnEnterCd}
+										   AND X.PAY_ACTION_CD	= #{payActionCd}
+										   AND Z.ELEMENT_TYPE	= 'D'
+										GROUP BY Y.ENTER_CD, Y.PAY_ACTION_CD, Y.SABUN, Y.ELEMENT_CD, Z.ELEMENT_NM
+										)
+									UNION
+									SELECT 15 AS NUM
+										 , A.ENTER_CD
+										 , A.PAY_ACTION_CD
+										 , A.SABUN
+										 , '15' AS ELEMENT_CD
+										 , '공제총액' AS ELEMENT_NM
+										 , NVL(B.TOT_DED_MON,0) AS MON
+									  FROM TCPN203 A
+										 , TCPN303 B
+									 WHERE A.ENTER_CD			= #{ssnEnterCd}
+									   AND A.PAY_ACTION_CD		= #{payActionCd}
+									   AND A.PAY_PEOPLE_STATUS	= 'J'
+									   AND A.ENTER_CD			= B.ENTER_CD(+)
+									   AND A.PAY_ACTION_CD		= B.PAY_ACTION_CD(+)
+									   AND A.SABUN				= B.SABUN(+)
+									UNION
+									SELECT 16 AS NUM
+										 , A.ENTER_CD
+										 , A.PAY_ACTION_CD
+										 , A.SABUN
+										 , '16' AS ELEMENT_CD
+										 , '실지급액' AS ELEMENT_NM
+										 , NVL(B.PAYMENT_MON,0) AS MON
+									  FROM TCPN203 A
+										 , TCPN303 B
+									 WHERE A.ENTER_CD			= #{ssnEnterCd}
+									   AND A.PAY_ACTION_CD		= #{payActionCd}
+									   AND A.PAY_PEOPLE_STATUS	= 'J'
+									   AND A.ENTER_CD			= B.ENTER_CD(+)
+									   AND A.PAY_ACTION_CD		= B.PAY_ACTION_CD(+)
+									   AND A.SABUN				= B.SABUN(+)
+									)
+						 WHERE 'ELEMENT_'||ELEMENT_CD	IN (NULL
+							<foreach item="tCnt" collection="titles" >
+															,TRIM(#{tCnt.elementCd})
+							</foreach>
+															)
+							) C
+					 WHERE A.ENTER_CD			= B.ENTER_CD
+					   AND A.SABUN				= B.SABUN
+					   AND A.ENTER_CD			= C.ENTER_CD(+)
+					   AND A.PAY_ACTION_CD		= C.PAY_ACTION_CD(+)
+					   AND A.SABUN				= C.SABUN(+)
+					   AND A.ENTER_CD			= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD		= #{payActionCd}
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND A.BUSINESS_PLACE_CD	= #{businessPlaceCd}
+					</if>
+					<if test='multiPayType != null and !multiPayType.equals("")'>
+					   AND NVL(A.PAY_TYPE,' ')	IN
+		<foreach collection="multiPayType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					GROUP BY B.ORG_CD,B.ORG_NM,B.JIKGUB_CD,B.SAL_CLASS, B.WORK_TYPE, B.MANAGE_CD, A.PAY_TYPE, B.STATUS_CD
+							,B.SABUN,B.NAME,B.EMP_YMD,B.GEMP_YMD,B.RET_YMD,A.PAY_ACTION_CD,A.PAY_PEOPLE_STATUS
+							 
+						 
+						 
+
+
+
+		</select>
+		<update parameterType="map" id="savePayCalcReCre">
+
+					MERGE INTO TCPN203 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.PAY_PEOPLE_STATUS
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS SABUN
+										 , NULL		AS PAY_PEOPLE_STATUS
+									  FROM DUAL
+<foreach item="rm" collection="updateRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})			AS SABUN
+										 , TRIM(#{rm.payPeopleStatus})	AS PAY_PEOPLE_STATUS
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.SABUN IS NOT NULL
+							) S
+					ON (	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.PAY_PEOPLE_STATUS	= S.PAY_PEOPLE_STATUS
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.SABUN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.SABUN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+		
+		<update parameterType="map" statementType="CALLABLE"  id="PayCalcReCreP_CPN_CAL_EMP_INS">
+
+				<![CDATA[
+					CALL P_CPN_CAL_EMP_INS(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{cnt,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						NULL,
+					    NULL,
+						#{sabun,mode=IN,jdbcType=VARCHAR},
+						'P',
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+		</update>
+		<update parameterType="map" statementType="CALLABLE"  id="PayCalcReCreP_CPN_RETRY_PAY_MAIN">
+
+				<![CDATA[
+					CALL P_CPN_RETRY_PAY_MAIN(	                                                  #{sqlcode,mode=OUT,jdbcType=VARCHAR},
+			#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+			#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+			#{payActionCd,mode=IN,jdbcType=VARCHAR},
+			#{businessPlaceCd,mode=IN,jdbcType=VARCHAR},
+			NULL,
+			#{ssnSabun,mode=IN,jdbcType=VARCHAR})
+				]]>
+
+
+		</update>
+	</mapper>

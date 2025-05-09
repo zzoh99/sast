@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.other.empPictureFileMgr">
+
+<!-- 사원이미지관리(파일등록) 조회 -->
+		<select parameterType="map" resultType="cMap" id="getEmpPictureFileMgrList">
+
+				<![CDATA[
+					SELECT LVL AS "_level"
+						 , ORG_CHART_NM
+						 , SDATE
+						 , PRIOR_ORG_CD
+						 , ORG_CD
+						 , ORG_NM
+					  FROM (
+					        SELECT LEVEL AS LVL, B.ORG_CHART_NM, A.SDATE, A.PRIOR_ORG_CD, A.ORG_CD, C.ORG_NM
+					          FROM TORG105 A,
+					            (
+					                SELECT SUB1.*
+					                  FROM TORG103 SUB1,
+					                    (
+					                        SELECT MAX(SDATE) AS SDATE, ENTER_CD, ORG_CHART_NM
+					                          FROM TORG103
+					                         WHERE ENTER_CD = #{ssnEnterCd}
+					                           AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					                          GROUP BY ENTER_CD, ORG_CHART_NM
+					                    ) SUB2
+					                 WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+					                   AND SUB1.ENTER_CD = SUB2.ENTER_CD
+					                   AND SUB1.SDATE = SUB2.SDATE
+					            ) B,
+					            (
+					                SELECT  SUB1.*
+					                  FROM  TORG101 SUB1
+					                 WHERE  SUB1.ENTER_CD = #{ssnEnterCd}
+					                   AND  TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SUB1.SDATE AND NVL(SUB1.EDATE, '99991231')
+					            ) C
+					         WHERE A.ENTER_CD = #{ssnEnterCd}
+					           AND A.ENTER_CD = B.ENTER_CD
+					           AND A.SDATE = B.SDATE
+					           AND A.ENTER_CD = C.ENTER_CD
+					           AND A.ORG_CD = C.ORG_CD
+					           AND NVL(C.INOUT_TYPE,'A') = 'A'
+					         START WITH A.PRIOR_ORG_CD = '0'
+					        CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+					        AND PRIOR A.SDATE = A.SDATE
+					        AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+					        ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+					)
+					UNION ALL
+					SELECT 1 AS "_level",
+					       Z.ORG_CHART_NM,
+					       Z.SDATE,
+					       '0' AS PRIOR_ORG_CD,
+					       X.ORG_CD,
+					       X.ORG_NM
+					 FROM TORG101 X
+					     ,(SELECT MAX(SDATE) AS SDATE, ENTER_CD, ORG_CD
+					         FROM TORG101
+					        WHERE ENTER_CD = #{ssnEnterCd}
+					          AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231')
+					       GROUP BY ENTER_CD, ORG_CD
+					      ) Y
+					     ,(SELECT SUB1.*
+					       FROM TORG103 SUB1,
+					            (SELECT MAX(SDATE) AS SDATE, ENTER_CD, ORG_CHART_NM
+					               FROM TORG103
+					              WHERE ENTER_CD = #{ssnEnterCd}
+					                AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE, '99991231')
+					             GROUP BY ENTER_CD, ORG_CHART_NM) SUB2
+					       WHERE SUB1.ENTER_CD = #{ssnEnterCd}
+					         AND SUB1.ENTER_CD = SUB2.ENTER_CD
+					         AND SUB1.SDATE = SUB2.SDATE
+					     ) Z
+					WHERE X.ENTER_CD = Y.ENTER_CD
+					  AND X.ORG_CD   = Y.ORG_CD
+					  AND X.SDATE    = Y.SDATE
+					  AND NVL(X.INOUT_TYPE,'A') = 'C'
+				]]>
+
+
+		</select>
+
+</mapper>

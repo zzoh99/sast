@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payApp.exWorkDriverAppDet">
+		<!-- 시간외근무신청 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverAppDet">
+
+				<![CDATA[
+					SELECT ENTER_CD
+					     , SABUN
+					     , APPL_SEQ
+					     , SDATE
+					     , EDATE
+					     , REQ_S_HM
+                         , SUBSTR(REQ_S_HM, 0, 2) AS REQ_S_H
+                         , SUBSTR(REQ_S_HM, 3, 2) AS REQ_S_M
+					     , REQ_E_HM
+                         , SUBSTR(REQ_E_HM, 0, 2) AS REQ_E_H
+                         , SUBSTR(REQ_E_HM, 3, 2) AS REQ_E_M
+					     , WORK_HOUR
+                         , SUBSTR(WORK_HOUR, 0, 2) AS WORK_HOUR_H
+                         , SUBSTR(WORK_HOUR, 3, 2) AS WORK_HOUR_M
+					     , REASON
+					     ,WORK_GUBUN
+					     , GOLF_YN
+                         , MORNING_S_HM
+                         , SUBSTR(MORNING_S_HM, 0, 2) AS MORNING_S_H
+                         , SUBSTR(MORNING_S_HM, 3, 2) AS MORNING_S_M
+					  FROM TTIM711
+					 WHERE ENTER_CD = TRIM( #{ssnEnterCd} )
+					   AND APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+
+		</select>
+
+		<!--동일일자 신청 여부-->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverAppDetDayCnt">
+
+				<![CDATA[
+					SELECT COUNT(A.SDATE) AS CNT
+					  FROM TTIM711 A, THRI103 C
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					   AND A.SDATE = REPLACE( TRIM( #{sdate} ) ,'-','')
+					   AND A.SABUN = TRIM( #{searchApplSabun} )
+					   AND A.APPL_SEQ <> TRIM( #{searchApplSeq} )
+					   AND NVL(A.UPDATE_YN, 'N') = 'N'
+					   AND A.ENTER_CD = C.ENTER_CD
+					   AND A.APPL_SEQ = C.APPL_SEQ
+					   AND C.APPL_STATUS_CD NOT IN ('12','23','33','44') /*결재반려,승인반려*/
+				]]>
+
+
+		</select>
+
+
+		<!-- 시간외근무관리 -->
+		<update parameterType="map" id="saveExWorkDriverAppDet">
+
+
+    MERGE INTO TTIM711 T
+					USING (
+							SELECT TRIM( #{ssnEnterCd} )                            AS ENTER_CD
+											, TRIM( #{searchApplSeq} )                          AS APPL_SEQ
+											, TRIM( #{searchApplSabun} )                            AS SABUN
+											, TRIM( #{workGubun} )                              AS WORK_GUBUN
+											, REPLACE( TRIM( #{sdate} ) ,'-','')	AS SDATE
+											, NULL											AS EDATE
+											, TRIM( #{reqSHm} )                       AS REQ_S_HM
+											, TRIM( #{reqEHm} )                       AS REQ_E_HM
+											, TRIM( #{workHour} )								  AS WORK_HOUR
+											, TRIM( #{morningSH} || #{morningSM} )      AS MORNING_S_HM
+											, TRIM( #{golfYn} )                                  AS GOLF_YN
+											, TRIM( #{reason} )                                   AS REASON
+							  FROM DUAL
+                            ) S
+                    ON (
+                    		T.ENTER_CD	=	S.ENTER_CD
+                        AND T.APPL_SEQ	=	S.APPL_SEQ
+                   		)
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.SABUN        = S.SABUN
+                                    , T.WORK_GUBUN  = S.WORK_GUBUN
+                                    , T.SDATE       = S.SDATE
+                                    , T.EDATE       = S.EDATE
+                                    , T.REQ_S_HM     = S.REQ_S_HM
+                                    , T.REQ_E_HM     = S.REQ_E_HM
+                                    , T.WORK_HOUR    = S.WORK_HOUR
+                                    , T.MORNING_S_HM = S.MORNING_S_HM
+                                    , T.GOLF_YN      = S.GOLF_YN
+                                    , T.REASON       = S.REASON
+                                    , T.CHKDATE    		= SYSDATE
+                                    , T.CHKID      		= #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                                T.ENTER_CD
+                              , T.APPL_SEQ
+                              , T.SABUN
+                              , T.WORK_GUBUN
+                              , T.SDATE
+                              , T.EDATE
+                              , T.REQ_S_HM
+                              , T.REQ_E_HM
+                              , T.WORK_HOUR
+                              , T.MORNING_S_HM
+                              , T.GOLF_YN
+                              , T.REASON
+                              , T.CHKDATE
+                              , T.CHKID
+                        )
+                        VALUES
+                        (
+                                S.ENTER_CD
+                              , S.APPL_SEQ
+                              , S.SABUN
+                              , S.WORK_GUBUN
+                              , S.SDATE
+                              , S.EDATE
+                              , S.REQ_S_HM
+                              , S.REQ_E_HM
+                              , S.WORK_HOUR
+                              , S.MORNING_S_HM
+                              , S.GOLF_YN
+                              , S.REASON
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+
+
+
+		</update>
+
+		<!-- 지정 근무일의 휴일정보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getExWorkDriverAppDetHolidayInfo">
+
+				<![CDATA[
+					SELECT CASE WHEN DAY_NM IN ('토', '일') OR HOLIDAY_NM <> '0' THEN '1'
+					       ELSE '2'
+					       END AS GUBUN,
+					       -- DAY_NM||'요일'||DECODE(HOLIDAY_NM, '0', '',', '||HOLIDAY_NM) AS DAY_TEXT
+					       F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tbl', DECODE(DAY_NM||'요일', '월요일' , 'monday', '화요일', 'tuesday' , '수요일', 'wednesday', '목요일', 'thursday', '금요일',  'friday', '토요일',  'saturday', '일요일', 'sunday'), #{ssnLocaleCd})
+					      			 ||DECODE(HOLIDAY_NM, '0', '',', '||F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'ttim001', ( SELECT LANGUAGE_CD FROM TTIM001 WHERE AA.SUN_DATE IN YY||MM||DD AND AA.HOLIDAY_NM = HOLIDAY_NM  AND ENTER_CD = #{ssnEnterCd})   , #{ssnLocaleCd})) AS DAY_TEXT
+					  FROM (
+					        SELECT DAY_NM AS DAY_NM
+					        		, A.SUN_DATE
+					               , (SELECT NVL(MAX(HOLIDAY_NM), '0')
+					                    FROM TTIM001
+					                   WHERE A.SUN_DATE IN YY||MM||DD) AS HOLIDAY_NM
+					          FROM TSYS007 A
+					         WHERE A.SUN_DATE = #{sdate}
+					       ) AA
+				]]>
+
+
+		</select>
+	</mapper>

@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	계산식관리 
+ -->
+<root>
+
+	<!-- 조회 -->
+	<query id="selectCalcExpressionMgrList">
+		<![CDATA[
+			SELECT 
+				A.ENTER_CD        
+				, A.ELEMENT_CD    
+				, A.FORMULA_SEQ   
+				, A.S_YM          
+				, A.SEARCH_SEQ    
+				, A.E_YM          
+				, NVL(F_CPN_GET_CAL_VALUE_NM(A.ENTER_CD, A.ELEMENT_CD,A.SEARCH_SEQ,A.S_YM),A.FORMULA_ORI) AS FORMULA_ORI	
+				, A.FORMULA_CHG		
+				, B.ELEMENT_NM      
+				, A.DISPLAY_YN      
+				, C.SEARCH_DESC		
+				, F_COM_GET_GRCODE_NAME(B.ENTER_CD, 'C00003', B.ELEMENT_LINK_TYPE, NULL, TO_CHAR(SYSDATE,'YYYYMMDD')) AS ELEMENT_LINK_TYPE_NM 
+				, B.REPORT_NM
+			 FROM TCPN230 A
+				, TCPN011 B 		  		  
+				, THRI201 C        
+			WHERE A.ENTER_CD 	= B.ENTER_CD	             
+			  AND A.ELEMENT_CD 	= B.ELEMENT_CD
+  			  AND B.SDATE = (SELECT MAX(G.SDATE)
+			                        FROM TCPN011 G
+			                       WHERE G.ENTER_CD = B.ENTER_CD 
+			                         AND G.ELEMENT_CD = B.ELEMENT_CD
+			                         AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN G.SDATE AND NVL(G.EDATE, '99991231'))			  
+			  AND C.ENTER_CD(+)   	= A.ENTER_CD
+			  AND C.SEARCH_SEQ(+) 	= A.SEARCH_SEQ 
+           	  AND A.ENTER_CD 		= #ssnEnterCd#
+			  AND B.ELEMENT_NM LIKE '%' || #searchNm# || '%'
+			  $query$
+			ORDER BY B.ELEMENT_TYPE, B.PRIORITY, A.S_YM DESC
+			]]>
+	</query>
+		
+    <!-- 저장 -->
+    <query id="saveCalcExpressionMgr">
+        <![CDATA[
+					MERGE INTO TCPN230 T
+					USING	(
+							SELECT	TRIM( #ssnEnterCd# )		AS ENTER_CD   
+									, TRIM( #element_cd# )		AS ELEMENT_CD
+									, TRIM( #formula_seq# )		AS FORMULA_SEQ           
+									, TRIM( #s_ym# )			AS S_YM 
+									, TRIM( #search_seq# )		AS SEARCH_SEQ        
+									, TRIM( #e_ym# )			AS E_YM 
+									, TRIM( #formula_chg# )		AS FORMULA_CHG
+									, TRIM( #display_yn# )		AS DISPLAY_YN
+									FROM DUAL
+							) S
+					ON ( T.ENTER_CD	= S.ENTER_CD AND T.ELEMENT_CD = S.ELEMENT_CD AND T.FORMULA_SEQ = S.FORMULA_SEQ AND T.S_YM = S.S_YM )
+					WHEN MATCHED THEN
+						UPDATE SET	T.E_YM  		= S.E_YM     
+									, T.FORMULA_ORI = F_CPN_GET_CAL_VALUE_NM(S.ENTER_CD, S.ELEMENT_CD,S.SEARCH_SEQ,S.S_YM)  
+									, T.FORMULA_CHG = S.FORMULA_CHG
+									, T.SEARCH_SEQ  = S.SEARCH_SEQ
+									, T.DISPLAY_YN  = S.DISPLAY_YN
+									, T.CHKDATE		= SYSDATE
+									, T.CHKID		= TRIM( #ssnSabun# )
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD   
+							, T.ELEMENT_CD      
+							, T.FORMULA_SEQ 
+							, T.S_YM     
+							, T.SEARCH_SEQ   
+							, T.E_YM
+							, T.FORMULA_ORI
+							, T.FORMULA_CHG
+							, T.DISPLAY_YN        
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD   
+							, S.ELEMENT_CD      
+							, LPAD(S_TCPN230.NEXTVAL+1,4,'0')         
+							, S.S_YM
+							, S.SEARCH_SEQ         
+							, S.E_YM     
+							, F_CPN_GET_CAL_VALUE_NM(S.ENTER_CD, S.ELEMENT_CD,S.SEARCH_SEQ,S.S_YM)
+							, S.FORMULA_CHG
+							, S.DISPLAY_YN                
+							, SYSDATE
+							, TRIM( #ssnSabun# )
+						)
+        ]]> 
+    </query>
+    
+    <!-- 삭제 -->
+    <query id="deleteCalcExpressionMgr">
+        <![CDATA[
+            DELETE FROM TCPN230
+             WHERE ENTER_CD        = #ssnEnterCd#
+               AND ELEMENT_CD      = #element_cd#
+               AND FORMULA_SEQ     = #formula_seq#
+               AND S_YM            = #s_ym#
+        ]]> 
+    </query>
+    
+	<!-- 시스템사용기준(계산방법보기버튼) 저장  -->
+	<query id="updateCpnFormulaBtnYn">
+		<![CDATA[
+			UPDATE TSYS955
+			SET STD_CD_VALUE  	= #std_cd_value#
+				, CHKDATE		= SYSDATE
+				, CHKID    		= #ssnSabun#
+			WHERE ENTER_CD 		= #ssnEnterCd#
+			  AND STD_CD 		= #std_cd#	
+		]]>
+	</query>    
+	
+	<!-- 계산식 존재여부 체크 -->
+	<query id="selectChkCalcExpressionMgr">
+		<![CDATA[
+			SELECT
+			       LISTAGG(CAL_VALUE_NM, '') WITHIN GROUP(ORDER BY CAL_SEQ) AS CAL_VALUE_NM
+			 FROM (
+				SELECT A.ELEMENT_CD
+			          , A.SEARCH_SEQ
+			          , A.SDATE
+			          , A.SEQ
+			          , (CASE WHEN A.ELE_CAL_TYPE = 'E' THEN (SELECT X.ELEMENT_NM AS ELEMENT_NM
+			                                FROM TCPN011 X
+			                               WHERE X.ENTER_CD = A.ENTER_CD
+			                               AND X.ELEMENT_CD = A.CAL_VALUE
+			                               AND X.SDATE = (SELECT MAX(Y.SDATE)
+			                                        FROM TCPN011 Y
+			                                       WHERE Y.ENTER_CD = X.ENTER_CD
+			                                         AND Y.ELEMENT_CD = X.ELEMENT_CD
+				                                         AND A.SDATE BETWEEN Y.SDATE AND NVL(Y.EDATE,'99991231')))
+				              WHEN A.ELE_CAL_TYPE = 'ES' THEN (SELECT X.ELEMENT_SET_NM
+				                               FROM TCPN071 X
+				                                WHERE X.ENTER_CD = A.ENTER_CD
+				                                AND X.ELEMENT_SET_CD = A.CAL_VALUE)
+				              WHEN A.ELE_CAL_TYPE = 'F' THEN (SELECT X.UDF_NAME
+				                                FROM TSYS801 X
+				                               WHERE X.ENTER_CD = A.ENTER_CD
+				                               AND X.UDF_CD   = A.CAL_VALUE)
+				              ELSE A.CAL_VALUE END) AS CAL_VALUE_NM
+						, A.CAL_SEQ
+			         FROM TCPN027 A
+			        WHERE A.ENTER_CD   = #ssnEnterCd#
+			          AND A.ELEMENT_CD = #element_cd#
+			          AND A.SEARCH_SEQ = #search_seq#
+			          AND A.SDATE   = ( SELECT MAX(B.SDATE) FROM  TCPN025 B
+				                     WHERE B.ENTER_CD = A.ENTER_CD
+				                       AND B.ELEMENT_CD = A.ELEMENT_CD
+				                       AND B.SEARCH_SEQ = A.SEARCH_SEQ
+				                       AND #s_ym#||'01' BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')))
+		]]>
+	</query>	
+	
+    <!-- 삭제 -->
+    <query id="deleteCalcExpressionMgrByBatch">
+        <![CDATA[
+            DELETE FROM TCPN230
+             WHERE ENTER_CD = #ssnEnterCd#
+        ]]> 
+    </query>	
+    
+    <!-- 생성1 -->
+    <query id="insertCalcExpressionMgrByBatch">
+        <![CDATA[
+			INSERT INTO TCPN230 (
+				ENTER_CD
+				, ELEMENT_CD
+				, FORMULA_SEQ
+				, S_YM
+				, SEARCH_SEQ
+				, E_YM
+				, FORMULA_ORI
+				, FORMULA_CHG
+				, DISPLAY_YN
+				, CHKDATE
+				, CHKID
+			)
+			SELECT   
+				B.ENTER_CD
+				, B.ELEMENT_CD 
+				, LPAD(S_TCPN230.NEXTVAL+1,4,'0') 
+				, TO_CHAR(SYSDATE,'YYYYMM')
+				, A.SEARCH_SEQ
+				, NULL
+				, F_CPN_GET_CAL_VALUE_NM (A.ENTER_CD, A.ELEMENT_CD, A.SEARCH_SEQ, TO_CHAR(SYSDATE,'YYYYMM'))
+				, NULL AS FORMULA_CHG	
+				, 'Y'	
+				, SYSDATE
+				,  #ssnSabun#		
+			 FROM TCPN025 A
+				, TCPN011 B
+			WHERE A.ENTER_CD(+) 	= B.ENTER_CD
+			  AND A.ELEMENT_CD(+) 	= B.ELEMENT_CD
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN NVL(A.SDATE,'20000101') AND NVL(A.EDATE,'99991231')
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+			  AND B.ENTER_CD 		= #ssnEnterCd#
+        ]]> 
+    </query>	    
+    
+    
+    <!-- 생성1 -->
+    <query id="insertCalcExpressionMgrByBatch2">
+        <![CDATA[
+			INSERT INTO TCPN230 (
+				ENTER_CD
+				, ELEMENT_CD
+				, FORMULA_SEQ
+				, S_YM
+				, SEARCH_SEQ
+				, E_YM
+				, FORMULA_ORI
+				, FORMULA_CHG
+				, DISPLAY_YN
+				, CHKDATE
+				, CHKID
+			)
+			SELECT   
+				B.ENTER_CD
+				, B.ELEMENT_CD 
+				, LPAD(S_TCPN230.NEXTVAL+1,4,'0') 
+				, TO_CHAR(SYSDATE,'YYYYMM')
+				, B.SEARCH_SEQ
+				, NULL
+				, F_CPN_GET_CAL_VALUE_NM (B.ENTER_CD, B.ELEMENT_CD, B.SEARCH_SEQ, TO_CHAR(SYSDATE,'YYYYMM'))
+				, NULL AS FORMULA_CHG	
+				, 'Y'	
+				, SYSDATE
+				,  #ssnSabun#		
+			 FROM TCPN011 A
+				, TCPN023 B
+			WHERE A.ENTER_CD(+) 	= B.ENTER_CD
+			  AND A.ELEMENT_CD(+) 	= B.ELEMENT_CD
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN NVL(A.SDATE,'20000101') AND NVL(A.EDATE,'99991231')
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+			  AND B.ENTER_CD 		= #ssnEnterCd#
+	          AND NOT EXISTS ( SELECT 1
+	                      FROM TCPN230 X
+	                      WHERE B.ENTER_CD 		= X.ENTER_CD
+	                        AND B.ELEMENT_CD 	= X.ELEMENT_CD
+	                        AND B.SEARCH_SEQ 	= X.SEARCH_SEQ)			  
+        ]]> 
+    </query>	 
+    
+	<!-- 생성3 -->
+    <query id="insertCalcExpressionMgrByBatch3">
+        <![CDATA[
+			INSERT INTO TCPN230 (
+				ENTER_CD
+				, ELEMENT_CD
+				, FORMULA_SEQ
+				, S_YM
+				, SEARCH_SEQ
+				, E_YM
+				, FORMULA_ORI
+				, FORMULA_CHG
+				, DISPLAY_YN
+				, CHKDATE
+				, CHKID
+			)
+			SELECT   
+				B.ENTER_CD
+				, B.ELEMENT_CD 
+				, LPAD(S_TCPN230.NEXTVAL+1,4,'0') 
+				, TO_CHAR(SYSDATE,'YYYYMM')
+				, A.SEARCH_SEQ
+				, NULL
+				, F_CPN_GET_CAL_VALUE_NM (A.ENTER_CD, A.ELEMENT_CD, A.SEARCH_SEQ, TO_CHAR(SYSDATE,'YYYYMM'))
+				, NULL AS FORMULA_CHG	
+				, 'Y'	
+				, SYSDATE
+				,  #ssnSabun#		
+			 FROM TCPN025 A
+				, TCPN011 B
+			WHERE A.ENTER_CD(+) 	= B.ENTER_CD
+			  AND A.ELEMENT_CD(+) 	= B.ELEMENT_CD
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN NVL(A.SDATE,'20000101') AND NVL(A.EDATE,'99991231')
+			  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231')
+			  AND B.ENTER_CD 		= #ssnEnterCd#
+	          AND NOT EXISTS ( SELECT 1
+	                      FROM TCPN230 X
+	                      WHERE B.ENTER_CD 		= X.ENTER_CD
+	                        AND B.ELEMENT_CD 	= X.ELEMENT_CD)					  
+        ]]> 
+    </query>	 
+</root>

@@ -1,0 +1,32 @@
+package com.hr.cpn.payReport.payDayChkStd;
+import java.util.List;
+import java.util.Map;
+import javax.inject.Inject;
+import javax.inject.Named;
+import org.springframework.stereotype.Service;
+import com.hr.common.dao.Dao;
+import com.hr.common.logger.Log;
+/**
+ * 일할계산대상자 관리 Service
+ * 
+ * @author 이름
+ *
+ */
+@Service("PayDayChkStdService")  
+public class PayDayChkStdService{
+	@Inject
+	@Named("Dao")
+	private Dao dao;
+	/**
+	 * 일할계산대상자 관리 다건 조회 Service
+	 * 
+	 * @param paramMap
+	 * @return List
+	 * @throws Exception
+	 */
+	public List<?> getPayDayChkStdList(Map<?, ?> paramMap) throws Exception {
+		Log.Debug();
+		return (List<?>) dao.getList("getPayDayChkStdList", paramMap);
+	}	
+
+}

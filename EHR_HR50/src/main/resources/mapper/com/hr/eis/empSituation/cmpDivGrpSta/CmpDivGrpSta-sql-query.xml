@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.cmpDivGrpSta">
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getCmpDivGrpStaList">
+		<![CDATA[
+				SELECT CODE,CODE_NM
+						, SUM(CNT) AS CNT, SUM(PER_CNT) AS PER_CNT
+				  FROM (
+				SELECT CODE_NM, CNT, ROUND((CNT/SUM(CNT) OVER())*100,1) AS PER_CNT, SEQ, CODE
+				  FROM (
+				        SELECT D.CODE, D.CODE_NM, D.SEQ, COUNT(A.SABUN) AS CNT
+				          FROM THRM151 A
+				              ,(SELECT MAX(A.SDATE) AS SDATE, A.ENTER_CD, A.SABUN,
+				              		NVL((SELECT CMP_DIV FROM THRM117 I 
+								      WHERE ENTER_CD = A.ENTER_CD
+								        AND SABUN = A.SABUN
+									    AND SEQ = (SELECT MAX(SEQ) FROM THRM117 WHERE ENTER_CD = I.ENTER_CD AND SABUN = I.SABUN)),'ETC') CMP_DIV
+                                  FROM THRM151 A
+                                 WHERE A.ENTER_CD = #{groupEnterCd}
+				                  AND (A.ENTER_CD, A.STATUS_CD) NOT IN (SELECT DISTINCT ENTER_CD, REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+				                                                          FROM (SELECT ENTER_CD, NVL(F_COM_GET_STD_CD_VALUE(ENTER_CD, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM TORG900) A
+				                                                       CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+							  <if test="jikweeCd != null and jikweeCd neq ''"> 
+			                      AND JIKWEE_CD IN
+		<foreach collection="jikweeCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+			                  <if test="jikchakCd != null and jikchakCd neq ''"> 
+		                          AND JIKCHAK_CD IN
+		<foreach collection="jikchakCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+			                  <if test="jikgubCd != null and jikgubCd neq ''"> 
+		                          AND JIKGUB_CD IN
+		<foreach collection="jikgubCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+		                      <if test="workType != null and workType neq ''">
+		                            AND WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+		                      <if test="manageCd != null and manageCd neq ''">
+		                            AND MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+		                      </if>
+		                     <![CDATA[
+	                           AND REPLACE(#{searchYmd}, '-', '') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+                                GROUP BY A.ENTER_CD, A.SABUN) B
+				              ,THRM100 C
+				              ,(SELECT CODE,CODE_NM,SEQ
+				                  FROM TSYS005
+				                 WHERE ENTER_CD = #{groupEnterCd}
+				                   AND GRCODE_CD = 'H11710'
+				                   AND USE_YN = 'Y'
+				                UNION ALL    
+                                SELECT 'ETC','기타',9999 AS SEQ
+                                  FROM DUAL    
+				               ) D
+				         WHERE A.ENTER_CD = B.ENTER_CD
+				           AND A.SABUN    = B.SABUN
+				           AND A.SDATE    = B.SDATE
+				           AND A.ENTER_CD = C.ENTER_CD
+				           AND A.SABUN    = C.SABUN
+				           AND A.SABUN    <> '990099'
+				           AND (C.RET_YMD IS NULL OR C.RET_YMD >= REPLACE(#{searchYmd}, '-', ''))
+				           AND B.CMP_DIV(+) = D.CODE
+				         GROUP BY D.CODE, D.CODE_NM, D.SEQ
+				       )
+				ORDER BY SEQ, CODE
+				)
+				GROUP BY CODE,CODE_NM,SEQ
+				ORDER BY TO_NUMBER(NVL(SEQ, 0))
+		]]>
+		</select>
+</mapper>

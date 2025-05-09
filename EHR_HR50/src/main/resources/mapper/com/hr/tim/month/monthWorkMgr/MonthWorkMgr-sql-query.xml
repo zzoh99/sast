@@ -1,0 +1,712 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.month.monthWorkMgr">
+	<select parameterType="map" resultType="cMap" id="getMonthWorkDayTab">
+
+				<![CDATA[
+					SELECT YM,SABUN,F_COM_GET_NAMES(ENTER_CD,SABUN) NAME
+					      ,GNT_CD,PAY_TYPE,BUSINESS_PLACE_CD,GNT_CNT
+					      , F_COM_GET_NAMES (ENTER_CD, SABUN, 'ALIAS') AS ALIAS
+					   	  , F_COM_GET_JIKWEE_NM (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS JIKWEE_NM
+             		   	  , F_COM_GET_JIKGUB_NM (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS JIKGUB_NM
+					      ,F_COM_GET_BP_NM      (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS BUSINESS_PLACE_NM
+					      ,F_COM_GET_ORG_CD     (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS Q_ORG_CD
+					      ,F_COM_GET_ORG_NM2    (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS Q_ORG_NM
+					      ,F_COM_GET_WORKTYPE_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS WORK_TYPE_NM
+					      ,F_COM_GET_PAY_TYPE_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS PAY_TYPE_NM
+					      ,LOCATION_NM
+					  FROM (
+							   SELECT ENTER_CD,YM,SABUN,GNT_CD,PAY_TYPE,BUSINESS_PLACE_CD,GNT_CNT , F_COM_GET_LOCATION_NM(A.ENTER_CD, F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))) AS LOCATION_NM
+							     FROM TTIM401 A --TTIM401
+							    WHERE ENTER_CD = #{ssnEnterCd}
+							      AND YM = REPLACE( #{searchYm}, '-','' )
+							      AND (SABUN LIKE '%' || #{searchText} || '%' OR F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)  LIKE '%' || #{searchText} || '%' )
+							      AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN,REPLACE( #{searchYm}, '-','' ) || '31') LIKE '%'|| #{searchOrgText} ||'%'
+							              ]]>
+<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+					              AND F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, REPLACE( #{searchYm}, '-','' ) || '31') = #{searchBusinessPlaceCd}
+</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+								  AND F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) = #{searchLocationCd}
+</if>
+							)
+					ORDER BY BUSINESS_PLACE_NM DESC
+						,F_ORG_ORG_CHART_SORT(ENTER_CD, Q_ORG_CD, TO_CHAR(sysdate, 'YYYYMMDD'))
+						,F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20030', F_COM_GET_JIKWEE_CD(ENTER_CD, SABUN, TO_CHAR(sysdate, 'YYYYMMDD')))
+						,F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20010', F_COM_GET_JIKGUB_CD(ENTER_CD, SABUN, TO_CHAR(sysdate, 'YYYYMMDD')))
+						,F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20020', F_COM_GET_JIKCHAK_CD(ENTER_CD, SABUN, TO_CHAR(sysdate, 'YYYYMMDD')))
+					, SABUN
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getMonthWorkTimeTab">
+
+				<![CDATA[
+					SELECT ENTER_CD,YM,APPLY_YY,SABUN,F_COM_GET_NAMES(ENTER_CD,SABUN) NAME
+						 , WORK_CD,PAY_TYPE,BUSINESS_PLACE_CD
+                         , ROUND(WORK_HOUR,2)   AS WORK_HOUR
+                         , ROUND(C_WORK_HOUR,2) AS C_WORK_HOUR
+                         , F_COM_GET_NAMES (ENTER_CD, SABUN, 'ALIAS') AS ALIAS
+					   	 , F_COM_GET_JIKWEE_NM (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS JIKWEE_NM
+             		   	 , F_COM_GET_JIKGUB_NM (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS JIKGUB_NM
+						 , F_COM_GET_BP_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS BUSINESS_PLACE_NM
+				       	 , F_COM_GET_ORG_CD(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS Q_ORG_CD
+				       	 , F_COM_GET_ORG_NM2(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS Q_ORG_NM
+					     , F_COM_GET_WORKTYPE_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS WORK_TYPE_NM
+					     , F_COM_GET_PAY_TYPE_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS PAY_TYPE_NM
+					     , LOCATION_NM
+					  FROM (
+									   SELECT ENTER_CD,YM,APPLY_YY,SABUN,WORK_CD,PAY_TYPE,BUSINESS_PLACE_CD,WORK_HOUR,C_WORK_HOUR
+									   		  ,F_COM_GET_LOCATION_NM(A.ENTER_CD, F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))) AS LOCATION_NM
+									     FROM TTIM403 A
+									    WHERE ENTER_CD =#{ssnEnterCd}
+									      AND YM = REPLACE( #{searchYm}, '-','' )
+									      AND (SABUN LIKE '%' || #{searchText} || '%' OR F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)  LIKE '%' || #{searchText} || '%' )
+									      AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN,REPLACE( #{searchYm}, '-','' ) || '31') LIKE '%'|| #{searchOrgText} ||'%'
+									              ]]>
+<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+									      AND F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, REPLACE( #{searchYm}, '-','' ) || '31') = #{searchBusinessPlaceCd}
+</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+								  		 AND F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) = #{searchLocationCd}
+</if>
+
+									)
+					ORDER BY BUSINESS_PLACE_NM DESC, F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(sysdate, 'YYYYMMDD')), WORK_CD
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getMonthWorkTimeTab1">
+
+				<![CDATA[
+				SELECT A.ENTER_CD
+				     , A.APPLY_YY
+				     , A.YM
+				     , A.SABUN
+				     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN) AS NAME
+				     , F_COM_GET_NAMES (A.ENTER_CD, A.SABUN, 'ALIAS') AS ALIAS
+					 , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, A.SDATE) AS JIKWEE_NM
+             		 , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, A.SDATE) AS JIKGUB_NM
+					 , A.BUSINESS_PLACE_CD
+					 , F_COM_GET_BP_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS BUSINESS_PLACE_NM
+					 , A.ORG_CD	 AS Q_ORG_CD
+				     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE) AS Q_ORG_NM
+				     , A.WORK_TYPE_NM
+				     , A.PAY_TYPE_NM
+				     , A.LOCATION_NM ]]>
+                 <foreach item="rtitles" collection="titles" >
+		             , (SELECT WORK_HOUR FROM TTIM403 X WHERE X.ENTER_CD = A.ENTER_CD AND X.APPLY_YY = A.APPLY_YY AND X.YM = A.YM AND X.SABUN = A.SABUN AND X.WORK_CD = #{rtitles.code}) AS "${rtitles.saveName}"
+                 </foreach>
+				  FROM (
+						SELECT UNIQUE A.ENTER_CD, A.APPLY_YY, A.YM, A.SABUN, A.BUSINESS_PLACE_CD
+						     , C.ORG_CD, C.WORK_TYPE_NM, C.PAY_TYPE_NM, C.SDATE, C.JIKWEE_CD, C.JIKGUB_CD, C.JIKCHAK_CD
+							 , F_COM_GET_LOCATION_NM(A.ENTER_CD, F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(LAST_DAY(TO_DATE(A.YM, 'YYYYMM')), 'YYYYMMDD'))) AS LOCATION_NM
+						  FROM TTIM403 A, THRM151 C
+						 WHERE A.ENTER_CD =#{ssnEnterCd}
+						   AND A.YM       = REPLACE( #{searchYm}, '-','' )
+<if test='searchText != null and !searchText.equals("")'>
+						   AND (A.SABUN LIKE '%' || #{searchText} || '%' OR F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)  LIKE '%' || #{searchText} || '%' )
+</if>
+<if test='searchOrgText != null and !searchOrgText.equals("")'>
+						   AND F_COM_GET_ORG_NM(C.ENTER_CD, C.ORG_CD, REPLACE( #{searchYm}, '-','' ) || '01') LIKE '%'|| #{searchOrgText} ||'%'
+</if>
+<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+							AND A.BUSINESS_PLACE_CD = #{searchBusinessPlaceCd}
+</if>
+<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+							AND C.LOCATION_CD = #{searchLocationCd}
+</if>
+					       AND A.ENTER_CD = C.ENTER_CD
+					       AND A.SABUN    = C.SABUN
+					       AND TO_CHAR(ADD_MONTHS(TO_DATE(A.YM || '01','YYYYMMDD'),1)-1,'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+						) A
+					ORDER BY BUSINESS_PLACE_NM DESC
+						,F_ORG_ORG_CHART_SORT(A.ENTER_CD, Q_ORG_CD, TO_CHAR(sysdate, 'YYYYMMDD'))
+						,F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20030', A.JIKWEE_CD)
+						,F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20010', A.JIKGUB_CD)
+						,F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20020', A.JIKCHAK_CD)
+					, SABUN
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getMonthWorkTotalTab">
+
+				<![CDATA[
+					SELECT	ENTER_CD
+					,		YM
+					,		APPLY_YY
+					,		SABUN
+					,		F_COM_GET_NAMES(ENTER_CD,SABUN) 					 						 AS NAME
+					, 		WORK_DD_CD
+					,		PAY_TYPE
+					,		BUSINESS_PLACE_CD
+					,		WORK_DD_CNT
+					, 		F_COM_GET_NAMES (ENTER_CD, SABUN, 'ALIAS') 									 AS ALIAS
+					, 		F_COM_GET_JIKWEE_NM (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31')  AS JIKWEE_NM
+             		, 		F_COM_GET_JIKGUB_NM (ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31')  AS JIKGUB_NM
+					, 		F_COM_GET_BP_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') 		 AS BUSINESS_PLACE_NM
+				    , 		F_COM_GET_ORG_CD(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') 	 AS Q_ORG_CD
+				    , 		F_COM_GET_ORG_NM2(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') 	 AS Q_ORG_NM
+					, 		F_COM_GET_WORKTYPE_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS WORK_TYPE_NM
+					, 		F_COM_GET_PAY_TYPE_NM(ENTER_CD, SABUN, REPLACE( #{searchYm}, '-','' ) || '31') AS PAY_TYPE_NM
+					, 		LOCATION_NM
+					FROM 	(
+								SELECT	ENTER_CD
+								,		YM
+								,		APPLY_YY
+								,		SABUN
+								,		WORK_DD_CD
+								,		PAY_TYPE
+								,		BUSINESS_PLACE_CD
+								,		WORK_DD_CNT
+								,		F_COM_GET_LOCATION_NM(A.ENTER_CD, F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD'))) AS LOCATION_NM
+								FROM 	TTIM404 A
+								WHERE 	ENTER_CD =#{ssnEnterCd}
+								AND 	YM =REPLACE( #{searchYm}, '-','' )
+								AND 	(SABUN LIKE '%' || #{searchText} || '%' OR F_COM_GET_NAMES(A.ENTER_CD, A.SABUN)  LIKE '%' || #{searchText} || '%' )
+								AND 	F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN,REPLACE( #{searchYm}, '-','' ) || '31') LIKE '%'|| #{searchOrgText} ||'%'
+]]>
+								<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+								AND 	F_COM_GET_BP_CD(A.ENTER_CD, A.SABUN, REPLACE( #{searchYm}, '-','' ) || '31') = #{searchBusinessPlaceCd}
+								</if>
+
+								<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+								AND 	F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(SYSDATE,'YYYYMMDD')) = #{searchLocationCd}
+								</if>
+							)
+				   ORDER BY BUSINESS_PLACE_NM DESC
+				   ,		F_ORG_ORG_CHART_SORT(ENTER_CD, Q_ORG_CD, TO_CHAR(sysdate, 'YYYYMMDD'))
+				   ,		F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20030', F_COM_GET_JIKWEE_CD(ENTER_CD, SABUN, TO_CHAR(sysdate, 'YYYYMMDD')))
+				   ,		F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20010', F_COM_GET_JIKGUB_CD(ENTER_CD, SABUN, TO_CHAR(sysdate, 'YYYYMMDD')))
+				   ,		F_COM_GET_GRCODE_SEQ(ENTER_CD, 'H20020', F_COM_GET_JIKCHAK_CD(ENTER_CD, SABUN, TO_CHAR(sysdate, 'YYYYMMDD')))
+				   , 		SABUN
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getMonthWorkTimeTab2">
+
+				<![CDATA[
+					SELECT 	ENTER_CD
+					, 		SABUN
+					, 		NAME
+					, 		JIKWEE_NM
+             		, 		JIKGUB_NM
+					, 		BUSINESS_PLACE_NM
+					, 		ORG_CD AS Q_ORG_CD
+					, 		ORG_NM AS Q_ORG_NM
+					, 		WORK_TYPE_NM
+					, 		PAY_TYPE_NM
+					, 		LOCATION_NM
+					, 		YMD
+					        ]]>
+					<foreach item="tit" collection="titles" >
+					, 		MAX( DECODE( #{tit.code}, WORK_CD, WORK_HOUR, NULL ) ) AS  ${tit.saveName}
+					</foreach>
+					FROM 	(
+								SELECT A.*
+								     , C.NAME
+									 , B.JIKWEE_NM
+									 , B.JIKGUB_NM
+								     , B.BUSINESS_PLACE_NM
+									 , B.ORG_CD
+									 , D.ORG_NM
+									 , B.WORK_TYPE_NM
+									 , B.PAY_TYPE_NM
+									 , F_COM_GET_LOCATION_NM(A.ENTER_CD, F_COM_GET_LOCATION_CD2(A.ENTER_CD,A.SABUN,TO_CHAR(LAST_DAY(TO_DATE(A.YM, 'YYYYMM')), 'YYYYMMDD'))) AS LOCATION_NM
+	     						  FROM TTIM407 A
+								  JOIN THRM151 B
+								    ON A.ENTER_CD = B.ENTER_CD
+								   AND A.SABUN = B.SABUN
+								   AND TO_CHAR(LAST_DAY(TO_DATE(A.YM, 'YYYYMM')), 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+								  JOIN THRM100 C
+								    ON A.ENTER_CD = C.ENTER_CD
+								   AND A.SABUN = C.SABUN
+								  JOIN TORG101 D
+								    ON B.ENTER_CD = D.ENTER_CD
+								   AND B.ORG_CD = D.ORG_CD
+								   AND TO_CHAR(LAST_DAY(TO_DATE(A.YM, 'YYYYMM')), 'YYYYMMDD') BETWEEN D.SDATE AND D.EDATE
+	    						 WHERE A.ENTER_CD = #{ssnEnterCd}
+	      						   AND A.YM = REPLACE( #{searchYm}, '-','' )
+								<if test='searchText != null and !searchText.equals("")'>
+	      						   AND (A.SABUN LIKE '%' || #{searchText} || '%' OR C.NAME LIKE '%' || #{searchText} || '%' )
+								</if>
+								<if test='searchOrgText != null and !searchOrgText.equals("")'>
+	      						   AND D.ORG_NM LIKE '%'|| #{searchOrgText} ||'%'
+								</if>
+								<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+									AND B.BUSINESS_PLACE_CD = #{searchBusinessPlaceCd}
+								</if>
+
+								<if test=' searchLocationCd != null and !searchLocationCd.equals("")'>
+									AND B.LOCATION_CD = #{searchLocationCd}
+								</if>
+							) A
+				    GROUP BY ENTER_CD
+					   	   , SABUN
+						   , NAME
+						   , JIKWEE_NM
+						   , JIKGUB_NM
+						   , BUSINESS_PLACE_CD
+						   , BUSINESS_PLACE_NM
+						   , ORG_CD
+						   , ORG_NM
+						   , WORK_TYPE_NM
+						   , PAY_TYPE_NM
+						   , LOCATION_NM
+						   , YMD
+					ORDER BY BUSINESS_PLACE_CD, YMD
+					, 		F_COM_JIKJE_SORT(ENTER_CD, SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+					, 		SABUN
+
+
+		</select>
+
+		<!-- 		저장 1-->
+		<update parameterType="map" id="saveMonthWorkDayTab">
+
+					MERGE INTO TTIM401 T
+					USING	(
+							SELECT     A.ENTER_CD
+                                    ,  A.YM
+                                    ,  A.SABUN
+                                    ,  A.GNT_CD
+									,  A.PAY_TYPE
+									,  A.BUSINESS_PLACE_CD
+									,  A.GNT_CNT
+							FROM	(
+									SELECT	   NULL AS ENTER_CD
+                                            ,  NULL AS YM
+                                            ,  NULL AS SABUN
+                                            ,  NULL AS GNT_CD
+											,  NULL AS PAY_TYPE
+											,  NULL AS BUSINESS_PLACE_CD
+											,  NULL AS GNT_CNT
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )     		AS ENTER_CD
+											, TRIM(#{rm.ym})     			AS YM
+                                            , TRIM(#{rm.sabun})    			AS SABUN
+                                            , TRIM(#{rm.gntCd})    			AS GNT_CD
+                                            , TRIM(#{rm.payType})    		AS PAY_TYPE
+                                            , F_COM_GET_BP_CD(#{ssnEnterCd}, TRIM(#{rm.sabun}), TO_CHAR(SYSDATE, 'YYYYMMDD'))   AS BUSINESS_PLACE_CD
+                                            , TRIM(#{rm.gntCnt})    		AS GNT_CNT
+									FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON (    T.ENTER_CD 		= #{ssnEnterCd}
+						    AND T.YM     	= S.YM
+						    AND T.SABUN   	= S.SABUN
+						    AND T.GNT_CD	= S.GNT_CD
+                    )
+					WHEN MATCHED THEN
+						UPDATE SET	 T.GNT_CNT	= S.GNT_CNT
+									,T.CHKDATE	= SYSDATE
+									,T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.YM
+							, T.SABUN
+							, T.GNT_CD
+							, T.PAY_TYPE
+							, T.BUSINESS_PLACE_CD
+							, T.GNT_CNT
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.YM
+							, S.SABUN
+							, S.GNT_CD
+							, S.PAY_TYPE
+							, S.BUSINESS_PLACE_CD
+							, S.GNT_CNT
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		<!-- 		저장 2-->
+		<update parameterType="map" id="saveMonthWorkTimeTab">
+
+					MERGE INTO TTIM403 T
+					USING	(
+							SELECT     A.ENTER_CD
+                                    ,  A.APPLY_YY
+                                    ,  A.YM
+                                    ,  A.SABUN
+									,  A.WORK_CD
+									,  A.WORK_HOUR
+									,  A.C_WORK_HOUR
+									,  A.PAY_TYPE
+									,  A.BUSINESS_PLACE_CD
+							FROM	(
+									SELECT	   NULL AS ENTER_CD
+                                            ,  NULL AS APPLY_YY
+                                            ,  NULL AS YM
+                                            ,  NULL AS SABUN
+											,  NULL AS WORK_CD
+											,  NULL AS WORK_HOUR
+											,  NULL AS C_WORK_HOUR
+											,  NULL AS PAY_TYPE
+											,  NULL AS BUSINESS_PLACE_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )     	AS ENTER_CD
+											, TRIM(#{rm.applyYy})     	AS APPLY_YY
+                                            , TRIM(#{rm.ym})    		AS YM
+                                            , TRIM(#{rm.sabun})   	 	AS SABUN
+                                            , TRIM(#{rm.workCd})    	AS WORK_CD
+                                            , TRIM(#{rm.workHour})    	AS WORK_HOUR
+                                            , TRIM(#{rm.cWorkHour})    	AS C_WORK_HOUR
+                                            , TRIM(#{rm.payType})    	AS PAY_TYPE
+                                            , F_COM_GET_BP_CD(#{ssnEnterCd}, TRIM(#{rm.sabun}), TO_CHAR(SYSDATE, 'YYYYMMDD'))    	AS BUSINESS_PLACE_CD
+									FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON (    T.ENTER_CD = #{ssnEnterCd}
+						    AND T.APPLY_YY	= S.APPLY_YY
+						    AND T.YM   		= S.YM
+						    AND T.SABUN   	= S.SABUN
+						    AND T.WORK_CD	= S.WORK_CD
+                    )
+					WHEN MATCHED THEN
+						UPDATE SET	 T.WORK_HOUR	= S.WORK_HOUR
+							        ,T.C_WORK_HOUR = S.C_WORK_HOUR
+									,T.CHKDATE	  	= SYSDATE
+									,T.CHKID	  	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.APPLY_YY
+							, T.YM
+							, T.SABUN
+							, T.WORK_CD
+							, T.WORK_HOUR
+							, T.C_WORK_HOUR
+							, T.PAY_TYPE
+							, T.BUSINESS_PLACE_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.APPLY_YY
+							, S.YM
+							, S.SABUN
+							, S.WORK_CD
+							, S.WORK_HOUR
+							, S.C_WORK_HOUR
+							, S.PAY_TYPE
+							, S.BUSINESS_PLACE_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<update parameterType="map" id="saveMonthWorkTimeTab1">
+
+					MERGE INTO TTIM403 T
+					USING	(
+							SELECT     A.ENTER_CD
+                                    ,  A.APPLY_YY
+                                    ,  A.YM
+                                    ,  A.SABUN
+									,  A.WORK_CD
+									,  A.WORK_HOUR
+									,  A.BUSINESS_PLACE_CD
+							FROM	(
+									SELECT	   NULL AS ENTER_CD
+                                            ,  NULL AS APPLY_YY
+                                            ,  NULL AS YM
+                                            ,  NULL AS SABUN
+											,  NULL AS WORK_CD
+											,  NULL AS WORK_HOUR
+											,  NULL AS BUSINESS_PLACE_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows403" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )     	AS ENTER_CD
+											, TRIM(#{rm.applyYy})     	AS APPLY_YY
+                                            , TRIM(#{rm.ym})    		AS YM
+                                            , TRIM(#{rm.sabun})   	 	AS SABUN
+                                            , TRIM(#{rm.workCd})    	AS WORK_CD
+                                            , TRIM(#{rm.workHour})    	AS WORK_HOUR
+                                            , F_COM_GET_BP_CD(#{ssnEnterCd}, TRIM(#{rm.sabun}), TO_CHAR(SYSDATE, 'YYYYMMDD'))    	AS BUSINESS_PLACE_CD
+									FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN     IS NOT NULL
+									      AND A.WORK_HOUR IS NOT NULL
+							) S
+					ON (    T.ENTER_CD = #{ssnEnterCd}
+						    AND T.APPLY_YY	= S.APPLY_YY
+						    AND T.YM   		= S.YM
+						    AND T.SABUN   	= S.SABUN
+						    AND T.WORK_CD	= S.WORK_CD
+                    )
+					WHEN MATCHED THEN
+						UPDATE SET	 T.WORK_HOUR	= S.WORK_HOUR
+									,T.CHKDATE	  	= SYSDATE
+									,T.CHKID	  	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.APPLY_YY
+							, T.YM
+							, T.SABUN
+							, T.WORK_CD
+							, T.WORK_HOUR
+							, T.BUSINESS_PLACE_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.APPLY_YY
+							, S.YM
+							, S.SABUN
+							, S.WORK_CD
+							, S.WORK_HOUR
+							, S.BUSINESS_PLACE_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		<!-- 		저장3 -->
+		<update parameterType="map" id="saveMonthWorkTotalTab">
+
+					MERGE INTO TTIM404 T
+					USING	(
+							SELECT     A.ENTER_CD
+                                    ,  A.APPLY_YY
+                                    ,  A.YM
+                                    ,  A.SABUN
+									,  A.WORK_DD_CD
+									,  A.WORK_DD_CNT
+									,  A.PAY_TYPE
+									,  A.BUSINESS_PLACE_CD
+							FROM	(
+									SELECT	   NULL AS ENTER_CD
+                                            ,  NULL AS APPLY_YY
+                                            ,  NULL AS YM
+                                            ,  NULL AS SABUN
+											,  NULL AS WORK_DD_CD
+											,  NULL AS WORK_DD_CNT
+											,  NULL AS PAY_TYPE
+											,  NULL AS BUSINESS_PLACE_CD
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM( #{ssnEnterCd} )     	AS ENTER_CD
+											, TRIM(#{rm.applyYy})     	AS APPLY_YY
+                                            , TRIM(#{rm.ym})    		AS YM
+                                            , TRIM(#{rm.sabun})    		AS SABUN
+                                            , TRIM(#{rm.workDdCd})    	AS WORK_DD_CD
+                                            , TRIM(#{rm.workDdCnt})    	AS WORK_DD_CNT
+                                            , TRIM(#{rm.payType})    	AS PAY_TYPE
+                                            , F_COM_GET_BP_CD(#{ssnEnterCd}, TRIM(#{rm.sabun}), TO_CHAR(SYSDATE, 'YYYYMMDD'))   	AS BUSINESS_PLACE_CD
+									FROM   DUAL
+</foreach>
+									) A WHERE A.SABUN IS NOT NULL
+							) S
+					ON (    T.ENTER_CD 			= #{ssnEnterCd}
+						    AND T.APPLY_YY  	= S.APPLY_YY
+						    AND T.YM			= S.YM
+						    AND T.SABUN			= S.SABUN
+						    AND T.WORK_DD_CD	= S.WORK_DD_CD
+                    )
+					WHEN MATCHED THEN
+						UPDATE SET	 T.WORK_DD_CNT	= S.WORK_DD_CNT
+									,T.CHKDATE	  	= SYSDATE
+									,T.CHKID	  	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+						      T.ENTER_CD
+							, T.APPLY_YY
+							, T.YM
+							, T.SABUN
+							, T.WORK_DD_CD
+							, T.WORK_DD_CNT
+							, T.PAY_TYPE
+							, T.BUSINESS_PLACE_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.APPLY_YY
+							, S.YM
+							, S.SABUN
+							, S.WORK_DD_CD
+							, S.WORK_DD_CNT
+							, S.PAY_TYPE
+							, S.BUSINESS_PLACE_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+
+<!-- 		일근무 저장 -->
+		<update parameterType="map" id="saveMonthWorkTimeTab2">
+
+				 MERGE INTO TTIM407 T
+				 USING
+				(
+
+				       SELECT ENTER_CD
+				            , YMD
+				            , SABUN
+				            , WORK_CD
+				            , YM
+				            , DECODE(WORK_HOUR, 0, NULL, WORK_HOUR) AS WORK_HOUR
+				            , BUSINESS_PLACE_CD
+				            , DECODE(WORK_HH, 0, NULL, WORK_HH) AS WORK_HH
+				            , DECODE(WORK_MM, 0, NULL, WORK_MM) AS WORK_MM
+				        FROM (
+						       SELECT TRIM(#{ssnEnterCd}) 		AS ENTER_CD
+						            , TRIM(#{ymd}) 				AS YMD
+						            , TRIM(#{sabun}) 				AS SABUN
+						            , TRIM(#{workCd})				AS WORK_CD
+						            , REPLACE( #{searchYm}, '-','' ) 	AS YM
+						            , TRIM(#{workHour})			AS WORK_HOUR
+						            , F_COM_GET_BP_CD(TRIM(#{ssnEnterCd}), TRIM(#{sabun}) , TO_CHAR(LAST_DAY(TO_DATE(REPLACE( #{searchYm}, '-','' ),'YYYYMM')),'YYYYMMDD')) AS BUSINESS_PLACE_CD
+						            , TRUNC(TO_NUMBER(NVL(TRIM(#{workHour}), 0))) AS WORK_HH
+						            , MOD(TO_NUMBER(NVL(TRIM(#{workHour}), 0)), 1) * 60 AS WORK_MM
+						        FROM DUAL
+						     )
+				) S
+				ON (
+				          T.ENTER_CD 	= S.ENTER_CD
+				     AND  T.YMD 		= S.YMD
+				     AND  T.SABUN 		= S.SABUN
+				     AND  T.WORK_CD 	= S.WORK_CD
+				)
+				WHEN MATCHED THEN
+				   UPDATE SET T.CHKDATE				= sysdate
+				            , T.CHKID	    		= #{ssnSabun}
+				            , T.YM 					= S.YM
+				            , T.WORK_HOUR 			= S.WORK_HOUR
+				            , T.BUSINESS_PLACE_CD 	= S.BUSINESS_PLACE_CD
+				            , T.WORK_HH 			= S.WORK_HH
+				            , T.WORK_MM 			= S.WORK_MM
+				WHEN NOT MATCHED THEN
+				   INSERT
+				   (
+				              T.ENTER_CD
+				            , T.YMD
+				            , T.SABUN
+				            , T.WORK_CD
+				            , T.YM
+				            , T.WORK_HOUR
+				            , T.BUSINESS_PLACE_CD
+				            , T.WORK_HH
+				            , T.WORK_MM
+				            , T.CHKDATE
+				            , T.CHKID
+				   )
+				   VALUES
+				   (
+				              S.ENTER_CD
+				            , S.YMD
+				            , S.SABUN
+				            , S.WORK_CD
+				            , S.YM
+				            , S.WORK_HOUR
+				            , S.BUSINESS_PLACE_CD
+				            , S.WORK_HH
+				            , S.WORK_MM
+				            , sysdate
+				            , #{ssnSabun}
+				   )
+		</update>
+
+		<!-- 		삭제1 -->
+		<delete parameterType="map" id="deleteMonthWorkDayTab">
+
+					DELETE FROM TTIM401
+					WHERE (ENTER_CD, YM, SABUN, GNT_CD)  IN 	(  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test=' rm.sabun != null and !rm.sabun.equals("")'>
+										    (#{ssnEnterCd} , #{rm.ym} , #{rm.sabun} , #{rm.gntCd} )
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+		<!-- 		삭제2 -->
+		<delete parameterType="map" id="deleteMonthWorkTimeTab">
+
+					DELETE FROM TTIM403
+					WHERE (ENTER_CD, APPLY_YY, YM, SABUN, WORK_CD)  IN 	(  (NULL, NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test=' rm.sabun != null and !rm.sabun.equals("")'>
+										    (#{ssnEnterCd} , #{rm.applyYy} , #{rm.ym} , #{rm.sabun} , #{rm.workCd} )
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+		<!-- 		삭제 (근무코드별) -->
+		<delete parameterType="map" id="deleteMonthWorkTimeTab1">
+
+					DELETE FROM TTIM403
+					WHERE (ENTER_CD, APPLY_YY, YM, SABUN)  IN 	(  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						, (#{ssnEnterCd} , #{rm.applyYy} , #{rm.ym} , #{rm.sabun} )
+</foreach>
+<foreach item="rm" collection="mergeRows" >
+						, (#{ssnEnterCd} , #{rm.applyYy} , #{rm.ym} , #{rm.sabun} )
+</foreach>
+										)
+		</delete>
+		<!-- 		삭제3 -->
+		<delete parameterType="map" id="deleteMonthWorkTotalTab">
+
+					DELETE FROM TTIM404
+					WHERE (ENTER_CD, APPLY_YY, YM, SABUN, WORK_DD_CD)  IN 	(  (NULL, NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test=' ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test=' rm.sabun != null and !rm.sabun.equals("")'>
+										    (#{ssnEnterCd} , #{rm.applyYy} , #{rm.ym} , #{rm.sabun} , #{rm.workDdCd} )
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+
+		<!-- 		일근무시간 삭제 -->
+		<delete parameterType="map" id="deleteMonthWorkTimeTab2">
+
+				<![CDATA[
+					DELETE FROM TTIM407
+					 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+					   AND YMD      = TRIM( #{ymd} )
+					   AND SABUN    = TRIM( #{sabun} )
+				]]>
+		</delete>
+
+</mapper>

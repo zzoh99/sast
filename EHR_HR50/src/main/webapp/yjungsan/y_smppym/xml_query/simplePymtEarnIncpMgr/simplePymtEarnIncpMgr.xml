@@ -1,0 +1,567 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	근로소득관리
+ -->
+<root>
+
+
+<!-- 		전화번호관련 테이블 컬럼수 조회 -->
+		<query id="getHpTableCnt">
+			<![CDATA[
+					SELECT COUNT(*) AS HPTB_CNT
+					  FROM USER_TAB_COLUMNS
+					 WHERE TABLE_NAME = 'THRM124'
+					   AND COLUMN_NAME = 'CONT_ADDRESS'
+				]]>
+		</query>
+
+
+<!-- 		중복 사번 체크  -->
+		<query id="getSabunChk">
+			<![CDATA[
+					SELECT  COUNT(*) AS CNT
+						  , WM_CONCAT(SABUN) AS SABUNS
+					  FROM TYEA811
+					 WHERE ENTER_CD = #ssnEnterCd#
+					   AND INCOME_TYPE = '77'
+				   	   $query$
+				]]>
+		</query>
+
+
+
+<!-- 		조회 -->
+		<query id="getSimplePymtEarnIncpMgr">
+			<![CDATA[
+					SELECT   A.ENTER_CD
+					       , DECODE(A.FINAL_CLOSE_YN,'Y',1,0) AS FINAL_CLOSE_YN			-- 마감여부
+					       , A.SABUN					-- 사번
+					       , A.NAME						-- 성명
+					       , A.BUSINESS_PLACE_CD		-- 사업장
+					       , B.EMP_YMD					-- 입사일
+					       , B.RET_YMD   				-- 퇴사일
+						   , SUBSTR(F_COM_DECRYPT (A.RES_NO, A.ENTER_CD),0,6)||'-'|| SUBSTR(F_COM_DECRYPT (A.RES_NO, A.ENTER_CD),7,7) AS RES_NO		-- 주민등록번호
+					       , REPLACE(NVL(A.TEL_NO,$isQuery$),'-','') AS TEL_NO																							-- 전화번호
+					       , A.CITIZEN_TYPE				-- 내외국인(1:내국인/9:외국인)
+					       , A.RESIDENCY_TYPE 			-- 거주구분(1:거주자,2:비거주자)
+					       , A.RESIDENCY_CD				-- 거주지국코드 국가코드(H20290)
+					       , ADJ_S_YMD					-- 근무시작일
+					       , ADJ_E_YMD					-- 근무종료일
+					       , A.TAX_MON					-- 과세소득, 급여 등(2020.01.01 개정으로 급여 등과 인정상여로 구분. 급여 등은 기존 과세소득 컬럼인 tax_mon 그대로 사용하기로 함)
+					       , NON_TAX_MON				-- 비과세소득
+					       , ETC_BONUS_MON				-- 인정상여
+					       , WORK_YY					-- 대상년도
+					       , HALF_TYPE					-- 반기구분(1:상반기/2:하반기)
+					       , CRE_WORK_YY				-- 소득귀속년도(발생년도)
+					       , INCOME_TYPE				-- 소득구분(YEA003)
+					       , A.SEND_TYPE				-- 신고구분(1:정기/2:수정)
+                           $query2$
+
+					  FROM TYEA811 A,
+					       THRM100 B
+				     WHERE A.ENTER_CD = B.ENTER_CD(+)
+					   AND A.SABUN = B.SABUN(+)
+					   AND A.ENTER_CD = #ssnEnterCd#
+				   	   $query$
+					   AND INCOME_TYPE = '77'
+					 ORDER BY FINAL_CLOSE_YN, HALF_TYPE, BUSINESS_PLACE_CD, B.EMP_YMD, A.CITIZEN_TYPE, A.RESIDENCY_TYPE, SABUN
+				]]>
+		</query>
+
+
+<!-- 		저장 -->
+		<query id="saveSimplePymtEarnIncpMgr">
+				<![CDATA[
+					MERGE INTO TYEA811 T
+					USING	(
+							SELECT	  ENTER_CD
+									, WORK_YY
+									, CRE_WORK_YY
+									, HALF_TYPE
+									, INCOME_TYPE
+									, SABUN
+									, NAME
+									, BUSINESS_PLACE_CD
+									, TEL_NO
+									, RES_NO
+									, CITIZEN_TYPE
+									, RESIDENCY_TYPE
+									, RESIDENCY_CD
+									, RESIDENCY_NM
+									, ADJ_S_YMD
+									, ADJ_E_YMD
+									, TAX_MON
+									, ETC_BONUS_MON
+									, FINAL_CLOSE_YN
+									, PAY_PEOPLE_STATUS
+									, SEND_TYPE
+									, ZIP
+									, ADDR
+							FROM	(
+									SELECT    TRIM(#ssnEnterCd#)  		   											AS ENTER_CD
+											, TRIM(#searchYear#)  	   												AS WORK_YY
+											, TO_CHAR(SYSDATE,'yyyy')      											AS CRE_WORK_YY
+											, TRIM(#searchHalfType#)  												AS HALF_TYPE
+											, '77'										 							AS INCOME_TYPE
+											, TRIM(#sabun#)     	   												AS SABUN
+											, TRIM(#name#)	   														AS NAME
+											, TRIM(#business_place_cd#)   											AS BUSINESS_PLACE_CD
+											, TRIM(#tel_no#)     													AS TEL_NO
+											, F_COM_ENCRYPT(TRIM(#res_no#), #ssnEnterCd#) 							AS RES_NO
+											, TRIM(#citizen_type#)      											AS CITIZEN_TYPE
+											, TRIM(#residency_type#)	   											AS RESIDENCY_TYPE
+											, TRIM(#residency_cd#) 	   												AS RESIDENCY_CD
+											, F_COM_GET_GRCODE_NAME(#ssnEnterCd#, 'H20290', TRIM(#residency_cd#), NULL, CASE WHEN #searchHalfType# = '1' THEN #searchYear#||'0630' WHEN #searchHalfType# = '2' THEN #searchYear#||'1231' ELSE TO_CHAR(LAST_DAY(TO_DATE(#searchYear#||#searchHalfType#||'01','YYYYMMDD')),'YYYYMMDD') END )  AS RESIDENCY_NM
+											, TRIM(#adj_s_ymd#)	   													AS ADJ_S_YMD
+											, TRIM(#adj_e_ymd#)		   												AS ADJ_E_YMD
+											, TRIM(#tax_mon#)		   												AS TAX_MON
+											, TRIM(#etc_bonus_mon#)		   											AS ETC_BONUS_MON
+											, TRIM(#final_close_yn#)		   										AS FINAL_CLOSE_YN
+											, DECODE(TRIM(#final_close_yn#),'Y','J','M')							AS PAY_PEOPLE_STATUS
+											, TRIM(#send_type#)		   												AS SEND_TYPE
+											, (
+													 SELECT MAX(ZIP)
+											           FROM THRM123
+											          WHERE ENTER_CD = TRIM(#ssnEnterCd#)
+											            AND SABUN    = TRIM(#sabun#)
+											            AND ADD_TYPE IN ('2','3')
+											            AND ZIP IS NOT NULL
+											   ) 																	AS ZIP
+											 , (
+													 SELECT MAX(ADDR1||ADDR2)
+											           FROM THRM123
+											          WHERE ENTER_CD = TRIM(#ssnEnterCd#)
+											            AND SABUN    = TRIM(#sabun#)
+											            AND ADD_TYPE IN ('2','3')
+											            AND ZIP IS NOT NULL
+											   ) 																	AS ADDR
+											FROM   DUAL
+									)  WHERE ENTER_CD 		IS NOT NULL
+										 AND WORK_YY 		IS NOT NULL
+										 AND CRE_WORK_YY 	IS NOT NULL
+										 AND HALF_TYPE 		IS NOT NULL
+										 AND INCOME_TYPE 	IS NOT NULL
+										 AND ADJ_S_YMD 		IS NOT NULL
+										 AND SABUN 			IS NOT NULL
+										 AND SEND_TYPE 		IS NOT NULL
+							) S
+					ON ( T.ENTER_CD        	= #ssnEnterCd#
+					 AND T.WORK_YY  		= S.WORK_YY
+					 AND T.ADJ_S_YMD  		= S.ADJ_S_YMD
+					 AND T.HALF_TYPE  		= S.HALF_TYPE
+					 AND T.INCOME_TYPE		= S.INCOME_TYPE
+					 AND T.SABUN			= S.SABUN
+					 AND T.SEND_TYPE		= S.SEND_TYPE
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET
+                                      T.BUSINESS_PLACE_CD	= S.BUSINESS_PLACE_CD
+                                    , T.TEL_NO				= S.TEL_NO
+                                    , T.RES_NO				= S.RES_NO
+                                    , T.CITIZEN_TYPE		= S.CITIZEN_TYPE
+                                    , T.RESIDENCY_TYPE		= S.RESIDENCY_TYPE
+                                    , T.RESIDENCY_CD		= S.RESIDENCY_CD
+                                    , T.RESIDENCY_NM		= S.RESIDENCY_NM
+                                    , T.ADJ_E_YMD			= S.ADJ_E_YMD
+                                    , T.TAX_MON				= S.TAX_MON
+                                    , T.ETC_BONUS_MON		= S.ETC_BONUS_MON
+                                    , T.FINAL_CLOSE_YN		= S.FINAL_CLOSE_YN
+                                    , T.PAY_PEOPLE_STATUS	= S.PAY_PEOPLE_STATUS
+                                    , T.CRE_WORK_YY			= S.CRE_WORK_YY
+									, T.CHKDATE	    		= SYSDATE
+									, T.CHKID    			= #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.WORK_YY
+							, T.CRE_WORK_YY
+                            , T.HALF_TYPE
+                            , T.INCOME_TYPE
+                            , T.SABUN
+                            , T.NAME
+                            , T.BUSINESS_PLACE_CD
+                            , T.TEL_NO
+                            , T.RES_NO
+                            , T.CITIZEN_TYPE
+                            , T.RESIDENCY_TYPE
+                            , T.RESIDENCY_CD
+                            , T.RESIDENCY_NM
+                            , T.ADJ_S_YMD
+                            , T.ADJ_E_YMD
+                            , T.TAX_MON
+                            , T.ETC_BONUS_MON
+                            , T.SEND_TYPE
+                            , T.FINAL_CLOSE_YN
+                            , T.PAY_PEOPLE_STATUS
+                            , T.ZIP
+                            , T.ADDR
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #ssnEnterCd#
+							, S.WORK_YY
+                            , S.CRE_WORK_YY
+                            , S.HALF_TYPE
+                            , S.INCOME_TYPE
+                            , S.SABUN
+                            , S.NAME
+                            , S.BUSINESS_PLACE_CD
+                            , S.TEL_NO
+                            , S.RES_NO
+                            , S.CITIZEN_TYPE
+                            , S.RESIDENCY_TYPE
+                            , S.RESIDENCY_CD
+                            , S.RESIDENCY_NM
+                            , S.ADJ_S_YMD
+                            , S.ADJ_E_YMD
+                            , S.TAX_MON
+                            , S.ETC_BONUS_MON
+                            , S.SEND_TYPE
+                            , S.FINAL_CLOSE_YN
+                            , S.PAY_PEOPLE_STATUS
+                            , S.ZIP
+                            , S.ADDR
+							, SYSDATE
+							, #ssnSabun#
+						)
+				]]>
+		</query>
+		<!-- 2021.07.05(월별 급여,인정상여 저장)
+             TBEN812 디테일 저장                         -->
+        <query id="saveSimplePymtEarnIncpMgr812">
+                <![CDATA[
+                    MERGE INTO TYEA812 T
+                    USING   (
+                            SELECT ENTER_CD
+                                 , WORK_YY
+                                 , CRE_WORK_YY
+                                 , SEND_TYPE
+                                 , HALF_TYPE
+                                 , INCOME_TYPE
+                                 , SABUN
+                                 , ADJ_S_YMD
+                                 , MONTH_SEQ
+                                 , TAX_MON
+                                 , ETC_BONUS_MON
+                            FROM (
+                                    SELECT    TRIM(#ssnEnterCd#)                                                    AS ENTER_CD
+                                            , TRIM(#searchYear#)                                                    AS WORK_YY
+                                            , TO_CHAR(SYSDATE,'yyyy')                                               AS CRE_WORK_YY
+                                            , TRIM(#send_type#)                                                     AS SEND_TYPE
+                                            , TRIM(#searchHalfType#)                                                AS HALF_TYPE
+                                            , '77'                                                                  AS INCOME_TYPE
+                                            , TRIM(#sabun#)                                               AS SABUN
+                                            , TRIM(#adj_s_ymd#)                                                     AS ADJ_S_YMD
+                                            , TRIM(#month_seq#)                                                     AS MONTH_SEQ
+
+                                            , TRIM(#tax_mon#)                                                       AS TAX_MON
+                                            , TRIM(#etc_bonus_mon#)                                                 AS ETC_BONUS_MON
+
+
+                                            FROM   DUAL
+                                    )  WHERE ENTER_CD       IS NOT NULL
+                                         AND WORK_YY        IS NOT NULL
+                                         AND CRE_WORK_YY    IS NOT NULL
+                                         AND SEND_TYPE      IS NOT NULL
+                                         AND HALF_TYPE      IS NOT NULL
+                                         AND INCOME_TYPE    IS NOT NULL
+                                         AND SABUN          IS NOT NULL
+                                         AND ADJ_S_YMD      IS NOT NULL
+                                         AND MONTH_SEQ      IS NOT NULL
+                                         AND TAX_MON        IS NOT NULL
+                                         AND ETC_BONUS_MON  IS NOT NULL
+                            ) S
+                    ON ( T.ENTER_CD         = S.ENTER_CD
+                     AND T.WORK_YY          = S.WORK_YY
+                     AND T.CRE_WORK_YY      = S.CRE_WORK_YY
+                     AND T.ADJ_S_YMD        = S.ADJ_S_YMD
+                     AND T.HALF_TYPE        = S.HALF_TYPE
+                     AND T.INCOME_TYPE      = S.INCOME_TYPE
+                     AND T.SABUN            = S.SABUN
+                     AND T.SEND_TYPE        = S.SEND_TYPE
+                     AND T.MONTH_SEQ        = S.MONTH_SEQ
+                     )
+                    WHEN MATCHED THEN
+                        UPDATE SET T.TAX_MON             = S.TAX_MON
+                                 , T.ETC_BONUS_MON       = S.ETC_BONUS_MON
+                                 , T.CHKDATE             = SYSDATE
+                                 , T.CHKID               = #ssnSabun#
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.WORK_YY
+                            , T.CRE_WORK_YY
+                            , T.SEND_TYPE
+                            , T.HALF_TYPE
+                            , T.INCOME_TYPE
+                            , T.SABUN
+                            , T.ADJ_S_YMD
+                            , T.MONTH_SEQ
+                            , T.TAX_MON
+                            , T.ETC_BONUS_MON
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              #ssnEnterCd#
+                            , S.WORK_YY
+                            , S.CRE_WORK_YY
+                            , S.SEND_TYPE
+                            , S.HALF_TYPE
+                            , S.INCOME_TYPE
+                            , S.SABUN
+                            , S.ADJ_S_YMD
+                            , S.MONTH_SEQ
+                            , S.TAX_MON
+                            , S.ETC_BONUS_MON
+                            , SYSDATE
+                            , #ssnSabun#
+                        )
+                ]]>
+        </query>
+		<!-- 		삭제 -->
+		<query id="deleteSimplePymtEarnIncpMgr">
+				<![CDATA[
+					DELETE FROM TYEA811
+					 WHERE ENTER_CD||'_'||WORK_YY||'_'||HALF_TYPE||'_'||INCOME_TYPE||'_'||SABUN||'_'||SEND_TYPE||'_'||ADJ_S_YMD IN
+					 	(
+							TRIM( #ssnEnterCd# )||'_'||
+							TRIM( #work_yy# )||'_'||
+							TRIM( #half_type# )||'_'||
+							TRIM( #income_type# )||'_'||
+							TRIM( #sabun# )||'_'||
+							TRIM( #send_type# )||'_'||
+							TRIM( #adj_s_ymd# )
+						)
+						AND INCOME_TYPE = '77'
+				]]>
+		</query>
+		<!-- 2021.08.03 TYEA821 삭제-->
+        <!--        삭제 -->
+        <query id="deleteSimplePymtEarnIncpMgr812">
+                <![CDATA[
+                    DELETE FROM TYEA812
+                     WHERE ENTER_CD||'_'||WORK_YY||'_'||HALF_TYPE||'_'||INCOME_TYPE||'_'||SABUN||'_'||SEND_TYPE||'_'||ADJ_S_YMD IN
+                        (
+                            TRIM( #ssnEnterCd# )||'_'||
+                            TRIM( #work_yy# )||'_'||
+                            TRIM( #half_type# )||'_'||
+                            TRIM( #income_type# )||'_'||
+                            TRIM( #sabun# )||'_'||
+                            TRIM( #send_type# )||'_'||
+                            TRIM( #adj_s_ymd# )
+                        )
+                        AND INCOME_TYPE = '77'
+                ]]>
+        </query>
+		<!-- 	전체마감/전체마감취소	 -->
+		<query id="updateSimplePymtEarnIncpMgr">
+				<![CDATA[
+					UPDATE TYEA811
+					SET FINAL_CLOSE_YN  = #final_close_yn#
+					  , CHKDATE	        = SYSDATE
+					WHERE ENTER_CD      = #ssnEnterCd#
+					    AND WORK_YY     = #searchYear#
+					    $query$
+				]]>
+		</query>
+
+    <!-- 급여코드 -->
+    <query id="getPayCdList">
+       <![CDATA[
+           SELECT DISTINCT A.PAY_CD AS CODE, (SELECT PAY_NM FROM TCPN051 WHERE ENTER_CD = A.ENTER_CD AND PAY_CD = A.PAY_CD) AS CODE_NM
+           FROM TCPN201 A
+           WHERE A.ENTER_CD = #ssnEnterCd#
+             AND F_CPN_YEA_PAY_CD(#ssnEnterCd#,A.PAY_CD) NOT IN ('Y1','S1','S2','Y3','Y7','Y9')
+           ORDER BY A.PAY_CD ASC
+       ]]>
+    </query>
+	<!-- 항목코드 조회(TCPN011) -->
+	<query id="selectElementCd">
+	    <![CDATA[
+	        SELECT A.ELEMENT_CD AS CODE,
+	               A.ELEMENT_NM AS CODE_NM
+	        FROM TCPN011 A
+	        WHERE A.ENTER_CD = #ssnEnterCd#
+	          AND A.ELEMENT_TYPE = 'A'
+	          AND A.ATTRIBUTE_8 IS NULL OR A.ATTRIBUTE_8 = 'C010_15'
+	          AND A.SDATE = (SELECT MAX(B.SDATE)
+	                         FROM TCPN011 B
+	                         WHERE B.ENTER_CD = A.ENTER_CD
+	                         AND B.ELEMENT_CD = A.ELEMENT_CD
+	                         AND TO_CHAR(TO_DATE(REPLACE(#searchYMD#,'-',''),'YYYYMMDD'),'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231'))
+	    ]]>
+	</query>
+	<!-- 작업 조회(TPCN201) -->
+	<query id="selectPayAction">
+	    <![CDATA[
+	        SELECT *
+	        FROM(
+				SELECT A.PAY_ACTION_CD,
+				       A.PAY_ACTION_NM,
+				       A.PAY_YM,      -- 급여년월
+				       A.PAY_CD,
+				       A.PAYMENT_YMD, -- 지급일자
+				       A.ORD_SYMD,
+				       A.ORD_EYMD,
+				       NVL((SELECT G.YM
+				          FROM TYEA201 G
+				         WHERE G.ENTER_CD = A.ENTER_CD
+				           AND G.PAY_ACTION_CD = A.PAY_ACTION_CD
+				           AND G.WORK_YY = #workYy#
+				           AND G.SEND_TYPE = #sendType#
+				           AND G.HALF_TYPE = #halfType#
+				           AND G.INCOME_TYPE = '77'), SUBSTR(A.PAYMENT_YMD,'1','6')) AS YM,
+				       (SELECT G.CHK_YN
+				          FROM TYEA201 G
+				         WHERE G.ENTER_CD = A.ENTER_CD
+				           AND G.PAY_ACTION_CD = A.PAY_ACTION_CD
+				           AND G.WORK_YY = #workYy#
+				           AND G.SEND_TYPE = #sendType#
+				           AND G.HALF_TYPE = #halfType#
+				           AND G.INCOME_TYPE = '77') AS CHK_YN
+				FROM TCPN201 A, (SELECT ENTER_CD, PAY_ACTION_CD
+								   FROM TCPN303
+								  WHERE ENTER_CD = #ssnEnterCd#
+								  GROUP BY ENTER_CD, PAY_ACTION_CD) B
+				WHERE A.ENTER_CD = B.ENTER_CD
+				  AND A.PAY_ACTION_CD = B.PAY_ACTION_CD
+				  AND A.ENTER_CD = #ssnEnterCd#
+				  AND A.PAY_YM BETWEEN REPLACE(#searchPaySym#,'-','') AND REPLACE(#searchPayEym#,'-','')
+				  AND SUBSTR(A.PAYMENT_YMD,'1','6') BETWEEN SUBSTR(REPLACE(#searchPaymentSymd#,'-',''),'1','6') AND SUBSTR(REPLACE(#searchPaymentEymd#,'-',''),'1','6')
+				  AND F_CPN_YEA_PAY_CD(#ssnEnterCd#,A.PAY_CD) NOT IN ('Y1','S1','S2','Y3','Y7','Y9')
+				  AND F_CPN_YEA_PAY_CD(#ssnEnterCd#,A.PAY_CD) NOT LIKE 'Y3%'
+				ORDER BY A.PAY_YM DESC
+			) WHERE 1=1
+			    $query$
+	        ]]>
+	</query>
+    <!-- 작업 조회(TPCN201) -->
+    <query id="getPayCdChkCnt">
+        <![CDATA[
+            SELECT COUNT(*) AS CHK_CNT
+            FROM TYEA201
+            WHERE ENTER_CD = #ssnEnterCd#
+              AND WORK_YY =  #workYy#
+              AND SEND_TYPE   = #sendType#
+              AND HALF_TYPE   = #halfType#
+              AND INCOME_TYPE = '77'
+              AND CHK_YN = 'Y'
+            ]]>
+    </query>
+	<!-- 인정상여 조회-->
+	<query id="selectEtcBouns">
+	    <![CDATA[
+	        SELECT A.ELEMENT_CD,
+	               A.ELEMENT_NM,
+	               'C010_15' AS ATTRIBUTE_8,
+	               '기타소득(인정상여)' AS ATTRIBUTE_8_NM,
+	               A.SDATE
+	        FROM TCPN011 A
+	        WHERE A.ENTER_CD = #ssnEnterCd#
+	          AND A.ELEMENT_TYPE = 'A'
+	          AND A.ATTRIBUTE_8 = 'C010_15'
+	          AND A.SDATE = (SELECT MAX(B.SDATE)
+	                         FROM TCPN011 B
+	                         WHERE B.ENTER_CD = A.ENTER_CD
+	                         AND B.ELEMENT_CD = A.ELEMENT_CD
+	                         AND TO_CHAR(TO_DATE(REPLACE(#searchYMD#,'-',''),'YYYYMMDD'),'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231'))
+	    ]]>
+	</query>
+	<!-- 작업 저장 -->
+	<!-- - "수정" 구분으로 작업일자를 저장하면, "정기"분과 충돌로 저장되지 않음.
+        MERGE문의 on절에 send_type 추가 -->
+	<query id="saveEtcBouns">
+	        <![CDATA[
+	            MERGE INTO TYEA201 T
+	            USING   (
+	                    SELECT    ENTER_CD
+							     ,WORK_YY
+							     ,SEND_TYPE
+							     ,HALF_TYPE
+							     ,INCOME_TYPE
+							     ,PAY_ACTION_CD
+							     ,CHK_YN
+							     ,YM
+	                    FROM    (
+	                            SELECT    TRIM(#ssnEnterCd#)                                              AS ENTER_CD
+	                                    , TRIM(#workYy#)                                                  AS WORK_YY
+	                                    , TRIM(#sendType#)                                                AS SEND_TYPE
+	                                    , TRIM(#halfType#)                                                AS HALF_TYPE
+	                                    , '77'                                                            AS INCOME_TYPE
+	                                    , TRIM(#pay_action_cd#)                                           AS PAY_ACTION_CD
+	                                    , TRIM(#chk_yn#)                                                  AS CHK_YN
+	                                    , TRIM(#ym#)                                                      AS YM
+	                                    FROM   DUAL
+	                            )  WHERE ENTER_CD       IS NOT NULL
+	                                 AND WORK_YY        IS NOT NULL
+	                                 AND SEND_TYPE      IS NOT NULL
+	                                 AND HALF_TYPE      IS NOT NULL
+	                                 AND INCOME_TYPE    IS NOT NULL
+	                                 AND PAY_ACTION_CD  IS NOT NULL
+	                                 AND CHK_YN         IS NOT NULL
+	                                 AND YM             IS NOT NULL
+	                    ) S
+				            ON ( T.ENTER_CD         = #ssnEnterCd#
+				             AND T.WORK_YY          = S.WORK_YY
+				             AND T.HALF_TYPE        = S.HALF_TYPE
+				             AND T.INCOME_TYPE      = S.INCOME_TYPE
+				             AND T.PAY_ACTION_CD    = S.PAY_ACTION_CD
+				             AND T.SEND_TYPE        = S.SEND_TYPE
+			             )
+			            WHEN MATCHED THEN
+			                UPDATE SET    T.CHK_YN          = S.CHK_YN
+                                        , T.YM              = S.YM
+			                            , T.CHKDATE         = SYSDATE
+			                            , T.CHKID           = #ssnSabun#
+			            WHEN NOT MATCHED THEN
+		                INSERT
+		                (
+		                      T.ENTER_CD
+		                    , T.WORK_YY
+		                    , T.SEND_TYPE
+		                    , T.HALF_TYPE
+		                    , T.INCOME_TYPE
+		                    , T.PAY_ACTION_CD
+		                    , T.CHK_YN
+		                    , T.YM
+		                    , T.CHKDATE
+		                    , T.CHKID
+		                )
+		                VALUES
+		                (
+		                      #ssnEnterCd#
+		                    , S.WORK_YY
+		                    , S.SEND_TYPE
+		                    , S.HALF_TYPE
+		                    , S.INCOME_TYPE
+		                    , S.PAY_ACTION_CD
+		                    , S.CHK_YN
+		                    , S.YM
+		                    , SYSDATE
+		                    , #ssnSabun#
+		                )
+	        ]]>
+	</query>
+	<!-- 인정상여 저장 -->
+	<query id="updateEtcBouns">
+	        <![CDATA[
+	            UPDATE TCPN011
+	            SET ATTRIBUTE_8     = #attribute_8#
+	              , CHKDATE         = SYSDATE
+	            WHERE ENTER_CD      = #ssnEnterCd#
+	              AND ELEMENT_CD    = #element_cd#
+	              AND SDATE         = (SELECT MAX(B.SDATE)
+	                                   FROM TCPN011 B
+	                                   WHERE B.ENTER_CD = #ssnEnterCd#
+	                                     AND B.ELEMENT_CD = #element_cd#
+	                                     AND TO_CHAR(TO_DATE(REPLACE(#searchYMD#,'-',''),'YYYYMMDD'),'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE,'99991231'))
+	        ]]>
+	</query>
+
+</root>

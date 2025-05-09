@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="tim.workApp.extenWorkAppDet">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppDet">
+
+				<![CDATA[
+					SELECT    ENTER_CD
+							, APPL_SEQ
+							, SABUN
+							, YMD
+							, SUBSTR(REQ_S_HM, 1, 2) AS REQ_SH
+							, SUBSTR(REQ_S_HM, 3, 4) AS REQ_SM
+							, SUBSTR(REQ_E_HM, 1, 2) AS REQ_EH
+							, SUBSTR(REQ_E_HM, 3, 4) AS REQ_EM
+							, REASON					     
+							, ( SELECT OUT_HM
+					           FROM TTIM335 X
+					          WHERE X.ENTER_CD = A.ENTER_CD
+					            AND X.SABUN    = A.SABUN
+					            AND X.YMD      = A.YMD ) AS OUT_HM  -- 퇴근시간
+					FROM      TTIM611 A
+					WHERE     ENTER_CD = TRIM(#{ssnEnterCd})
+					AND       SABUN    = TRIM(#{searchApplSabun})
+					AND 	  APPL_SEQ = TRIM(#{searchApplSeq})
+				]]>
+
+
+		</select>
+
+<!-- 		근무코드 리스트 -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppDetWorkCd">
+
+				<![CDATA[
+		            SELECT C.WORK_CD   AS CODE 
+		                 , C.WORK_S_NM  AS CODE_NM
+		                 , C.WORK_CD_TYPE
+		                 , ( SELECT REQUEST_HOUR
+		                       FROM TTIM612 X
+		                      WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+		                        AND X.APPL_SEQ = TRIM(#{searchApplSeq})
+		                        AND X.WORK_CD  = C.WORK_CD
+		                   ) AS REQUEST_HOUR
+		              FROM TTIM120_v A, TTIM018 B, TTIM015 C
+		             WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+		               AND A.SABUN    = TRIM(#{searchApplSabun})
+		               AND A.YMD      = REPLACE(TRIM( #{searchYmd} ), '-', '')
+		               AND A.ENTER_CD = B.ENTER_CD
+		               AND A.TIME_CD  = B.TIME_CD
+		               AND B.ENTER_CD = C.ENTER_CD
+		               AND B.WORK_CD  = C.WORK_CD
+		               AND C.WORK_CD <> '0010'
+		             GROUP BY C.WORK_CD, C.WORK_S_NM, C.SEQ, C.WORK_CD_TYPE
+		             ORDER BY C.SEQ
+	             
+				]]>
+
+
+		</select>
+<!-- 연장근무시간 조회  -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppDetWorkInfo">
+
+				<![CDATA[
+					SELECT SUBSTR(B.BEGIN_SHM, 1,2) ||':'||SUBSTR(B.BEGIN_SHM, 3,4) AS BEGIN_SHM	-- 인정시작시간
+
+						 , C.S_YMD AS WEEK_SDATE    -- 단위기간 시작일자
+						 , C.E_YMD AS WEEK_EDATE    -- 단위기간 기준 종료일자
+                         , F_TIM_GET_OT_WORK_TIME(A.ENTER_CD, A.SABUN, A.WORK_GRP_CD, A.YMD, 'W') AS SUM_WEEK_OT_TIME	-- 주 합계
+                         , F_TIM_GET_OT_WORK_TIME(A.ENTER_CD, A.SABUN, A.WORK_GRP_CD, A.YMD, 'T') AS SUM_TERM_OT_TIME	-- 단위기간 합계
+                         , B.WORK_SHM
+                         , A.TIME_CD
+                         , F_TIM_GET_STD_WORK_TIME(A.ENTER_CD, A.TIME_CD, '201') AS HOLWORK_TIME_TOTAL  -- T10017(근무코드구분) : 201(휴일근무) (휴일기본근무 근무시간 합산)
+					  FROM TTIM120_V A
+					     , TTIM017 B
+					     , TABLE(EMP_WORK_TERM( TRIM( #{ssnEnterCd}), TRIM( #{searchApplSabun} ), REPLACE(TRIM( #{searchYmd} ), '-', ''))) C
+					 WHERE A.ENTER_CD    =  #{ssnEnterCd}
+					   AND A.SABUN       = TRIM( #{searchApplSabun} )
+					   AND A.YMD         = REPLACE(TRIM( #{searchYmd} ), '-', '')
+					   AND A.ENTER_CD    = B.ENTER_CD
+					   AND A.TIME_CD     = B.TIME_CD
+					   AND A.WORK_GRP_CD = C.WORK_GRP_CD
+                       AND A.YMD BETWEEN C.S_YMD AND C.E_YMD
+
+				]]>
+
+
+		</select>
+
+<!-- 재직상태, 휴일  체크  -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppDetHoliChk">
+
+				<![CDATA[
+					SELECT F_COM_GET_STATUS_CD( #{ssnEnterCd} , TRIM( #{searchApplSabun} ), REPLACE(TRIM( #{searchYmd} ), '-', '')) AS STATUS_CD --재직상태
+					     , F_TIM_GET_HOLIDAY_CNT( #{ssnEnterCd} , TRIM( #{searchApplSabun} ), TRIM( 'HOLCHK' ), TRIM( nvl(REPLACE(TRIM( #{searchYmd} ), '-', ''), '99991231') ), TRIM( nvl(REPLACE(TRIM( #{searchYmd} ), '-', ''), '99991231') )) AS HOLIDAY_CNT --휴일인지 여부
+					     , ( SELECT OUT_HM
+					           FROM TTIM335 X
+					          WHERE X.ENTER_CD = A.ENTER_CD
+					            AND X.SABUN    = A.SABUN
+					            AND X.YMd      = A.YMD ) AS OUT_HM  -- 퇴근시간
+					     , A.WORK_ORG_CD
+					     , A.TIME_CD       
+					  FROM TTIM120_V A
+					 WHERE A.ENTER_CD    =  #{ssnEnterCd}
+					   AND A.SABUN       = TRIM( #{searchApplSabun} )
+					   AND A.YMD         = REPLACE(TRIM( #{searchYmd} ), '-', '')
+				]]>
+
+
+		</select>
+
+<!-- 근무시간 계산  -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppDetTime">
+
+					SELECT 
+<bind name="icnt" value="1" />
+<foreach item="rtitles" collection="titles" separator="," >
+							F_TIM_WORK_INFO_TEMP_HOUR(#{ssnEnterCd}, #{searchSabun}, REPLACE(TRIM( #{searchYmd} ), '-', ''), TRIM( #{sHm} ), TRIM( #{eHm} ), #{rtitles.code}) AS TIME${icnt} ,
+							#{rtitles.code} AS CODE${icnt}
+							, #{rtitles.workCdType} AS WORK_CD_TYPE${icnt}
+							
+<bind name="icnt" value="icnt + 1" />
+</foreach>
+					  FROM DUAL
+
+		</select>
+
+<!-- 기 신청 건 체크   -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppDetDupCnt">
+
+				<![CDATA[
+					SELECT COUNT(1) AS DUP_CNT
+					  FROM TTIM611 A, THRI103 B
+					 WHERE A.ENTER_CD     = #{ssnEnterCd}
+					   AND A.SABUN        = #{searchApplSabun}
+					   AND A.APPL_SEQ    != #{searchApplSeq}
+					   AND A.YMD          = REPLACE( #{searchYmd} ,'-','')
+					   AND A.ENTER_CD = B.ENTER_CD
+					   AND A.APPL_SEQ = B.APPL_SEQ
+					   AND B.APPL_STATUS_CD NOT IN ( '11', '23', '33', 'ZZ' )   -- 11:임시저장, 23:결재반려, 33:수신반려, ZZ:취소완료
+				]]>
+
+
+		</select>
+
+<!-- 신청시간 및 한도 체크   -->
+		<select parameterType="map" resultType="cMap" id="getExtenWorkAppDetCheckTime">
+
+				<![CDATA[
+					SELECT F_TIM_GET_OT_WORK_TIME_CHECK( #{ssnEnterCd}, #{searchApplSabun}, REPLACE( #{searchYmd} ,'-',''), TRIM( #{requestHour} )) AS CHK_MSG
+					  FROM DUAL
+				]]>
+
+
+		</select>
+
+
+
+<!-- 연장근무추가신청 세부내역 저장 -->
+		<update parameterType="map" id="saveExtenWorkAppDet">
+
+					MERGE INTO TTIM611 T
+					USING	
+					(   
+						       SELECT TRIM(#{ssnEnterCd})  				AS  ENTER_CD
+						            , TRIM(#{searchApplSeq})  			AS  APPL_SEQ
+						            , TRIM(#{searchApplSabun})			AS  SABUN
+						            , REPLACE(TRIM(#{searchYmd}),'-','')	AS  YMD
+						            , TRIM(#{reqSh})	|| TRIM(#{reqSm})		AS  REQ_S_HM
+						            , TRIM(#{reqEh})	|| TRIM(#{reqEm})		AS  REQ_E_HM
+						            , TRIM(#{reason})  					AS  REASON
+						        FROM DUAL
+						  
+					) S
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.APPL_SEQ = S.APPL_SEQ 
+					     AND  T.SABUN    = S.SABUN 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+						        , T.YMD				= S.YMD
+								, T.REQ_S_HM		= S.REQ_S_HM
+								, T.REQ_E_HM		= S.REQ_E_HM
+								, T.REASON			= S.REASON
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+								, T.YMD
+								, T.REQ_S_HM
+								, T.REQ_E_HM
+								, T.REASON
+								, T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+								, S.YMD
+								, S.REQ_S_HM
+								, S.REQ_E_HM
+								, S.REASON
+								, SYSDATE
+								, #{ssnSabun}
+						)
+		</update>
+
+
+<!-- 연장근무추가신청 세부내역 저장 -->
+		<update parameterType="map" id="saveExtenWorkAppDet2">
+
+					MERGE INTO TTIM612 T
+					USING	
+					(   
+						SELECT ENTER_CD
+						     , APPL_SEQ
+						     , WORK_CD
+						     , NVL(REQUEST_HOUR, 0) AS REQUEST_HOUR
+						 FROM (    
+						
+						       SELECT TRIM(#{ssnEnterCd})  					AS  ENTER_CD
+						            , TRIM(#{searchApplSeq})  				AS  APPL_SEQ
+						            , TRIM(#{workCd1}) 						AS  WORK_CD
+						            , TRIM(#{requestHour1}) 					AS  REQUEST_HOUR
+						        FROM DUAL
+						        UNION ALL
+						       SELECT TRIM(#{ssnEnterCd})  					AS  ENTER_CD
+						            , TRIM(#{searchApplSeq})  				AS  APPL_SEQ
+						            , TRIM(#{workCd2}) 						AS  WORK_CD
+						            , TRIM(#{requestHour2}) 					AS  REQUEST_HOUR
+						        FROM DUAL
+						        UNION ALL
+						       SELECT TRIM(#{ssnEnterCd})  					AS  ENTER_CD
+						            , TRIM(#{searchApplSeq})  				AS  APPL_SEQ
+						            , TRIM(#{workCd3}) 						AS  WORK_CD
+						            , TRIM(#{requestHour3}) 					AS  REQUEST_HOUR
+						        FROM DUAL
+						        UNION ALL
+						       SELECT TRIM(#{ssnEnterCd})  					AS  ENTER_CD
+						            , TRIM(#{searchApplSeq})  				AS  APPL_SEQ
+						            , TRIM(#{workCd4}) 						AS  WORK_CD
+						            , TRIM(#{requestHour4}) 					AS  REQUEST_HOUR
+						        FROM DUAL
+						        UNION ALL
+						       SELECT TRIM(#{ssnEnterCd})  						AS  ENTER_CD
+						            , TRIM(#{searchApplSeq})  				AS  APPL_SEQ
+						            , TRIM(#{workCd5}) 						AS  WORK_CD
+						            , TRIM(#{requestHour5}) 					AS  REQUEST_HOUR
+						        FROM DUAL
+						      )
+						 WHERE WORK_CD IS NOT NULL
+						  
+					) S
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.APPL_SEQ = S.APPL_SEQ 
+					     AND  T.WORK_CD  = S.WORK_CD 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE			= sysdate 
+					            , T.CHKID			= #{ssnSabun}
+						        , T.REQUEST_HOUR	= S.REQUEST_HOUR
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.WORK_CD
+								, T.REQUEST_HOUR
+								, T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.WORK_CD
+								, S.REQUEST_HOUR
+								, SYSDATE
+								, #{ssnSabun}
+						)
+		</update>
+
+
+</mapper>

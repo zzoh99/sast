@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.payRateStd.tab1">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayRateTab1StdList">
+				<![CDATA[
+					SELECT   PAY_CD
+					       , ORD_DETAIL_CD 
+					       , ORD_DETAIL_REASON
+					       , SEQ 
+					       , F_WORK_MONTH 
+					       , T_WORK_MONTH 
+					       , F_REST_PERIOD 
+					       , T_REST_PERIOD 
+					       , ELEMENT_SET_CD 
+					       , RATE 
+					       , PERIOD_TYPE
+					       , REVERSE_PERIOD_YN					       
+					 FROM TCPN009       /* TCPN009  */ 
+					 WHERE ENTER_CD = #{ssnEnterCd}
+					 ORDER BY PAY_CD, ORD_DETAIL_CD, SEQ
+				]]>
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePayRateTab1Std">
+					MERGE INTO TCPN009 T
+					USING	(
+							SELECT	A.SEQ
+							        , A.PAY_CD
+                                    , A.ORD_DETAIL_CD
+                                    , A.ORD_DETAIL_REASON
+									, A.F_WORK_MONTH
+									, A.T_WORK_MONTH
+									, A.F_REST_PERIOD
+									, A.T_REST_PERIOD
+									, A.ELEMENT_SET_CD
+									, A.RATE
+									, A.PERIOD_TYPE
+									, A.REVERSE_PERIOD_YN									
+							FROM	(
+									SELECT	  NULL      AS SEQ
+                                            , NULL      AS PAY_CD                
+                                            , NULL      AS ORD_DETAIL_CD      
+                                            , NULL		AS ORD_DETAIL_REASON          
+											, NULL		AS F_WORK_MONTH                     
+											, NULL		AS T_WORK_MONTH                     
+											, NULL		AS F_REST_PERIOD                    
+											, NULL		AS T_REST_PERIOD                    
+											, NULL		AS ELEMENT_SET_CD                   
+                                            , NULL      AS RATE         
+                                            , NULL      AS PERIOD_TYPE
+                                            , NULL      AS REVERSE_PERIOD_YN                                                                
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											<choose>
+											<when test='rm.seq != null and !rm.seq.equals("")'>
+											   TRIM(#{rm.seq}) 			AS SEQ
+											</when>
+											<when test='rm.seq != null and !rm.seq.equals("")'>
+												TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER(SEQ)),0) + ${icnt})
+												          FROM TCPN009
+												          WHERE ENTER_CD = #{ssnEnterCd}
+												          AND PAY_CD = #{rm.payCd}
+												          AND ORD_DETAIL_CD = #{rm.ordDetailCd}
+												          ) )	AS SEQ
+												<bind name="icnt" value="icnt + 1" />
+											</when>
+											</choose>
+											, TRIM(#{rm.payCd})           AS PAY_CD
+                                            , TRIM(#{rm.ordDetailCd})     AS ORD_DETAIL_CD
+                                            , TRIM(#{rm.ordDetailReason}) AS ORD_DETAIL_REASON
+											, TRIM(#{rm.fWorkMonth})      AS F_WORK_MONTH
+											, TRIM(#{rm.tWorkMonth})      AS T_WORK_MONTH
+											, TRIM(#{rm.fRestPeriod})     AS F_REST_PERIOD
+											, TRIM(#{rm.tRestPeriod})     AS T_REST_PERIOD
+											, TRIM(#{rm.elementSetCd})    AS ELEMENT_SET_CD
+											, TRIM(#{rm.rate})            AS RATE
+											, TRIM(#{rm.periodType})      AS PERIOD_TYPE
+											, TRIM(#{rm.reversePeriodYn})      AS REVERSE_PERIOD_YN
+											FROM   DUAL
+</foreach>
+									) A
+							WHERE A.PAY_CD IS NOT NULL
+							  AND A.ORD_DETAIL_CD IS NOT NULL 
+							) S
+					ON ( T.ENTER_CD		= #{ssnEnterCd}
+					AND  T.PAY_CD = S.PAY_CD
+					AND  T.ORD_DETAIL_CD = S.ORD_DETAIL_CD
+                    AND  T.SEQ = S.SEQ 
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.F_WORK_MONTH      = S.F_WORK_MONTH      
+									, T.T_WORK_MONTH      = S.T_WORK_MONTH      
+									, T.F_REST_PERIOD     = S.F_REST_PERIOD     
+									, T.T_REST_PERIOD     = S.T_REST_PERIOD     
+                                    , T.ELEMENT_SET_CD    = S.ELEMENT_SET_CD    
+                                    , T.RATE              = S.RATE          
+                                    , T.ORD_DETAIL_REASON = S.ORD_DETAIL_REASON    
+                                    , T.PERIOD_TYPE       = S.PERIOD_TYPE    
+                                    , T.REVERSE_PERIOD_YN       = S.REVERSE_PERIOD_YN                                      
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD -- KEY
+							, T.PAY_CD -- KEY
+							, T.ORD_DETAIL_CD -- KEY
+							, T.SEQ -- KEY
+							, T.F_WORK_MONTH
+							, T.T_WORK_MONTH
+							, T.F_REST_PERIOD
+							, T.T_REST_PERIOD
+							, T.ELEMENT_SET_CD
+							, T.RATE
+							, T.CHKDATE
+							, T.CHKID
+							, T.ORD_DETAIL_REASON
+							, T.PERIOD_TYPE
+							, T.REVERSE_PERIOD_YN														
+						) 
+						VALUES 
+						(
+                              #{ssnEnterCd} -- KEY
+                            , S.PAY_CD -- KEY
+                            , S.ORD_DETAIL_CD -- KEY
+                            , S.SEQ -- KEY
+                            , S.F_WORK_MONTH
+                            , S.T_WORK_MONTH
+                            , S.F_REST_PERIOD
+                            , S.T_REST_PERIOD
+                            , S.ELEMENT_SET_CD
+                            , S.RATE
+							, SYSDATE
+							, #{ssnSabun}
+							, S.ORD_DETAIL_REASON
+							, S.PERIOD_TYPE
+							, S.REVERSE_PERIOD_YN							
+						)
+
+
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayRateTab1Std">
+					DELETE FROM TCPN009 
+					WHERE 	(ENTER_CD, PAY_CD, ORD_DETAIL_CD, SEQ) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										  <if test='rm.payCd != null and !rm.payCd.equals("")'>
+                                            <if test='rm.ordDetailCd != null and !rm.ordDetailCd.equals("")'>
+                                              <if test='rm.seq != null and !rm.seq.equals("")'>
+											   (#{ssnEnterCd}, TRIM( #{rm.payCd} ), TRIM( #{rm.ordDetailCd} ), TRIM( #{rm.seq} ) )
+											  </if>
+											</if>
+										  </if>
+										</if>
+</foreach>
+										)
+		</delete>
+		
+<!-- 		생성 -->	
+		<insert parameterType="map" id="insertPayRateTab1Std">
+
+						INSERT INTO MainMnStdTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+
+
+
+		</insert>
+		
+<!-- 		수정 -->
+		<update parameterType="map" id="updatePayRateTab1Std">
+					UPDATE ZTST002 T SET 
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID 
+						) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT   
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+		
+	</mapper>

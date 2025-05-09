@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	원천세항목관리
+ -->
+<root>
+
+	<!-- 원천세 항목 조회  -->
+	<query id="selectOtaxEleMgrList">
+		<![CDATA[
+				SELECT ENTER_CD,
+				       TAX_ELE_CD,
+				       SDATE,
+				       EDATE,
+				       TAX_ELE_NM,
+				       TAX_ELE_TYPE,
+				       INCOME_NM1,
+				       INCOME_NM2,
+				       INCOME_NM3,
+				       INCOME_NM4,
+				       INWON_YN,
+				       PAYMENT_MON_YN,
+				       PAYE_ITAX_YN,
+				       PAYE_ATAX_YN,
+				       PAYE_ADDTAX_YN,
+				       REFUND_YN,
+				       PAY_ITAX_YN,
+				       PAY_ATAX_YN,
+				       SEQ,
+				       M_TAX_ELE_CD,
+				       ATT_TAX_ELE_CD,
+				       CHKDATE,
+				       CHKID
+				FROM (SELECT A.*
+				        FROM TCPN911 A
+				       WHERE A.ENTER_CD = #ssnEnterCd# 
+				         AND A.SDATE = (SELECT MAX(G.SDATE)
+										  FROM TCPN911 G
+										 WHERE G.ENTER_CD = A.ENTER_CD
+										   AND G.SDATE <= NVL(REPLACE(#searchYmd#,'-',''),TO_CHAR(SYSDATE, 'YYYYMMDD')))			
+					  )
+				WHERE NVL(REPLACE(#searchYmd#,'-',''),TO_CHAR(sysdate, 'YYYYMMDD')) BETWEEN SDATE AND NVL(EDATE,'99991231')
+				  AND TAX_ELE_NM LIKE '%'||#searchEleNm#||'%'
+				ORDER BY SEQ							 
+			]]> 
+	</query>
+
+	<query id="selectOtaxEleMgrCnt">
+		<![CDATA[
+            SELECT COUNT(*) AS CNT
+            FROM ( SELECT ENTER_CD, TAX_ELE_CD, SDATE
+                   FROM TCPN911
+                   WHERE ENTER_CD = #ssnEnterCd#
+                 ) A
+            WHERE A.ENTER_CD = #ssnEnterCd#
+              AND A.TAX_ELE_CD = #tax_ele_cd#
+              AND A.SDATE = #sdate#
+        ]]>
+	</query>
+
+	<query id="deleteOtaxEleMgr">
+		<![CDATA[
+					DELETE FROM TCPN911
+					 WHERE ENTER_CD = #ssnEnterCd#
+					   AND TAX_ELE_CD = #tax_ele_cd#
+					   AND SDATE = #sdate#
+		]]>
+	</query>
+			
+	<query id="mergeOtaxEleMgr">
+		<![CDATA[
+					MERGE INTO TCPN911 T
+					USING	(
+							SELECT A.TAX_ELE_CD,
+							       A.SDATE,
+							       A.TAX_ELE_NM,
+							       A.TAX_ELE_TYPE,
+							       A.INCOME_NM1,
+							       A.INCOME_NM2,
+							       A.INCOME_NM3,
+							       A.INCOME_NM4,
+							       A.INWON_YN,
+							       A.PAYMENT_MON_YN,
+							       A.PAYE_ITAX_YN,
+							       A.PAYE_ATAX_YN,
+							       A.PAYE_ADDTAX_YN,
+							       A.REFUND_YN,
+							       A.PAY_ITAX_YN,
+							       A.PAY_ATAX_YN,
+							       A.SEQ,
+							       A.M_TAX_ELE_CD,
+							       A.ATT_TAX_ELE_CD
+							  FROM (
+									SELECT  #tax_ele_cd#          AS TAX_ELE_CD,    
+											#sdate#               AS SDATE,         
+											#tax_ele_nm#          AS TAX_ELE_NM,            
+											#tax_ele_type#        AS TAX_ELE_TYPE,  
+											#income_nm1#          AS INCOME_NM1,    
+											#income_nm2#          AS INCOME_NM2,    
+											#income_nm3#          AS INCOME_NM3,    
+											#income_nm4#          AS INCOME_NM4,    
+											#inwon_yn#            AS INWON_YN,      
+											#payment_mon_yn#      AS PAYMENT_MON_YN,
+											#paye_itax_yn#        AS PAYE_ITAX_YN,  
+											#paye_atax_yn#        AS PAYE_ATAX_YN,  
+											#paye_addtax_yn#      AS PAYE_ADDTAX_YN,
+											#refund_yn#           AS REFUND_YN,     
+											#pay_itax_yn#         AS PAY_ITAX_YN,   
+											#pay_atax_yn#         AS PAY_ATAX_YN,   
+											#seq#                 AS SEQ,           
+											#m_tax_ele_cd#        AS M_TAX_ELE_CD,  
+											#att_tax_ele_cd#      AS ATT_TAX_ELE_CD
+									  FROM DUAL
+									) A
+							 WHERE A.TAX_ELE_CD	IS NOT NULL
+							) S
+					ON (	T.ENTER_CD	= #ssnEnterCd#
+						AND	T.TAX_ELE_CD	= S.TAX_ELE_CD
+						AND T.SDATE 		= S.SDATE
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.TAX_ELE_NM     =S.TAX_ELE_NM     
+							     , T.TAX_ELE_TYPE   =S.TAX_ELE_TYPE   
+							     , T.INCOME_NM1     =S.INCOME_NM1     
+							     , T.INCOME_NM2     =S.INCOME_NM2     
+							     , T.INCOME_NM3     =S.INCOME_NM3     
+							     , T.INCOME_NM4     =S.INCOME_NM4     
+							     , T.INWON_YN       =S.INWON_YN       
+							     , T.PAYMENT_MON_YN =S.PAYMENT_MON_YN 
+							     , T.PAYE_ITAX_YN   =S.PAYE_ITAX_YN   
+							     , T.PAYE_ATAX_YN   =S.PAYE_ATAX_YN   
+							     , T.PAYE_ADDTAX_YN =S.PAYE_ADDTAX_YN 
+							     , T.REFUND_YN      =S.REFUND_YN      
+							     , T.PAY_ITAX_YN    =S.PAY_ITAX_YN    
+							     , T.PAY_ATAX_YN    =S.PAY_ATAX_YN    
+							     , T.SEQ            =S.SEQ            
+							     , T.M_TAX_ELE_CD   =S.M_TAX_ELE_CD   
+							     , T.ATT_TAX_ELE_CD =S.ATT_TAX_ELE_CD 
+								 , T.CHKDATE		= SYSDATE
+								 , T.CHKID			= #ssnSabun#
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							 T.ENTER_CD      
+							,T.TAX_ELE_CD    
+							,T.SDATE         
+							,T.TAX_ELE_NM    
+							,T.TAX_ELE_TYPE  
+							,T.INCOME_NM1    
+							,T.INCOME_NM2    
+							,T.INCOME_NM3    
+							,T.INCOME_NM4    
+							,T.INWON_YN      
+							,T.PAYMENT_MON_YN
+							,T.PAYE_ITAX_YN  
+							,T.PAYE_ATAX_YN  
+							,T.PAYE_ADDTAX_YN
+							,T.REFUND_YN     
+							,T.PAY_ITAX_YN   
+							,T.PAY_ATAX_YN   
+							,T.SEQ           
+							,T.M_TAX_ELE_CD  
+							,T.ATT_TAX_ELE_CD
+							,T.CHKDATE       
+							,T.CHKID         
+						)
+						VALUES
+						(
+							 #ssnEnterCd#
+							, S.TAX_ELE_CD    
+							, S.SDATE         
+							, S.TAX_ELE_NM    
+							, S.TAX_ELE_TYPE  
+							, S.INCOME_NM1    
+							, S.INCOME_NM2    
+							, S.INCOME_NM3    
+							, S.INCOME_NM4    
+							, S.INWON_YN      
+							, S.PAYMENT_MON_YN
+							, S.PAYE_ITAX_YN  
+							, S.PAYE_ATAX_YN  
+							, S.PAYE_ADDTAX_YN
+							, S.REFUND_YN     
+							, S.PAY_ITAX_YN   
+							, S.PAY_ATAX_YN   
+							, S.SEQ           
+							, S.M_TAX_ELE_CD  
+							, S.ATT_TAX_ELE_CD
+							, SYSDATE
+							, #ssnSabun#
+						)
+		]]> 
+	</query>	
+</root>

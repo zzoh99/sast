@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 소급예외수당관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payRetroact.retroExceAllowDedMgr">
+		<select parameterType="map" resultType="cMap" id="getRetroExceAllowDedMgrList">
+
+				<![CDATA[
+					SELECT A.PAY_ACTION_CD
+						 , TRIM(E.PAY_ACTION_NM) AS PAY_ACTION_NM
+						 , A.RTR_PAY_ACTION_CD
+						 , C.ELEMENT_CD
+						 , NVL(F_COM_GET_LANGUAGE_MAPPING (#{ssnEnterCd}, 'tcpn011', C.LANGUAGE_CD, #{ssnLocaleCd}), C.ELEMENT_NM) ELEMENT_NM
+						 , B.PAY_YM
+						 , B.PAY_CD
+						 , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn051', D.LANGUAGE_CD, #{ssnLocaleCd}), D.PAY_NM) AS PAY_NM
+						 , (SELECT CLOSE_YN FROM TCPN981 WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS CLOSE_YN
+						 , (SELECT TRIM(PAY_ACTION_NM) FROM TCPN201 WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.RTR_PAY_ACTION_CD) AS RTR_PAY_ACTION_NM
+					  FROM TCPN519 A
+						 , TCPN201 B
+						 , TCPN011 C
+						 , TCPN051 D
+						 , TCPN201 E
+					 WHERE A.ENTER_CD			= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD		= #{payActionCd}
+					           			]]>
+					<if test='elementCd != null and !elementCd.equals("")'>
+					   AND A.ELEMENT_CD			= #{elementCd}
+					</if>
+					<if test='rtrPayActionCd != null and !rtrPayActionCd.equals("")'>
+					   AND A.RTR_PAY_ACTION_CD	= #{rtrPayActionCd}
+					</if>
+					   AND A.ENTER_CD			= B.ENTER_CD
+					   AND A.PAY_ACTION_CD		= B.PAY_ACTION_CD
+					   AND A.ENTER_CD			= C.ENTER_CD
+					   AND A.ELEMENT_CD			= C.ELEMENT_CD
+					   AND B.ENTER_CD			= D.ENTER_CD
+					   AND B.PAY_CD				= D.PAY_CD
+					   AND C.SDATE				= (SELECT MAX(SDATE)
+					     							 FROM TCPN011
+					     							WHERE ENTER_CD = A.ENTER_CD
+					     							  AND ELEMENT_CD = A.ELEMENT_CD
+					     							  AND B.PAYMENT_YMD BETWEEN SDATE AND NVL(EDATE,'99991231'))
+					   AND E.ENTER_CD(+)		= A.ENTER_CD
+					   AND E.PAY_ACTION_CD(+)	= A.PAY_ACTION_CD
+					ORDER BY A.PAY_ACTION_CD DESC, A.RTR_PAY_ACTION_CD DESC, B.PAY_CD, C.ELEMENT_CD
+
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getRetroExceAllowDedMgrDtlList">
+
+				<![CDATA[
+					SELECT A.SABUN
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) AS NAME
+						 , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS ALIAS
+						 , F_COM_GET_JIKGUB_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKGUB_NM
+						 , F_COM_GET_JIKWEE_NM (A.ENTER_CD, A.SABUN, TO_CHAR (SYSDATE, 'YYYYMMDD')) AS JIKWEE_NM
+						 , A.PAY_ACTION_CD
+						 , A.RTR_PAY_ACTION_CD
+						 , A.ELEMENT_CD
+						 , A.GUBUN
+						 , A.MON
+						 , TRIM(A.NOTE) AS NOTE
+						 ,(SELECT CLOSE_YN	FROM TCPN981 WHERE ENTER_CD = A.ENTER_CD AND PAY_ACTION_CD = A.PAY_ACTION_CD) AS CLOSE_YN
+					  FROM TCPN520 A
+						 , THRM100 B
+					 WHERE A.ENTER_CD			= #{ssnEnterCd}
+					           		]]>
+
+			<if test='sabunName != null and !sabunName.equals("")'>
+						   AND A.SABUN||F_COM_GET_NAMES(B.ENTER_CD,B.SABUN) LIKE '%'||trim(#{sabunName})||'%'
+			</if>
+					   AND A.PAY_ACTION_CD		= #{payActionCd}
+					   AND A.RTR_PAY_ACTION_CD	= #{rtrPayActionCd}
+					   AND A.ELEMENT_CD			= #{elementCd}
+					   AND A.ENTER_CD			= B.ENTER_CD
+					   AND A.SABUN				= B.SABUN
+					ORDER BY B.NAME, A.GUBUN
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getRetroExceAllowDedMgrRtrPayActionList">
+
+				<![CDATA[
+					SELECT A.PAY_ACTION_CD
+						 , TRIM(A.PAY_ACTION_NM) AS PAY_ACTION_NM
+						 , C.RTR_PAY_ACTION_CD
+						 , TRIM(C.PAY_ACTION_NM) AS RTR_PAY_ACTION_NM
+						 , A.PAY_YM
+						 , A.PAY_CD
+						 , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn051', B.LANGUAGE_CD, #{ssnLocaleCd}), B.PAY_NM) AS PAY_NM
+						 , B.RUN_TYPE
+						 , A.PAYMENT_YMD
+						 , A.ORD_SYMD
+						 , A.ORD_EYMD
+						 , A.TIME_YM
+						 , A.CAL_TAX_METHOD
+						 , A.CAL_TAX_SYM
+						 , A.CAL_TAX_EYM
+						 , A.ADD_TAX_RATE
+						 , A.BON_SYMD
+						 , A.BON_EYMD
+						 , A.GNT_SYMD
+						 , A.GNT_EYMD
+						 , A.BON_CAL_TYPE
+						 , A.BON_STD_CNT
+						 , A.BON_APPLY_TYPE
+						 , A.BON_MON_RATE
+						 , A.PAYMENT_METHOD
+						 ,(SELECT COUNT(*) FROM TCPN203 WHERE ENTER_CD=A.ENTER_CD AND PAY_ACTION_CD=A.PAY_ACTION_CD) MAN_CNT
+					  FROM TCPN201 A
+						 , TCPN051 B
+						 , TCPN503 C
+					 WHERE A.ENTER_CD			= #{ssnEnterCd}
+						   AND A.PAY_ACTION_CD	= #{payActionCd}
+						   AND A.ENTER_CD		= B.ENTER_CD
+						   AND A.PAY_CD			= B.PAY_CD
+						   AND A.ENTER_CD		= C.ENTER_CD
+						   AND A.PAY_ACTION_CD	= C.PAY_ACTION_CD
+					ORDER BY A.PAY_ACTION_CD DESC, C.RTR_PAY_ACTION_CD DESC, A.PAY_YM DESC, A.PAYMENT_YMD DESC
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getRetroExceAllowDedMgrElementList">
+
+				<![CDATA[
+					SELECT A.PAY_ACTION_CD
+						 , A.RTR_PAY_ACTION_CD, A.ELEMENT_CD, A.ELEMENT_NM
+						 , B.PAY_ACTION_NM, C.PAY_ACTION_NM AS RTR_PAY_ACTION_NM
+					  FROM TCPN504 A
+						 , TCPN201 B
+						 , TCPN503 C
+					 WHERE A.ENTER_CD				= #{ssnEnterCd}
+						   AND A.PAY_ACTION_CD		= #{payActionCd}
+						           		]]>
+						<if test='rtrPayActionCd != null and !rtrPayActionCd.equals("")'>
+						   AND A.RTR_PAY_ACTION_CD	= #{rtrPayActionCd}
+						</if>
+						   AND A.ENTER_CD			= B.ENTER_CD
+						   AND A.PAY_ACTION_CD		= B.PAY_ACTION_CD
+						   AND A.ENTER_CD			= C.ENTER_CD
+						   AND A.PAY_ACTION_CD		= C.PAY_ACTION_CD
+						   AND A.RTR_PAY_ACTION_CD	= C.RTR_PAY_ACTION_CD
+					ORDER BY A.ELEMENT_CD
+
+
+
+		</select>
+		<update parameterType="map" id="saveRetroExceAllowDedMgr">
+
+
+					MERGE INTO TCPN519 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.RTR_PAY_ACTION_CD
+								 , A.ELEMENT_CD
+							  FROM (
+									SELECT NULL		AS PAY_ACTION_CD
+										 , NULL		AS RTR_PAY_ACTION_CD
+										 , NULL		AS ELEMENT_CD
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.rtrPayActionCd})	AS RTR_PAY_ACTION_CD
+										 , TRIM(#{rm.elementCd})		AS ELEMENT_CD
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.PAY_ACTION_CD IS NOT NULL
+							   AND A.RTR_PAY_ACTION_CD IS NOT NULL
+							   AND A.ELEMENT_CD IS NOT NULL
+							) S
+					ON (	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD		= S.PAY_ACTION_CD
+						AND	T.RTR_PAY_ACTION_CD	= S.RTR_PAY_ACTION_CD
+						AND	T.ELEMENT_CD		= S.ELEMENT_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.RTR_PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.RTR_PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+		<update parameterType="map" id="saveRetroExceAllowDedMgrDtl">
+
+
+					MERGE INTO TCPN520 T
+					USING	(
+							SELECT A.SABUN
+								 , A.PAY_ACTION_CD
+								 , A.RTR_PAY_ACTION_CD
+								 , A.ELEMENT_CD
+								 , A.GUBUN
+								 , A.MON
+								 , A.NOTE
+							  FROM (
+									SELECT NULL		AS SABUN
+										 , NULL		AS PAY_ACTION_CD
+										 , NULL		AS RTR_PAY_ACTION_CD
+										 , NULL		AS ELEMENT_CD
+										 , NULL		AS GUBUN
+										 , NULL		AS MON
+										 , NULL		AS NOTE
+									  FROM DUAL
+<foreach item="rm" collection="mergeRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.sabun})			AS SABUN
+										 , TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.rtrPayActionCd})	AS RTR_PAY_ACTION_CD
+										 , TRIM(#{rm.elementCd})		AS ELEMENT_CD
+										 , TRIM(#{rm.gubun})			AS GUBUN
+										 , TRIM(#{rm.mon})				AS MON
+										 , TRIM(#{rm.note})				AS NOTE
+									  FROM DUAL
+</foreach>
+									) A
+							 WHERE A.SABUN IS NOT NULL
+							   AND A.PAY_ACTION_CD IS NOT NULL
+							   AND A.RTR_PAY_ACTION_CD IS NOT NULL
+							   AND A.ELEMENT_CD IS NOT NULL
+							) S
+					ON (	T.ENTER_CD			= #{ssnEnterCd}
+						AND	T.SABUN				= S.SABUN
+						AND	T.PAY_ACTION_CD		= S.PAY_ACTION_CD
+						AND	T.RTR_PAY_ACTION_CD	= S.RTR_PAY_ACTION_CD
+						AND	T.ELEMENT_CD		= S.ELEMENT_CD
+						)
+					WHEN MATCHED THEN
+						UPDATE SET T.GUBUN		= S.GUBUN
+								 , T.MON		= S.MON
+								 , T.NOTE		= S.NOTE
+								 , T.CHKDATE	= SYSDATE
+								 , T.CHKID		= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.PAY_ACTION_CD
+							, T.RTR_PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.GUBUN
+							, T.MON
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.SABUN
+							, S.PAY_ACTION_CD
+							, S.RTR_PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, S.GUBUN
+							, S.MON
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteRetroExceAllowDedMgr">
+
+
+					DELETE FROM TCPN519
+					WHERE 	(ENTER_CD, PAY_ACTION_CD, RTR_PAY_ACTION_CD, ELEMENT_CD) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+											<if test='rm.payActionCd != null and !rm.payActionCd.equals("")'>
+												<if test='rm.rtrPayActionCd != null and !rm.rtrPayActionCd.equals("")'>
+													<if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+														(#{ssnEnterCd}, TRIM( #{rm.payActionCd} ), TRIM( #{rm.rtrPayActionCd} ), TRIM( #{rm.elementCd} ))
+													</if>
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteRetroExceAllowDedMgrDtl">
+
+
+					DELETE FROM TCPN520
+					WHERE 	(ENTER_CD, SABUN, PAY_ACTION_CD, RTR_PAY_ACTION_CD, ELEMENT_CD) IN 	(  (NULL,NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+											<if test='rm.sabun != null and !rm.sabun.equals("")'>
+												<if test='rm.payActionCd != null and !rm.payActionCd.equals("")'>
+													<if test='rm.rtrPayActionCd != null and !rm.rtrPayActionCd.equals("")'>
+														<if test='rm.elementCd != null and !rm.elementCd.equals("")'>
+															(#{ssnEnterCd}, TRIM( #{rm.sabun} ), TRIM( #{rm.payActionCd} ), TRIM( #{rm.rtrPayActionCd} ), TRIM( #{rm.elementCd} ))
+														</if>
+													</if>
+												</if>
+											</if>
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+		<update parameterType="map" statementType="CALLABLE" id="RetroExceAllowDedMgrP_CPN_PAY_RETROACT_MAKE_ITEM">
+
+				<![CDATA[
+					CALL P_CPN_PAY_RETROACT_MAKE_ITEM(
+						#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+						#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+						#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+						#{payActionCd,mode=IN,jdbcType=VARCHAR},
+						#{rtrPayActionCd,mode=IN,jdbcType=VARCHAR},
+						#{elementCd,mode=IN,jdbcType=VARCHAR},
+						#{ssnSabun,mode=IN,jdbcType=VARCHAR}
+					)
+				]]>
+
+		</update>
+	</mapper>

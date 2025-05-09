@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 건강보험기본사항
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.healthInsurance.healthInsMgr">
+
+	<select id="getHealthInsMgrBasicMap" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.SABUN
+			 , A.IDENTITY_NO
+			 , TO_CHAR(TO_DATE(A.ACQ_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS ACQ_YMD
+			 , TO_CHAR(TO_DATE(A.LOSS_YMD,'YYYYMMDD'),'YYYY-MM-DD') AS LOSS_YMD
+		  FROM TBEN201 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+		   AND A.SABUN		= #{sabun}
+	]]>
+	</select>
+	
+	<select id="getHealthInsMgrChangeList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.SABUN
+			 , A.SEQ
+			 , A.SDATE
+			 , A.EDATE
+			 , A.SOC_CHANGE_CD
+			 , A.SOC_STATE_CD
+			 , A.GRADE
+			 , A.REDUCTION_RATE
+			 , A.REDUCTION_CD
+			 , A.REWARD_TOT_MON
+			 , A.REDUCTION_RATE2
+			 , A.MEMO
+			 , A.MON1
+			 , A.MON2
+			 , NVL(A.MON1,0)+NVL(A.MON2,0) AS MON3
+			 , A.MON4
+			 , A.MON5
+			 , NVL(A.MON4,0)+NVL(A.MON5,0) AS TOTAL_MON
+		  FROM TBEN203 A
+		 WHERE A.ENTER_CD	= #{ssnEnterCd}
+		   AND A.SABUN		= #{sabun}
+		ORDER BY A.SEQ DESC
+	]]>
+	</select>
+		
+	<select id="getHealthInsMgrPaymentList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT ENTER_CD
+			 , SABUN
+			 , PAYMENT_YMD
+			 , PAY_NM
+			 , SOC_DEDUCT_CD
+			 , GRADE
+			 , SELF_MON
+			 , ADD_SELF_MON
+			 , MON1
+			 , MON3
+			 , NVL(SELF_MON,0)+NVL(ADD_SELF_MON,0)+NVL(MON1,0)+NVL(MON3,0) AS TOT_HEALTH
+			 , SELF_MON2
+			 , ADD_SELF_MON2
+			 , MON2
+			 , MON4
+			 , NVL(SELF_MON2,0)+NVL(ADD_SELF_MON2,0)+NVL(MON2,0)+NVL(MON4,0) AS TOT_CONVAL
+			 , NVL(SELF_MON,0)+NVL(SELF_MON2,0) AS TOT_SELF_MON
+			 , NVL(ADD_SELF_MON,0)+NVL(ADD_SELF_MON2,0) AS TOT_ADD_SELF_MON
+			 , NVL(MON1,0)+NVL(MON2,0) AS TOT_ADJUST
+			 , NVL(MON3,0)+NVL(MON4,0) AS TOT_REFUND
+			 , NVL(SELF_MON,0)+NVL(SELF_MON2,0) AS SUM_TOT
+		  FROM (SELECT A.ENTER_CD
+					 , B.SABUN
+					 , A.PAYMENT_YMD
+					 , (SELECT PAY_NM FROM TCPN051 WHERE ENTER_CD = A.ENTER_CD AND PAY_CD = A.PAY_CD) AS PAY_NM
+					 , '10' AS SOC_DEDUCT_CD
+					 , NULL AS GRADE
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = '1020') AS SELF_MON
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = 'DA109') AS ADD_SELF_MON
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = 'DA110') AS MON1
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = 'DA111') AS MON3
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = '1010') AS SELF_MON2
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = 'DA113') AS ADD_SELF_MON2
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = 'DA114') AS MON2
+					 , (SELECT RESULT_MON
+						FROM TCPN205
+						WHERE ENTER_CD = B.ENTER_CD AND PAY_ACTION_CD = B.PAY_ACTION_CD AND SABUN = B.SABUN AND ELEMENT_CD = 'DA115') AS MON4
+				  FROM TCPN201 A
+					 , TCPN203 B
+				 WHERE A.ENTER_CD		= B.ENTER_CD
+				   AND A.PAY_ACTION_CD	= B.PAY_ACTION_CD
+				   AND A.PAY_CD = '01'
+				   AND A.ENTER_CD		= #{ssnEnterCd}
+				   AND B.SABUN			= #{sabun} ]]>
+				<if test="year != null and searchYmd neq ''">
+				   AND SUBSTR(A.PAY_YM,1,4) = #{year}
+				</if>
+			)
+		ORDER BY PAYMENT_YMD DESC
+	</select>
+		
+	<select id="getSelfMonLongTermCareMon" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT SELF_MON, LONGTERMCARE_MON - CEIL((LONGTERMCARE_MON * (NVL('0',0)/100))/10)*10 AS LONGTERMCARE_MON
+		  FROM (
+			 SELECT TRUNC(SELF_MON * (1-(NVL('0',0)/100)),-1) AS SELF_MON, F_BEN_HI_LONGTERMCARE_MON(#{ssnEnterCd},REPLACE( #{searchYmd} , '-',''),SELF_MON) LONGTERMCARE_MON
+			   FROM (
+			  SELECT F_BEN_HI_SELF_MON(#{ssnEnterCd}, REPLACE( #{searchYmd} , '-',''), #{searchRewardTotMon}) AS SELF_MON
+			  FROM DUAL
+		  )
+		)
+	]]>
+	</select>
+		
+	<select id="getSelfMonLongTermCareF_CPN_GET_UPDOWN_MON" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_BEN_INSURENCE_BASE_MON( #{ssnEnterCd}, '15', #{searchRewardTotMon}, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{reductionRate}, #{reductionRate2} ) AS SELF_MON
+		    ,  F_BEN_INSURENCE_BASE_MON( #{ssnEnterCd}, '15-1', #{searchRewardTotMon}, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{reductionRate}, #{reductionRate2} ) AS LONGTERMCARE_MON
+		  FROM DUAL
+	]]>
+	</select>
+		
+	<update id="saveHealthInsMgrBasic" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN201 T
+		USING	(
+				SELECT A.SABUN
+					 , A.ACQ_YMD
+					 , A.LOSS_YMD
+					 , A.IDENTITY_NO
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS ACQ_YMD
+							 , NULL	AS LOSS_YMD
+							 , NULL	AS IDENTITY_NO
+						  FROM DUAL
+						UNION ALL
+						SELECT TRIM(#{sabun})						AS SABUN
+							 , TRIM(REPLACE(#{acqYmd},'-',''))	AS ACQ_YMD
+							 , TRIM(REPLACE(#{lossYmd},'-',''))	AS LOSS_YMD
+							 , TRIM(#{identityNo})				AS IDENTITY_NO
+						  FROM DUAL
+						) A
+				WHERE A.SABUN IS NOT NULL
+				) S
+		ON	(	T.ENTER_CD	= #{ssnEnterCd}
+			AND	T.SABUN		= S.SABUN
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.ACQ_YMD		= S.ACQ_YMD
+					 , T.LOSS_YMD		= S.LOSS_YMD
+					 , T.IDENTITY_NO	= S.IDENTITY_NO
+					 , T.CHKDATE		= SYSDATE
+					 , T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				T.ENTER_CD
+			  , T.SABUN
+			  , T.ACQ_YMD
+			  , T.LOSS_YMD
+			  , T.IDENTITY_NO
+			  , T.CHKDATE
+			  , T.CHKID
+			)
+			VALUES
+			(
+				#{ssnEnterCd}
+			  , S.SABUN
+			  , S.ACQ_YMD
+			  , S.LOSS_YMD
+			  , S.IDENTITY_NO
+			  , SYSDATE
+			  , #{ssnSabun}
+			)
+	]]>
+	</update>
+		
+	<update id="saveHealthInsMgrChange" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN203 T
+		USING	(
+				SELECT A.SABUN
+					 , A.SEQ
+					 , A.SDATE
+					 , A.SOC_CHANGE_CD
+					 , A.SOC_STATE_CD
+					 , A.GRADE
+					 , A.EDATE
+					 , A.REDUCTION_RATE
+					 , A.REWARD_TOT_MON
+					 , A.REDUCTION_RATE2
+					 , A.MEMO
+					 , A.MON1
+					 , A.MON2
+					 , A.MON3
+					 , A.MON4
+					 , A.MON5
+				  FROM (
+						SELECT NULL	AS SABUN
+							 , NULL	AS SEQ
+							 , NULL	AS SDATE
+							 , NULL	AS SOC_CHANGE_CD
+							 , NULL	AS SOC_STATE_CD
+							 , NULL	AS GRADE
+							 , NULL	AS EDATE
+							 , NULL	AS REDUCTION_RATE
+							 , NULL	AS REWARD_TOT_MON
+							 , NULL	AS REDUCTION_RATE2
+							 , NULL	AS MEMO
+							 , NULL	AS MON1
+							 , NULL	AS MON2
+							 , NULL	AS MON3
+							 , NULL	AS MON4
+							 , NULL	AS MON5
+						  FROM DUAL ]]>
+					<foreach item="rm" collection="mergeRows" index="idx">
+						UNION ALL
+						SELECT TRIM(#{rm.sabun})			AS SABUN
+							 , CASE WHEN TRIM(#{rm.seq}) IS NULL OR TRIM(#{rm.seq}) = '0' THEN
+							 			(SELECT (NVL(MAX(SEQ),0) + (#{idx} + 1)) FROM TBEN203 WHERE ENTER_CD = #{ssnEnterCd} AND SABUN = TRIM(#{rm.sabun}))
+							 		ELSE TO_NUMBER(#{rm.seq}) END SEQ
+							 , TRIM(#{rm.sdate})			AS SDATE
+							 , TRIM(#{rm.socChangeCd})		AS SOC_CHANGE_CD
+							 , TRIM(#{rm.socStateCd})		AS SOC_STATE_CD
+							 , TRIM(#{rm.grade})			AS GRADE
+							 , TRIM(#{rm.edate})			AS EDATE
+							 , TRIM(#{rm.reductionRate})	AS REDUCTION_RATE
+							 , TRIM(#{rm.rewardTotMon})		AS REWARD_TOT_MON
+							 , TRIM(#{rm.reductionRate2})	AS REDUCTION_RATE2
+							 , TRIM(#{rm.memo})				AS MEMO
+							 , TRIM(#{rm.mon1})				AS MON1
+							 , TRIM(#{rm.mon2})				AS MON2
+							 , NVL(TO_NUMBER(TRIM(#{rm.mon1})),0)+NVL(TO_NUMBER(TRIM(#{rm.mon2})),0)	AS MON3
+							 , TRIM(#{rm.mon4})				AS MON4
+							 , TRIM(#{rm.mon5})				AS MON5
+						  FROM DUAL
+					</foreach>
+	<![CDATA[
+						) A
+				WHERE A.SABUN IS NOT NULL
+				  AND A.SEQ IS NOT NULL
+				  AND A.SDATE IS NOT NULL
+				) S
+			ON	(	T.ENTER_CD	= #{ssnEnterCd}
+				AND	T.SABUN		= S.SABUN
+				AND	T.SEQ		= S.SEQ
+				AND	T.SDATE		= S.SDATE
+				)
+			WHEN MATCHED THEN
+				UPDATE SET T.SOC_CHANGE_CD		= S.SOC_CHANGE_CD
+						 , T.SOC_STATE_CD		= S.SOC_STATE_CD
+						 , T.GRADE				= S.GRADE
+						 , T.EDATE				= S.EDATE
+						 , T.REDUCTION_RATE		= S.REDUCTION_RATE
+						 , T.REWARD_TOT_MON		= S.REWARD_TOT_MON
+						 , T.REDUCTION_RATE2	= S.REDUCTION_RATE2
+						 , T.MEMO				= S.MEMO
+						 , T.MON1				= S.MON1
+						 , T.MON2				= S.MON2
+						 , T.MON3				= S.MON3
+						 , T.MON4				= S.MON4
+						 , T.MON5				= S.MON5
+						 , T.CHKDATE			= SYSDATE
+						 , T.CHKID				= #{ssnSabun}
+			WHEN NOT MATCHED THEN
+				INSERT
+				(
+					T.ENTER_CD
+				  , T.SABUN
+				  , T.SEQ
+				  , T.SDATE
+				  , T.SOC_CHANGE_CD
+				  , T.SOC_STATE_CD
+				  , T.GRADE
+				  , T.EDATE
+				  , T.REDUCTION_RATE
+				  , T.REWARD_TOT_MON
+				  , T.REDUCTION_RATE2
+				  , T.MEMO
+				  , T.MON1
+				  , T.MON2
+				  , T.MON3
+				  , T.MON4
+				  , T.MON5
+				  , T.CHKDATE
+				  , T.CHKID
+				)
+				VALUES
+				(
+					#{ssnEnterCd}
+				  , S.SABUN
+				  , S.SEQ
+				  , S.SDATE
+				  , S.SOC_CHANGE_CD
+				  , S.SOC_STATE_CD
+				  , S.GRADE
+				  , S.EDATE
+				  , S.REDUCTION_RATE
+				  , S.REWARD_TOT_MON
+				  , S.REDUCTION_RATE2
+				  , S.MEMO
+				  , S.MON1
+				  , S.MON2
+				  , S.MON3
+				  , S.MON4
+				  , S.MON5
+				  , SYSDATE
+				  , #{ssnSabun}
+				)
+	]]>
+	</update>
+		
+	<delete id="deleteHealthInsMgrChange" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN203
+		 WHERE ENTER_CD||'_'||SABUN||'_'||TO_CHAR(SEQ)||'_'||SDATE IN ( NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq '' 
+					and rm.seq != null and rm.seq neq '' and rm.sdate != null and rm.sdate neq ''">
+			TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.seq})||'_'||TRIM(#{rm.sdate})
+			</if>
+		</foreach>
+		)
+	</delete>
+		
+</mapper>

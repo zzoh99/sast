@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appMboItemMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppMboItemMgrList">
+
+				<![CDATA[
+				  SELECT A.APPRAISAL_CD
+			           , A.TARGET_TYPE
+			           , A.SEQ
+			           , A.SEQ_NM
+			           , A.APP_BASIS_POINT
+			           , A.MEMO
+			           , A.TARGET_INDEX_KPI
+			           , A.SUNBUN
+			           , A.APP_ORG_TYPE
+			    	FROM TPAP108 A
+			   	   WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+			   	             ]]>
+				   <if test='searchAppraisalCd != null and !searchAppraisalCd.equals("")'>
+				     AND A.APPRAISAL_CD = TRIM(#{searchAppraisalCd})
+				   </if>
+			    ORDER BY A.SUNBUN
+
+
+		</select>
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveAppMboItemMgr">
+
+				<![CDATA[ 
+					MERGE INTO TSYS301 T
+					USING	(
+							SELECT	  A.PRG_CD
+									, A.PRG_NM
+									, A.PRG_ENG_NM
+									, A.PRG_PATH
+									, A.USE
+									, A.VERSION
+									, A.MEMO
+									, A.DATE_TRACK_YN
+									, A.LOG_SAVE_YN
+							FROM	(
+									SELECT	  NULL	AS PRG_CD       
+											, NULL	AS PRG_NM       
+											, NULL	AS PRG_ENG_NM   
+											, NULL	AS PRG_PATH     
+											, NULL	AS USE          
+											, NULL	AS VERSION      
+											, NULL	AS MEMO         
+											, NULL	AS DATE_TRACK_YN
+											, NULL	AS LOG_SAVE_YN  
+									FROM	DUAL
+									]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  TRIM( #{rm.prgCd})	AS PRG_CD
+											, TRIM( #{rm.prgNm})	AS PRG_NM
+											, TRIM( #{rm.prgEngNm})	AS PRG_ENG_NM
+											, TRIM( #{rm.prgPath})	AS PRG_PATH
+											, TRIM( #{rm.use})	AS USE
+											, TRIM( #{rm.version})	AS VERSION
+											, TRIM( #{rm.memo})	AS MEMO
+											, TRIM( #{rm.dateTrackYn})	AS DATE_TRACK_YN
+											, TRIM( #{rm.logSaveYn})	AS LOG_SAVE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE PRG_CD IS NOT NULL
+							) S
+					ON ( T.PRG_CD		= S.PRG_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	     
+									  T.PRG_NM        	= S.PRG_NM       
+									, T.PRG_ENG_NM    	= S.PRG_ENG_NM   
+			                      	, T.PRG_PATH      	= S.PRG_PATH     
+			                   		, T.USE           	= S.USE          
+			                    	, T.VERSION       	= S.VERSION      
+			                      	, T.MEMO          	= S.MEMO         
+			                     	, T.DATE_TRACK_YN 	= S.DATE_TRACK_YN
+			                       	, T.LOG_SAVE_YN		= S.LOG_SAVE_YN 
+									, T.CHKDATE			= SYSDATE
+									, T.CHKID			= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.PRG_CD       
+   							, T.PRG_NM       
+   							, T.PRG_ENG_NM   
+   							, T.PRG_PATH     
+   							, T.USE          
+   							, T.VERSION      
+   							, T.MEMO         
+   							, T.DATE_TRACK_YN
+   							, T.LOG_SAVE_YN    
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+ 							  S.PRG_CD       
+ 							, S.PRG_NM       
+ 							, S.PRG_ENG_NM   
+ 							, S.PRG_PATH     
+ 							, S.USE          
+ 							, S.VERSION      
+ 							, S.MEMO         
+ 							, S.DATE_TRACK_YN
+ 							, S.LOG_SAVE_YN  
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppMboItemMgr">
+
+					DELETE FROM TSYS301 
+					WHERE 	PRG_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.prgCd != null and !rm.prgCd.equals("")'>
+											TRIM( #{rm.prgCd})
+										</if>
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->	
+		<insert parameterType="map" id="insertAppMboItemMgr">
+
+				<![CDATA[
+						INSERT INTO MainMnMgrTable
+						(
+							  PRG_CD       
+							, PRG_NM       
+							, PRG_ENG_NM   
+							, PRG_PATH     
+							, USE          
+							, VERSION      
+							, MEMO         
+							, DATE_TRACK_YN
+							, LOG_SAVE_YN  
+							, CHKDATE
+							, CHKID
+						) 
+						SELECT	  S.PRG_CD       
+								, S.PRG_NM       
+								, S.PRG_ENG_NM   
+								, S.PRG_PATH     
+								, S.USE          
+								, S.VERSION      
+								, S.MEMO         
+								, S.DATE_TRACK_YN
+								, S.LOG_SAVE_YN  
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS PRG_CD       
+										, NULL 	AS PRG_NM       
+										, NULL 	AS PRG_ENG_NM   
+										, NULL 	AS PRG_PATH     
+										, NULL 	AS USE          
+										, NULL 	AS VERSION      
+										, NULL 	AS MEMO         
+										, NULL 	AS DATE_TRACK_YN
+										, NULL 	AS LOG_SAVE_YN
+								FROM   DUAL
+								]]>
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TRIM( #{rm.prgCd})	AS PRG_CD
+										, TRIM( #{rm.prgNm})	AS PRG_NM
+										, TRIM( #{rm.prgEngNm})	AS PRG_ENG_NM
+										, TRIM( #{rm.prgPath})	AS PRG_PATH
+										, TRIM( #{rm.use})	AS USE
+										, TRIM( #{rm.version})	AS VERSION
+										, TRIM( #{rm.memo})	AS MEMO
+										, TRIM( #{rm.dateTrackYn})	AS DATE_TRACK_Y
+										, TRIM( #{rm.logSaveYn})	AS LOG_SAVE_YN
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.PRG_CD IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppMboItemMgr">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET 
+					( COL1, COL2, COL3, COL4, CHKDATE, CHKID ) 
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT   
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					) 
+					WHERE EXISTS (	
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1 
+											FROM ( 
+												SELECT	NULL 				AS COL1	FROM	DUAL
+	<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL 
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+
+</mapper>

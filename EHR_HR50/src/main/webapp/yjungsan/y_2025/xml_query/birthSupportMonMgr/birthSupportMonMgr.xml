@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	출산지원금 쿼리
+ -->
+<root>
+
+	<!-- 출산지원금 조회 -->
+	<query id="selectBirthSupportMonMgr">
+		<![CDATA[
+			SELECT A.ENTER_CD
+			     , A.WORK_YY
+			     , A.ADJUST_TYPE
+			     , A.SABUN
+			     , B.FAM_NM AS NAME /* 근로자명 */
+			     , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+			     , A.FAM_NM /* 자녀명 */
+				 , F_COM_DECRYPT(A.FAMRES,A.ENTER_CD) AS FAMRES
+				 , A.SUP_YMD
+				 , A.SUP_MON
+				 , A.SUP_CNT
+				 , A.REGINO
+				 , A.WORK_YN
+				 , A.SPECIAL_YN
+				 , A.MEMO
+			  FROM TCPN887 A
+			  JOIN TCPN823 B
+			    ON A.ENTER_CD      = B.ENTER_CD
+			   AND A.WORK_YY       = B.WORK_YY
+               AND A.ADJUST_TYPE   = B.ADJUST_TYPE
+			   AND A.SABUN         = B.SABUN
+			   AND B.FAM_CD        = '0'
+			 WHERE A.ENTER_CD      = #ssnEnterCd#
+               AND A.WORK_YY       = #searchWorkYy#
+               AND REGEXP_LIKE(A.ADJUST_TYPE, '^[1359]') -- 시뮬레이션 자료 등은 조회되지 않도록
+        	   AND ( #searchAdjustType# IS NULL OR A.ADJUST_TYPE = #searchAdjustType# ) -- 조회조건 : 작업구분
+        	   AND ( #searchSupCnt# IS NULL OR A.SUP_CNT = #searchSupCnt# ) -- 조회조건 : 지급회차
+               AND ( A.SABUN LIKE '%' || TRIM(#searchSbNm#) || '%' OR B.FAM_NM LIKE '%' || TRIM(#searchSbNm#) || '%' )
+               AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+		]]> 
+	</query>
+	
+	<!-- 출산지원금 입력 -->
+	<query id="insertBirthSupportMonMgr">
+		<![CDATA[
+			INSERT INTO TCPN887
+			(	
+				  ENTER_CD
+				, WORK_YY
+				, ADJUST_TYPE
+				, SABUN
+				, FAM_NM
+				, FAMRES
+				, SUP_YMD
+				, SUP_MON
+				, SUP_CNT
+				, REGINO
+				, WORK_YN
+				, SPECIAL_YN
+				, MEMO
+				, CHKDATE
+				, CHKID
+			) 
+			VALUES 
+			(
+				#ssnEnterCd#
+				, #work_yy#
+				, #adjust_type#
+				, #sabun#
+				, #fam_nm#
+				, F_COM_ENCRYPT(#famres#, #ssnEnterCd#)
+				, #sup_ymd#
+				, #sup_mon#
+				, #sup_cnt#
+				, #regino#
+				, #work_yn#
+				, #special_yn#
+				, #memo#
+				, SYSDATE
+				, #ssnSabun#
+			)
+		]]> 
+	</query>
+	
+	<!-- 출산지원금 수정 -->
+	<query id="updateBirthSupportMonMgr">
+		<![CDATA[
+			UPDATE TCPN887
+			   SET FAM_NM = #fam_nm#
+				 , SUP_YMD = #sup_ymd#
+				 , SUP_MON = #sup_mon#
+				 , REGINO = #regino#
+				 , WORK_YN = #work_yn#
+				 , SPECIAL_YN = #special_yn#
+				 , MEMO = #memo#
+				 , CHKDATE				= SYSDATE 
+				 , CHKID				= #ssnSabun#             
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND WORK_YY  	    	= #work_yy#
+			   AND ADJUST_TYPE   		= #adjust_type#
+			   AND SABUN   				= #sabun#
+			   AND SUP_CNT   			= #sup_cnt#
+			   AND F_COM_DECRYPT(FAMRES, ENTER_CD) = #famres# /* 암호화할 때마다 결과값이 다른 사이트가 있기 때문에, 복화화한 평문으로 비교 */
+		]]> 
+	</query>
+	
+	<!-- 출산지원금 삭제 -->
+	<query id="deleteBirthSupportMonMgr">
+		<![CDATA[
+			DELETE FROM TCPN887
+			 WHERE ENTER_CD				= #ssnEnterCd#
+			   AND WORK_YY  	    	= #work_yy#
+			   AND ADJUST_TYPE   		= #adjust_type#
+			   AND SABUN   				= #sabun#
+			   AND SUP_CNT   			= #sup_cnt#
+			   AND F_COM_DECRYPT(FAMRES, ENTER_CD) = #famres# /* 암호화할 때마다 결과값이 다른 사이트가 있기 때문에, 복화화한 평문으로 비교 */
+		]]> 
+	</query>
+	
+	<query id="selectDupChk">
+		<![CDATA[
+			SELECT ENTER_CD
+			     , WORK_YY
+			     , F_COM_GET_GRCODE_NAME(ENTER_CD,'C00303',ADJUST_TYPE, NULL, #work_yy#||'1231') AS ADJUST_TYPE
+			     , SABUN
+				 , FAM_NM
+				 , SUP_CNT
+				 , F_COM_DECRYPT(FAMRES, ENTER_CD) AS FAMRES
+			  FROM TCPN887
+			 WHERE ENTER_CD      = #ssnEnterCd#
+               AND WORK_YY       = #work_yy#
+               AND ADJUST_TYPE   = #adjust_type#
+			   AND SABUN   		 = #sabun#
+			   AND SUP_CNT   	 = #sup_cnt#
+			   AND F_COM_DECRYPT(FAMRES, ENTER_CD) = #famres# /* 암호화할 때마다 결과값이 다른 사이트가 있기 때문에, 복화화한 평문으로 비교 */
+		]]> 
+	</query>
+	
+</root>

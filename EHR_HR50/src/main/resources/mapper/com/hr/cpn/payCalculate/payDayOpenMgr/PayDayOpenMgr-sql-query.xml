@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.payDayOpenMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPayDayOpenMgrList">
+
+				<![CDATA[
+				SELECT PAY_CD 
+					  ,OPEN_DD 
+					  ,OPEN_HM 
+				  FROM ( SELECT	ROWNUM AS RNUM
+				               ,PAY_CD 
+							   ,OPEN_DD 
+							   ,OPEN_HM 
+					       FROM ( SELECT A.PAY_CD 
+						                ,A.OPEN_DD 
+										,A.OPEN_HM  
+						            FROM TCPN991 A		
+						           WHERE A.ENTER_CD = #{ssnEnterCd}
+						             AND A.PAY_CD LIKE '%'|| #{searchPayCd} ||'%'
+						           ORDER BY A.PAY_CD
+					         ) 
+				        )              
+				]]>
+
+
+		</select>
+		
+		<select parameterType="map" resultType="cMap" id="getPayDayOpenMgrMap">
+
+				<![CDATA[
+					SELECT RUN_TYPE, PAYMENT_DD
+					FROM TCPN051
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND PAY_CD = #{selectPayCd}
+				]]>
+
+
+		</select>
+		
+<!-- 		저장 -->	
+		<update parameterType="map" id="savePayDayOpenMgr">
+
+
+					MERGE INTO TCPN991 T
+					USING	(
+							SELECT   PAY_CD
+				                   , OPEN_DD
+				                   , OPEN_HM
+							FROM	(
+									SELECT	  NULL		AS PAY_CD  
+											, NULL		AS OPEN_DD 
+											, NULL		AS OPEN_HM 
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT    TRIM(#{rm.payCd}) AS PAY_CD
+											, TRIM(#{rm.openDd}) AS OPEN_DD
+											, TRIM(#{rm.openHm}) AS OPEN_HM
+											FROM   DUAL
+</foreach>
+									)  WHERE PAY_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD = #{ssnEnterCd}
+					AND  T.PAY_CD   = S.PAY_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.OPEN_DD 	= S.OPEN_DD 
+									, T.OPEN_HM 	= S.OPEN_HM 
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.PAY_CD
+							, T.OPEN_DD
+							, T.OPEN_HM
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+							, S.PAY_CD      
+							, S.OPEN_DD     
+							, S.OPEN_HM     
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePayDayOpenMgr">
+
+
+					DELETE FROM TCPN991 
+					WHERE 	(ENTER_CD, PAY_CD) IN 	(  (NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+						,			<if test='ssnEnterCd != null and !ssnEnterCd.equals("")'>
+										<if test='rm.payCd != null and !rm.payCd.equals("")'>
+											(#{ssnEnterCd}, TRIM( #{rm.payCd} ) )
+										</if>
+									</if>
+</foreach>
+										)
+
+
+
+		</delete>
+	</mapper>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common.upload.fileUpload">
+	
+	<select id="getFileSequence" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT F_COM_GET_SEQ('FILE') AS SEQ FROM DUAL
+	]]>
+	</select>	
+		
+	<select id="getFileList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT	  ENTER_CD
+				, FILE_SEQ
+				, SEQ_NO
+				, FILE_GUBN
+				, R_FILE_NM
+				, S_FILE_NM
+				, FILE_PATH
+				, FILE_SIZE
+				, TO_CHAR( CHKDATE,'YYYY-MM-DD HH:MM:SS') AS CHKDATE
+				, CHKID
+				, '0' AS DOWNLOAD
+	 	FROM TSYS972
+		WHERE	ENTER_CD= #{ssnEnterCd} 
+		AND	FILE_SEQ 	= #{fileSeq}
+		ORDER BY SEQ_NO 
+	]]>
+	</select>
+
+	<insert id="insertUpload" parameterType="map">
+	<![CDATA[
+		INSERT INTO TSYS972
+			(
+				  ENTER_CD 
+				, FILE_SEQ 
+				, SEQ_NO   
+				, FILE_GUBN
+				, R_FILE_NM
+				, S_FILE_NM
+				, FILE_PATH
+				, FILE_SIZE
+				, CHKDATE  
+				, CHKID    
+			) 
+			SELECT	  #{ssnEnterCd}
+					, S.FILE_SEQ 
+					, S.SEQ_NO   
+					, S.FILE_GUBN
+					, S.R_FILE_NM
+					, S.S_FILE_NM
+					, S.FILE_PATH
+					, S.FILE_SIZE
+					, SYSDATE
+					, #{ssnSabun}
+			FROM (
+					SELECT    NULL 	AS FILE_SEQ 
+							, NULL 	AS SEQ_NO   
+							, NULL 	AS FILE_GUBN
+							, NULL 	AS R_FILE_NM
+							, NULL 	AS S_FILE_NM
+							, NULL 	AS FILE_PATH
+							, NULL 	AS FILE_SIZE
+					FROM   DUAL ]]>
+		<foreach item="rm" collection="upFile" index="idx">
+					UNION ALL
+					SELECT	  TO_NUMBER( TRIM( #{fileSeq} ) )  	AS FILE_SEQ
+							, ( SELECT (NVL( MAX(SEQ_NO ),0) + (#{idx} + 1)) FROM TSYS972 WHERE ENTER_CD = #{ssnEnterCd} AND FILE_SEQ = NVL( TO_NUMBER( TRIM( #{fileSeq} ) ) ,0) ) 	AS SEQ_NO
+							, ''					AS FILE_GUBN
+							, TRIM(#{rm.realNm})	AS R_FILE_NM
+							, TRIM(#{rm.saveNm})	AS S_FILE_NM
+							, TRIM(#{rm.sPath})		AS FILE_PATH
+							, TRIM(#{rm.size})		AS FILE_SIZE
+					FROM   DUAL
+		</foreach>
+				) S
+		WHERE S.FILE_SEQ IS NOT NULL
+	</insert>
+		
+	<delete id="deleteFile" parameterType="map">
+	<![CDATA[
+		DELETE FROM TSYS972 
+		WHERE 	( ENTER_CD,FILE_SEQ,SEQ_NO ) IN 	(  ( NULL, NULL, NULL ) ]]>
+		<foreach item="rm" collection="deleteRows">
+			, 	( 	
+					  #{ssnEnterCd}
+					, TO_NUMBER( TRIM( #{rm.fileSeq} ) )
+					, TO_NUMBER( TRIM( #{rm.seqNo} ) )
+				)
+		</foreach>
+		)
+	</delete>
+	
+</mapper>
+

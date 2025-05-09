@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+<!--
+	원천징수세액조회
+ -->
+<root>
+
+	
+	<!-- 원천징수세액 조회  -->
+    <query id="selectYeaAddrList">
+        <![CDATA[
+            SELECT  TH.NAME
+            	   ,TC.SABUN
+            	   ,TC.ORG_NM
+            	   ,TC.ZIP
+            	   ,TC.ADDR1
+            	   ,TC.ADDR2
+            	   ,TC.WORK_YY
+            	   ,TC.ORG_CD
+            	   ,TC.ENTER_CD
+			  FROM TCPN811 TC, THRM100 TH
+             WHERE TC.ENTER_CD      = TH.ENTER_CD
+               AND TC.SABUN         = TH.SABUN
+               AND TC.ENTER_CD      = #ssnEnterCd#  
+               AND TC.WORK_YY       = #searchYear#
+               AND TC.ADJUST_TYPE   = #searchAdjustType#
+               AND TC.ORG_CD LIKE '%' || #orgCd# || '%'
+               AND (TH.NAME LIKE '%' || #searchSbNm# || '%' OR TC.SABUN LIKE '%' || #searchSbNm# || '%') 
+               AND DECODE('',#searchBizPlaceCd#,'A',F_CPN_YEA_BP_CD(TC.ENTER_CD,TC.WORK_YY,TC.ADJUST_TYPE,TC.SABUN)) = DECODE('',#searchBizPlaceCd#,'A',#searchBizPlaceCd#)
+        ]]> 
+    </query>
+    
+    <!-- 원천징수세액 분할 납부 저장  -->
+    <query id="saveYeaAddrList">
+       
+<![CDATA[
+					MERGE INTO THRM123 T
+					USING	(
+							SELECT	  A.ZIP
+									, A.ADDR1
+									, A.ADDR2
+									, A.ENTER_CD
+									, A.SABUN
+									, A.ADD_TYPE
+							FROM	(
+									SELECT	  NULL		AS ZIP
+											, NULL		AS ADDR1
+											, NULL		AS ADDR2
+											, NULL		AS ENTER_CD
+											, NULL		AS SABUN
+											, NULL		AS ADD_TYPE
+									FROM	DUAL
+
+							UNION ALL
+									SELECT
+											  TRIM( #zip# ) 		AS ZIP
+											, TRIM( #addr1# )		AS ADDR1
+											, TRIM( #addr2# )		AS ADDR2
+											, TRIM( #enter_cd# )	AS ENTER_CD
+											, TRIM( #sabun# )		AS SABUN
+											, TRIM( #add_type# )	AS ADD_TYPE
+											FROM   DUAL
+									) A WHERE A.ENTER_CD IS NOT NULL
+									  AND A.SABUN IS NOT NULL
+									  AND A.ADD_TYPE IS NOT NULL
+							) S
+					ON ( (T.ENTER_CD||T.SABUN||T.ADD_TYPE)		= (S.ENTER_CD||S.SABUN||S.ADD_TYPE) )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.ZIP		 = S.ZIP
+									, T.ADDR1	 = S.ADDR1
+									, T.ADDR2	 = S.ADDR2
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ZIP
+							, T.ADDR1
+							, T.ADDR2
+							, T.ENTER_CD
+							, T.SABUN
+							, T.ADD_TYPE
+						) 
+						VALUES 
+						(
+							  S.ZIP
+							, S.ADDR1
+							, S.ADDR2
+							, S.ENTER_CD
+							, S.SABUN
+							, S.ADD_TYPE
+						)
+				]]>       
+    </query>
+
+</root>

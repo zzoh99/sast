@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	저축내역관리
+ -->
+<root>
+
+	<!-- 저축 내역 조회  -->
+	<query id="selectSavHisMgrList">
+		<![CDATA[
+			SELECT A.ENTER_CD, A.WORK_YY, A.ADJUST_TYPE, A.SABUN,
+			       A.SAVING_DEDUCT_TYPE, -- 연금저축등소득공제구분(C00317)
+			       A.FINANCE_ORG_CD, -- 금융기관코드(C00319)
+			       A.PAYING_NUM_CD,  -- 납입횟수코드(C00321)
+			       F_COM_DECRYPT(A.ACCOUNT_NO, A.ENTER_CD) AS ACCOUNT_NO,     -- 계좌번호
+			       A.INPUT_MON,      -- 신청금액
+			       A.APPL_MON, 
+			       A.DED_MON,
+			       A.ADJ_INPUT_TYPE,
+			       A.NTS_YN,
+			       A.FEEDBACK_TYPE,
+			       A.CHKDATE,
+			       A.CHKID,
+			       A.REG_DT
+			       , B.NAME
+			       , F_COM_GET_ORG_NM21(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) AS ORG_NM
+			       , A.DOC_SEQ
+			       , A.DOC_SEQ_DETAIL
+			  FROM TCPN830 A, THRM100 B
+			 WHERE A.ENTER_CD       = B.ENTER_CD
+			   AND A.SABUN          = B.SABUN
+			   AND A.ENTER_CD      = #ssnEnterCd#   
+			   AND A.WORK_YY       = #searchYear#
+			   AND A.ADJUST_TYPE   = #searchAdjustType#
+			   AND A.ADJ_INPUT_TYPE LIKE #searchInputType#||'%'
+			   AND (B.NAME LIKE '%' || #searchSbNm# || '%' OR A.SABUN LIKE '%' || #searchSbNm# || '%')  
+			   AND A.SAVING_DEDUCT_TYPE  IN
+			                   (SELECT B.CODE
+			                      FROM TSYS005 B
+			                     WHERE B.ENTER_CD = A.ENTER_CD
+			                       AND B.GRCODE_CD = 'C00317'
+			                       AND B.NOTE1 IN ('3', '4'))
+			   AND A.SAVING_DEDUCT_TYPE LIKE NVL(#searchSavingDeductType#, '%')
+			   AND A.REG_DT BETWEEN NVL(REPLACE(#searchYmd1#, '-', ''), '00001231') AND NVL(REPLACE(#searchYmd2#, '-', ''), '99991231')
+	   ]]> 
+	</query>
+
+	<query id="selectSavHisMgrSavingDeductType">
+		<![CDATA[
+			SELECT CODE, CODE_NM
+			  FROM TSYS005
+			 WHERE ENTER_CD = #ssnEnterCd#
+			   AND GRCODE_CD = 'C00317'
+			   AND NOTE1 IN ('3', '4') 
+			 ORDER BY SEQ
+		]]>
+	</query>
+	
+</root>

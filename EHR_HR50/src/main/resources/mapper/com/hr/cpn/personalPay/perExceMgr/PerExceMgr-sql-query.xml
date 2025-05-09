@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cpn.personalPay.perExceMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerExceMgrFirstList">
+			
+				<![CDATA[
+					SELECT #{searchSabunHidden} AS SABUN
+						 , #{searchPayActionNmHidden} AS PAY_ACTION_CD
+						 , C.ELEMENT_CD
+						 , C.ELEMENT_NM
+						 , C.ELEMENT_TYPE
+						 , E.RESULT_MON
+						 , D.PAYMENT_MON
+						 , NVL( (SELECT CC.CLOSE_YN FROM TCPN981 CC
+						          WHERE CC.ENTER_CD      = #{ssnEnterCd}
+						            AND CC.PAY_ACTION_CD = #{searchPayActionNmHidden}
+						         )
+						   , 'N') AS CLOSE_YN
+						 , D.NOTE
+						FROM TCPN011 C
+						   , ( SELECT *
+						         FROM TCPN110
+						        WHERE ENTER_CD      = #{ssnEnterCd}
+						          AND SABUN         = #{searchSabunHidden}
+						          AND PAY_ACTION_CD = #{searchPayActionNmHidden}
+						     ) D
+						   , TCPN205 E
+						   , TCPN201 F
+                           , TCPN071 G
+                           , TCPN072 H
+                           , TCPN051 I
+						WHERE C.ENTER_CD       = #{ssnEnterCd}
+						  AND C.ENTER_CD       = D.ENTER_CD(+)
+						  AND C.ELEMENT_CD     = D.ELEMENT_CD(+)
+                          AND C.ENTER_CD = F.ENTER_CD
+                          AND C.ENTER_CD = G.ENTER_CD
+                          AND C.ENTER_CD = H.ENTER_CD
+                          AND G.ELEMENT_SET_CD = H.ELEMENT_SET_CD
+                          AND H.ELEMENT_CD = C.ELEMENT_CD
+                          AND C.ENTER_CD = I.ENTER_CD
+                          AND I.PAY_CD = F.PAY_CD
+                          AND I.ELEMENT_SET_CD = G.ELEMENT_SET_CD
+                          AND I.ELEMENT_SET_CD = H.ELEMENT_SET_CD
+                          AND F.PAY_ACTION_CD = #{searchPayActionNmHidden}
+						  AND C.ELEMENT_TYPE   = 'A'
+						  AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN NVL(C.SDATE, '19000101') AND NVL(C.EDATE, '99991231')
+						  AND E.ENTER_CD      (+)= #{ssnEnterCd}
+						  AND E.PAY_ACTION_CD (+)= #{searchPayActionNmHidden}
+						  AND E.SABUN         (+)= #{searchSabunHidden}
+						  AND E.ELEMENT_CD    (+)= C.ELEMENT_CD
+						ORDER BY C.PRIORITY
+				]]>
+		</select>
+
+<!-- 		저장 TCPN110-->
+		<update parameterType="map" id="savePerExceMgrFirstDetail">
+					MERGE INTO TCPN110 T
+					USING	(
+							SELECT	  SABUN
+									, PAY_ACTION_CD
+									, ELEMENT_CD
+									, PAYMENT_MON
+									, NOTE
+							FROM	(
+									SELECT	  NULL		AS SABUN
+											, NULL		AS PAY_ACTION_CD
+											, NULL		AS ELEMENT_CD
+											, NULL		AS PAYMENT_MON
+											, NULL AS NOTE
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.sabun} )	AS SABUN
+											, TRIM( #{rm.payActionCd} )	AS PAY_ACTION_CD
+											, TRIM( #{rm.elementCd} )	AS ELEMENT_CD
+											, TRIM( #{rm.paymentMon} )	AS PAYMENT_MON
+											, TRIM( #{rm.note} )	AS NOTE
+											FROM   DUAL
+</foreach>
+									)  WHERE SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	     = #{ssnEnterCd}
+					AND  T.SABUN         = S.SABUN
+					AND  T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					AND  T.ELEMENT_CD    = S.ELEMENT_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAYMENT_MON  	= S.PAYMENT_MON
+									, T.NOTE = S.NOTE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.PAYMENT_MON
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.SABUN
+							, S.PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, S.PAYMENT_MON
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 		저장 TCPN109-->
+		<update parameterType="map" id="savePerExceMgrFirstMaster">
+					MERGE INTO TCPN109 T
+					USING	(
+							SELECT	  PAY_ACTION_CD
+									, ELEMENT_CD
+							FROM	(
+									SELECT	  NULL		AS PAY_ACTION_CD
+											, NULL		AS ELEMENT_CD
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.payActionCd} )	AS PAY_ACTION_CD
+											, TRIM( #{rm.elementCd} )	AS ELEMENT_CD
+											FROM   DUAL
+</foreach>
+									)  WHERE PAY_ACTION_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	     = #{ssnEnterCd}
+					AND  T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					AND  T.ELEMENT_CD    = S.ELEMENT_CD
+					)
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePerExceMgrFirst">
+					DELETE FROM TCPN110
+					WHERE 	(ENTER_CD, SABUN, PAY_ACTION_CD, ELEMENT_CD) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+								<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+									<if test="rm.sabun != null and rm.sabun neq ''">
+										<if test="rm.payActionCd != null and rm.payActionCd neq ''">
+											<if test="rm.elementCd != null and rm.elementCd neq ''">
+												(#{ssnEnterCd} , TRIM( #{rm.sabun} ), TRIM( #{rm.payActionCd} ), TRIM( #{rm.elementCd} ) )
+											</if>
+										</if>
+									</if>
+								</if>
+</foreach>
+										)
+		</delete>
+
+
+
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getPerExceMgrSecondList">
+				<![CDATA[
+					SELECT
+					      #{searchSabunHidden} AS SABUN
+					    , #{searchPayActionNmHidden} AS PAY_ACTION_CD
+					    , C.ELEMENT_CD
+					    , C.ELEMENT_NM
+					    , C.ELEMENT_TYPE
+					    , E.RESULT_MON
+					    , D.PAYMENT_MON
+					    , NVL( (SELECT CC.CLOSE_YN FROM TCPN981 CC
+					              WHERE CC.ENTER_CD      = #{ssnEnterCd}
+					                AND CC.PAY_ACTION_CD = #{searchPayActionNmHidden}
+					            )
+					         ,'N') AS CLOSE_YN
+					    , D.NOTE
+					FROM    TCPN011 C
+					     , (  SELECT *
+					          FROM   TCPN110
+					          WHERE  ENTER_CD      = #{ssnEnterCd}
+					            AND  SABUN         = #{searchSabunHidden}
+					            AND  PAY_ACTION_CD = #{searchPayActionNmHidden}
+					     ) D
+					     , TCPN205 E
+					     , TCPN201 F
+                         , TCPN071 G
+                         , TCPN072 H
+                         , TCPN051 I
+					WHERE  C.ENTER_CD       = #{ssnEnterCd}
+					  AND  C.ENTER_CD       = D.ENTER_CD(+)
+					  AND  C.ELEMENT_CD     = D.ELEMENT_CD(+)
+                      AND  C.ENTER_CD = F.ENTER_CD
+                      AND  C.ENTER_CD = G.ENTER_CD
+                      AND  C.ENTER_CD = H.ENTER_CD
+                      AND G.ELEMENT_SET_CD = H.ELEMENT_SET_CD
+                      AND H.ELEMENT_CD = C.ELEMENT_CD
+                      AND C.ENTER_CD = I.ENTER_CD
+                      AND I.PAY_CD = F.PAY_CD
+                      AND I.ELEMENT_SET_CD = G.ELEMENT_SET_CD
+                      AND I.ELEMENT_SET_CD = H.ELEMENT_SET_CD
+                      AND F.PAY_ACTION_CD = #{searchPayActionNmHidden}
+					  AND  C.ELEMENT_TYPE   = 'D'
+					  AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN NVL(C.SDATE, '19000101') AND NVL(C.EDATE, '99991231')
+					  AND E.ENTER_CD        (+)= #{ssnEnterCd}
+					  AND E.PAY_ACTION_CD   (+)= #{searchPayActionNmHidden}
+					  AND E.SABUN           (+)= #{searchSabunHidden}
+					  AND E.ELEMENT_CD      (+)= C.ELEMENT_CD
+				]]>
+		</select>
+
+
+<!-- 		저장 TCPN110-->
+		<update parameterType="map" id="savePerExceMgrSecondDetail">
+					MERGE INTO TCPN110 T
+					USING	(
+							SELECT	  SABUN
+									, PAY_ACTION_CD
+									, ELEMENT_CD
+									, PAYMENT_MON
+									, NOTE
+							FROM	(
+									SELECT	  NULL		AS SABUN
+											, NULL		AS PAY_ACTION_CD
+											, NULL		AS ELEMENT_CD
+											, NULL		AS PAYMENT_MON
+											, NULL AS NOTE
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.sabun} )	AS SABUN
+											, TRIM( #{rm.payActionCd} )	AS PAY_ACTION_CD
+											, TRIM( #{rm.elementCd} )	AS ELEMENT_CD
+											, TRIM( #{rm.paymentMon} )	AS PAYMENT_MON
+											, TRIM( #{rm.note} )	AS NOTE
+											FROM   DUAL
+</foreach>
+									)  WHERE SABUN IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	     = #{ssnEnterCd}
+					AND  T.SABUN         = S.SABUN
+					AND  T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					AND  T.ELEMENT_CD    = S.ELEMENT_CD
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.PAYMENT_MON  	= S.PAYMENT_MON
+									, T.NOTE = S.NOTE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.SABUN
+							, T.PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.PAYMENT_MON
+							, T.NOTE
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.SABUN
+							, S.PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, S.PAYMENT_MON
+							, S.NOTE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+		<!-- 		저장 TCPN109-->
+		<update parameterType="map" id="savePerExceMgrSecondMaster">
+					MERGE INTO TCPN109 T
+					USING	(
+							SELECT	  PAY_ACTION_CD
+									, ELEMENT_CD
+							FROM	(
+									SELECT	  NULL		AS PAY_ACTION_CD
+											, NULL		AS ELEMENT_CD
+									FROM	DUAL
+<foreach item="rm" collection="mergeRows">
+							UNION ALL
+									SELECT    TRIM( #{rm.payActionCd} )	AS PAY_ACTION_CD
+											, TRIM( #{rm.elementCd} )	AS ELEMENT_CD
+											FROM   DUAL
+</foreach>
+									)  WHERE PAY_ACTION_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD	     = #{ssnEnterCd}
+					AND  T.PAY_ACTION_CD = S.PAY_ACTION_CD
+					AND  T.ELEMENT_CD    = S.ELEMENT_CD
+					)
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.PAY_ACTION_CD
+							, T.ELEMENT_CD
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  #{ssnEnterCd}
+							, S.PAY_ACTION_CD
+							, S.ELEMENT_CD
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deletePerExceMgrSecond">
+					DELETE FROM TCPN110
+					WHERE 	(ENTER_CD, SABUN, PAY_ACTION_CD, ELEMENT_CD) IN 	(  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows">
+						,
+								<if test="ssnEnterCd != null and ssnEnterCd neq ''">
+									<if test="rm.sabun != null and rm.sabun neq ''">
+										<if test="rm.payActionCd != null and rm.payActionCd neq ''">
+											<if test="rm.elementCd != null and rm.elementCd neq ''">
+												(#{ssnEnterCd} , TRIM( #{rm.sabun} ), TRIM( #{rm.payActionCd} ), TRIM( #{rm.elementCd} ) )
+											</if>
+										</if>
+									</if>
+								</if>
+</foreach>
+										)
+			
+			
+		</delete>
+	
+</mapper>

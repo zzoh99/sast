@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 건강보험 고지금액관리
+ * @author JM
+-->
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.healthInsurance.healthInsEmpMthDataMgr">
+		
+	<select id="getHealthInsEmpMthDataMgrList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT B.ORG_NM
+			 , B.WORK_TYPE
+			 , B.JIKCHAK_CD
+			 , B.JIKWEE_CD
+			 , B.SABUN
+			 , B.NAME
+			 , B.MANAGE_CD
+			 , B.STATUS_CD
+			 , B.EMP_YMD
+			 , B.RES_NO
+			 , A.ENTER_CD
+			 , A.YM
+			 , A.IDENTITY_NO
+			 , A.ACQ_YMD
+			 , A.LOSS_YMD
+			 , A.REASON
+			 , A.REWARD_TOT_MON
+			 , A.S_YM
+			 , A.E_YM
+			 , A.REASON1
+			 , A.MON1
+			 , A.MON2
+			 , A.MON3
+			 , A.MON4
+			 , A.MON5
+			 , A.S_YM2
+			 , A.E_YM2
+			 , A.REASON2
+			 , A.MON6
+			 , A.MON7
+			 , A.MON8
+			 , A.MON9
+			 , A.MON10
+			 , A.MON11
+			 , A.MON12
+			 , A.MON13
+			 , A.MON14
+			 , A.MON15
+			 , CASE WHEN B.SABUN IS NULL THEN 'N' ELSE 'Y' END REG_YN
+			 , A.BIGO
+		  FROM TBEN212 A
+			 , (SELECT X.ENTER_CD
+					 , Y.ORG_CD
+					 , TRIM(F_COM_GET_ORG_NM(Y.ENTER_CD,Y.ORG_CD,Y.SDATE)) AS ORG_NM
+					 , Y.WORK_TYPE
+					 , Y.JIKCHAK_CD
+					 , Y.JIKWEE_CD
+					 , Y.MANAGE_CD
+					 , Y.STATUS_CD
+					 , X.SABUN
+					 , TRIM(X.NAME) AS NAME
+					 , X.EMP_YMD
+					 , X.GEMP_YMD
+					 , CRYPTIT.DECRYPT (X.RES_NO, X.ENTER_CD) AS RES_NO
+					 , X.RES_NO AS ORG_RES_NO
+					 , X.RET_YMD
+				  FROM THRM100 X
+					 , THRM151 Y
+				 WHERE X.ENTER_CD	= Y.ENTER_CD
+				   AND X.SABUN		= Y.SABUN
+				   AND X.ENTER_CD	= #{ssnEnterCd} ]]>
+			<if test="multiManageCd != null and multiManageCd neq ''">
+				   AND Y.MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			</if>
+			<if test="multiStatusCd != null and multiStatusCd neq ''">
+				   AND Y.STATUS_CD	IN <foreach collection="multiStatusCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+			</if>
+			<if test="sabunName != null and sabunName neq ''">
+				   AND X.SABUN || X.NAME LIKE '%'|| TRIM(#{sabunName}) ||'%'
+			</if>
+				   AND Y.SDATE 		= (	SELECT MAX(SDATE)
+										  FROM THRM151
+										 WHERE ENTER_CD	= Y.ENTER_CD
+										   AND SABUN	= Y.SABUN
+										   AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN SDATE AND NVL(EDATE,'99991231') )
+				) B
+		 WHERE A.ENTER_CD	= B.ENTER_CD
+		   AND A.SABUN		= B.SABUN
+		   AND A.ENTER_CD	= #{ssnEnterCd}
+		   AND A.YM			= REPLACE(#{ym},'-','')
+		ORDER BY B.ORG_NM,B.WORK_TYPE,B.JIKCHAK_CD,B.JIKWEE_CD,B.NAME
+	</select>
+		
+	<update id="saveHealthInsEmpMthDataMgr" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN212 T
+		USING	(
+				SELECT A.SABUN
+					 , A.YM
+					 , A.IDENTITY_NO
+					 , A.ACQ_YMD
+					 , A.LOSS_YMD
+					 , A.REASON
+					 , A.REWARD_TOT_MON
+					 , A.S_YM
+					 , A.E_YM
+					 , A.REASON1
+					 , A.MON1
+					 , A.MON2
+					 , A.MON3
+					 , A.MON4
+					 , A.MON5
+					 , A.S_YM2
+					 , A.E_YM2
+					 , A.REASON2
+					 , A.MON6
+					 , A.MON7
+					 , A.MON8
+					 , A.MON9
+					 , A.MON10
+					 , A.MON11
+					 , A.MON12
+					 , A.MON13
+					 , A.MON14
+					 , A.MON15
+					 , A.REG_YN
+					 , A.BIGO
+				FROM (
+						SELECT NULL		AS SABUN
+							 , NULL		AS YM
+							 , NULL		AS IDENTITY_NO
+							 , NULL		AS ACQ_YMD
+							 , NULL		AS LOSS_YMD
+							 , NULL		AS REASON
+							 , NULL		AS REWARD_TOT_MON
+							 , NULL		AS S_YM
+							 , NULL		AS E_YM
+							 , NULL		AS REASON1
+							 , NULL		AS MON1
+							 , NULL		AS MON2
+							 , NULL		AS MON3
+							 , NULL		AS MON4
+							 , NULL		AS MON5
+							 , NULL		AS S_YM2
+							 , NULL		AS E_YM2
+							 , NULL		AS REASON2
+							 , NULL		AS MON6
+							 , NULL		AS MON7
+							 , NULL		AS MON8
+							 , NULL		AS MON9
+							 , NULL		AS MON10
+							 , NULL		AS MON11
+							 , NULL		AS MON12
+							 , NULL		AS MON13
+							 , NULL		AS MON14
+							 , NULL		AS MON15
+							 , NULL		AS REG_YN
+							 , NULL		AS BIGO
+						  FROM DUAL ]]>
+				<foreach item="rm" collection="mergeRows">
+						  UNION ALL
+						SELECT TRIM(#{rm.sabun})				AS SABUN
+							 , TRIM(REPLACE(#{rm.ym},'-',''))	AS YM
+							 , TRIM(#{rm.identityNo})			AS IDENTITY_NO
+							 , TRIM(#{rm.acqYmd})				AS ACQ_YMD
+							 , TRIM(#{rm.lossYmd})				AS LOSS_YMD
+							 , TRIM(#{rm.reason})				AS REASON
+							 , TRIM(#{rm.rewardTotMon})			AS REWARD_TOT_MON
+							 , TRIM(#{rm.sYm})					AS S_YM
+							 , TRIM(#{rm.eYm})					AS E_YM
+							 , TRIM(#{rm.reason1})				AS REASON1
+							 , TRIM(#{rm.mon1})					AS MON1
+							 , TRIM(#{rm.mon2})					AS MON2
+							 , TRIM(#{rm.mon3})					AS MON3
+							 , TRIM(#{rm.mon4})					AS MON4
+							 , TRIM(#{rm.mon5})					AS MON5
+							 , TRIM(#{rm.sYm2})					AS S_YM2
+							 , TRIM(#{rm.eYm2})					AS E_YM2
+							 , TRIM(#{rm.reason2})				AS REASON2
+							 , TRIM(#{rm.mon6})					AS MON6
+							 , TRIM(#{rm.mon7})					AS MON7
+							 , TRIM(#{rm.mon8})					AS MON8
+							 , TRIM(#{rm.mon9})					AS MON9
+							 , TRIM(#{rm.mon10})				AS MON10
+							 , TRIM(#{rm.mon11})				AS MON11
+							 , TRIM(#{rm.mon12})				AS MON12
+							 , TRIM(#{rm.mon13})				AS MON13
+							 , TRIM(#{rm.mon14})				AS MON14
+							 , TRIM(#{rm.mon15})				AS MON15
+							 , TRIM(#{rm.regYn})				AS REG_YN
+							 , TRIM(#{rm.bigo})					AS BIGO
+						  FROM DUAL
+				</foreach>
+	<![CDATA[
+					) A
+				 WHERE A.YM IS NOT NULL
+				   AND A.SABUN IS NOT NULL
+				) S
+		ON (	T.ENTER_CD			= #{ssnEnterCd}
+			AND	T.SABUN			= S.SABUN
+			AND	T.YM				= S.YM
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.IDENTITY_NO	= S.IDENTITY_NO
+					 , T.ACQ_YMD		= S.ACQ_YMD
+					 , T.LOSS_YMD		= S.LOSS_YMD
+					 , T.REASON			= S.REASON
+					 , T.REWARD_TOT_MON	= S.REWARD_TOT_MON
+					 , T.S_YM			= S.S_YM
+					 , T.E_YM			= S.E_YM
+					 , T.REASON1		= S.REASON1
+					 , T.MON1			= S.MON1
+					 , T.MON2			= S.MON2
+					 , T.MON3			= S.MON3
+					 , T.MON4			= S.MON4
+					 , T.MON5			= S.MON5
+					 , T.S_YM2			= S.S_YM2
+					 , T.E_YM2			= S.E_YM2
+					 , T.REASON2		= S.REASON2
+					 , T.MON6			= S.MON6
+					 , T.MON7			= S.MON7
+					 , T.MON8			= S.MON8
+					 , T.MON9			= S.MON9
+					 , T.MON10			= S.MON10
+					 , T.MON11			= S.MON11
+					 , T.MON12			= S.MON12
+					 , T.MON13			= S.MON13
+					 , T.MON14			= S.MON14
+					 , T.MON15			= S.MON15
+					 , T.REG_YN			= S.REG_YN
+					 , T.BIGO			= S.BIGO
+					 , T.CHKDATE		= SYSDATE
+					 , T.CHKID			= #{ssnSabun}
+		WHEN NOT MATCHED THEN
+		     INSERT
+		     (
+		        T.ENTER_CD,
+				T.SABUN,
+				T.YM,
+				T.IDENTITY_NO,
+				T.ACQ_YMD,
+				T.LOSS_YMD,
+				T.REASON,
+				T.REWARD_TOT_MON,
+				T.S_YM,
+				T.E_YM,
+				T.REASON1,
+				T.MON1,
+				T.MON2,
+				T.MON3,
+				T.MON4,
+				T.MON5,
+				T.S_YM2,
+				T.E_YM2,
+				T.REASON2,
+				T.MON6,
+				T.MON7,
+				T.MON8,
+				T.MON9,
+				T.MON10,
+				T.MON11,
+				T.MON12,
+				T.MON13,
+				T.MON14,
+				T.MON15,
+				T.REG_YN,
+				T.BIGO,
+				T.CHKDATE,
+				T.CHKID
+		     )
+		     VALUES
+		     (
+		        #{ssnEnterCd},
+				S.SABUN,
+				S.YM,
+				S.IDENTITY_NO,
+				S.ACQ_YMD,
+				S.LOSS_YMD,
+				S.REASON,
+				S.REWARD_TOT_MON,
+				S.S_YM,
+				S.E_YM,
+				S.REASON1,
+				S.MON1,
+				S.MON2,
+				S.MON3,
+				S.MON4,
+				S.MON5,
+				S.S_YM2,
+				S.E_YM2,
+				S.REASON2,
+				S.MON6,
+				S.MON7,
+				S.MON8,
+				S.MON9,
+				S.MON10,
+				S.MON11,
+				S.MON12,
+				S.MON13,
+				S.MON14,
+				S.MON15,
+				S.REG_YN,
+				S.BIGO,
+				SYSDATE,
+				#{ssnSabun}
+		     )
+	]]>
+	</update>
+		
+	<update id="saveIdentityNo" parameterType="map">
+	<![CDATA[
+		MERGE INTO TBEN201 T
+		USING	(
+				SELECT A.SABUN
+					 , A.IDENTITY_NO
+				FROM (
+						SELECT NULL		AS SABUN
+							 , NULL		AS IDENTITY_NO
+						  FROM DUAL ]]>
+		<foreach item="rm" collection="mergeRows">
+						UNION ALL
+						SELECT TRIM(#{rm.sabun})		AS SABUN
+							 , TRIM(#{rm.identityNo})	AS IDENTITY_NO
+						  FROM DUAL
+		</foreach>
+	<![CDATA[
+					) A
+				 WHERE A.SABUN IS NOT NULL
+				) S
+		ON (	T.ENTER_CD		= #{ssnEnterCd}
+			AND	T.SABUN			= S.SABUN
+			)
+		WHEN MATCHED THEN
+			UPDATE SET T.IDENTITY_NO	= S.IDENTITY_NO
+					 , T.CHKDATE		= SYSDATE
+					 , T.CHKID			= #{ssnSabun}
+	]]>
+	</update>
+		
+	<delete id="deleteHealthInsEmpMthDataMgr" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN212
+		 WHERE ENTER_CD||'_'||SABUN||'_'||YM IN (  NULL ]]>
+		<foreach item="rm" collection="deleteRows">
+			,
+			<if test="ssnEnterCd != null and ssnEnterCd neq '' and rm.sabun != null and rm.sabun neq '' and rm.ym != null and rm.ym neq ''">
+				TRIM(#{ssnEnterCd})||'_'||TRIM(#{rm.sabun})||'_'||TRIM(#{rm.ym})
+			</if>
+		</foreach>
+		)
+	</delete>
+</mapper>

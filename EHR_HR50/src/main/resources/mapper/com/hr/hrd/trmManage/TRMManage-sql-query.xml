@@ -1,0 +1,489 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    <mapper namespace="hrd.trmManage">
+
+
+        <select parameterType="map" resultType="cMap" id="getSkillList">
+
+                <![CDATA[
+                    SELECT LEVEL AS "_level"
+                         , POINT_YN, LEVEL AS LVL, SKILL_CD AS CODE, PRIOR_SKILL_CD AS PRIOR_CODE , SKILL_NM AS CODE_NM , SKILL_TYPE AS CODE_TYPE
+                         , DECODE(PRIOR_SKILL_CD,'0','',DECODE(B.TRM_CD,'','0','1')) AS TRM_CD
+                         , SKILL_DESC  AS CODE_DESC , START_YMD, END_YMD, REG_YMD, SEQ, USE_YN
+                         , DECODE(PRIOR_SKILL_CD,'0','N',DECODE(B.TRM_CD,'','N','Y')) AS TRM_YN
+                      FROM TCDPW203 A
+                         , (SELECT ENTER_CD, TRM_CD FROM  TCDPT501 WHERE ENTER_CD = #{ssnEnterCd} AND  TRM_TYPE = 'S'  GROUP BY ENTER_CD, TRM_CD ) B
+                     WHERE A.ENTER_CD = B.ENTER_CD(+)
+                       AND A.SKILL_CD = B.TRM_CD(+)
+--					   AND USE_YN LIKE
+                     START WITH A.ENTER_CD = #{ssnEnterCd}
+                       AND PRIOR_SKILL_CD = '0'
+                   CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+                       AND PRIOR SKILL_CD = PRIOR_SKILL_CD
+                     ORDER SIBLINGS BY PRIOR_SKILL_CD, SEQ
+                ]]>
+
+
+        </select>
+
+
+        <select parameterType="map" resultType="cMap" id="getKnowledgeList">
+
+                <![CDATA[
+                    SELECT LEVEL AS "_level",
+                           LEVEL AS LVL,
+                           KNOWLEDGE_CD AS CODE,
+                           PRIOR_KNOWLEDGE_CD AS PRIOR_CODE,
+                           POINT_YN,
+                           KNOWLEDGE_NM AS CODE_NM,
+                           KNOWLEDGE_TYPE AS CODE_TYPE,
+                           TECH_BIZ_TYPE  AS TECH_BIZ_TYPE,
+                           DECODE(PRIOR_KNOWLEDGE_CD,'0','',DECODE(B.TRM_CD,'','0','1')) AS TRM_CD,
+                           KNOWLEDGE_DESC AS CODE_DESC,
+                           START_YMD,
+                           END_YMD,
+                           REG_YMD,
+                           SEQ,
+                           USE_YN,
+                           DECODE(PRIOR_KNOWLEDGE_CD,'0','N',DECODE(B.TRM_CD,'','N','Y')) AS TRM_YN
+                      FROM TCDPW201 A , (SELECT ENTER_CD, TRM_CD
+                                           FROM TCDPT501
+                                          WHERE ENTER_CD = #{ssnEnterCd}
+                                            AND TRM_TYPE = #{searchTechBizType}
+                                          GROUP BY ENTER_CD, TRM_CD ) B
+                     WHERE A.ENTER_CD          = B.ENTER_CD(+)
+                       AND A.KNOWLEDGE_CD      = B.TRM_CD(+)
+                     START WITH A.ENTER_CD     = #{ssnEnterCd}
+                       AND PRIOR_KNOWLEDGE_CD  = '0'
+                       AND TECH_BIZ_TYPE       = #{searchTechBizType}
+                     CONNECT BY
+                           PRIOR A.ENTER_CD    = A.ENTER_CD
+                       AND PRIOR KNOWLEDGE_CD  = PRIOR_KNOWLEDGE_CD
+                       AND PRIOR TECH_BIZ_TYPE = TECH_BIZ_TYPE
+                     ORDER SIBLINGS BY SEQ, KNOWLEDGE_CD
+
+                ]]>
+
+
+        </select>
+
+
+        <update parameterType="map" id="saveTRM">
+
+                    MERGE INTO TCDPT501 T
+                    USING (
+                            SELECT A.ENTER_CD
+                                 , A.TRM_TYPE
+                                 , A.TRM_CD
+                                 , A.EDUCATION
+                                 , A.ITEM_GUBUN
+                                 , A.SELECT_TYPE
+                                 , A.GRADE_TYPE
+                                 , A.CHKDATE
+                                 , A.CHKID
+                              FROM (
+                                    SELECT NULL AS ENTER_CD
+                                         , NULL AS TRM_TYPE
+                                         , NULL AS TRM_CD
+                                         , NULL AS EDUCATION
+                                         , NULL AS ITEM_GUBUN
+                                         , NULL AS SELECT_TYPE
+                                         , NULL AS GRADE_TYPE
+                                         , NULL AS CHKDATE
+                                         , NULL AS CHKID
+                                      FROM DUAL
+                                    <foreach item="rm" collection="mergeRows" >
+                                     UNION ALL
+                                    SELECT TRIM( #{ssnEnterCd}     )   AS ENTER_CD
+                                         , TRIM( #{searchTrmType}  ) AS TRM_TYPE
+                                         , TRIM( #{searchCode}     ) AS TRM_CD
+                                         , TRIM( #{rm.education} ) AS EDUCATION
+                                         , TRIM( #{rm.itemGubun} ) AS ITEM_GUBUN
+                                         , TRIM( #{rm.selectType}) AS SELECT_TYPE
+                                         , TRIM( #{rm.gradeType} ) AS GRADE_TYPE
+                                         , SYSDATE AS CHKDATE
+                                         , #{ssnSabun} AS CHKID
+                                      FROM DUAL
+                                    </foreach>
+                                  ) A WHERE A.ENTER_CD IS NOT NULL
+                          ) S
+                           ON ( T.ENTER_CD = S.ENTER_CD AND T.TRM_TYPE = S.TRM_TYPE AND T.TRM_CD = S.TRM_CD AND T.EDUCATION = S.EDUCATION)
+                      WHEN MATCHED THEN
+                           UPDATE SET T.ITEM_GUBUN = S.ITEM_GUBUN
+                                , T.SELECT_TYPE = S.SELECT_TYPE
+                                , T.GRADE_TYPE = S.GRADE_TYPE
+                                , T.CHKDATE = S.CHKDATE
+                                , T.CHKID = S.CHKID
+                      WHEN NOT MATCHED THEN
+                           INSERT ( T.ENTER_CD     , T.TRM_TYPE     , T.TRM_CD     , T.EDUCATION     , T.ITEM_GUBUN     , T.SELECT_TYPE     , T.GRADE_TYPE     , T.CHKDATE     , T.CHKID)
+                           VALUES ( S.ENTER_CD     , S.TRM_TYPE     , S.TRM_CD     , S.EDUCATION     , S.ITEM_GUBUN     , S.SELECT_TYPE     , S.GRADE_TYPE     , S.CHKDATE     , S.CHKID)
+
+
+        </update>
+
+        <delete parameterType="map" id="deleteTRM">
+
+                    DELETE FROM TCDPT501
+                     WHERE ENTER_CD||'_'||TRM_TYPE||'_'||TRM_CD||'_'||EDUCATION IN 	( NULL
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                    <if test='rm.education != null and !rm.education("")'>
+                        TRIM(#{ssnEnterCd})||'_'||TRIM(#{searchTrmType})||'_'||TRIM(#{searchCode})||'_'||TRIM(#{rm.education})
+                    </if>
+</foreach>
+
+                                        )
+        </delete>
+
+
+
+
+        <select parameterType="map" resultType="cMap" id="getTRMRegList">
+
+                <![CDATA[
+
+                    SELECT ITEM_GUBUN, A.EDUCATION, B.EDUCATIONNM, TIME, NUM
+                      FROM TCDPT501 A,
+                           (
+                            SELECT ENTER_CD, EDUCATION, EDUCATIONNM, TIME, NUM
+                              FROM (
+                                    SELECT ENTER_CD, TO_CHAR(NUM) AS EDUCATION, EDUCATIONNM, NVL(TIME,0) AS TIME, EDUCATION AS NUM
+                                      FROM TCDPT101_V
+                                     UNION
+                                    SELECT ENTER_CD, TO_CHAR(SEQ) AS EDUCATION, EDUCATIONNM, NVL(TOTAL_TIME,0) AS TIME, '' AS NUM
+                                      FROM TCDPT201_V
+                                     UNION
+                                    --SELECT 'HR', ACT_VER_ID  AS EDUCATION , EDUCATIONNM,  TIME, '' AS NUM  FROM  TCDPT309 AAA  -- 'HR' 하드코딩한 이유를 모르겠음.
+                                    SELECT ENTER_CD, ACT_VER_ID  AS EDUCATION , EDUCATIONNM,  TIME, '' AS NUM  FROM  TCDPT309 AAA
+                                     WHERE SDATE = (SELECT MAX(SDATE) FROM  TCDPT309  WHERE ENTER_CD = AAA.ENTER_CD AND ACT_VER_ID = AAA.ACT_VER_ID  GROUP BY ACT_VER_ID)
+                                ) XX
+                           ) B
+                     WHERE A.ENTER_CD = B.ENTER_CD
+                       AND A.EDUCATION   = B.EDUCATION
+                       AND A.ENTER_CD    = #{ssnEnterCd}
+                       AND A.TRM_TYPE    = #{searchTrmType}
+                       AND A.TRM_CD      = #{searchCode}
+                       AND A.SELECT_TYPE = #{searchSelectType}
+                       AND A.GRADE_TYPE  = #{searchGradeType}
+
+				]]>
+
+
+        </select>
+
+
+
+
+
+        <select parameterType="map" resultType="cMap" id="getTRMEduPopupList">
+
+                <![CDATA[
+				SELECT A.ENTER_CD
+                     , A.EDU_SEQ
+                     , A.EDU_EVENT_SEQ
+                     , A.EDU_EVENT_NM
+                     , A.EDU_STATUS_CD
+                     , A.EDU_ORG_CD
+                     , A.EDU_PLACE
+                     , A.EDU_S_YMD
+                     , A.EDU_E_YMD
+                     , A.EDU_S_HM
+                     , A.EDU_E_HM
+                     , A.EDU_DAY
+                     , A.EDU_HOUR
+                     , A.APPL_S_YMD
+                     , A.APPL_E_YMD
+                     , A.CURRENCY_CD
+                     , A.PER_EXPENSE_MON
+                     , A.REAL_EXPENSE_MON
+                     , A.LABOR_APPLY_YN
+                     , A.LABOR_MON
+                     , A.LABOR_RETURN_YN
+                     , A.LABOR_RETURN_YMD
+                     , A.FILE_SEQ
+                     , A.EDU_SATI_SKIP_YN
+                     , A.MAX_PERSON
+                     , A.NOTE
+                     , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'L10010', C.EDU_BRANCH_CD) AS EDU_BRANCH_NM
+                     , F_COM_GET_GRCODE_NAME(C.ENTER_CD, 'L10015', C.EDU_M_BRANCH_CD) AS EDU_M_BRANCH_NM
+                     , C.EDU_COURSE_NM
+                     , C.IN_OUT_TYPE
+                     , C.EDU_BRANCH_CD
+                     , C.EDU_M_BRANCH_CD
+                     , C.EDU_METHOD_CD
+                     , C.EDU_STATUS_CD
+                     , C.EDU_ORG_CD
+                     , C.FOREIGN_CD
+                     , C.MANDATORY_YN
+                     , C.NOTE
+                     , '0' AS SELECT_IMG
+                     , B.EDU_ORG_NM
+				FROM TTRA121 A -- 교육과정_이벤트
+                   , TTRA001 B -- 교육기관
+                   , TTRA101 C -- 교육과정관리
+			   WHERE A.ENTER_CD = #{ssnEnterCd}
+			     AND A.EDU_STATUS_CD = '10030' -- 교육과정상태코드(L10170)(10030:운영)
+					-- AND NVL(A.INNER_YN,'N') = 'N' -- 개인시청가능여부
+					-- AND C.EDU_COURSE_NM LIKE :과정명
+					-- AND A.EDU_EVENT_NM LIKE :회차명
+				 AND A.ENTER_CD	= C.ENTER_CD
+				 AND A.ENTER_CD	= B.ENTER_CD(+)
+				 AND A.EDU_ORG_CD = B.EDU_ORG_CD(+)
+				 AND A.EDU_SEQ		= C.EDU_SEQ
+				         ]]>
+<if test='searchEduSeq != null and !searchEduSeq.equals("")'>
+            	 AND A.EDU_SEQ    = #{searchEduSeq}
+</if>
+
+<if test='checkType != null and checkType.equals("Y")'>
+    <![CDATA[
+				 -- 신청시작,종료일 체크
+				 AND TO_CHAR(SYSDATE,'YYYYMMDD') BETWEEN A.APPL_S_YMD AND NVL(A.APPL_E_YMD,'99991231')
+				AND NVL((SELECT COUNT(*)
+				    	   FROM TTRA201 K, THRI103 J
+						  WHERE K.ENTER_CD = J.ENTER_CD
+							AND K.APPL_SEQ = J.APPL_SEQ
+							AND K.ENTER_CD = A.ENTER_CD
+							AND K.EDU_SEQ	= A.EDU_SEQ
+							AND K.EDU_EVENT_SEQ = A.EDU_EVENT_SEQ
+							AND J.APPL_STATUS_CD NOT IN ('23','33')),0) <= NVL(A.MAX_PERSON,999)
+			   ]]>
+</if>
+
+				ORDER BY C.EDU_COURSE_NM, A.EDU_EVENT_NM
+
+
+        </select>
+        
+        <update parameterType="map" id="saveTcdpw203">
+
+                    MERGE INTO TCDPW203 T
+                    USING (
+                            SELECT A.ENTER_CD
+								 , A.SKILL_CD
+								 , A.PRIOR_SKILL_CD
+								 , A.SKILL_NM
+								 , A.SKILL_TYPE
+								 , A.SKILL_DESC
+								 , A.START_YMD
+								 , A.END_YMD
+								 , A.REG_YMD
+								 , A.SEQ
+								 , A.USE_YN
+								 , A.CHKDATE
+								 , A.CHKID
+                              FROM (
+                                    SELECT NULL AS ENTER_CD
+                                         , NULL AS SKILL_CD
+                                         , NULL AS PRIOR_SKILL_CD
+                                         , NULL AS SKILL_NM
+                                         , NULL AS SKILL_TYPE
+                                         , NULL AS SKILL_DESC
+                                         , NULL AS START_YMD
+                                         , NULL AS END_YMD
+                                         , NULL AS REG_YMD
+                                         , NULL AS SEQ
+                                         , NULL AS USE_YN
+                                         , NULL AS CHKDATE
+                                         , NULL AS CHKID
+                                      FROM DUAL
+                                    <foreach item="rm" collection="mergeRows" >
+                                     UNION ALL
+                                    SELECT TRIM( #{ssnEnterCd}     ) AS ENTER_CD
+											<choose><when test='rm.code != null and !rm.code.equals("")'>
+												, TRIM( #{rm.code} ) AS SKILL_CD
+                                            </when><otherwise>
+											    , (
+													SELECT (NVL(MAX(TO_NUMBER(SKILL_CD)),0) + 1)
+													  FROM TCDPW203
+													 WHERE ENTER_CD = #{ssnEnterCd}
+											      )	AS SKILL_CD
+                                            </otherwise>
+                                            </choose>
+                                         , TRIM( #{rm.priorCode} ) AS PRIOR_SKILL_CD
+                                         , TRIM( #{rm.codeNm} ) AS SKILL_NM
+                                         , TRIM( #{rm.codeType} ) AS SKILL_TYPE
+                                         , TRIM( #{rm.codeDesc} ) AS SKILL_DESC
+                                         , TO_CHAR(SYSDATE,'YYYYMMDD') AS START_YMD
+                                         , '99991231' AS END_YMD
+                                         , TO_CHAR(SYSDATE,'YYYYMMDD') AS REG_YMD
+                                         , TRIM( #{rm.seq} ) AS SEQ
+                                         , 'Y' AS USE_YN
+                                         , SYSDATE AS CHKDATE
+                                         , #{ssnSabun} AS CHKID
+                                      FROM DUAL
+                                    </foreach>
+                                  ) A WHERE A.ENTER_CD IS NOT NULL
+                          ) S
+                           ON ( T.ENTER_CD = S.ENTER_CD AND T.SKILL_CD = S.SKILL_CD)
+                      WHEN MATCHED THEN
+                           UPDATE SET T.SKILL_NM = S.SKILL_NM
+                                , T.SKILL_DESC = S.SKILL_DESC
+                                , T.SEQ = S.SEQ
+                                , T.CHKDATE = S.CHKDATE
+                                , T.CHKID = S.CHKID
+                      WHEN NOT MATCHED THEN
+                           INSERT ( T.ENTER_CD
+						        , T.SKILL_CD
+						        , T.PRIOR_SKILL_CD
+						        , T.SKILL_NM
+						        , T.SKILL_TYPE
+						        , T.SKILL_DESC
+						        , T.START_YMD
+						        , T.END_YMD
+						        , T.REG_YMD
+						        , T.SEQ
+						        , T.USE_YN
+						        , T.CHKDATE
+						        , T.CHKID)
+						 VALUES ( S.ENTER_CD
+						        , S.SKILL_CD
+						        , S.PRIOR_SKILL_CD
+						        , S.SKILL_NM
+						        , S.SKILL_TYPE
+						        , S.SKILL_DESC
+						        , S.START_YMD
+						        , S.END_YMD
+						        , S.REG_YMD
+						        , S.SEQ
+						        , S.USE_YN
+						        , S.CHKDATE
+						        , S.CHKID)
+        </update>
+        
+        <delete parameterType="map" id="deleteTcdpw203">
+
+                    DELETE FROM TCDPW203
+                     WHERE ENTER_CD||'_'||SKILL_CD IN 	( NULL
+					<foreach item="rm" collection="deleteRows" >
+	                        ,
+	                    <if test="rm.code != null and rm.code !=''">
+	                        TRIM(#{ssnEnterCd})||'_' ||TRIM(#{rm.code})
+	                    </if>
+                    </foreach>
+                                        )
+
+
+
+        </delete>
+        
+        <update parameterType="map" id="saveTcdpw201">
+
+
+                    MERGE INTO TCDPW201 T
+                    USING (
+                            SELECT A.ENTER_CD
+								 , A.KNOWLEDGE_CD
+								 , A.PRIOR_KNOWLEDGE_CD
+								 , A.KNOWLEDGE_NM
+								 , A.KNOWLEDGE_TYPE
+								 , A.TECH_BIZ_TYPE
+								 , A.KNOWLEDGE_DESC
+								 , A.START_YMD
+								 , A.END_YMD
+								 , A.REG_YMD
+								 , A.SEQ
+								 , A.USE_YN
+								 , A.CHKDATE
+								 , A.CHKID
+                              FROM (
+                                    SELECT NULL AS ENTER_CD
+                                         , NULL AS KNOWLEDGE_CD
+                                         , NULL AS PRIOR_KNOWLEDGE_CD
+                                         , NULL AS KNOWLEDGE_NM
+                                         , NULL AS KNOWLEDGE_TYPE
+                                         , NULL AS TECH_BIZ_TYPE
+                                         , NULL AS KNOWLEDGE_DESC
+                                         , NULL AS START_YMD
+                                         , NULL AS END_YMD
+                                         , NULL AS REG_YMD
+                                         , NULL AS SEQ
+                                         , NULL AS USE_YN
+                                         , NULL AS CHKDATE
+                                         , NULL AS CHKID
+                                      FROM DUAL
+                                    <foreach item="rm" collection="mergeRows" >
+                                     UNION ALL
+                                    SELECT TRIM( #{ssnEnterCd}     ) AS ENTER_CD
+											<choose><when test='rm.code != null and !rm.code.equals("")'>
+												, TRIM( #{rm.code} ) AS KNOWLEDGE_CD
+                                            </when><otherwise>
+											    , (
+													SELECT (NVL(MAX(TO_NUMBER(KNOWLEDGE_CD)),0) + 1)
+													  FROM TCDPW201
+													 WHERE ENTER_CD = #{ssnEnterCd}
+											      )	AS KNOWLEDGE_CD
+                                            </otherwise>
+                                            </choose>
+                                         , TRIM( #{rm.priorCode} ) AS PRIOR_KNOWLEDGE_CD
+                                         , TRIM( #{rm.codeNm} ) AS KNOWLEDGE_NM
+                                         , TRIM( #{rm.codeType} ) AS KNOWLEDGE_TYPE
+                                         , TRIM( #{rm.techBizType} ) AS TECH_BIZ_TYPE
+                                         , TRIM( #{rm.codeDesc} ) AS KNOWLEDGE_DESC
+                                         , TO_CHAR(SYSDATE,'YYYYMMDD') AS START_YMD
+                                         , '99991231' AS END_YMD
+                                         , TO_CHAR(SYSDATE,'YYYYMMDD') AS REG_YMD
+                                         , TRIM( #{rm.seq} ) AS SEQ
+                                         , 'Y' AS USE_YN
+                                         , SYSDATE AS CHKDATE
+                                         , #{ssnSabun} AS CHKID
+                                      FROM DUAL
+                                    </foreach>
+                                  ) A WHERE A.ENTER_CD IS NOT NULL
+                          ) S
+                           ON ( T.ENTER_CD = S.ENTER_CD AND T.KNOWLEDGE_CD = S.KNOWLEDGE_CD)
+                      WHEN MATCHED THEN
+                           UPDATE SET T.KNOWLEDGE_NM = S.KNOWLEDGE_NM
+                                , T.KNOWLEDGE_DESC = S.KNOWLEDGE_DESC
+                                , T.SEQ = S.SEQ
+                                , T.CHKDATE = S.CHKDATE
+                                , T.CHKID = S.CHKID
+                      WHEN NOT MATCHED THEN
+                           INSERT ( T.ENTER_CD
+						        , T.KNOWLEDGE_CD
+						        , T.PRIOR_KNOWLEDGE_CD
+						        , T.KNOWLEDGE_NM
+						        , T.KNOWLEDGE_TYPE
+						        , T.TECH_BIZ_TYPE
+						        , T.KNOWLEDGE_DESC
+						        , T.START_YMD
+						        , T.END_YMD
+						        , T.REG_YMD
+						        , T.SEQ
+						        , T.USE_YN
+						        , T.CHKDATE
+						        , T.CHKID)
+						 VALUES ( S.ENTER_CD
+						        , S.KNOWLEDGE_CD
+						        , S.PRIOR_KNOWLEDGE_CD
+						        , S.KNOWLEDGE_NM
+						        , S.KNOWLEDGE_TYPE
+						        , S.TECH_BIZ_TYPE
+						        , S.KNOWLEDGE_DESC
+						        , S.START_YMD
+						        , S.END_YMD
+						        , S.REG_YMD
+						        , S.SEQ
+						        , S.USE_YN
+						        , S.CHKDATE
+						        , S.CHKID)
+        </update>
+        
+        <delete parameterType="map" id="deleteTcdpw201">
+
+                    DELETE FROM TCDPW201
+                     WHERE ENTER_CD||'_'||KNOWLEDGE_CD IN 	( NULL
+					<foreach item="rm" collection="deleteRows" >
+	                        ,
+	                    <if test='rm.code != null and !rm.code("")'>
+	                        TRIM(#{ssnEnterCd})||'_' ||TRIM(#{rm.code})
+                        </if>
+                    </foreach>
+                                        )
+        </delete>
+
+
+
+</mapper>

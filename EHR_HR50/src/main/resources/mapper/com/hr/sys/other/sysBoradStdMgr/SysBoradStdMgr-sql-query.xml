@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.other.sysBoradStdMgr">
+<!-- 		기준관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getSysBoradStdMgrList">
+
+				<![CDATA[
+					SELECT '0' AS DETAIL    
+							, X.BBS_CD
+							, X.GB_CD
+							, X.KEY
+							, X.VALUE
+							, X.SDATE
+							, X.EDATE
+					FROM TSYS701 X
+					WHERE X.ENTER_CD = TRIM(#{ssnEnterCd})
+					          ]]>
+				<if test='searchFromYmd != null and !searchFromYmd.equals("")'>
+					<![CDATA[ AND NVL(X.EDATE,'99991231')  >= REPLACE(#{searchFromYmd},'-','') ]]>
+				</if>
+				<if test='searchToYmd != null and !searchToYmd.equals("")'>
+					<![CDATA[ AND NVL(X.SDATE,'00000000')  <= REPLACE(#{searchToYmd},'-','') ]]>
+				</if>
+
+				<if test='searchSchGubunCd != null and !searchSchGubunCd.equals("")'>
+					AND X.GB_CD =  #{searchSchGubunCd}
+				</if>
+				
+				<if test='searchBbsCd != null and !searchBbsCd.equals("")'>
+					AND X.BBS_CD =  #{searchBbsCd}
+				</if>
+				ORDER BY X.BBS_CD, X.GB_CD, X.SDATE DESC
+
+
+
+		</select>
+		
+<!-- 		기준관리 저장 -->	
+		<update parameterType="map" id="saveSysBoradStdMgr">
+
+
+					MERGE INTO TSYS701 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.BBS_CD
+									, A.GB_CD
+									, A.KEY
+									, A.VALUE
+									, A.SDATE
+									, A.EDATE
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS BBS_CD
+											, NULL		AS GB_CD 
+											, NULL		AS KEY   
+											, NULL		AS VALUE 
+											, NULL		AS SDATE 
+											, NULL		AS EDATE 
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT	
+											  TRIM( #{ssnEnterCd} )	AS ENTER_CD
+											, TRIM( #{rm.bbsCd} )	AS BBS_CD
+											, TRIM( #{rm.gbCd} )	AS GB_CD
+											, TRIM( #{rm.key} )		AS KEY
+											, TRIM( #{rm.value} )	AS VALUE
+											, TRIM( #{rm.sdate} )	AS SDATE
+											, TRIM( #{rm.edate} )	AS EDATE
+											FROM   DUAL
+</foreach>
+									) A WHERE A.BBS_CD IS NOT NULL 
+										  AND A.GB_CD IS NOT NULL 
+										  AND A.KEY IS NOT NULL 
+										  AND A.VALUE IS NOT NULL 
+							) S
+					ON ( T.ENTER_CD = S.ENTER_CD AND T.BBS_CD = S.BBS_CD AND T.GB_CD = S.GB_CD AND T.KEY = S.KEY AND T.VALUE = S.VALUE)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.SDATE	= S.SDATE
+									, T.EDATE	= S.EDATE
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(	
+						      T.ENTER_CD
+							, T.BBS_CD
+							, T.GB_CD
+							, T.KEY
+							, T.VALUE
+							, T.SDATE
+							, T.EDATE
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  S.ENTER_CD
+							, S.BBS_CD
+							, S.GB_CD
+							, S.KEY
+							, S.VALUE
+							, S.SDATE
+							, S.EDATE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+
+		</update>
+<!-- 		기준관리 삭제 -->
+		<delete parameterType="map" id="deleteSysBoradStdMgr">
+
+
+					DELETE FROM TSYS701
+					WHERE  ENTER_CD||'_'||BBS_CD||'_'||GB_CD||'_'||KEY||'_'||VALUE IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='ssnEnterCd != null and !ssnEnterCd.equals("")
+											and rm.bbsCd != null and !rm.bbsCd.equals("")
+											and rm.key != null and !rm.key.equals("")'>
+TRIM( #{ssnEnterCd} )||'_'||TRIM( #{rm.bbsCd} )||'_'||TRIM( #{rm.gbCd} )||'_'||TRIM( #{rm.key} )||'_'||TRIM( #{rm.value} )
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

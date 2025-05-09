@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="sys.system.langMgr">
+
+<!-- 		언어관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getLangMgrList">
+
+				<![CDATA[
+					SELECT LANG_CD,
+						COUNTRY_CD,
+						SEQ,
+						USE_YN
+					FROM TLAN100
+					ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getLangCountryList">
+
+				<![CDATA[
+					SELECT  CODE, F_COM_GET_GRCODE_NAME(#{ssnEnterCd}, 'H20295', CODE, #{ssnLocaleCd} ) AS CODE_NM
+					FROM TSYS005
+					WHERE GRCODE_CD = 'H20295'
+					AND ENTER_CD    = #{ssnEnterCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+					AND CODE IN(SELECT NOTE1
+								FROM TSYS005
+								WHERE GRCODE_CD = 'L00100'
+								AND ENTER_CD    = #{ssnEnterCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+								)
+					ORDER BY SEQ
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getUseLangCd">
+
+				<![CDATA[
+					SELECT A.CODE, F_COM_GET_GRCODE_NAME(#{ssnEnterCd}, 'L00100', CODE, #{ssnLocaleCd} ) CODE_NM
+					FROM TSYS005 A, TLAN100 B
+					WHERE A.GRCODE_CD = 'L00100'
+					AND A.CODE = B.LANG_CD
+					AND A.ENTER_CD = #{ssnEnterCd} AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN S_YMD AND E_YMD
+					ORDER BY B.SEQ
+				]]>
+
+
+		</select>
+
+
+
+<!-- 		언어관리 저장 -->
+		<update parameterType="map" id="saveLangMgr">
+
+
+					MERGE INTO TLAN100 T
+					USING	(
+							SELECT	  A.LANG_CD
+									, A.COUNTRY_CD
+									, A.SEQ
+									, A.USE_YN
+							FROM	(
+									SELECT	  NULL		AS LANG_CD
+											, NULL		AS COUNTRY_CD
+											, NULL		AS SEQ
+											, NULL		AS USE_YN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											TRIM( #{rm.langCd} )	AS LANG_CD
+											, TRIM( #{rm.countryCd} )	AS COUNTRY_CD
+											, TRIM( #{rm.seq} )	AS SEQ
+											, TRIM( #{rm.useYn} )	AS USE_YN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.LANG_CD IS NOT NULL
+							) S
+					ON (T.LANG_CD = S.LANG_CD )
+					WHEN MATCHED THEN
+						UPDATE SET	  T.COUNTRY_CD	= S.COUNTRY_CD
+									, T.SEQ	= S.SEQ
+									, T.USE_YN	= S.USE_YN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.LANG_CD
+							, T.COUNTRY_CD
+							, T.SEQ
+							, T.USE_YN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							S.LANG_CD
+							, S.COUNTRY_CD
+							, S.SEQ
+							, S.USE_YN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		언어관리 삭제 -->
+		<delete parameterType="map" id="deleteLangMgr">
+
+
+					DELETE FROM TLAN100
+					WHERE LANG_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.langCd != null and !rm.langCd.equals("")'>
+											TRIM(#{rm.langCd})
+										</if>
+</foreach>
+										)
+		</delete>
+
+
+
+		<!-- 사용언어관리 조회 -->
+		<select parameterType="map" resultType="cMap" id="getUseLangMgrList">
+
+				<![CDATA[
+					SELECT A.ENTER_CD
+						, A.LANG_CD
+						, A.SEQ
+						, A.USE_YN
+						, A.DEFAULT_YN
+						, A.COUNTRY_CD
+					FROM TLAN101 A
+					WHERE A.ENTER_CD    = #{ssnEnterCd}
+					ORDER BY NVL(A.DEFAULT_YN, 'N') DESC, A.SEQ
+				]]>
+
+
+		</select>
+
+		<!-- 사용언어관리 저장 -->
+		<update parameterType="map" id="saveUseLangMgr">
+
+
+					MERGE INTO TLAN101 T
+					USING   (
+							SELECT    A.ENTER_CD
+									, A.LANG_CD
+									, A.SEQ
+									, A.USE_YN
+									, A.DEFAULT_YN
+									, A.COUNTRY_CD
+							FROM    (
+									SELECT    NULL      AS ENTER_CD
+											, NULL      AS LANG_CD
+											, NULL      AS SEQ
+											, NULL      AS USE_YN
+											, NULL      AS DEFAULT_YN
+											, NULL      AS COUNTRY_CD
+									FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}               AS ENTER_CD
+											, TRIM( #{rm.langCd} )      AS LANG_CD
+											, TRIM( #{rm.seq} )         AS SEQ
+											, TRIM( #{rm.useYn} )       AS USE_YN
+											, TRIM( #{rm.defaultYn} )   AS DEFAULT_YN
+											, TRIM( #{rm.countryCd} )   AS COUNTRY_CD
+											FROM   DUAL
+</foreach>
+									) A WHERE A.LANG_CD IS NOT NULL
+							) S
+					ON (T.ENTER_CD = S.ENTER_CD AND T.LANG_CD = S.LANG_CD )
+					WHEN MATCHED THEN
+						UPDATE SET    T.SEQ = S.SEQ
+									, T.USE_YN  = S.USE_YN
+									, T.DEFAULT_YN  = S.DEFAULT_YN
+									, T.CHKDATE = SYSDATE
+									, T.CHKID   = #{ssnSabun}
+									, T.COUNTRY_CD = S.COUNTRY_CD
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							T.ENTER_CD
+							, T.LANG_CD
+							, T.SEQ
+							, T.USE_YN
+							, T.DEFAULT_YN
+							, T.CHKDATE
+							, T.CHKID
+							, T.COUNTRY_CD
+						)
+						VALUES
+						(
+							S.ENTER_CD
+							, S.LANG_CD
+							, S.SEQ
+							, S.USE_YN
+							, S.DEFAULT_YN
+							, SYSDATE
+							, #{ssnSabun}
+							, S.COUNTRY_CD
+						)
+		</update>
+<!--        언어관리 삭제 -->
+		<delete parameterType="map" id="deleteUseLangMgr">
+
+
+					DELETE FROM TLAN101
+					WHERE ENTER_CD = #{ssnEnterCd}
+					AND LANG_CD IN (  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.langCd != null and !rm.langCd.equals("")'>
+											#{rm.langCd}
+										</if>
+</foreach>
+									)
+		</delete>
+
+		<!-- 언어코드 조회 -->
+		<select parameterType="map" resultType="cMap" id="getUseLangMgrCodeList">
+
+				<![CDATA[
+					SELECT LANG_CD CODE,
+						LANG_NM CODE_NM
+					FROM TLAN100
+					ORDER BY SEQ
+
+				]]>
+
+
+		</select>
+
+</mapper>

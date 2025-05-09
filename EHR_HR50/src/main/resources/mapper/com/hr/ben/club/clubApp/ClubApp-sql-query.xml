@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.club.clubApp">
+	
+	<!-- 동호회 신청 내역 조회 -->	
+	<select id="getClubAppList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT A.ENTER_CD
+			     , A.APPL_SEQ
+			     , A.SABUN
+			     , A.CLUB_SEQ
+			     , A.JOIN_TYPE
+			     , A.SDATE
+			     , A.EDATE
+			     , A.AGREE_YN
+			     , TO_CHAR(A.AGREE_DATE,'YYYY-MM-DD  HH24:MI:SS') AS AGREE_DATE
+			     , A.FILE_SEQ
+			     , A.NOTE
+			     , B.APPL_CD
+				 , B.APPL_SEQ
+				 , B.APPL_YMD
+				 , B.APPL_SABUN
+				 , B.APPL_IN_SABUN
+				 , B.APPL_STATUS_CD
+				 , DECODE(B.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+				 , '0' AS DETAIL
+			  FROM THRI103 B, TBEN501 A, TBEN500 C
+			 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+               AND A.ENTER_CD   = B.ENTER_CD
+               AND A.APPL_SEQ   = B.APPL_SEQ
+               AND A.ENTER_CD   = C.ENTER_CD(+)
+               AND A.CLUB_SEQ   = C.CLUB_SEQ(+)
+               AND A.SABUN      = TRIM( #{searchSabun} )
+             ORDER BY B.APPL_YMD DESC, B.APPL_SEQ DESC
+	]]>
+	</select>
+		
+	<!-- 동호회 가입 현황 조회 -->	
+	<select id="getClubAppedList" parameterType="map" resultType="cMap">
+	<![CDATA[
+			SELECT A.CLUB_SEQ
+				 , B.CLUB_FEE
+				 , B.CLUB_NM 
+				 , B.SABUN_A
+				 , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_A, #{ssnLocaleCd} ) AS SABUN_A_NAME  --회장성명
+				 , B.SABUN_B
+				 , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_B, #{ssnLocaleCd} ) AS SABUN_B_NAME  --고문성명
+				 , B.SABUN_C
+				 , F_COM_GET_NAMES(B.ENTER_CD, B.SABUN_C, #{ssnLocaleCd} ) AS SABUN_C_NAME  --총무성명
+				 , A.SDATE 
+				 , A.EDATE 
+				 , A.AGREE_DATE 
+				 , ('/SignPhotoOut.do' || chr(63) || 'enterCd=' || #{ssnEnterCd} || chr(38) || 'fileSeq=' || A.FILE_SEQ) AS FILE_SEQ_URL
+				 , ( 
+						SELECT CASE WHEN(SYSDATE BETWEEN 
+											 TO_DATE((SELECT TO_CHAR(SYSDATE,'YYYY')||Z.NOTE1
+													    FROM TSYS005 Z
+													   WHERE Z.ENTER_CD  = A.ENTER_CD
+													     AND Z.GRCODE_CD = 'B50000'
+													     AND Z.CODE      = 'A'
+													     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Z.S_YMD AND Z.E_YMD))
+									 AND 
+											 TO_DATE((SELECT TO_CHAR(SYSDATE,'YYYY')||Z.NOTE2
+													    FROM TSYS005 Z
+													   WHERE Z.ENTER_CD  = A.ENTER_CD
+													     AND Z.GRCODE_CD = 'B50000'
+													     AND Z.CODE      = 'A'
+													     AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN Z.S_YMD AND Z.E_YMD))
+							) THEN '<a class="button">동의</a>' ELSE '' END FROM DUAL 
+					) AS BTN_AGREE
+				FROM TBEN502 A, TBEN500 B
+				WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				AND A.ENTER_CD 	 = B.ENTER_CD 
+				AND A.CLUB_SEQ 	 = B.CLUB_SEQ 
+				AND A.SABUN    	 = TRIM( #{searchSabun} )
+				AND NVL(B.TEMP_YN,'N') != 'Y' ]]>
+		<choose>
+			<when test="searchYmd != null and searchYmd neq ''">
+				AND TO_DATE(#{searchYmd}) BETWEEN TO_DATE(A.SDATE) AND TO_DATE(A.EDATE)
+			</when>
+			<otherwise>
+				AND TO_DATE(sysdate) BETWEEN TO_DATE(A.SDATE) AND TO_DATE(A.EDATE)
+			</otherwise>
+		</choose>
+		   ORDER BY B.CLUB_NM, A.EDATE DESC, A.SABUN
+	</select>
+		
+	<!-- 급여제공동의 내용 저장 -->
+	<update id="saveClubAppAgreeInfo" parameterType="map">
+	<![CDATA[
+	   		 MERGE INTO TBEN502 T 
+			 USING ( ]]>
+			<foreach item="rm" collection="mergeRows" separator=" UINION ALL " >
+					       SELECT TRIM( #{ssnEnterCd} ) 								AS  ENTER_CD 
+					            , TRIM( #{rm.searchApplSabun} ) 	 					AS  SABUN
+					            , TRIM( #{rm.clubSeq} )    								AS  CLUB_SEQ
+					            , (SELECT 
+									NVL(
+										(
+											SELECT MIN(Z.SDATE)
+											FROM TBEN502 Z
+											WHERE Z.SABUN = TRIM( #{rm.searchApplSabun} ) AND Z.ENTER_CD = TRIM( #{ssnEnterCd} ) AND Z.CLUB_SEQ = TRIM( #{rm.clubSeq} )
+											AND SUBSTR(Z.SDATE,0,4) = TO_CHAR(SYSDATE,'YYYY')
+										)
+										,(TO_CHAR(SYSDATE,'YYYY')||'0201')
+										)
+									FROM DUAL)  	 									AS  SDATE
+					            , (TO_CHAR(ADD_MONTHS(SYSDATE, +12),'YYYY')||'0131')  	AS  EDATE
+					            , 'Y' AS  AGREE_YN
+			<choose>
+				<when test="rm.agreeDate != null and rm.agreeDate neq ''">
+								, TO_DATE(#{rm.agreeDate} ,'YYYY-MM-DD HH24:MI:SS')		AS  AGREE_DATE
+				</when>
+				<otherwise>
+								, SYSDATE												AS  AGREE_DATE
+				</otherwise>
+			</choose>
+					            , TRIM(#{rm.fileSeq})  								AS  FILE_SEQ
+					        FROM DUAL
+			</foreach>
+		<![CDATA[ ) S 
+					ON ( 
+					          T.ENTER_CD = S.ENTER_CD 
+					     AND  T.SABUN = S.SABUN 
+					     AND  T.CLUB_SEQ = S.CLUB_SEQ 
+					     AND  T.SDATE = S.SDATE 
+					) 
+					WHEN MATCHED THEN 
+					   UPDATE SET T.CHKDATE	 = sysdate 
+					            , T.CHKID	 = #{ssnSabun} 
+					            , T.EDATE	 = S.EDATE 
+					            , T.AGREE_YN = S.AGREE_YN 
+					            , T.AGREE_DATE = S.AGREE_DATE 
+					            , T.FILE_SEQ = S.FILE_SEQ 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.SABUN
+					            , T.CLUB_SEQ
+					            , T.SDATE
+					            , T.EDATE
+					            , T.AGREE_YN
+					            , T.AGREE_DATE
+					            , T.FILE_SEQ
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.SABUN
+					            , S.CLUB_SEQ
+					            , S.SDATE
+					            , S.EDATE
+					            , S.AGREE_YN
+					            , sysdate
+					            , S.FILE_SEQ
+					            , sysdate
+					            , #{ssnSabun}
+					   ) 
+	]]>
+	</update>
+		
+	<select id="getClubAppClubCode" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT TT.* 
+		  FROM (
+				  SELECT C.CLUB_SEQ AS CODE, C.CLUB_NM AS CODE_NM
+				  FROM TBEN500 C
+					 WHERE C.ENTER_CD   = #{ssnEnterCd}
+                          AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND C.EDATE
+                        ) TT
+	  	 ORDER BY CODE_NM
+	]]>
+	</select>
+		
+	<delete id="deleteClubApp" parameterType="map">
+	<![CDATA[
+		DELETE FROM TBEN501
+		 WHERE ENTER_CD = TRIM(#{ssnEnterCd}) 
+		   AND ( APPL_SEQ ) IN ( ( NULL) ]]>
+		<foreach item="rm" collection="deleteRows">
+			<if test="rm.applSeq != null and rm.applSeq neq ''">
+				, ( TRIM( #{rm.applSeq} ) ) 
+			</if>
+		</foreach>
+		    )
+	</delete>
+		
+</mapper>

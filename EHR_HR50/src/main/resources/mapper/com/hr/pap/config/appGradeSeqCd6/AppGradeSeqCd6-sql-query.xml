@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appGradeSeqCd6">
+<!--  조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppGradeSeqCd6List">
+
+				<![CDATA[
+					WITH T_STD AS (
+					    SELECT A.ENTER_CD
+					         , A.APPRAISAL_CD
+					         , A.ORG_GRADE_CD
+					         , A.ORG_INWON
+					         , LISTAGG(A.CNT, '@')     WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON, B.SEQ) CNT_ARR
+					         , LISTAGG(A.MIN_CNT, '@') WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON, B.SEQ) MIN_CNT_ARR
+					         , LISTAGG(A.MAX_CNT, '@') WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON, B.SEQ) MAX_CNT_ARR
+					      FROM TPAP218 A
+					         , TPAP217 B
+					     WHERE A.ENTER_CD     = B.ENTER_CD
+					       AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					       AND A.APP_CLASS_CD = B.APP_CLASS_CD
+					       AND A.ENTER_CD     = TRIM( #{ssnEnterCd} )
+					       AND A.APPRAISAL_CD = TRIM( #{searchAppraisalCd} )
+					     ]]>
+<if test='searchOrgGradeCd != null and !searchOrgGradeCd.equals("")'>
+					       AND A.ORG_GRADE_CD = TRIM( #{searchOrgGradeCd} )
+</if>
+					     GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.ORG_GRADE_CD, A.ORG_INWON
+					)
+					SELECT R.ENTER_CD
+					     , R.APPRAISAL_CD
+					     , R.APP_GROUP_CD
+					     , R.APP_GROUP_NM
+					     , R.ORG_GRADE_CD
+					     , R.CNT_ARR_PLAN
+					     , R.MIN_CNT_ARR_PLAN
+					     , R.MAX_CNT_ARR_PLAN
+					     , R.CNT_ARR_EXEC
+					     , S.ORG_INWON AS TOT_CNT_PLAN
+					     , R.TOT_CNT_EXEC
+					     , R.S_CHK
+					  FROM (
+					         SELECT P.ENTER_CD
+					              , P.APPRAISAL_CD
+					              , P.APP_GROUP_CD
+					              , B.APP_GROUP_NM
+					              , B.ORG_GRADE_CD
+					              , P.CNT_ARR     AS CNT_ARR_PLAN
+					              , P.MIN_CNT_ARR AS MIN_CNT_ARR_PLAN
+					              , P.MAX_CNT_ARR AS MAX_CNT_ARR_PLAN
+					              , P.TOT_CNT     AS TOT_CNT_PLAN
+					              , E.CNT_ARR     AS CNT_ARR_EXEC
+					              , DECODE(E.TOT_CNT, 0, E.GROUP_TOT_CNT, E.TOT_CNT) AS TOT_CNT_EXEC
+					              , CASE WHEN P.CNT_ARR = E.CNT_ARR THEN 'Y'
+					                     ELSE 'N'
+					                END S_CHK
+					           FROM (
+					                     SELECT A.ENTER_CD
+					                          , A.APPRAISAL_CD
+					                          , A.APP_GROUP_CD
+					                          , A.APP_SEQ_CD
+					                          , LISTAGG(A.CNT,     '@') WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_GROUP_CD, A.APP_SEQ_CD, B.SEQ) CNT_ARR
+					                          , LISTAGG(A.MIN_CNT, '@') WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_GROUP_CD, A.APP_SEQ_CD, B.SEQ) MIN_CNT_ARR
+					                          , LISTAGG(A.MAX_CNT, '@') WITHIN GROUP (ORDER BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_GROUP_CD, A.APP_SEQ_CD, B.SEQ) MAX_CNT_ARR
+					                          , SUM(A.CNT) AS TOT_CNT
+					                       FROM TPAP222 A
+					                          , TPAP217 B
+					                      WHERE A.ENTER_CD = B.ENTER_CD
+					                        AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					                        AND A.APP_CLASS_CD = B.APP_CLASS_CD
+					                        AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+					                        AND A.APPRAISAL_CD = TRIM( #{searchAppraisalCd} )
+					                        AND A.APP_TYPE_CD = SUBSTR(TRIM( #{searchAppraisalCd} ), 3, 1)
+					                        AND A.APP_SEQ_CD = '6'
+					                      GROUP BY A.ENTER_CD, A.APPRAISAL_CD, A.APP_GROUP_CD, A.APP_SEQ_CD
+					                ) P
+					              , (
+					                     SELECT Z.ENTER_CD, Z.APPRAISAL_CD, Z.APP_GROUP_CD, Z.APP_SEQ_CD
+					                          , LISTAGG(Z.CNT, '@') WITHIN GROUP (ORDER BY Z.ENTER_CD, Z.APPRAISAL_CD, Z.APP_GROUP_CD, Z.APP_SEQ_CD, Z.SEQ) CNT_ARR
+					                          , SUM(Z.CNT) AS TOT_CNT
+					                          , MAX(Z.GROUP_TOT_CNT) AS GROUP_TOT_CNT
+					                       FROM (
+					                                 SELECT T.ENTER_CD
+					                                      , T.APPRAISAL_CD
+					                                      , T.APP_GROUP_CD
+					                                      , T.APP_SEQ_CD
+					                                      , G.APP_CLASS_CD
+					                                      , G.SEQ
+					                                      , SUM(CASE WHEN T.MBO_T_APP_3RD_CLASS_CD = G.APP_CLASS_CD THEN T.CNT ELSE 0 END) AS CNT
+					                                      , SUM(T.CNT) AS GROUP_TOT_CNT
+					                                   FROM TPAP217 G
+					                                      , (
+					                                             SELECT A.ENTER_CD
+					                                                  , A.APPRAISAL_CD
+					                                                  , B.APP_GROUP_CD
+					                                                  , B.APP_SEQ_CD
+					                                                  , C.MBO_T_APP_3RD_CLASS_CD
+					                                                  , COUNT(*) AS CNT
+					                                               FROM TPAP201 A
+					                                                  , TPAP202 B
+					                                                  , TPAP350 C
+					                                              WHERE A.ENTER_CD     = B.ENTER_CD
+					                                                AND A.APPRAISAL_CD = B.APPRAISAL_CD
+					                                                AND A.APP_STEP_CD  = B.APP_STEP_CD
+					                                                AND A.SABUN        = B.SABUN
+					                                                AND A.APP_ORG_CD   = B.APP_ORG_CD
+					                                                AND A.ENTER_CD     = C.ENTER_CD
+					                                                AND A.APPRAISAL_CD = C.APPRAISAL_CD
+					                                                AND A.SABUN        = C.SABUN
+					                                                AND A.APP_ORG_CD   = C.APP_ORG_CD
+					                                                AND A.APP_STEP_CD  = '5'
+					                                                AND A.APP_YN       = 'Y'
+					                                                AND B.APP_SEQ_CD   = '6'
+					                                                AND A.ENTER_CD     = TRIM( #{ssnEnterCd} )
+					                                                AND A.APPRAISAL_CD = TRIM( #{searchAppraisalCd} )
+					                                              GROUP BY A.ENTER_CD, A.APPRAISAL_CD, B.APP_GROUP_CD, B.APP_SEQ_CD, C.MBO_T_APP_3RD_CLASS_CD
+					                                        ) T
+					                                  WHERE G.ENTER_CD = T.ENTER_CD(+)
+					                                    AND G.APPRAISAL_CD = T.APPRAISAL_CD(+)
+					                                  GROUP BY T.ENTER_CD, T.APPRAISAL_CD, T.APP_GROUP_CD, T.APP_SEQ_CD, G.APP_CLASS_CD, G.SEQ
+					                            ) Z
+					                      GROUP BY Z.ENTER_CD, Z.APPRAISAL_CD, Z.APP_GROUP_CD, Z.APP_SEQ_CD
+					                ) E
+					              , TPAP133 B
+					          WHERE P.ENTER_CD     = E.ENTER_CD
+					            AND P.APPRAISAL_CD = E.APPRAISAL_CD
+					            AND P.APP_GROUP_CD = E.APP_GROUP_CD
+					            AND P.ENTER_CD     = B.ENTER_CD
+					            AND P.APPRAISAL_CD = B.APPRAISAL_CD
+					            AND P.APP_GROUP_CD = B.APP_GROUP_CD
+					            AND P.APP_SEQ_CD   = B.APP_SEQ_CD
+					       ) R
+					     , T_STD S
+					 WHERE 1 = 1
+					   AND R.ENTER_CD     = S.ENTER_CD
+					   AND R.APPRAISAL_CD = S.APPRAISAL_CD
+					   AND R.ORG_GRADE_CD = S.ORG_GRADE_CD
+					   AND R.MIN_CNT_ARR_PLAN = S.MIN_CNT_ARR
+					   AND R.MAX_CNT_ARR_PLAN = S.MAX_CNT_ARR
+<if test='searchAppGroupNm != null and !searchAppGroupNm.equals("")'>
+					   AND R.APP_GROUP_NM LIKE '%' || #{searchAppGroupNm} || '%'
+</if>
+<if test='searchOrgGradeCd != null and !searchOrgGradeCd.equals("")'>
+					   AND R.ORG_GRADE_CD = #{searchOrgGradeCd}
+</if>
+<if test='searchSChk != null and !searchSChk.equals("")'>
+					   AND S_CHK = #{searchSChk}
+</if>
+					 ORDER BY R.ORG_GRADE_CD, R.APP_GROUP_CD
+
+
+		</select>
+
+</mapper>

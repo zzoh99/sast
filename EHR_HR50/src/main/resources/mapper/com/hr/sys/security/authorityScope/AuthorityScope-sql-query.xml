@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="sys.security.authorityScope">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAuthorityScopeList">
+
+				<![CDATA[
+					SELECT	  AUTH_SCOPE_CD
+							, AUTH_SCOPE_NM
+							, SCOPE_TYPE
+							, PRG_URL
+							, SQL_SYNTAX
+							, TABLE_NM
+				  	FROM TSYS315
+				 	WHERE ENTER_CD = #{ssnEnterCd}
+				   	AND AUTH_SCOPE_NM LIKE '%'|| #{searchAuchScopeNm} ||'%'
+				 	ORDER BY AUTH_SCOPE_CD, AUTH_SCOPE_NM 
+				]]>
+
+
+		</select>
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveAuthorityScope">
+
+					MERGE INTO TSYS315 T
+					USING	(
+							SELECT	  A.AUTH_SCOPE_CD
+									, A.AUTH_SCOPE_NM
+									, A.SCOPE_TYPE   
+									, A.PRG_URL      
+									, A.SQL_SYNTAX   
+									, A.TABLE_NM     
+							FROM	(
+									SELECT	  NULL		AS AUTH_SCOPE_CD
+											, NULL		AS AUTH_SCOPE_NM
+											, NULL		AS SCOPE_TYPE   
+											, NULL		AS PRG_URL      
+											, NULL		AS SQL_SYNTAX   
+											, NULL		AS TABLE_NM     
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											 TRIM( #{rm.authScopeCd} )	AS AUTH_SCOPE_CD
+											, TRIM( #{rm.authScopeNm} )	AS AUTH_SCOPE_NM
+											, TRIM( #{rm.scopeType} )	AS SCOPE_TYPE
+											, TRIM( #{rm.prgUrl} )		AS PRG_URL
+											, TRIM( #{rm.sqlSyntax} )	AS SQL_SYNTAX
+											, TRIM( #{rm.tableNm } )	AS TABLE_NM
+											FROM   DUAL
+</foreach>
+									) A WHERE A.AUTH_SCOPE_CD IS NOT NULL
+							) S
+					ON ( T.AUTH_SCOPE_CD		= S.AUTH_SCOPE_CD
+							AND T.ENTER_CD = #{ssnEnterCd}
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.AUTH_SCOPE_NM	= S.AUTH_SCOPE_NM
+									, T.SCOPE_TYPE   	= S.SCOPE_TYPE   
+									, T.PRG_URL      	= S.PRG_URL      
+									, T.SQL_SYNTAX   	= S.SQL_SYNTAX   
+									, T.TABLE_NM     	= S.TABLE_NM     
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD
+							, T.AUTH_SCOPE_CD
+							, T.AUTH_SCOPE_NM
+							, T.SCOPE_TYPE   
+							, T.PRG_URL      
+							, T.SQL_SYNTAX   
+							, T.TABLE_NM     
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+							  #{ssnEnterCd}
+							, S.AUTH_SCOPE_CD
+							, S.AUTH_SCOPE_NM
+							, S.SCOPE_TYPE   
+							, S.PRG_URL      
+							, S.SQL_SYNTAX   
+							, S.TABLE_NM     
+							, SYSDATE
+							, #{ssnSabun}
+						)
+
+
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAuthorityScope">
+
+					DELETE FROM TSYS315 
+					WHERE 	AUTH_SCOPE_CD IN 	(  NULL
+<foreach item="rm" collection="deleteRows" >
+						,
+										<if test='rm.authScopeCd != null and !rm.authScopeCd.equals("")'>
+											TRIM( #{rm.authScopeCd} )
+										</if>
+</foreach>
+										)
+
+
+
+		</delete>
+
+</mapper>

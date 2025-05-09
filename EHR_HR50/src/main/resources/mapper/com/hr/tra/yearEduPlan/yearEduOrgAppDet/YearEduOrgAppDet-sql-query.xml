@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tra.yearEduPlan.yearEduOrgAppDet">
+	
+<!-- 신청내용 조회 -->
+		<select parameterType="map" resultType="cMap" id="getYearEduOrgAppDetMap">
+			
+				<![CDATA[
+					SELECT A.ENTER_CD
+					     , A.APPL_SEQ
+					     , A.SABUN
+					     , A.YEAR
+					     , A.ORG_CD
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, B.APPL_YMD) AS ORG_NM
+					     , F_COM_GET_PRIOR_ORG_TYPE_NM(A.ENTER_CD, A.ORG_CD, 'B0400', B.APPL_YMD ) AS PRIOR_ORG_NM
+					     , A.NOTE
+                      FROM TTRA501 A, THRI103 B
+                     WHERE A.ENTER_CD   = #{ssnEnterCd}
+                       AND A.APPL_SEQ   = #{searchApplSeq}
+                       AND A.ENTER_CD   = B.ENTER_CD
+                       AND A.APPL_SEQ   = B.APPL_SEQ
+				]]>
+			
+			
+		</select>
+		
+<!-- 부서명 본부명 조회 -->
+		<select parameterType="map" resultType="cMap" id="getYearEduOrgAppDetOrgMap">
+			
+				<![CDATA[
+					SELECT ORG_CD, F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, #{searchApplYmd}) AS ORG_NM
+					   , F_COM_GET_PRIOR_ORG_TYPE_NM(A.ENTER_CD, A.ORG_CD, 'B0400', #{searchApplYmd} ) AS PRIOR_ORG_NM
+					FROM THRM151 A
+					WHERE A.ENTER_CD = #{ssnEnterCd}
+					AND A.SABUN = #{searchApplSabun}
+					AND #{searchApplYmd} BETWEEN A.SDATE AND NVL(A.EDATE,'99991231')
+				]]>
+			
+			
+		</select>
+		
+<!-- 시트 조회 -->
+		<select parameterType="map" resultType="cMap" id="getYearEduOrgAppDetaAppInfo">
+			
+				<![CDATA[
+                      SELECT A.ENTER_CD
+						     , A.SABUN
+						     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME -- 성명
+							 , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, #{searchApplYmd}, #{ssnLocaleCd}) AS JIKWEE_NM
+						     , A.YEAR
+						     , A.SEQ
+						     , A.ORG_CD
+						     , A.EDU_COURSE_NM
+						     , A.IN_OUT_TYPE
+						     , A.PRIORITY_CD
+						     , A.MON01
+						     , A.MON02
+						     , A.MON03
+						     , A.MON04
+						     , A.MON05
+						     , A.MON06
+						     , A.MON07
+						     , A.MON08
+						     , A.MON09
+						     , A.MON10
+						     , A.MON11
+						     , A.MON12
+						     , A.TOT_MON
+						     , A.NOTE
+						  FROM TTRA503 A 
+						 WHERE A.ENTER_CD	= TRIM(#{ssnEnterCd})
+						   AND A.ORG_CD 	= TRIM(#{orgCd})
+					       AND A.YEAR 		= TRIM(#{year})
+						ORDER BY YEAR DESC, SABUN, SEQ
+				]]>
+		</select>
+		
+<!-- 신청 내용 저장 -->
+		<update parameterType="map" id="saveYearEduOrgAppDet">
+			
+					MERGE INTO TTRA501 T
+					USING (
+<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+							SELECT	  TRIM( #{ssnEnterCd} ) 						AS ENTER_CD
+									, TRIM( #{rm.searchApplSeq} ) 				AS APPL_SEQ
+									, TRIM( #{rm.searchApplSabun} ) 			AS SABUN
+						            , TRIM( #{rm.orgCd} )						AS ORG_CD
+						            , TRIM( #{rm.year} ) 						AS YEAR
+							 FROM   DUAL
+</foreach>
+						 ) S
+					ON ( 		 T.ENTER_CD	= S.ENTER_CD
+							AND  T.APPL_SEQ	= S.APPL_SEQ
+					 )
+					WHEN MATCHED THEN
+					   UPDATE SET T.CHKDATE	= sysdate 
+					            , T.CHKID	= #{ssnSabun} 
+					            , T.ORG_CD  = S.ORG_CD 
+				           		, T.YEAR 	= S.YEAR 
+					WHEN NOT MATCHED THEN 
+					   INSERT 
+					   ( 
+					              T.ENTER_CD
+					            , T.APPL_SEQ
+					            , T.SABUN
+					            , T.ORG_CD
+					            , T.YEAR
+					            , T.CHKDATE
+					            , T.CHKID
+					   ) 
+					   VALUES 
+					   ( 
+					              S.ENTER_CD
+					            , S.APPL_SEQ
+					            , S.SABUN
+					            , S.ORG_CD
+					            , S.YEAR
+					            , sysdate
+					            , #{ssnSabun}
+						)
+		</update>
+		
+		<!-- 중복신청 조회 -->
+		<select parameterType="map" resultType="cMap" id="getYearEduOrgAppDetDupChk">
+			
+				<![CDATA[
+					   SELECT COUNT(1) AS CNT
+					     FROM TTRA501 A
+					    WHERE A.ENTER_CD    = #{ssnEnterCd}   
+					      AND A.APPL_SEQ    <> TRIM( #{searchApplSeq} )   	
+                          AND A.YEAR   		= TRIM( #{year} )
+                          AND A.ORG_CD 		= TRIM( #{orgCd} )
+                          AND EXISTS ( SELECT 1
+                                         FROM THRI103 X
+                                        WHERE X.ENTER_CD = A.ENTER_Cd
+                                          AND X.APPL_SEQ = A.APPL_SEQ
+                                          AND X.APPL_STATUS_CD IN ( '21', '31', '99' )
+                                      )                                             
+				]]>
+			
+			
+		</select>
+
+</mapper>

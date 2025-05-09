@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ben.famResUpd">
+
+	<select id="getFamResUpdList" parameterType="map" resultType="cMap">
+	<![CDATA[
+		SELECT A.ENTER_CD
+		     , A.SABUN
+		     , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+	         , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+	         , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+	         , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+	         , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+	         , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS WORKTYPE_NM
+	         , A.BEN_NM
+		     , A.FAM_CD
+		     , A.FAM_NM
+		     , A.FAM_YMD
+		     , CRYPTIT.DECRYPT(B.FAMRES, B.ENTER_CD) AS FAM_RES_NO
+		     , DECODE( B.FAMRES, NULL, 0, 1) AS ROW_EDIT
+		  FROM (
+				SELECT '학자금' AS BEN_NM, A.ENTER_CD, A.SABUN, A.FAM_CD, A.FAM_NM, A.FAM_YMD
+				  FROM TBEN751 A
+				 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				   AND A.FAM_RES_NO IS NULL ]]>
+		<if test='searchBenGubun != null and searchBenGubun eq "B"'>
+				   AND 1=2
+		</if>
+		<![CDATA[
+				 GROUP BY A.ENTER_CD, A.SABUN, A.FAM_CD, A.FAM_NM, A.FAM_YMD
+				 UNION
+				SELECT '의료비' AS BEN_NM, A.ENTER_CD, A.SABUN, A.FAM_CD, A.FAM_NM, A.FAM_YMD
+				  FROM TBEN703 A
+				 WHERE A.ENTER_CD = TRIM(#{ssnEnterCd})
+				   AND A.FAM_RES_NO IS NULL 
+		]]>
+		<if test='searchBenGubun != null and searchBenGubun eq "A"'>
+				   AND 1=2
+		</if>
+				GROUP BY A.ENTER_CD, A.SABUN, A.FAM_CD, A.FAM_NM, A.FAM_YMD
+			   ) A, THRM111 B
+		WHERE 1=1
+		<choose>
+			<when test='searchGubun != null and searchGubun eq "Y"'>
+		   AND A.ENTER_CD = B.ENTER_CD
+	       AND A.SABUN    = B.SABUN
+	       AND A.FAM_NM   = B.FAM_NM
+	       AND A.FAM_YMD  = B.FAM_YMD  		
+			</when>
+			<otherwise>
+		   AND A.ENTER_CD = B.ENTER_CD(+)
+	       AND A.SABUN    = B.SABUN(+)
+	       AND A.FAM_NM   = B.FAM_NM(+)
+	       AND A.FAM_YMD  = B.FAM_YMD(+)  		
+			</otherwise>
+		</choose>
+		ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')), A.FAM_YMD DESC
+	</select>
+		
+	<!-- 학자금 가족 주민번호 갱신 -->
+	<update id="saveFamResUpd751" parameterType="map">
+	<![CDATA[	
+		MERGE INTO TBEN751	T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+			SELECT TRIM(#{ssnEnterCd})		AS	ENTER_CD
+				 , TRIM(#{rm.sabun})		AS	SABUN
+				 , TRIM(#{rm.famCd})		AS	FAM_CD
+				 , TRIM(#{rm.famNm})		AS	FAM_NM
+				 , TRIM(#{rm.famYmd})		AS	FAM_YMD
+				 , CRYPTIT.ENCRYPT(TRIM(#{rm.famResNo}), TRIM(#{ssnEnterCd})) AS	FAM_RES_NO
+		      FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S
+		ON	(
+				T.ENTER_CD		=	S.ENTER_CD
+			AND	T.SABUN		    =	S.SABUN
+			AND	T.FAM_CD		=	S.FAM_CD
+			AND	T.FAM_NM		=	S.FAM_NM
+			AND	T.FAM_YMD		=	S.FAM_YMD
+			AND	T.FAM_RES_NO IS NULL
+		)
+		WHEN MATCHED THEN
+			UPDATE SET T.FAM_RES_NO = S.FAM_RES_NO
+	]]>
+	</update>
+		
+	<!-- 의료비 가족 주민번호 갱신 -->
+	<update id="saveFamResUpd703" parameterType="map">
+	<![CDATA[	
+		MERGE INTO TBEN703	T
+		USING ( ]]>
+		<foreach item="rm" collection="mergeRows" separator=" UNION ALL ">
+				SELECT TRIM(#{ssnEnterCd})		AS	ENTER_CD
+					 , TRIM(#{rm.sabun})		AS	SABUN
+					 , TRIM(#{rm.famCd})		AS	FAM_CD
+					 , TRIM(#{rm.famNm})		AS	FAM_NM
+					 , TRIM(#{rm.famYmd})		AS	FAM_YMD
+					 , CRYPTIT.ENCRYPT(TRIM(#{rm.famResNo}), TRIM(#{ssnEnterCd})) AS	FAM_RES_NO
+			      FROM DUAL
+		</foreach>
+	<![CDATA[
+		) S
+		ON	(
+				T.ENTER_CD		=	S.ENTER_CD
+			AND	T.SABUN		    =	S.SABUN
+			AND	T.FAM_CD		=	S.FAM_CD
+			AND	T.FAM_NM		=	S.FAM_NM
+			AND	T.FAM_YMD		=	S.FAM_YMD
+			AND	T.FAM_RES_NO IS NULL
+		)
+		WHEN MATCHED THEN
+			UPDATE SET
+					T.FAM_RES_NO =	S.FAM_RES_NO
+	]]>
+	</update>
+</mapper>

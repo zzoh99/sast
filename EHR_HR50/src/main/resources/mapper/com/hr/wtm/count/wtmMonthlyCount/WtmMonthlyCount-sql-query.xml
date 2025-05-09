@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="wtm.count.wtmMonthlyCount">
+
+	<!-- 월근태/근무집계(기준년월일) 조회 -->
+	<select parameterType="map" resultType="cMap" id="getWtmMonthlyCountStatus">
+		<![CDATA[
+			SELECT NVL(MAX(A.SUM_YN), 'N') AS SUM_YN
+			     , NVL(MAX(A.END_YN), 'N') AS END_YN
+			  FROM TWTM999 A
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.YM = TRIM( #{searchYm} )
+		]]>
+		<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+			   AND A.BUSINESS_PLACE_CD = #{searchBusinessPlaceCd}
+		</if>
+	</select>
+
+	<select parameterType="map" resultType="cMap" id="getWtmMonthlyCountEmployees">
+		<![CDATA[
+			SELECT A.ENTER_CD, A.SABUN, B.PAY_TYPE, A.EMP_YMD, A.RET_YMD
+			  FROM THRM100 A
+			 INNER JOIN
+			      (
+					   SELECT ENTER_CD, SABUN, PAY_TYPE
+					     FROM THRM151 B1
+					    WHERE (B1.ENTER_CD, B1.SABUN, B1.SDATE) IN
+					          (
+					              SELECT ENTER_CD, SABUN, MAX(SDATE)
+					                FROM THRM151
+					               WHERE ENTER_CD = #{ssnEnterCd}
+									 AND #{searchStdYmd} BETWEEN SDATE AND NVL(EDATE, '99991231')
+		]]>
+					               <if test='searchSabun != null and !"".equals(searchSabun)'>
+									   AND SABUN = #{searchSabun}
+								   </if>
+		<![CDATA[
+					               GROUP BY ENTER_CD, SABUN
+					          )
+				  ) B
+			    ON B.ENTER_CD = A.ENTER_CD
+			   AND B.SABUN = A.SABUN
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+		]]>
+	</select>
+
+	<!-- 월근태/근무집계(작업) 프로시저 -->
+	<update parameterType="map" id="excWtmMonthlyCount" statementType="CALLABLE">
+		<![CDATA[
+		{CALL P_WTM_MONTHLY_COUNT(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{sqlCnt,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchYm,mode=IN,jdbcType=VARCHAR},
+				#{placeCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+	</update>
+
+	<!-- 월근태/근무집계(작업취소) 프로시저 -->
+	<update parameterType="map" id="excWtmMonthlyCountCancel" statementType="CALLABLE">
+		<![CDATA[
+		{CALL P_WTM_MONTHLY_COUNT_CANCEL(
+				#{sqlCode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlErrm,mode=OUT,jdbcType=VARCHAR},
+				#{sqlCnt,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchYm,mode=IN,jdbcType=VARCHAR},
+				#{placeCd,mode=IN,jdbcType=VARCHAR},
+				#{sabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+	</update>
+
+	<!-- 월근태/근무집계 마감 -->
+	<update parameterType="map" id="updateWtmMonthlyCountClose">
+		<![CDATA[
+			UPDATE TWTM999
+			   SET END_YN = 'Y'
+			     , CHKDATE = SYSDATE
+			     , CHKID = #{ssnSabun}
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.YM = TRIM( #{searchYm} )
+		]]>
+		<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+			AND A.BUSINESS_PLACE_CD = #{searchBusinessPlaceCd}
+		</if>
+	</update>
+
+	<!-- 월근태/근무집계 마감취소 -->
+	<update parameterType="map" id="updateWtmMonthlyCountCloseCancel">
+		<![CDATA[
+			UPDATE TWTM999
+			   SET END_YN = 'N'
+			     , CHKDATE = SYSDATE
+			     , CHKID = #{ssnSabun}
+			 WHERE A.ENTER_CD = #{ssnEnterCd}
+			   AND A.YM = TRIM( #{searchYm} )
+		]]>
+		<if test='searchBusinessPlaceCd != null and !searchBusinessPlaceCd.equals("")'>
+			AND A.BUSINESS_PLACE_CD = #{searchBusinessPlaceCd}
+		</if>
+	</update>
+</mapper>

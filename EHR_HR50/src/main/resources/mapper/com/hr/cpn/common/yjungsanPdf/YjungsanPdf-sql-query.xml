@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.common.yjungsanPdf">
+		<select parameterType="map" resultType="cMap" id="getYjungsanPdfList">
+            <![CDATA[
+                    SELECT A.ENTER_CD     	/* 회사구분 */
+                         , B.NAME         	/* 이름 */
+                         , B.SABUN        	/* 사번 */
+                         , F_COM_GET_ORG_NM21(B.ENTER_CD,B.SABUN,TO_CHAR(A.UPLOAD_DATE,'YYYYMMDD')) AS ORG_NM 	/* 조직명 */
+                         , F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN) AS BIZ_PLACE_CD 			/* 사업장 */
+                         , A.WORK_YY      	/* 귀속년도 */
+                         , A.ADJUST_TYPE  	/* 정산구분 */
+                         , A.FILE_TYPE    	/* 파일구분 */
+                         , A.UPLOAD_DATE  	/* 업로드일자 */
+                         , A.FILE_SEQ     	/* 파일순번 */
+                         , A.FILE_PATH    	/* 파일경로정보 */
+                         , A.FILE_NAME    	/* 파일명 */
+                         , A.ATTR1			/* ATTR1 */
+                         , A.ATTR2    		/* ATTR2 */
+                         , A.ATTR3    		/* ATTR3 */
+                         , A.ATTR4    		/* ATTR4 */
+                         , '<a class="basic btn-white">삭제</a>' AS DEL_BTN
+                         , '<a class="basic btn-download">다운로드</a>' AS DOWN_BTN
+                    FROM TYEA105 A /* 연말정산_증빙자료관리 */
+                       , THRM100 B /* 인사마스타 */
+                    WHERE A.ENTER_CD = B.ENTER_CD
+                      AND A.SABUN = B.SABUN
+                      AND A.ENTER_CD = #{ssnEnterCd}
+                      AND A.FILE_TYPE = '1' /*원천징수영수중PDF만*/
+#if($searchWorkYy && !$searchWorkYy.equals(""))
+                      AND A.WORK_YY = #{searchWorkYy}
+#end
+#if($searchAdjustType && !$searchAdjustType.equals(""))
+                      AND A.ADJUST_TYPE = #{searchAdjustType}
+#end
+#if($searchSbNm && !$searchSbNm.equals(""))
+                      AND (A.SABUN LIKE '%'|| #{searchSbNm} ||'%' OR B.NAME LIKE '%'|| #{searchSbNm} ||'%')
+#end
+#if($searchBizPlaceCd && !$searchBizPlaceCd.equals(""))
+                      AND DECODE('',#{searchBizPlaceCd},'A',F_CPN_YEA_BP_CD(A.ENTER_CD,A.WORK_YY,A.ADJUST_TYPE,A.SABUN)) = DECODE('',#{searchBizPlaceCd},'A',#{searchBizPlaceCd})
+#end
+            ]]>
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getYjungsanPdfInfo">
+            <![CDATA[
+                        SELECT A.FILE_PATH AS FILE_PATH  		/* 파일경로정보 */
+                             , A.FILE_NAME AS FILE_NAME			/* 파일명 */
+                             , A.ATTR1     AS ATTR1         	/* ATTR1(저장 파일명) */
+                         FROM TYEA105 A                      	/* 연말정산_증빙자료관리 */
+                        WHERE A.ENTER_CD  	= #{ssnEnterCd}
+                          AND A.WORK_YY 	= #{workYy}
+                          AND A.FILE_TYPE 	= #{fileType}
+                          AND A.ADJUST_TYPE = #{adjustType}
+                          AND A.FILE_SEQ 	= #{fileSeq}
+                          AND A.FILE_NAME  	= #{fileName}
+
+                ]]>
+		</select>
+		<update parameterType="map" id="tyea105save">
+            <![CDATA[
+					INSERT INTO TYEA105 /* 연말정산_증빙자료관리 */
+						(
+						    ENTER_CD        /* 회사구분 */
+						  , SABUN           /* 사원번호 */
+						  , WORK_YY         /* 귀속년도 */
+						  , ADJUST_TYPE     /* 정산구분 */
+						  , FILE_TYPE       /* 파일구분 */
+						  , FILE_SEQ        /* 파일순번 */
+						  , UPLOAD_DATE     /* 업로드일자 */
+						  , FILE_PATH       /* 파일경로정보 */
+						  , FILE_NAME       /* 파일명 */
+						  , ATTR1           /* ATTR1 */
+						  , ATTR2           /* ATTR2 */
+						  , ATTR3           /* ATTR3 */
+						  , ATTR4           /* ATTR4 */
+						  , CHKDATE         /* 최종수정시간 */
+						  , CHKID           /* 최종수정자 */
+						)
+						VALUES
+						(
+						    #{ssnEnterCd}    /* 회사구분 */
+						  , #{sabun}         /* 사원번호 */
+						  , #{workYy}        /* 귀속년도 */
+						  , #{adjustType}    /* 정산구분 */
+						  , #{fileType}      /* 파일구분 */
+						  , NVL(( SELECT MAX(NVL(FILE_SEQ, 0)) + 1
+						      FROM TYEA105
+						      WHERE ENTER_CD = #{ssnEnterCd }
+						        AND SABUN = TRIM(#{sabun})
+						        AND WORK_YY = #{workYy}
+						        AND ADJUST_TYPE = #{adjustType}
+						        AND FILE_TYPE = #{fileType} ),1)       /* 파일순번 */
+						  , SYSDATE         /* 업로드일자 */
+						  , #{filePath}      /* 파일경로정보 */
+						  , #{fileName}     /* 파일명 */
+						  , #{attr1}         /* ATTR1 */
+						  , #{attr2}         /* ATTR2 */
+						  , ''		       /* ATTR3 */
+						  , ''             /* ATTR4 */
+						  , SYSDATE         /* 최종수정시간 */
+						  , #{ssnSabun}       /* 최종수정자 */
+						)
+				]]>
+		</update>
+
+		<delete parameterType="map" id="tyea105Delete">
+		    DELETE FROM TYEA105
+            WHERE ENTER_CD = #{ssnEnterCd }
+              AND SABUN = TRIM(#{sabun})
+              AND WORK_YY = #{workYy}
+              AND ADJUST_TYPE = #{adjustType}
+              AND FILE_TYPE   			= #{fileType}
+              AND FILE_SEQ   			= #{fileSeq}
+        </delete>
+	</mapper>

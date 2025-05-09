@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hri.applicationBasis.appPathReg">
+		<select parameterType="map" resultType="cMap" id="getAppPathRegList">
+
+				<![CDATA[
+					SELECT    PATH_SEQ
+        					, PATH_NM
+        					, DEFAULT_YN
+        					, ORG_LEVEL_CD
+        					, MODIFY_YN
+					FROM THRI104
+					WHERE 1=1
+                	AND ENTER_CD	= #{ssnEnterCd}
+                	AND SABUN		= #{ssnSabun}
+				]]>
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppPathOrgList">
+
+				<![CDATA[
+						SELECT LEVEL AS "_level"
+						     , A.SDATE
+						     , A.PRIOR_ORG_CD
+						     , A.ORG_CD
+						     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, A.SDATE, #{ssnLocaleCd}) AS ORG_NM
+						     , A.DIRECT_YN
+						     , A.SEQ
+						     , A.ORG_LEVEL
+						     , '' AS ORG_CHART_NM
+						  FROM (
+						      	SELECT *
+						      	  FROM TORG105 A
+								 WHERE A.ENTER_CD = TRIM( #{ssnEnterCd} )
+								   AND A.SDATE = (SELECT MAX(AA.SDATE)
+													FROM TORG103 AA
+												   WHERE AA.ENTER_CD = A.ENTER_CD
+													 AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN AA.SDATE AND NVL(AA.EDATE,'99991231')
+												  )
+							   ) A
+						 START WITH A.PRIOR_ORG_CD = '0'
+						 CONNECT BY PRIOR A.ENTER_CD = A.ENTER_CD
+						    AND PRIOR A.SDATE = A.SDATE
+						    AND PRIOR A.ORG_CD = A.PRIOR_ORG_CD
+						 ORDER SIBLINGS BY A.PRIOR_ORG_CD, A.SEQ
+
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAppPathRegOrgUserList">
+
+				<![CDATA[
+					SELECT A.SABUN
+				     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				     , B.ORG_CD
+				     , B.JIKWEE_CD
+				     , B.JIKCHAK_CD
+				     , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+				     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+				     , F_COM_GET_JIKGUB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKGUB_NM
+				     , F_COM_GET_WORKTYPE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS WORK_TYPE_NM
+				     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN, #{ssnLocaleCd}) AS NAME
+				     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN,'ALIAS') AS EMP_ALIAS
+				     , B.JIKWEE_CD
+				     , B.JIKGUB_CD
+				     , B.JIKCHAK_CD
+				     , B.WORK_TYPE
+				  FROM THRM100 A, THRM151 B
+				 WHERE A.ENTER_CD = B.ENTER_CD
+				   AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+				   AND A.SABUN = B.SABUN
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+				   AND B.STATUS_CD NOT IN ('RA', 'EA', 'FB')
+				   ]]>
+			    <if test='orgNm != null and !orgNm.equals("")'>
+              	   AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%' || TRIM( #{orgNm} ) || '%'
+                </if>
+                <if test='orgCd != null and !orgCd.equals("")'>
+              	   AND B.ORG_CD = #{orgCd}
+				</if>
+                <if test='name != null and !name.equals("")'>
+                   AND F_COM_GET_NAMES(A.ENTER_CD,A.SABUN)  LIKE '%' || TRIM( #{name} ) || '%'
+				</if>
+				 <if test='searchKeyword != null and !"".equals(searchKeyword)'>
+					 AND (
+					         F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) LIKE '%' || TRIM( #{searchKeyword} ) || '%'
+					         OR
+					         F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd})  LIKE '%' || TRIM( #{searchKeyword} ) || '%'
+					     )
+				 </if>
+                ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getOrgUserTokenList">
+
+				<![CDATA[
+					SELECT A.SABUN
+				     , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+				     , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+				     , F_COM_GET_JIKCHAK_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+				     , F_COM_GET_NAMES(A.ENTER_CD,A.SABUN, #{ssnLocaleCd}) AS NAME
+				     , F_SEC_GET_TOKEN2(A.SABUN) AS T_SABUN
+				  FROM THRM100 A, THRM151 B
+				 WHERE A.ENTER_CD = #{ssnEnterCd}
+				   AND A.ENTER_CD = B.ENTER_CD
+				   AND A.SABUN = B.SABUN
+				   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND B.EDATE
+				   AND B.STATUS_CD NOT IN ('RA', 'EA', 'FB', 'RAA')
+				           ]]>
+			    <if test='orgNm != null and !orgNm.equals("")'>
+              	   AND F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD')) LIKE '%' || TRIM( #{orgNm} ) || '%'
+				</if>
+                <if test='orgCd != null and !orgCd.equals("")'>
+              	   AND B.ORG_CD = #{orgCd}
+				</if>
+                <if test='name != null and !name.equals("")'>
+                   AND F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) LIKE '%' || TRIM( #{name} ) || '%'
+				</if>
+                ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppPathRegApplList">
+
+				<![CDATA[
+					SELECT    A.PATH_SEQ
+							, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN, #{ssnLocaleCd}) AS NAME
+							, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS') AS EMP_ALIAS
+        					, A.AGREE_SABUN
+        					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',C.JIKWEE_CD, #{ssnLocaleCd}) 	AS JIKWEE_NM
+        					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',C.JIKCHAK_CD, #{ssnLocaleCd})	AS JIKCHAK_NM
+        					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',C.JIKGUB_CD, #{ssnLocaleCd})	AS JIKGUB_NM
+					     	, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',C.JIKGUB_CD, #{ssnLocaleCd}) 	AS JIKGUB_CD
+        					, A.APPL_TYPE_CD
+        					, A.AGREE_SEQ
+					FROM THRI105 A,THRM100 B,  THRM151 C
+					WHERE  1=1
+					AND A.ENTER_CD 		= #{ssnEnterCd}
+					AND A.SABUN 		= #{ssnSabun}
+					AND A.PATH_SEQ 		= TO_NUMBER( TRIM( #{pathSeq} ) )
+					AND A.ENTER_CD 		= B.ENTER_CD(+)
+					AND A.ENTER_CD 		= C.ENTER_CD(+)
+					AND A.AGREE_SABUN   = B.SABUN(+)
+					AND A.AGREE_SABUN   = C.SABUN(+)
+					AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+					ORDER BY TO_NUMBER( A.AGREE_SEQ ) DESC
+				]]>
+
+
+		</select>
+		<select parameterType="map" resultType="cMap" id="getAppPathRegReferList">
+
+				<![CDATA[
+					SELECT    A.PATH_SEQ
+							, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN, #{ssnLocaleCd}) AS NAME
+							, F_COM_GET_NAMES(B.ENTER_CD,B.SABUN,'ALIAS') AS ALIAS
+        					, A.CC_SABUN
+        					, C.JIKWEE_CD
+        					, C.JIKCHAK_CD
+        					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20030',C.JIKWEE_CD, #{ssnLocaleCd}) 	AS JIKWEE_NM
+        					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20020',C.JIKCHAK_CD, #{ssnLocaleCd})	AS JIKCHAK_NM
+        					, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',C.JIKGUB_CD, #{ssnLocaleCd})	AS JIKGUB_NM
+					     	, F_COM_GET_GRCODE_NAME(A.ENTER_CD,'H20010',C.JIKGUB_CD, #{ssnLocaleCd}) 	AS JIKGUB_CD
+        					, A.MEMO
+					FROM THRI127 A,THRM100 B,  THRM151 C
+					WHERE  1=1
+					AND A.ENTER_CD 		= #{ssnEnterCd}
+					AND A.SABUN 		= #{ssnSabun}
+					AND A.PATH_SEQ 		= TO_NUMBER( TRIM( #{pathSeq} ) )
+					AND A.ENTER_CD 		= B.ENTER_CD(+)
+					AND A.ENTER_CD 		= C.ENTER_CD(+)
+					AND A.CC_SABUN   	= B.SABUN(+)
+					AND A.CC_SABUN   	= C.SABUN(+)
+					AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN C.SDATE AND NVL(C.EDATE, '99991231')
+				]]>
+
+
+		</select>
+
+
+		<update parameterType="map" id="saveAppPathReg">
+
+   					MERGE INTO THRI104 TARGETTABLE
+                  	USING (
+               				SELECT    A.PATH_SEQ       	AS PATH_SEQ
+                                	, A.PATH_NM        	AS PATH_NM
+                                	, A.MODIFY_YN      	AS MODIFY_YN
+                                	, A.ORG_LEVEL_CD   	AS ORG_LEVEL_CD
+                                	, A.DEFAULT_YN     	AS DEFAULT_YN
+                     		FROM   (
+                               		SELECT    NULL			AS PATH_SEQ
+                                			, NULL			AS PATH_NM
+                                			, NULL			AS MODIFY_YN
+                                			, NULL			AS ORG_LEVEL_CD
+                                			, NULL			AS DEFAULT_YN
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<bind name="ocnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT
+											TO_NUMBER( TRIM(#{rm.orgLevelCd}) ) 	AS PATH_SEQ
+                               			,  TRIM(#{rm.pathNm})			AS PATH_NM
+                               			,  TRIM(#{rm.modifyYn})  		AS MODIFY_YN
+										,  TRIM(#{rm.orgLevelCd})  		AS ORG_LEVEL_CD
+                               			,  TRIM(#{rm.defaultYn}) 		AS DEFAULT_YN
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.PATH_SEQ IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               	   TARGETTABLE.ENTER_CD = #{ssnEnterCd}
+                               AND TARGETTABLE.SABUN 	= #{ssnSabun}
+                               AND TARGETTABLE.PATH_SEQ = SOURCETABLE.PATH_SEQ
+                               AND TARGETTABLE.PATH_NM 	= SOURCETABLE.PATH_NM
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.MODIFY_YN    	= SOURCETABLE.MODIFY_YN
+									, TARGETTABLE.ORG_LEVEL_CD 	= SOURCETABLE.ORG_LEVEL_CD
+									, TARGETTABLE.DEFAULT_YN   	= SOURCETABLE.DEFAULT_YN
+                                  	, TARGETTABLE.CHKDATE		= SYSDATE
+                                  	, TARGETTABLE.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SABUN
+               				, TARGETTABLE.PATH_SEQ
+               				, TARGETTABLE.PATH_NM
+							, TARGETTABLE.MODIFY_YN
+							, TARGETTABLE.ORG_LEVEL_CD
+							, TARGETTABLE.DEFAULT_YN
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, #{ssnSabun}
+               				, SOURCETABLE.PATH_SEQ
+							, SOURCETABLE.PATH_NM
+							, SOURCETABLE.MODIFY_YN
+							, SOURCETABLE.ORG_LEVEL_CD
+							, SOURCETABLE.DEFAULT_YN
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<delete parameterType="map" id="deleteAppPathReg">
+
+
+   					DELETE FROM THRI104
+					WHERE ( ENTER_CD,SABUN,PATH_SEQ,PATH_NM  ) IN  (  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{ssnSabun}), TRIM(#{rm.pathSeq}) , TRIM(#{rm.pathNm})   )
+</foreach>
+					)
+		</delete>
+		<delete parameterType="map" id="deleteAppPathReg105">
+
+   					DELETE FROM THRI105
+					WHERE ( ENTER_CD,SABUN,PATH_SEQ  ) IN  (  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{ssnSabun}), TRIM(#{rm.pathSeq})   )
+</foreach>
+					)
+		</delete>
+		<delete parameterType="map" id="deleteAppPathReg127">
+
+
+   					DELETE FROM THRI127
+					WHERE ( ENTER_CD,SABUN,PATH_SEQ  ) IN  (  (NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{ssnSabun}), TRIM(#{rm.pathSeq})   )
+</foreach>
+					)
+		</delete>
+		<update parameterType="map" id="saveAppPathRegAppl">
+
+   					MERGE INTO THRI105 TARGETTABLE
+                  	USING (
+               				SELECT    A.PATH_SEQ       	AS PATH_SEQ
+                                	, A.AGREE_SABUN    	AS AGREE_SABUN
+                                	, A.AGREE_SEQ      	AS AGREE_SEQ
+                                	, A.APPL_TYPE_CD   	AS APPL_TYPE_CD
+                     		FROM   (
+                               		SELECT    NULL			AS PATH_SEQ
+                                			, NULL			AS AGREE_SABUN
+                                			, NULL			AS AGREE_SEQ
+                                			, NULL			AS APPL_TYPE_CD
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT
+                               			   TO_NUMBER( TRIM(#{rm.pathSeq}) )			AS PATH_SEQ
+                               			,  TRIM(#{rm.agreeSabun})  		AS AGREE_SABUN
+                               			,  TO_NUMBER( TRIM(#{rm.agreeSeq}) )  		AS AGREE_SEQ
+                           			<choose><when test='rm.applTypeCd.equals("기안")'>
+                           				, TRIM('30')					AS APPL_TYPE_CD
+									</when>
+									<when test='rm.applTypeCd.equals("접수")'>
+                           				, TRIM('40')					AS APPL_TYPE_CD
+									</when>
+                           			<otherwise>
+                               			, TRIM(#{rm.applTypeCd}) 		AS APPL_TYPE_CD
+									</otherwise>
+									</choose>
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.PATH_SEQ IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               	   TARGETTABLE.ENTER_CD 	= #{ssnEnterCd}
+                               AND TARGETTABLE.SABUN 		= #{ssnSabun}
+                               AND TARGETTABLE.PATH_SEQ 	= SOURCETABLE.PATH_SEQ
+                               AND TARGETTABLE.AGREE_SABUN  = SOURCETABLE.AGREE_SABUN
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.AGREE_SEQ   	= SOURCETABLE.AGREE_SEQ
+									, TARGETTABLE.APPL_TYPE_CD	= SOURCETABLE.APPL_TYPE_CD
+                                  	, TARGETTABLE.CHKDATE		= SYSDATE
+                                  	, TARGETTABLE.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SABUN
+               				, TARGETTABLE.PATH_SEQ
+               				, TARGETTABLE.AGREE_SABUN
+							, TARGETTABLE.AGREE_SEQ
+							, TARGETTABLE.APPL_TYPE_CD
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, #{ssnSabun}
+               				, SOURCETABLE.PATH_SEQ
+							, SOURCETABLE.AGREE_SABUN
+							, SOURCETABLE.AGREE_SEQ
+							, SOURCETABLE.APPL_TYPE_CD
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<update parameterType="map" id="saveAppPathRegAppl2">
+
+   					MERGE INTO THRI105 TARGETTABLE
+                  	USING (
+               				SELECT    A.PATH_SEQ       	AS PATH_SEQ
+                                	, A.AGREE_SABUN    	AS AGREE_SABUN
+                                	, A.AGREE_SEQ      	AS AGREE_SEQ
+                                	, A.APPL_TYPE_CD   	AS APPL_TYPE_CD
+                     		FROM   (
+                               		SELECT    NULL			AS PATH_SEQ
+                                			, NULL			AS AGREE_SABUN
+                                			, NULL			AS AGREE_SEQ
+                                			, NULL			AS APPL_TYPE_CD
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+                  	UNION ALL
+                                	SELECT
+                               			   TRIM(#{rm.orgLevelCd})		AS PATH_SEQ
+                               			,  TRIM( #{ssnSabun} )  			AS AGREE_SABUN
+                               			,  '1'							AS AGREE_SEQ
+                           				, TRIM('30')					AS APPL_TYPE_CD
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.PATH_SEQ IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               	   TARGETTABLE.ENTER_CD 	= #{ssnEnterCd}
+                               AND TARGETTABLE.SABUN 		= TRIM( #{ssnSabun} )
+                               AND TARGETTABLE.PATH_SEQ 	= SOURCETABLE.PATH_SEQ
+                               AND TARGETTABLE.AGREE_SABUN  = SOURCETABLE.AGREE_SABUN
+                           )
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SABUN
+               				, TARGETTABLE.PATH_SEQ
+               				, TARGETTABLE.AGREE_SABUN
+							, TARGETTABLE.AGREE_SEQ
+							, TARGETTABLE.APPL_TYPE_CD
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, TRIM( #{ssnSabun} )
+               				, SOURCETABLE.PATH_SEQ
+							, SOURCETABLE.AGREE_SABUN
+							, SOURCETABLE.AGREE_SEQ
+							, SOURCETABLE.APPL_TYPE_CD
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<delete parameterType="map" id="deleteAppPathRegAppl">
+
+   					DELETE FROM THRI105
+					WHERE ( ENTER_CD,SABUN,PATH_SEQ,AGREE_SABUN  ) IN  (  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{ssnSabun}), TRIM(#{rm.pathSeq}) , TRIM(#{rm.agreeSabun})   )
+</foreach>
+					)
+		</delete>
+		<update parameterType="map" id="saveAppPathRegRefer">
+
+   					MERGE INTO THRI127 TARGETTABLE
+                  	USING (
+               				SELECT    A.PATH_SEQ       	AS PATH_SEQ
+                                	, A.CC_SABUN    	AS CC_SABUN
+                                	, A.MEMO       		AS MEMO
+                     		FROM   (
+                               		SELECT    NULL			AS PATH_SEQ
+                                			, NULL			AS CC_SABUN
+                                			, NULL			AS MEMO
+                                	FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                  	UNION ALL
+                                	SELECT
+                               			   TO_NUMBER( TRIM(#{rm.pathSeq}) )		AS PATH_SEQ
+                               			,  TRIM(#{rm.ccSabun})  	AS CC_SABUN
+                               			,  TRIM(#{rm.memo})  		AS MEMO
+                                	FROM   DUAL
+</foreach>
+									) A
+							WHERE A.PATH_SEQ IS NOT NULL
+                           ) SOURCETABLE
+                        ON (
+                               	   TARGETTABLE.ENTER_CD 	= #{ssnEnterCd}
+                               AND TARGETTABLE.SABUN 		= #{ssnSabun}
+                               AND TARGETTABLE.PATH_SEQ 	= SOURCETABLE.PATH_SEQ
+                               AND TARGETTABLE.CC_SABUN   	= SOURCETABLE.CC_SABUN
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    TARGETTABLE.MEMO        	= SOURCETABLE.MEMO
+                                  	, TARGETTABLE.CHKDATE		= SYSDATE
+                                  	, TARGETTABLE.CHKID			= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  TARGETTABLE.ENTER_CD
+               				, TARGETTABLE.SABUN
+               				, TARGETTABLE.PATH_SEQ
+               				, TARGETTABLE.CC_SABUN
+							, TARGETTABLE.MEMO
+                          	, TARGETTABLE.CHKDATE
+                          	, TARGETTABLE.CHKID
+               			)
+               			VALUES
+               			(
+               				  #{ssnEnterCd}
+               				, #{ssnSabun}
+               				, SOURCETABLE.PATH_SEQ
+							, SOURCETABLE.CC_SABUN
+							, SOURCETABLE.MEMO
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+		</update>
+		<delete parameterType="map" id="deleteAppPathRegRefer">
+
+   					DELETE FROM THRI127
+					WHERE ( ENTER_CD,SABUN,PATH_SEQ,CC_SABUN  ) IN  (  (NULL,NULL,NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+,                         (  TRIM( #{ssnEnterCd}  ), TRIM(#{ssnSabun}), TRIM(#{rm.pathSeq}) , TRIM(#{rm.ccSabun})   )
+</foreach>
+					)
+		</delete>
+
+</mapper>
+

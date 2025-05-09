@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.basisConfig.welfPayItemMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getWelfPayItemMgrList">
+
+				<![CDATA[
+					SELECT A.PAY_CD
+					     , A.BENEFIT_BIZ_CD
+					     , A.ELEMENT_CD
+					     , NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}), B.ELEMENT_NM) AS ELEMENT_NM
+					     , A.MON1_YN
+					     , A.MON2_YN
+					     , A.MON3_YN
+					     , A.MON4_YN
+					     , A.MON5_YN
+					     , A.MON6_YN
+					     , A.MON7_YN
+					     , A.MON8_YN
+					     , A.MON9_YN
+					     , A.MON10_YN
+					     , A.MON11_YN
+					     , A.MON12_YN
+					  FROM TBEN005 A
+					 INNER JOIN TCPN051 D
+					                 ON D.ENTER_CD = A.ENTER_CD
+					                AND D.PAY_CD = A.PAY_CD
+					  LEFT OUTER JOIN (SELECT *
+					                     FROM TCPN011  B
+					                    WHERE B.ENTER_CD = #{ssnEnterCd}
+					                      AND B.SDATE = (SELECT MAX (SDATE) AS SDATE
+					                                       FROM TCPN011
+					                                      WHERE ENTER_CD = B.ENTER_CD
+					                                        AND ELEMENT_CD = B.ELEMENT_CD
+					                                        AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN SDATE AND NVL (EDATE, '99991231'))
+					                  ) B
+					                 ON A.ENTER_CD = B.ENTER_CD
+					                AND A.ELEMENT_CD = B.ELEMENT_CD
+					 WHERE A.ENTER_CD = #{ssnEnterCd}
+					           				]]>
+					<if test='searchBenefitElemNm != null and !searchBenefitElemNm.equals("")'>
+					   AND NVL(F_COM_GET_LANGUAGE_MAPPING(#{ssnEnterCd}, 'tcpn011', B.LANGUAGE_CD, #{ssnLocaleCd}), B.ELEMENT_NM) LIKE '%'||TRIM(#{searchBenefitElemNm})||'%'
+					</if>
+					<if test='ssnSearchType.equals("O")'>
+						<![CDATA[
+					   AND (D.BUSINESS_PLACE_CD IN (SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+					                                  FROM (SELECT F_COM_GET_AUTH_PARSE(TRIM(#{ssnEnterCd}),'C10',F_COM_GET_AUTH_VALUE(TRIM(#{ssnEnterCd}),TRIM(#{ssnSabun}),TRIM(#{ssnGrpCd}))) AS PARAM FROM dual) A
+					                               CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1)
+					        OR D.BUSINESS_PLACE_CD IS NULL)
+					        ]]>
+					</if>
+					<if test='searchType.equals("P")'>
+					   AND A.ELEMENT_CD IN  (SELECT ELEMENT_CD 
+                        FROM TCPN011 
+                       WHERE ENTER_CD    = A.ENTER_CD 
+                         AND NVL(ATTRIBUTE_8,'1') = 'C010_01' --국민연금
+                     )
+					</if>
+					<if test='searchType.equals("H")'>
+					   AND A.ELEMENT_CD IN  (SELECT ELEMENT_CD 
+                        FROM TCPN011 
+                       WHERE ENTER_CD    = A.ENTER_CD 
+                         AND NVL(ATTRIBUTE_8,'1') = 'C010_03' --건강보험
+                     )
+					</if>
+					<if test='searchType.equals("E")'>
+					   AND A.ELEMENT_CD IN  (SELECT ELEMENT_CD 
+                        FROM TCPN011 
+                       WHERE ENTER_CD    = A.ENTER_CD 
+                         AND NVL(ATTRIBUTE_8,'1') NOT IN ('C010_01', 'C010_03') --건강보험, 국민연금
+                     )
+					</if>
+					 ORDER BY A.PAY_CD
+					        , A.BENEFIT_BIZ_CD
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveWelfPayItemMgr">
+
+
+					MERGE INTO TBEN005 T
+                    USING   (
+                            SELECT    A.PAY_CD
+                                    , A.BENEFIT_BIZ_CD
+                                    , A.ELEMENT_CD
+									, A.MON1_YN
+									, A.MON2_YN
+									, A.MON3_YN
+									, A.MON4_YN
+									, A.MON5_YN
+									, A.MON6_YN
+									, A.MON7_YN
+									, A.MON8_YN
+									, A.MON9_YN
+									, A.MON10_YN
+									, A.MON11_YN
+									, A.MON12_YN
+                            FROM    (
+                                    SELECT    NULL AS PAY_CD
+                                            , NULL AS BENEFIT_BIZ_CD
+                                            , NULL AS ELEMENT_CD
+                                            , NULL AS MON1_YN
+                                            , NULL AS MON2_YN
+                                            , NULL AS MON3_YN
+                                            , NULL AS MON4_YN
+                                            , NULL AS MON5_YN
+                                            , NULL AS MON6_YN
+                                            , NULL AS MON7_YN
+                                            , NULL AS MON8_YN
+                                            , NULL AS MON9_YN
+                                            , NULL AS MON10_YN
+                                            , NULL AS MON11_YN
+                                            , NULL AS MON12_YN
+                                    FROM    DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+                            UNION ALL
+                                            SELECT    TRIM(#{rm.payCd})         AS PAY_CD
+                                            , TRIM(#{rm.benefitBizCd})  AS BENEFIT_BIZ_CD
+                                            , TRIM(#{rm.elementCd})     AS ELEMENT_CD
+                                            , TRIM(#{rm.mon1Yn})     AS MON1_YN
+                                            , TRIM(#{rm.mon2Yn})     AS MON2_YN
+                                            , TRIM(#{rm.mon3Yn})     AS MON3_YN
+                                            , TRIM(#{rm.mon4Yn})     AS MON4_YN
+                                            , TRIM(#{rm.mon5Yn})     AS MON5_YN
+                                            , TRIM(#{rm.mon6Yn})     AS MON6_YN
+                                            , TRIM(#{rm.mon7Yn})     AS MON7_YN
+                                            , TRIM(#{rm.mon8Yn})     AS MON8_YN
+                                            , TRIM(#{rm.mon9Yn})     AS MON9_YN
+                                            , TRIM(#{rm.mon10Yn})     AS MON10_YN
+                                            , TRIM(#{rm.mon11Yn})     AS MON11_YN
+                                            , TRIM(#{rm.mon12Yn})     AS MON12_YN
+                                        FROM   DUAL
+</foreach>
+                                    ) A WHERE A.PAY_CD IS NOT NULL
+                                          AND A.BENEFIT_BIZ_CD IS NOT NULL
+                                          AND A.ELEMENT_CD IS NOT NULL
+                            ) S
+                    ON (    T.ENTER_CD  = #{ssnEnterCd}
+                        AND T.PAY_CD = S.PAY_CD
+                        AND T.BENEFIT_BIZ_CD = S.BENEFIT_BIZ_CD
+                        AND T.ELEMENT_CD = S.ELEMENT_CD
+                       )
+                    WHEN MATCHED THEN
+                        UPDATE SET    T.MON1_YN = S.MON1_YN
+                        			, T.MON2_YN = S.MON2_YN
+                        			, T.MON3_YN = S.MON3_YN
+                        			, T.MON4_YN = S.MON4_YN
+                        			, T.MON5_YN = S.MON5_YN
+                        			, T.MON6_YN = S.MON6_YN
+                        			, T.MON7_YN = S.MON7_YN
+                        			, T.MON8_YN = S.MON8_YN
+                        			, T.MON9_YN = S.MON9_YN
+                        			, T.MON10_YN = S.MON10_YN
+                        			, T.MON11_YN = S.MON11_YN
+                        			, T.MON12_YN = S.MON12_YN
+                        			, T.CHKDATE = SYSDATE
+                        			, T.CHKID = #{ssnSabun}
+                    WHEN NOT MATCHED THEN
+                        INSERT
+                        (
+                              T.ENTER_CD
+                            , T.PAY_CD
+                            , T.BENEFIT_BIZ_CD
+                            , T.ELEMENT_CD
+                            , T.MON1_YN
+                            , T.MON2_YN
+                            , T.MON3_YN
+                            , T.MON4_YN
+                            , T.MON5_YN
+                            , T.MON6_YN
+                            , T.MON7_YN
+                            , T.MON8_YN
+                            , T.MON9_YN
+                            , T.MON10_YN
+                            , T.MON11_YN
+                            , T.MON12_YN
+                            , T.CHKDATE
+                            , T.CHKID
+                        )
+                        VALUES
+                        (
+                              #{ssnEnterCd}
+                            , S.PAY_CD
+                            , S.BENEFIT_BIZ_CD
+                            , S.ELEMENT_CD
+                            , S.MON1_YN
+                            , S.MON2_YN
+                            , S.MON3_YN
+                            , S.MON4_YN
+                            , S.MON5_YN
+                            , S.MON6_YN
+                            , S.MON7_YN
+                            , S.MON8_YN
+                            , S.MON9_YN
+                            , S.MON10_YN
+                            , S.MON11_YN
+                            , S.MON12_YN
+                            , SYSDATE
+                            , #{ssnSabun}
+                        )
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteWelfPayItemMgr">
+					DELETE FROM TBEN005
+                    WHERE   (ENTER_CD, PAY_CD, BENEFIT_BIZ_CD, ELEMENT_CD) IN   (  (NULL, NULL, NULL, NULL)
+<foreach item="rm" collection="deleteRows" >
+                        ,
+                                        <if test='ssnEnterCd != null and !ssnEnterCd.equals("") and rm.payCd != null and !rm.payCd.equals("") and rm.benefitBizCd != null and !rm.benefitBizCd.equals("") and rm.elementCd != null and !rm.elementCd.equals("")'>
+                                                   (#{ssnEnterCd}, TRIM(#{rm.payCd}), TRIM(#{rm.benefitBizCd}), TRIM(#{rm.elementCd}))
+                                        </if>
+
+</foreach>
+                                        )
+		</delete>
+	</mapper>

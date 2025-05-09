@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * 급여계산
+ * @author JM
+-->
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="cpn.payCalculate.sepMonPayMgr">
+		<select parameterType="map" resultType="cMap" id="getSepMonPayMgrList">
+
+				<![CDATA[
+				/* getSepMonPayMgrList */
+					SELECT /*+ INDEX(TCPN203 IX_CPN203_1) */
+						   A.ORG_NM
+						 , A.WORK_TYPE
+						 , A.JIKCHAK_CD
+						 , A.JIKWEE_CD
+						 , A.JIKGUB_CD
+						 , A.SABUN
+						 , A.NAME
+						 , A.MANAGE_CD
+						 , A.PAY_TYPE
+						 , A.STATUS_CD
+						 , A.EMP_YMD
+						 , A.RET_YMD
+						 , A.RES_NO
+						 , A.PAY_ACTION_CD
+						 , A.BUSINESS_PLACE_CD
+						 , A.PAY_PEOPLE_STATUS AS STATUS
+						 , CASE WHEN A.PAY_PEOPLE_STATUS = 'J' AND #{closeYn} = 'N' THEN '<a class="basic" onClick="calcCancel('''||A.SABUN||''')">계산취소</a>'
+						        WHEN A.PAY_PEOPLE_STATUS = 'P' AND #{closeYn} = 'N' THEN '<a class="basic" onClick="calc('''||A.SABUN||''')">계산</a>'
+						        ELSE '' END AS BTN_PRT
+						 , DECODE(A.PAY_PEOPLE_STATUS,'P','1','J','1','PM','1','M','1','0') PAY_PEOPLE_STATUS
+						 , DECODE(A.PAY_PEOPLE_STATUS,'J','완료','M','재계산',' ') AS PAY_PEOPLE_STATUS_TEXT
+						 , DECODE(A.PAY_PEOPLE_STATUS,'P','P','J','J','PM','PM','M','M','0') AS OLD_PAY_PEOPLE_STATUS
+						 , A.CC_CD
+						 , A.JOB_NM
+						 , TO_CHAR(A.CHKDATE,'YYYY-MM-DD  HH24:MI:SS') AS CHKDATE
+						 , A.SAL_CLASS
+						 , A.REAL_PAYMENT_YMD
+					  FROM TCPN203 A
+					 WHERE A.ENTER_CD			= #{ssnEnterCd}
+					   AND A.PAY_ACTION_CD		= #{payActionCd}
+					           		]]>
+					<if test='businessPlaceCd != null and !businessPlaceCd.equals("")'>
+					   AND A.BUSINESS_PLACE_CD	= #{businessPlaceCd}
+					</if>
+					<if test='sabunName != null and !sabunName.equals("")'>
+					   AND A.SABUN||A.NAME LIKE '%'||trim(#{sabunName})||'%'
+					</if>
+					ORDER BY A.PAY_PEOPLE_STATUS DESC, A.CHKDATE ASC, F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+
+
+
+		</select>
+
+		<update parameterType="map" id="saveSepMonPayMgr">
+
+				<![CDATA[
+				/* saveSepMonPayMgr */
+					MERGE INTO TCPN203 T
+					USING	(
+							SELECT A.PAY_ACTION_CD
+								 , A.SABUN
+								 , A.REAL_PAYMENT_YMD
+							  FROM (
+									SELECT NULL	AS PAY_ACTION_CD
+										 , NULL	AS SABUN
+										 , NULL	AS REAL_PAYMENT_YMD
+									  FROM DUAL
+									  		]]>
+<foreach item="rm" collection="updateRows" >
+									UNION ALL
+									SELECT TRIM(#{rm.payActionCd})		AS PAY_ACTION_CD
+										 , TRIM(#{rm.sabun})			AS SABUN
+										 , REPLACE(TRIM(#{rm.realPaymentYmd}), '-', '')				AS REAL_PAYMENT_YMD
+									  FROM DUAL
+</foreach>
+									) A
+							WHERE A.PAY_ACTION_CD IS NOT NULL
+							  AND A.SABUN IS NOT NULL
+							) S
+					ON	(	T.ENTER_CD		= #{ssnEnterCd}
+						AND	T.PAY_ACTION_CD	= S.PAY_ACTION_CD
+						AND	T.SABUN			= S.SABUN
+						)
+					WHEN MATCHED THEN
+						UPDATE SET
+								   T.REAL_PAYMENT_YMD	= S.REAL_PAYMENT_YMD
+								 , T.CHKDATE			= SYSDATE
+								 , T.CHKID				= #{ssnSabun}
+
+
+
+		</update>
+
+	</mapper>

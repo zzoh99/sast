@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="org.job.jobDivReportApp">
+	
+		<!-- 부서 콤보 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobOrgList">
+
+				<![CDATA[
+					SELECT A.ORG_CD AS CODE
+					     , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, B.SDATE) AS CODE_NM
+					     /*,SUBSTR(REPLACE(C.FULL_ORG_NM, '#', '>'),2) AS CODE_NM*/
+					FROM  (SELECT DISTINCT ENTER_CD, ORG_CD, F_COM_GET_ORG_NM(ENTER_CD, ORG_CD, SDATE) AS ORG_NM
+					]]>
+							<choose><when test='pageType != null and !pageType.equals("1")'>
+                                FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{ssnSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+		</when><otherwise>
+								FROM TABLE(THRM151_AUTH(#{ssnEnterCd}, #{ssnSearchType}, #{searchApplSabun}, #{ssnGrpCd}, TO_CHAR(SYSDATE, 'YYYYMMDD')))
+							</otherwise>
+							</choose>
+					
+                                ) A, TORG103 B, TORG105 C
+					WHERE A.ENTER_CD = B.ENTER_CD
+						AND A.ENTER_CD = C.ENTER_CD
+						AND B.SDATE = C.SDATE
+						AND A.ORG_CD = C.ORG_CD
+						AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL(B.EDATE, '99991231')
+					ORDER BY C.ORDER_SEQ
+
+
+		</select>
+		
+		<!-- 부서원 직무분장표 -->
+		<select parameterType="map" resultType="cMap" id="getJobRegAppList2">
+
+				<![CDATA[
+						  SELECT  A.ENTER_CD
+                                , MAX(A.APPL_SEQ) AS APPL_SEQ
+                                , A.SABUN
+                                , A.ORG_CD
+                                , MAX(A.ORG_NM) AS ORG_NM
+                                , MAX(A.APPL_YN) AS APPL_YN
+                                , MAX(A.APPL_YMD) AS APPL_YMD
+                                , MAX(A.APPLY_YMD) AS APPLY_YMD
+                                , MAX(A.TITLE_YN) AS TITLE_YN
+                                , MAX(A.JOB_D_TYPE) AS JOB_D_TYPE
+                                , MAX(A.JOB_M_TYPE) AS JOB_M_TYPE
+                                , MAX(A.TASK_CD) AS TASK_CD
+                                , A.JOB_CD
+                                , MAX(A.JOB_CD_NM) AS JOB_CD_NM
+                                , MAX(A.JOB_NM) AS JOB_NM
+                                , MAX(A.JIKCHAK_NM) AS JIKCHAK_NM
+                                , MAX(A.JIKWEE_NM) AS JIKWEE_NM
+                                , MAX(A.NAME) AS NAME
+                                , MAX(A.APPL_STATUS_CD) AS APPL_STATUS_CD
+                                , MAX(A.AGREE_YMD) AS AGREE_YMD
+                                , MAX(A.APPL_SABUN) AS APPL_SABUN
+                                , MAX(A.APPL_IN_SABUN) AS APPL_IN_SABUN
+                                , MAX(A.BTN_DEL) AS BTN_DEL
+                                , MAX(A.DETAIL) AS DETAIL
+                             FROM (
+                                   SELECT A.ENTER_CD
+                                        , A.APPL_SEQ
+                                        , A.SABUN
+                                        , A.ORG_CD
+                                        , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+                                        , A.APPL_YN
+                                        , A.APPL_YMD
+                                        , A.APPLY_YMD
+                                        , B.TITLE_YN
+                                        , B.JOB_D_TYPE
+                                        , B.JOB_M_TYPE
+                                        , B.TASK_CD
+                                        , B.JOB_CD
+                                        , (SELECT CC.JOB_NM 
+                                             FROM TORG201 CC 
+                                            WHERE CC.ENTER_CD = B.ENTER_CD
+                                              AND CC.JOB_CD = B.JOB_CD) AS JOB_CD_NM
+                                        , F_COM_GET_TITLE_JOB_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JOB_NM
+                                        , F_COM_GET_JIKCHAK_NM( A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKCHAK_NM
+                                        , F_COM_GET_JIKWEE_NM(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS JIKWEE_NM
+                                        , F_COM_GET_NAMES(A.ENTER_CD, A.SABUN, #{ssnLocaleCd} ) AS NAME
+                                        , C.APPL_STATUS_CD
+                                        , C.AGREE_YMD
+                                        , C.APPL_SABUN
+                                        , C.APPL_IN_SABUN
+                                        , DECODE(C.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+                                        , 0 AS DETAIL
+                                     FROM THRM171 A
+                                     LEFT JOIN THRM173 B
+                                       ON A.ENTER_CD = B.ENTER_CD
+                                      AND A.SABUN = B.SABUN
+                                      AND A.APPL_SEQ = B.APPL_SEQ
+                                    INNER JOIN THRI103 C
+                                       ON A.ENTER_CD = C.ENTER_CD
+                                      AND A.APPL_SEQ = C.APPL_SEQ
+                                    WHERE 1=1
+                                     AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+                                             ]]>
+				                    <choose><when test='orgCd.equals("1")'>
+				                    	AND A.APPL_SEQ IN (
+                             			
+                             			       SELECT A.APPL_SEQ
+                             			         FROM (
+                             			         		SELECT *
+                             			         		  FROM (
+                             			         		  		SELECT A.SABUN
+				                             			              , MAX(B.APPL_SEQ) AS APPL_SEQ
+				                             			              , MIN(B.APPL_YMD) AS MIN_APPL_YMD
+		                                          					  , MAX(B.APPL_YMD) AS MAX_APPL_YMD
+								                                  FROM THRM173 A
+								                                  LEFT JOIN THRM171 B
+								                                    ON A.ENTER_CD = B.ENTER_CD
+								                                   AND A.SABUN = B.SABUN
+								                                   AND A.APPL_SEQ = B.APPL_SEQ
+								                                 INNER JOIN THRI103 C
+		                                                            ON A.ENTER_CD = C.ENTER_CD
+		                                                           AND A.APPL_SEQ = C.APPL_SEQ
+								                                 WHERE 1=1
+								                                   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+								                                   AND C.APPL_STATUS_CD = '99'
+											                 <if test='orgCd != null and !orgCd.equals("")'>
+											                       AND A.ORG_CD = #{orgCd}
+															 </if>
+											                 GROUP BY A.SABUN
+                             			         		  ) A
+                             			         		  WHERE 1=1
+                                							AND A.MAX_APPL_YMD BETWEEN A.MIN_APPL_YMD AND NVL(REPLACE(TRIM(#{searchBaseDate}),'-'),'99991231')
+                             			         ) A
+                                               
+											)
+									</when><otherwise>
+				                    	AND A.APPL_SEQ IN (
+                             			
+                             			       SELECT A.APPL_SEQ
+                             			         FROM (
+		                             			         SELECT A.SABUN
+		                             			              , MAX(B.APPL_SEQ) AS APPL_SEQ
+						                                  FROM THRM173 A
+						                                  LEFT JOIN THRM171 B
+						                                    ON A.ENTER_CD = B.ENTER_CD
+						                                   AND A.SABUN = B.SABUN
+						                                   AND A.APPL_SEQ = B.APPL_SEQ
+						                                 INNER JOIN THRI103 C
+                                                            ON A.ENTER_CD = C.ENTER_CD
+                                                           AND A.APPL_SEQ = C.APPL_SEQ
+						                                 WHERE 1=1
+						                                   AND A.ENTER_CD = TRIM(#{ssnEnterCd})
+						                                   AND C.APPL_STATUS_CD = '99'
+									                 <if test='searchFromApplYmd != null and !searchFromApplYmd.equals("")'>
+									                       AND SUBSTR(REPLACE(TRIM(B.APPL_YMD),'-'),1,4) BETWEEN #{searchFromApplYmd} AND #{searchToApplYmd}
+													 </if>
+									                 <if test='orgCd != null and !orgCd.equals("")'>
+									                       AND A.ORG_CD = #{orgCd}
+													 </if>
+									                 GROUP BY A.SABUN
+                             			         ) A
+                                               
+											)
+									</otherwise>
+									</choose>
+				                    
+				                    
+                             ) A
+							GROUP BY A.ENTER_CD, A.SABUN, A.ORG_CD, A.JOB_CD
+							ORDER BY F_COM_JIKJE_SORT(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'))
+
+
+		</select>
+		
+		<!-- 직무분장표 조회 -->
+		<select parameterType="map" resultType="cMap" id="getJobDivReportAppList">
+
+				<![CDATA[
+						 SELECT A.APPL_SEQ
+                              , A.ENTER_CD
+                              , A.ORG_CD
+                              , F_COM_GET_ORG_NM2(A.ENTER_CD, A.SABUN, TO_CHAR(SYSDATE,'YYYYMMDD'), #{ssnLocaleCd}) AS ORG_NM
+                              , A.SABUN
+                              , C.APPL_YMD
+						      , C.APPL_STATUS_CD
+						      , C.AGREE_YMD
+						      , C.APPL_SABUN
+						      , C.APPL_IN_SABUN
+						      , DECODE(C.APPL_STATUS_CD, '11', '<a class="sbasic">삭제</a>', '') AS BTN_DEL
+						      , 0 AS DETAIL
+						      , A.APPLY_YMD
+                           FROM THRM175 A
+                         INNER JOIN THRI103 C
+                            ON A.ENTER_CD = C.ENTER_CD
+                           AND A.APPL_SEQ = C.APPL_SEQ
+                         WHERE 1=1
+                           AND A.ENTER_CD = TRIM( #{ssnEnterCd} )
+                                   ]]>
+						<if test='orgCd != null and !orgCd.equals("")'>
+						   AND A.ORG_CD = #{orgCd}
+						</if>
+						<if test='searchFromApplYmd != null and !searchFromApplYmd.equals("")'>
+                           AND SUBSTR(REPLACE(TRIM(C.APPL_YMD),'-'),1,4) BETWEEN #{searchFromApplYmd} AND #{searchToApplYmd}
+						</if>
+                        <if test='searchSabun != null and !searchSabun.equals("")'>
+                           AND A.SABUN = #{searchSabun}
+						</if>
+                        ORDER BY C.APPL_YMD DESC
+
+
+		</select>
+		
+		<!-- 직무분장표 삭제 -->
+		<delete parameterType="map" id="deleteJobDivReportApp">
+
+						DELETE 
+						  FROM THRM175			
+						 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+						   AND ( APPL_SEQ ) IN ( ( NULL) 			
+				<foreach item="rm" collection="deleteRows" >
+				    <if test='  rm.applSeq != null and !rm.applSeq.equals("") '>
+						     , ( TRIM( #{rm.applSeq} ) )
+					</if>
+				</foreach>
+						       )
+		</delete>
+		
+		<!-- 직무분장표 삭제 -->
+		<delete parameterType="map" id="deleteJobDivReportAppGrid">
+
+					DELETE 
+					  FROM THRM176
+			 WHERE ENTER_CD = TRIM(#{ssnEnterCd})
+			   AND ( APPL_SEQ) IN ( ( NULL) 
+	<foreach item="rm" collection="deleteRows" >
+	    <if test='  rm.applSeq != null and !rm.applSeq.equals("")'>
+			     , ( TRIM( #{rm.applSeq} ) )
+		</if>
+	</foreach>
+			       )
+		</delete>
+
+
+</mapper>

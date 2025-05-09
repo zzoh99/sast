@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.empSituation.jikjongHisSta">
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getJikjongHisStaList">
+			
+				<![CDATA[
+					SELECT JIKJONG_CD AS CODE
+					     , JIKJONG_NM AS CODE_NM
+					     , REPLACE(#{searchYmd}, '-', '') AS SEARCH_YMD
+					     , NVL(SUM(CNT),0) AS CNT
+					     , NVL(SUM(PER_CNT),0) AS PER_CNT
+					  FROM (
+					        SELECT JIKJONG_CD
+					             , JIKJONG_NM
+					             , CNT
+					             , ROUND((CNT/SUM(CNT) OVER())*100, 1) AS PER_CNT
+					          FROM (
+					                SELECT B.JIKJONG_CD
+					                     , B.JIKJONG_NM
+					                     , COUNT(A.SABUN) AS CNT
+					                  FROM THRM151 A
+					                     , (
+					                        SELECT MAX(A.SDATE) AS SDATE
+					                             , A.ENTER_CD
+					                             , A.SABUN
+					                             , F_COM_GET_ORG_NM(A.ENTER_CD, A.ORG_CD, REPLACE(#{searchYmd}, '-', '')) AS ORG_NM
+					                             , F_COM_GET_JIKJONG_CD3(A.ENTER_CD, A.SABUN, REPLACE(#{searchYmd}, '-', '')) AS JIKJONG_CD
+		                                   		 , F_COM_GET_JIKJONG_NM3(A.ENTER_CD, A.SABUN, REPLACE(#{searchYmd}, '-', '')) AS JIKJONG_NM
+					                          FROM THRM151 A
+					                         WHERE A.ENTER_CD = #{groupEnterCd}
+					                           AND A.STATUS_CD NOT IN (
+					                                                   SELECT DISTINCT REGEXP_SUBSTR(A.PARAM, '[^,]+', 1, LEVEL)
+					                                                     FROM ( SELECT NVL(F_COM_GET_STD_CD_VALUE(#{groupEnterCd}, 'HRM_STATUS_CD_EX'),'RA') AS PARAM FROM dual ) A
+					                                                  CONNECT BY LEVEL <= length(REGEXP_REPLACE(A.PARAM, '[^,]+',''))+1) ]]>
+<if test="manageCd != null and manageCd neq ''">
+					                           AND A.MANAGE_CD IN
+		<foreach collection="manageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+<if test="workType != null and workType neq ''">
+					                           AND A.WORK_TYPE IN
+		<foreach collection="workType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+</if>
+					                           AND REPLACE(#{searchYmd}, '-', '') BETWEEN A.SDATE AND NVL(A.EDATE, '99991231')
+					                         GROUP BY A.ENTER_CD, A.SABUN, A.ORG_CD
+					                     ) B
+					                     , THRM100 C
+					                 WHERE A.ENTER_CD = B.ENTER_CD
+					                   AND A.SABUN    = B.SABUN
+					                   AND A.SDATE    = B.SDATE
+					                   AND A.ENTER_CD = C.ENTER_CD
+					                   AND A.SABUN    = C.SABUN
+					                   AND (C.RET_YMD IS NULL OR C.RET_YMD >= REPLACE(#{searchYmd}, '-', ''))
+<if test="searchOrgNm != null and searchOrgNm neq ''">
+					                   AND B.ORG_NM LIKE '%' || #{searchOrgNm} || '%'
+</if>
+					                 GROUP BY B.JIKJONG_CD, B.JIKJONG_NM
+					             ) X
+					     )
+					 GROUP BY JIKJONG_CD, JIKJONG_NM
+		</select>
+		
+</mapper>

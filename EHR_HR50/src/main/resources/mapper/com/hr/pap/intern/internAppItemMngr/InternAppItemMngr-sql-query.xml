@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.intern.internAppItemMngr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getInternAppItemMngrList">
+
+				<![CDATA[
+				 SELECT A.ENTER_CD
+					, A.APP_ITEM_SEQ
+					, A.APP_ITEM_NM
+					, A.APP_ITEM_DETAIL
+					, A.APP_CODE_TYPE
+				  FROM TPAP692 A
+				 WHERE A.ENTER_CD     = TRIM(#{ssnEnterCd})
+			  	ORDER BY A.APP_ITEM_SEQ
+				]]>
+
+
+		</select>
+<!-- 		저장 -->	
+		<update parameterType="map" id="saveInternAppItemMngr">
+
+					MERGE INTO TPAP692 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APP_ITEM_SEQ
+									, A.APP_ITEM_NM
+									, A.APP_ITEM_DETAIL
+									, A.APP_CODE_TYPE
+							FROM	(
+									SELECT	  NULL	AS ENTER_CD        
+											, NULL	AS APP_ITEM_SEQ    
+											, NULL	AS APP_ITEM_NM        
+											, NULL	AS APP_ITEM_DETAIL       
+											, NULL	AS APP_CODE_TYPE       
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											  #{ssnEnterCd}	                AS ENTER_CD
+											        
+											<choose><when test='rm.appItemSeq != null and !rm.appItemSeq.equals("")'>
+												--증가가 되는 키인경우 키가 공백이 아니면 들어온 값을 삽입
+												, TRIM(#{rm.appItemSeq}) 			AS APP_ITEM_SEQ
+											</when><otherwise>
+												--증가가 되는 키인경우 키가 공백이면 증가된 값을 삽입
+												, TO_CHAR( NVL((SELECT MAX(APP_ITEM_SEQ)
+													FROM TPAP692
+													WHERE ENTER_CD = #{ssnEnterCd}
+												), 0) + ${icnt} )	AS SEQ
+												--icnt 증가
+												<bind name="icnt" value="icnt + 1" />
+											</otherwise>
+											</choose>
+
+											, TRIM( #{rm.appItemNm} )	    AS APP_ITEM_NM
+											, TRIM( #{rm.appItemDetail} )	AS APP_ITEM_DETAIL
+											, TRIM( #{rm.appCodeType} )		AS APP_CODE_TYPE
+											FROM   DUAL
+</foreach>
+									) A WHERE ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		    = S.ENTER_CD
+					AND  T.APP_ITEM_SEQ		= S.APP_ITEM_SEQ
+					 )
+					WHEN MATCHED THEN
+						UPDATE SET	     
+									  T.APP_ITEM_NM         = S.APP_ITEM_NM          
+									, T.APP_ITEM_DETAIL     = S.APP_ITEM_DETAIL
+									, T.APP_CODE_TYPE       = S.APP_CODE_TYPE
+									, T.CHKDATE			    = SYSDATE
+									, T.CHKID			    = #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT 
+						(
+							  T.ENTER_CD        
+   							, T.APP_ITEM_SEQ    
+   							, T.APP_ITEM_NM       
+   							, T.APP_ITEM_DETAIL       
+   							, T.APP_CODE_TYPE
+							, T.CHKDATE
+							, T.CHKID
+						) 
+						VALUES 
+						(
+ 							  S.ENTER_CD        
+ 							, S.APP_ITEM_SEQ    
+ 							, S.APP_ITEM_NM       
+ 							, S.APP_ITEM_DETAIL       
+ 							, S.APP_CODE_TYPE
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+		
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteInternAppItemMngr">
+
+					DELETE FROM TPAP692
+					WHERE 	(ENTER_CD,APP_ITEM_SEQ ) IN 	(  (NULL,NULL)
+<foreach item="rm" collection="deleteRows" >
+						,				(
+										#{ssnEnterCd}
+										,	TRIM( #{rm.appItemSeq} )
+										)
+</foreach>
+										)
+		</delete>
+
+
+</mapper>

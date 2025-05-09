@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="eis.hrm.retEmpSta">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getRetEmpStaList">
+			
+				<![CDATA[
+				 SELECT ENTER_CD
+				 		  , '/EmpPhotoOut.do'||chr(63)||'enterCd=' || ENTER_CD || chr(38) || 'searchKeyword=' || SABUN ||  chr(38) || 'type=1' AS PHOTO 	
+                          ,SABUN
+                          ,NAME
+                          ,ORG_NM
+                          ,ORG_CD
+                          ,MANAGE_NM
+                          ,JIKWEE_NM                                                 
+                          ,JIKWEE_CD                                        
+                          ,JIKGUB_NM
+                          ,JIKGUB_CD
+                          ,JIKCHAK_NM
+                          ,JIKCHAK_CD
+                          ,GEMP_YMD
+                          ,EMP_YMD
+                          ,RET_YMD
+                          ,WORK_TYPE
+                          ,WORK_TYPE_NM
+                          ,WORK_YY_CNT || '년 ' || WORK_MM_CNT || '개월' AS TERM
+                          ,G_WORK_YY_CNT || '년 ' || G_WORK_MM_CNT || '개월' AS G_TERM
+                          ,STF_TYPE_NM
+                          ,ORD_DETAIL_NM
+                          ,ORD_REASON_NM
+                          ,MEMO
+                          , F_SYS_GET_ENDOW_AUTH_YN( ENTER_CD, TRIM( #{ssnGrpCd} ) ,TRIM( #{ssnSabun} ),  SABUN ) AS AUTH_YN
+                  FROM
+                        (        
+                        SELECT A.ENTER_CD,                                             --회사구분
+                               A.SABUN,                                                 -- 사번
+                               F_COM_GET_NAMES(A.ENTER_CD,A.SABUN) NAME,              -- 성명(한글)          
+                               F_COM_GET_ORG_NM (B.ENTER_CD,B.ORG_CD,B.SDATE) AS ORG_NM, -- 소속
+                               B.ORG_CD,                                              -- 소속코드
+                               B.JIKWEE_NM,                                                   --직위
+                               B.JIKWEE_CD,                                           -- 직위코드
+                               B.JIKGUB_NM,                                                   --직급
+                               B.JIKGUB_CD,                                           -- 직급코드
+                               B.JIKCHAK_NM,                                                 -- 직책
+                               B.JIKCHAK_CD,                                          -- 직책코드
+                               B.MANAGE_CD,                                           -- 사원구분코드
+                               B.MANAGE_NM,
+                               A.GEMP_YMD,
+                               A.EMP_YMD,                                             -- 입사일자
+                               A.RET_YMD,                                             -- 퇴사일자     
+                               B.WORK_TYPE,
+                               B.WORK_TYPE_NM,
+                               A.STF_TYPE_NM,                                        -- 입사구분    
+                               A.RESIGN_REASON_NM,                            --퇴직사유
+                               (SELECT F_COM_GET_ORD_DETAIL_NM(ENTER_CD, ORD_TYPE_CD, ORD_DETAIL_CD) 
+                                FROM THRM191 
+                                WHERE ENTER_CD = A.ENTER_CD
+                                AND   SABUN = A.SABUN
+                                AND   ORD_YMD = A.RET_YMD
+                                AND F_COM_GET_ORD_TYPE(ENTER_CD, ORD_TYPE_CD) = '60'
+                                ) AS ORD_DETAIL_NM,
+                               (SELECT ORD_REASON_NM 
+                                FROM THRM191 
+                                WHERE ENTER_CD = A.ENTER_CD
+                                AND   SABUN = A.SABUN
+                                AND   ORD_YMD = A.RET_YMD
+                                AND F_COM_GET_ORD_TYPE(ENTER_CD, ORD_TYPE_CD) = '60'
+                                ) AS ORD_REASON_NM,
+                                (SELECT MEMO 
+                                FROM THRM191 
+                                WHERE ENTER_CD = A.ENTER_CD
+                                AND   SABUN = A.SABUN
+                                AND   ORD_YMD = A.RET_YMD
+                                AND F_COM_GET_ORD_TYPE(ENTER_CD, ORD_TYPE_CD) = '60'
+                                ) AS MEMO,
+                              TRUNC(MONTHS_BETWEEN(DECODE(NVL(RET_YMD,'N'),'N',SYSDATE,TO_DATE(RET_YMD,'YYYYMMDD')), TO_DATE(NVL(A.GEMP_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')),'YYYYMMDD'))/12) AS G_WORK_YY_CNT,
+                              TRUNC(MOD(MONTHS_BETWEEN(DECODE(NVL(RET_YMD,'N'),'N',SYSDATE,TO_DATE(RET_YMD,'YYYYMMDD')), TO_DATE(NVL(A.GEMP_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')),'YYYYMMDD')),12)) AS G_WORK_MM_CNT,
+                              TRUNC(MONTHS_BETWEEN(DECODE(NVL(RET_YMD,'N'),'N',SYSDATE,TO_DATE(RET_YMD,'YYYYMMDD')), TO_DATE(NVL(A.EMP_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')),'YYYYMMDD'))/12) AS WORK_YY_CNT,
+                              TRUNC(MOD(MONTHS_BETWEEN(DECODE(NVL(RET_YMD,'N'),'N',SYSDATE,TO_DATE(RET_YMD,'YYYYMMDD')), TO_DATE(NVL(A.EMP_YMD,TO_CHAR(SYSDATE,'YYYYMMDD')),'YYYYMMDD')),12)) AS WORK_MM_CNT
+                         FROM THRM100 A,                                                    -- 인사마스터
+                              THRM151 B
+                         WHERE A.ENTER_CD = B.ENTER_CD
+                         AND A.SABUN    = B.SABUN
+                         AND A.RET_YMD BETWEEN B.SDATE AND NVL (B.EDATE,'99999999') ]]>
+						<if test='except1 != null and except1 eq "Y"'> <![CDATA[
+						   AND B.STATUS_CD <> 'CA' ]]>
+						</if>
+						<if test='except2 != null and except2 eq "Y"'> <![CDATA[
+						   AND NVL((SELECT  X.CNT_TYPE_CD 
+							          FROM TCPN403 X 
+							         WHERE X.ENTER_CD = B.ENTER_CD 
+							           AND X.SABUN = B.SABUN 
+									   AND (X.ENTER_CD, X.SABUN, X.SDATE) IN ( SELECT Y.ENTER_CD, Y.SABUN, MAX(Y.SDATE)
+							           	                                         FROM TCPN403 Y
+							            	                                    WHERE Y.ENTER_CD = X.ENTER_CD
+							                                                      AND Y.SABUN = X.SABUN
+							                                                      AND A.RET_YMD  BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231') 
+							                                                    GROUP BY Y.ENTER_CD, Y.SABUN ) ) , '^' ) <> '070'	]]>	
+						</if>
+						<if test='except3 != null and except3 eq "Y"'> <![CDATA[
+						   AND B.JIKWEE_CD <> '177' ]]>
+						</if>  
+                        )
+                  WHERE ENTER_CD = NVL(TRIM(#{groupEnterCd}),  TRIM(#{ssnEnterCd}))
+                    AND RET_YMD BETWEEN REPLACE(#{searchYmdFrom}, '-') AND REPLACE(#{searchYmdTo}, '-') 
+					<if test="searchOrgNm != null and searchOrgNm neq ''">
+					   AND NVL(ORG_NM,'^') LIKE '%'|| #{searchOrgNm} ||'%'
+					</if>		
+					<if test="searchName != null and searchName neq ''">
+					   AND NVL(NAME,'^') LIKE '%'|| #{searchName} ||'%'
+					</if>
+					<if test="multiJikgubNm != null and multiJikgubNm neq ''">
+					   AND JIKGUB_CD	IN
+		<foreach collection="multiJikgubNm" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>				
+					<if test="multiManageCd != null and multiManageCd neq ''">
+					   AND MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>
+					<if test="multiWorkType != null and multiWorkType neq ''">
+					   AND WORK_TYPE	IN
+		<foreach collection="multiWorkType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+					</if>					
+                 ORDER BY F_COM_JIKJE_SORT(ENTER_CD, SABUN, RET_YMD)
+        </select>
+        
+		<!-- 		현인원 조회용 -->
+		<select parameterType="map" resultType="cMap" id="getRetEmpStaMap">
+			
+				<![CDATA[
+				  SELECT NOW_CNT, TERM_CNT, RETIRE_CNT
+					   , DECODE(NOW_CNT,0,0,ROUND((RETIRE_CNT / NOW_CNT ) * 100, 2)) AS RETIRE_PER
+					FROM (
+					            SELECT COUNT (*) AS NOW_CNT
+					              FROM THRM100 A,THRM151 B
+					             WHERE A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+					             	AND A.ENTER_CD = NVL(TRIM(#{groupEnterCd}),  TRIM(#{ssnEnterCd}))
+					                AND TO_CHAR (SYSDATE, 'YYYYMMDD') BETWEEN B.SDATE AND NVL (B.EDATE, '99999999')
+					                AND B.STATUS_CD IN ('AA', 'CA', 'EA') ]]>
+									<if test='except1 != null and except1 eq "Y"'> <![CDATA[
+									   AND B.STATUS_CD <> 'CA' ]]>
+									</if>
+									<if test='except2 != null and except2 eq "Y"'> <![CDATA[
+									   AND NVL((SELECT  X.CNT_TYPE_CD 
+										          FROM TCPN403 X 
+										         WHERE X.ENTER_CD = B.ENTER_CD 
+										           AND X.SABUN = B.SABUN 
+												   AND (X.ENTER_CD, X.SABUN, X.SDATE) IN ( SELECT Y.ENTER_CD, Y.SABUN, MAX(Y.SDATE)
+							           	                                         FROM TCPN403 Y
+							            	                                    WHERE Y.ENTER_CD = X.ENTER_CD
+							                                                      AND Y.SABUN = X.SABUN
+							                                                      AND TO_CHAR(SYSDATE,'YYYYMMDD')  BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231') 
+							                                                    GROUP BY Y.ENTER_CD, Y.SABUN ) ) , '^' ) <> '070'		
+									]]></if>
+									<if test='except3 != null and except3 eq "Y"'> <![CDATA[
+									   AND B.JIKWEE_CD <> '177' ]]>
+									</if>             
+					           ) A, 
+					           ( SELECT COUNT (*) TERM_CNT
+					              FROM THRM100 A,THRM151 B
+					             WHERE A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+					             	AND A.ENTER_CD = NVL(TRIM(#{groupEnterCd}),  TRIM(#{ssnEnterCd}))
+									AND TO_CHAR(SYSDATE, 'YYYY') -1 || '1231' BETWEEN B.SDATE AND NVL (B.EDATE, '99999999')
+									AND B.STATUS_CD IN ('AA', 'CA', 'EA')
+									
+									<if test='except1 != null and except1 eq "Y"'> <![CDATA[
+									   AND B.STATUS_CD <> 'CA' ]]>
+									</if>
+									<if test='except2 != null and except2 eq "Y"'> <![CDATA[
+									     AND NVL((SELECT  X.CNT_TYPE_CD 
+										          FROM TCPN403 X 
+										         WHERE X.ENTER_CD = B.ENTER_CD 
+										           AND X.SABUN = B.SABUN 
+												   AND (X.ENTER_CD, X.SABUN, X.SDATE) IN ( SELECT Y.ENTER_CD, Y.SABUN, MAX(Y.SDATE)
+							           	                                         FROM TCPN403 Y
+							            	                                    WHERE Y.ENTER_CD = X.ENTER_CD
+							                                                      AND Y.SABUN = X.SABUN
+							                                                      AND TO_CHAR(SYSDATE, 'YYYY') -1 || '1231' BETWEEN Y.SDATE AND NVL(Y.EDATE, '99991231') 
+							                                                    GROUP BY Y.ENTER_CD, Y.SABUN ) ) , '^' ) <> '070' ]]>		
+									</if>
+									<if test='except3 != null and except3 eq "Y"'> <![CDATA[
+									   AND B.JIKWEE_CD <> '177' ]]>
+									</if>				
+					            ) B,   
+					            ( SELECT COUNT (*) RETIRE_CNT
+					                FROM THRM100 A,THRM151 B
+					              WHERE A.ENTER_CD = B.ENTER_CD AND A.SABUN = B.SABUN
+				              		AND A.ENTER_CD = NVL(TRIM(#{groupEnterCd}),  TRIM(#{ssnEnterCd}))
+				              		AND A.RET_YMD BETWEEN B.SDATE AND NVL(B.EDATE, '99999999')
+				              		AND A.RET_YMD BETWEEN REPLACE(#{searchYmdFrom}, '-') AND REPLACE(#{searchYmdTo}, '-')
+									<if test="searchOrgNm != null and searchOrgNm neq ''">
+									   AND F_COM_GET_ORG_NM (B.ENTER_CD,B.ORG_CD,B.SDATE) LIKE '%'|| #{searchOrgNm} ||'%'
+									</if>
+									<if test="searchName != null and searchName neq ''">
+									   AND NVL(F_COM_GET_NAMES(A.ENTER_CD,A.SABUN),'^') LIKE '%'|| #{searchName} ||'%'
+									</if>
+									<if test="multiJikgubNm != null and multiJikgubNm neq ''">
+									   AND B.JIKGUB_CD	IN
+		<foreach collection="multiJikgubNm" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+									</if>
+									<if test="multiManageCd != null and multiManageCd neq ''">
+									   AND B.MANAGE_CD	IN <foreach collection="multiManageCd" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+									</if>
+									<if test="multiWorkType != null and multiWorkType neq ''">
+									   AND B.WORK_TYPE	IN
+		<foreach collection="multiWorkType" item="item" index="index" open="(" close=")" separator=",">
+				#{item}
+		</foreach>
+									</if>
+					            ) C
+		</select>
+</mapper>

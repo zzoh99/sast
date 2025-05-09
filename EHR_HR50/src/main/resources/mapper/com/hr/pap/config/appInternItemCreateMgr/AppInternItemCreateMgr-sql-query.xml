@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="pap.config.appInternItemCreateMgr">
+<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppInternItemCreateMgrList">
+
+				<![CDATA[
+					   SELECT A.APPRAISAL_YY
+					        , A.APP_TIME_CD
+					        , A.APPRAISAL_CD
+					        , A.APPRAISAL_NM
+					        , (SELECT CASE WHEN COUNT(B.APPRAISAL_CD) > 0 THEN '작업완료' ELSE '' END
+						       FROM   TPAP601 B
+						       WHERE  B.ENTER_CD     = A.ENTER_CD
+						       AND    B.APPRAISAL_CD = A.APPRAISAL_CD)  AS CHECK_Y
+						    , '5' AS APP_STEP_CD
+					   FROM     TPAP101 A
+					   WHERE    A.ENTER_CD     = #{ssnEnterCd}
+					   AND      A.APPRAISAL_CD = #{searchAppraisalCd}
+					   AND      A.APP_TYPE_CD IN ('D') /*인턴평가*/
+					   ORDER BY A.APPRAISAL_YY DESC, A.APP_TIME_CD DESC, F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'P10003', A.APP_TYPE_CD), A.APP_S_YMD DESC, A.APP_E_YMD DESC, A.APPRAISAL_CD
+				]]>
+
+
+		</select>
+
+		<!-- 		조회 -->
+		<select parameterType="map" resultType="cMap" id="getAppInternItemCreateMgrList1">
+
+				<![CDATA[
+					    SELECT E.APPRAISAL_YY
+					    	  ,E.APP_TIME_CD
+					    	  ,A.APPRAISAL_CD
+					          ,A.SABUN
+					          ,B.NAME
+					          ,A.ORG_NM
+					          ,A.JIKGUB_NM
+					          ,A.JIKWEE_NM
+					          ,A.JIKCHAK_NM
+					          ,A.WORK_TYPE
+					          ,A.WORK_TYPE_NM
+					          ,A.JOB_CD
+					          ,A.JOB_NM
+					          ,C.SEQ
+					          ,C.INTERN_ITEM_TYPE
+					          ,C.INTERN_ITEM_NM
+					          ,C.INTERN_ITEM_MEMO
+					          ,C.APP_BASIS_POINT
+					          ,C.SUNBUN
+					    FROM   TPAP201 A
+					          ,THRM100 B
+					          ,TPAP601 C
+					          ,TPAP101 E
+				        WHERE  A.ENTER_CD        = B.ENTER_CD
+						AND    A.SABUN           = B.SABUN
+						AND    A.ENTER_CD        = C.ENTER_CD
+						AND    A.APPRAISAL_CD    = C.APPRAISAL_CD
+						AND    A.SABUN           = C.SABUN
+						AND    A.ENTER_CD        = E.ENTER_CD
+						AND    A.APPRAISAL_CD    = E.APPRAISAL_CD
+						AND    A.ENTER_CD        = #{ssnEnterCd}
+						AND    A.APPRAISAL_CD    = #{searchAppraisalCd}
+						           ]]>
+					<if test='searchJikweeCd != null and !searchJikweeCd.equals("")'>
+						AND    A.JIKWEE_CD  LIKE #{searchJikweeCd}
+					</if>
+					<if test='searchJikchakCd != null and !searchJikchakCd.equals("")'>
+						AND    A.JIKCHAK_CD LIKE #{searchJikchakCd}
+					</if>
+					<if test='searchJobCd != null and !searchJobCd.equals("")'>
+						AND    A.JOB_CD LIKE     #{searchJobCd}
+					</if>
+					<if test='searchSabun != null and !searchSabun.equals("")'>
+						AND    A.SABUN         = #{searchSabun}
+					</if>
+				   ORDER BY    F_ORG_ORG_CHART_SORT(A.ENTER_CD, A.ORG_CD, SYSDATE)
+				              ,F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20030', A.JIKWEE_CD)
+				              ,F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20010', A.JIKGUB_CD)
+				              ,F_COM_GET_GRCODE_SEQ(A.ENTER_CD, 'H20020', A.JIKCHAK_CD)
+				              ,A.SABUN
+				              ,C.SEQ
+
+
+		</select>
+
+		<select parameterType="map" resultType="cMap" id="getAppInternItemCreateMgrMap">
+
+				<![CDATA[
+					SELECT COL1, COL2, COL3, COL4, COL5 FROM ZTST002
+					WHERE 1 = 1
+					AND ROWNUM = 1
+				]]>
+
+
+		</select>
+
+<!-- 		저장 -->
+		<update parameterType="map" id="saveAppInternItemCreateMgr">
+
+					MERGE INTO TPAP601 T
+					USING	(
+							SELECT	  A.ENTER_CD
+									, A.APPRAISAL_CD
+									, A.SABUN
+									, A.SEQ
+									, A.INTERN_ITEM_TYPE
+									, A.INTERN_ITEM_NM
+									, A.INTERN_ITEM_MEMO
+									, A.APP_BASIS_POINT
+									, A.SUNBUN
+							FROM	(
+									SELECT	  NULL		AS ENTER_CD
+											, NULL		AS APPRAISAL_CD
+											, NULL		AS SABUN
+											, NULL		AS SEQ
+											, NULL		AS INTERN_ITEM_TYPE
+											, NULL		AS INTERN_ITEM_NM
+											, NULL		AS INTERN_ITEM_MEMO
+											, NULL		AS APP_BASIS_POINT
+											, NULL		AS SUNBUN
+									FROM	DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="mergeRows" >
+							UNION ALL
+									SELECT
+											#{ssnEnterCd}                     AS ENTER_CD
+											, TRIM( #{rm.appraisalCd} )	    AS APPRAISAL_CD
+											, TRIM( #{rm.sabun} )	        AS SABUN
+											, TRIM( #{rm.seq} )	            AS SEQ
+                                            , TRIM( #{rm.internItemType})	AS INTERN_ITEM_TYPE
+                                            , TRIM( #{rm.internItemNm})	AS INTERN_ITEM_NM
+											, TRIM( #{rm.internItemMemo})	AS INTERN_ITEM_MEMO
+											, TRIM( #{rm.appBasisPoint})	AS APP_BASIS_POINT
+											, TRIM( #{rm.sunbun})	        AS SUNBUN
+											FROM   DUAL
+</foreach>
+									) A WHERE A.ENTER_CD IS NOT NULL
+							) S
+					ON ( T.ENTER_CD		= S.ENTER_CD
+					AND  T.APPRAISAL_CD	= S.APPRAISAL_CD
+					AND  T.SABUN		= S.SABUN
+					AND  T.SEQ		    = S.SEQ
+					)
+					WHEN MATCHED THEN
+						UPDATE SET	  T.INTERN_ITEM_TYPE	= S.INTERN_ITEM_TYPE
+									, T.INTERN_ITEM_NM  	= S.INTERN_ITEM_NM
+									, T.INTERN_ITEM_MEMO	= S.INTERN_ITEM_MEMO
+									, T.APP_BASIS_POINT 	= S.APP_BASIS_POINT
+									, T.SUNBUN          	= S.SUNBUN
+									, T.CHKDATE	= SYSDATE
+									, T.CHKID	= #{ssnSabun}
+					WHEN NOT MATCHED THEN
+						INSERT
+						(
+							  T.ENTER_CD
+							, T.APPRAISAL_CD
+							, T.SABUN
+							, T.SEQ
+							, T.INTERN_ITEM_TYPE
+							, T.INTERN_ITEM_NM
+							, T.INTERN_ITEM_MEMO
+							, T.APP_BASIS_POINT
+							, T.SUNBUN
+							, T.CHKDATE
+							, T.CHKID
+						)
+						VALUES
+						(
+							  S.ENTER_CD
+							, S.APPRAISAL_CD
+							, S.SABUN
+							, S.SEQ
+							, S.INTERN_ITEM_TYPE
+							, S.INTERN_ITEM_NM
+							, S.INTERN_ITEM_MEMO
+							, S.APP_BASIS_POINT
+							, S.SUNBUN
+							, SYSDATE
+							, #{ssnSabun}
+						)
+		</update>
+<!-- 		삭제 -->
+		<delete parameterType="map" id="deleteAppInternItemCreateMgr">
+
+					DELETE FROM TPAP601
+					WHERE 	(ENTER_CD,APPRAISAL_CD,SABUN,SEQ) IN 	(  (NULL,NULL,NULL,NULL,)
+<foreach item="rm" collection="deleteRows" >
+						,
+										(
+										#{ssnEnterCd}
+										<if test='rm.appraisalCd != null and !rm.appraisalCd.equals("")'>
+											, TRIM( #{rm.appraisalCd} )
+										</if>
+										<if test='rm.sabun != null and !rm.sabun.equals("")'>
+											, TRIM( #{rm.sabun} )
+										</if>
+										<if test='rm.seq != null and !rm.seq.equals("")'>
+											, TRIM( #{rm.seq} )
+										</if>
+										)
+</foreach>
+										)
+		</delete>
+<!-- 		생성 -->
+		<insert parameterType="map" id="insertAppInternItemCreateMgr">
+
+						INSERT INTO MainMnMgrTable
+						(
+							  COL1
+							, COL2
+							, COL3
+							, COL4
+							, COL5
+							, COL6
+							, CHKDATE
+							, CHKID
+						)
+						SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, sysdate
+								, #{ssnSabun}
+						FROM (
+								SELECT    NULL 	AS COL1
+										, NULL 	AS COL2
+										, NULL 	AS COL3
+										, NULL 	AS COL4
+										, NULL 	AS COL5
+										, NULL 	AS COL6
+								FROM   DUAL
+<bind name="icnt" value="1" />
+<foreach item="rm" collection="insertRows" >
+					UNION ALL
+								SELECT	  TO_CHAR( (SELECT (NVL(MAX(TO_NUMBER( COL1 )),0) + ${icnt}) FROM ZTST002) )	AS COL1
+										<bind name="icnt" value="icnt + 1" />
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+		</insert>
+<!-- 		수정 -->
+		<update parameterType="map" id="updateAppInternItemCreateMgr">
+
+				<![CDATA[
+					UPDATE ZTST002 T SET
+					(	  COL1
+						, COL2
+						, COL3
+						, COL4
+						, CHKDATE
+						, CHKID
+						)
+					=
+					(	SELECT	  S.COL1
+								, S.COL2
+								, S.COL3
+								, S.COL4
+								, S.COL5
+								, S.COL6
+								, SYSDATE
+								, #{ssnSabun}
+						FROM (
+							SELECT	  NULL 	AS COL1
+									, NULL 	AS COL2
+									, NULL 	AS COL3
+									, NULL 	AS COL4
+									, NULL 	AS COL5
+									, NULL 	AS COL6
+									FROM   DUAL
+									]]>
+<foreach item="rm" collection="updateRows" >
+					UNION ALL
+								SELECT
+										  TRIM(#{rm.col1})	AS COL1
+										, TRIM(#{rm.col2})	AS COL2
+										, TRIM(#{rm.col3})	AS COL3
+										, TRIM(#{rm.col4})	AS COL4
+										, TRIM(#{rm.col5})	AS COL5
+										, TRIM(#{rm.col6})	AS COL6
+								FROM   DUAL
+</foreach>
+							) S
+						WHERE S.COL1 IS NOT NULL
+					)
+					WHERE EXISTS (
+									SELECT S.COL1
+									FROM (
+											SELECT	S.COL1
+											FROM (
+												SELECT	NULL 				AS COL1	FROM	DUAL
+			<foreach item="rm" collection="updateRows" > UNION ALL		SELECT	TRIM(#{rm.col1})	AS COL1	FROM	DUAL  </foreach>
+												) S
+											WHERE S.COL1 IS NOT NULL
+										)S
+									WHERE T.COL1 = S.COL1
+								)
+		</update>
+
+		<update parameterType="map" id="prcAppInternItemCreateMgr" statementType="CALLABLE">
+		<![CDATA[
+			{CALL P_PAPN_INTERN_DIC_INS(
+				#{sqlcode,mode=OUT,jdbcType=VARCHAR},
+				#{sqlerrm,mode=OUT,jdbcType=VARCHAR},
+				#{ssnEnterCd,mode=IN,jdbcType=VARCHAR},
+				#{searchAppraisalCd,mode=IN,jdbcType=VARCHAR},
+				#{searchSabun,mode=IN,jdbcType=VARCHAR},
+				#{ssnSabun,mode=IN,jdbcType=VARCHAR})}
+		]]>
+		</update>
+
+</mapper>

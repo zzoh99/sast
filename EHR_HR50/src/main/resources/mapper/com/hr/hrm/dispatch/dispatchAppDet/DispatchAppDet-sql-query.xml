@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="hrm.dispatch.dispatchAppDet">
+
+<!--  신청 MAP -->
+		<select parameterType="map" resultType="cMap" id="getDispatchAppDet">
+
+				<![CDATA[
+				SELECT
+					  A.ENTER_CD
+					, A.SABUN
+					, A.APPL_YMD
+					, A.APPL_SEQ
+					, TO_CHAR(TO_DATE(A.DISPATCH_SYMD, 'YYYYMMDD') , 'YYYY-MM-DD') AS DISPATCH_SYMD
+					, TO_CHAR(TO_DATE(A.DISPATCH_EYMD, 'YYYYMMDD') , 'YYYY-MM-DD') AS DISPATCH_EYMD
+					, A.DISPATCH_ORG_CD
+					, A.DISPATCH_ORG_NM
+					, A.DISPATCH_REASON
+				FROM THRM581 A
+				, THRI103 B
+				WHERE A.ENTER_CD  = TRIM( #{ssnEnterCd} )
+					AND B.ENTER_CD = A.ENTER_CD
+					AND B.APPL_SEQ = A.APPL_SEQ
+					AND A.APPL_SEQ = TRIM( #{searchApplSeq} )
+				]]>
+
+
+		</select>
+
+		<update parameterType="map" id="saveDispatchAppDet">
+
+   					MERGE INTO THRM581 T
+                  	USING (
+						  	SELECT	  A.ENTER_CD
+									, A.SABUN
+                                    , A.APPL_YMD            -- 신청일자
+									, A.APPL_SEQ
+									, A.DISPATCH_SYMD		-- 파견시작일
+									, A.DISPATCH_EYMD		-- 파견종료일
+									, A.DISPATCH_ORG_CD		-- 파견지코드
+									, A.DISPATCH_ORG_NM		-- 파견지명
+                                    , A.DISPATCH_REASON         -- 파견사유
+                                    , A.ORD_TYPE_CD
+                                    , A.ORD_YMD
+							FROM
+								(
+									SELECT
+											TRIM(#{ssnEnterCd}) 			AS ENTER_CD
+											, TRIM( #{searchApplSabun} )					AS SABUN
+											, REPLACE( TRIM( #{searchApplYmd} ),'-','')	AS APPL_YMD
+											, TO_NUMBER( TRIM( #{searchApplSeq} ))		AS APPL_SEQ
+											, REPLACE( TRIM( #{dispatchSymd} ),'-','')	AS DISPATCH_SYMD
+											, REPLACE( TRIM( #{dispatchEymd} ),'-','')	AS DISPATCH_EYMD
+											, TRIM( #{dispatchOrgCd})						AS DISPATCH_ORG_CD
+											, TRIM( #{dispatchOrgNm})						AS DISPATCH_ORG_NM
+											, TRIM( #{dispatchReason})					AS DISPATCH_REASON
+											, 'J' AS ORD_TYPE_CD
+											, REPLACE( TRIM( #{dispatchSymd} ),'-','')	AS ORD_YMD
+									FROM   DUAL
+								) A
+								WHERE	1 = 1
+								AND	A.ENTER_CD IS NOT NULL
+								AND	A.SABUN IS NOT NULL
+								AND	A.APPL_YMD IS NOT NULL
+								AND	A.APPL_SEQ IS NOT NULL
+                           ) S
+                        ON (
+                               	   T.ENTER_CD	= S.ENTER_CD
+                               AND T.SABUN 		= S.SABUN
+                               AND T.APPL_YMD	= S.APPL_YMD
+                               AND T.APPL_SEQ	= S.APPL_SEQ
+                           )
+           			WHEN MATCHED THEN
+         				UPDATE SET    T.DISPATCH_SYMD 		= S.DISPATCH_SYMD
+         							, T.DISPATCH_EYMD      = S.DISPATCH_EYMD
+									, T.DISPATCH_ORG_CD		= S.DISPATCH_ORG_CD
+									, T.DISPATCH_ORG_NM		= S.DISPATCH_ORG_NM
+									, T.DISPATCH_REASON 	= S.DISPATCH_REASON
+									, T.ORD_YMD				= S.ORD_YMD
+									, T.CHKDATE       	= SYSDATE
+									, T.CHKID         	= #{ssnSabun}
+      				WHEN NOT MATCHED THEN
+               			INSERT
+               			(
+               				  T.ENTER_CD
+							, T.SABUN
+							, T.APPL_YMD
+							, T.APPL_SEQ
+							, T.DISPATCH_SYMD
+							, T.DISPATCH_EYMD
+							, T.DISPATCH_ORG_CD
+							, T.DISPATCH_ORG_NM
+							, T.DISPATCH_REASON
+							, T.ORD_TYPE_CD
+							, T.ORD_YMD
+							, T.CHKDATE
+							, T.CHKID
+               			)
+               			VALUES
+               			(
+               				  S.ENTER_CD
+							, S.SABUN
+							, S.APPL_YMD
+							, S.APPL_SEQ
+							, S.DISPATCH_SYMD
+							, S.DISPATCH_EYMD
+							, S.DISPATCH_ORG_CD
+							, S.DISPATCH_ORG_NM
+							, S.DISPATCH_REASON
+							, S.ORD_TYPE_CD
+							, S.ORD_YMD
+               				, SYSDATE
+               				, #{ssnSabun}
+               			)
+
+		</update>
+</mapper>
