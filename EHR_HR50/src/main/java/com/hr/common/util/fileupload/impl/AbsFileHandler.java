@@ -1427,10 +1427,20 @@ public abstract class AbsFileHandler implements IFileHandler {
 
 							//picture data  start
 							//String path    = request.getSession().getServletContext().getRealPath("/") + "/hrfile/"+session.getAttribute("ssnEnterCd")+"/picture/" + tsys201Map.get("sFileNm");
-							String path = (this.config.getDiskPath().length() == 0 ? ClassPathUtils.getClassPathHrfile() : this.config.getDiskPath() + "/")
-									+ session.getAttribute("ssnEnterCd")+"/picture/"+tsys201Map.get("sFileNm");
+							// String path = (this.config.getDiskPath().length() == 0 ? ClassPathUtils.getClassPathHrfile() : this.config.getDiskPath() + "/")
+							// 		+ session.getAttribute("ssnEnterCd")+"/picture/"+tsys201Map.get("sFileNm");
 
-							File imgFile =  new  File(path);
+							Path secureFilePath = null;
+							if(this.config.getDiskPath().isEmpty()) {
+								secureFilePath = SecurePathUtil.getSecurePath(ClassPathUtils.getClassPathHrfile(), session.getAttribute("ssnEnterCd").toString(), "picture", tsys201Map.get("sFileNm").toString());
+							} else {
+								secureFilePath = SecurePathUtil.getSecurePath(this.config.getDiskPath(), session.getAttribute("ssnEnterCd").toString(), "picture", tsys201Map.get("sFileNm").toString());
+							}
+
+							String securePath = secureFilePath.toString();
+
+
+							File imgFile =  new  File(securePath);
 							FileInputStream ifo = new FileInputStream(imgFile);
 							ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
